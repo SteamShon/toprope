@@ -1,8 +1,9 @@
 # Toprope
 
-**A correctness layer and software factory for the work between people.**
+**A correctness layer and software factory for any stateful domain where people and agents act.**
 
-Toprope captures a team's hidden workflow through an interview and turns it into a
+Toprope captures a domain, often a workflow that has only ever existed in people's heads,
+through an interview and turns it into a
 declared **world model**: objects, actions, a transition matrix and invariants. From that
 model it compiles working software that people and agents both use, and it verifies every
 allowed and denied state transition before anything is deployed. Every action and decision
@@ -13,9 +14,9 @@ is recorded as an event, so the model can keep improving.
 
 ---
 
-## Why
+## Why (where this started)
 
-Agents raised individual productivity, coding most of all. Organizational productivity did
+Toprope started from one problem, and it is the first one we test. Agents raised individual productivity, coding most of all. Organizational productivity did
 not follow. The bottleneck moved to the work **between** people: getting code into the
 product, or designing an experiment and moving a metric. That work runs on implicit, oral
 process: who may approve, what must be true first, when a result counts.
@@ -26,6 +27,27 @@ process: who may approve, what must be true first, when a result counts.
   find out after deployment.
 - **Decisions do not accumulate.** They are made in chats and meetings, so nobody can learn
   from them.
+
+## Where it fits, and where it does not
+
+The work between people is the starting point, not the boundary. Toprope applies wherever
+there is **state, allowed actions and rules**, whoever acts:
+
+| Who acts | Example |
+|---|---|
+| people ↔ people | approving and launching an experiment, shipping a change across teams |
+| people ↔ agents | an agent does the work, and people step in only at approval points |
+| agents ↔ agents | agent pipelines with no human in the loop, where the boundary and the record matter even more |
+| end users ↔ a product | the backend of a consumer or business product built on state transitions: bookings, orders, subscriptions |
+| one person | a personal tool with real states and rules |
+
+It fits poorly where there is little to declare: one-off generation with no state,
+open-ended creative work, and tasks whose success cannot be defined. Without a transition
+matrix and invariants, the harness has nothing to check.
+
+The research stays narrow even though the positioning is broad. The first domains are
+Toprope itself and an experiment lifecycle. Only ⑥ is specific to work between people.
+Claims ① to ⑤ are about any declared domain.
 
 ## The bet
 
