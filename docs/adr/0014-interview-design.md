@@ -11,12 +11,16 @@ about each cell would make ① fail on cost.
 ## Decision
 1. **Defaults first.** The drafter proposes defaults that the owner confirms once, instead
    of cell by cell. Examples:
-   - an action is `n/a` outside the states listed as its sources
+   - an action **applies only in** the states listed in its `applies_in` field (a field
+     this ADR adds to actions), and is `n/a` elsewhere
    - a role may perform an action only where its actor list says so
    - terminal states allow no state-changing action.
 
-   A default is an element like any other, with `source` and `status`. Cells it covers are
-   no longer `undecided`.
+   A default is an element like any other, with `source` and `status`. **Only a confirmed
+   default** decides cells, and it never overrides a cell that is explicitly declared,
+   including one explicitly declared `undecided`, or a cell that real attempts have hit.
+   Those cells are still asked about. Change reports count cells decided by defaults
+   separately from cells decided by explicit answers, so defaults cannot hide gaps.
 2. **Group cells into one question** when they share an outcome. For example, *"Once an
    experiment has ended, can anything still change its status?"* settles a whole row.
 3. **Prioritize** remaining questions by:

@@ -23,8 +23,12 @@ nearly free" (③) loses its meaning.
    - An invariant declares `scope: aggregate` or `scope: cross`.
    - Aggregate invariants are guarded at append (ADR-0012).
    - **Cross-aggregate invariants** (e.g. "at most one running experiment per surface") are
-     enforced through a declared **reservation**: a small generated aggregate that is
-     claimed before the transition and released after. The model checks this.
+     enforced through a declared **reservation**: a small generated aggregate. It is
+     claimed (by a generated saga) before the transition into the constrained states, and
+     **held for as long as the object stays in those states**. It is released by the
+     transition that leaves them, or by a compensating release if the claiming command
+     fails. The model and the harness check this, including races for the same
+     reservation (docs/semantics.md).
    - A cross invariant without a reservation is checked after the fact and raises an
      alarm. The compiler warns that it is not enforced.
 3. **Functions.**

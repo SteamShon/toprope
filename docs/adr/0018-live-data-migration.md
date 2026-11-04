@@ -26,5 +26,6 @@ straight into it.
    migration test.
 
 ## Consequences
-- Moves from "later" to M0b (built) and M2 (used for real).
+- The **in-flight check** is built in M0a, because M1's seeded changes include ones that strand
+  objects. **Migration plans** are built in M0b and used for real in M2.
 - Impact reports (ADR-0013) list stranded live objects next to affected tests.

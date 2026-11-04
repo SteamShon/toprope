@@ -37,13 +37,13 @@ adapter joins only for unattended workflows (M4). Semantics: [`semantics.md`](se
 
 | Context | Owns | Serves | First in |
 |---|---|---|---|
-| **Authoring** | sources, drafts, interview questions, provenance and status of every element | ① ② | M0 kernel, then self-compiled in M1 |
-| **Domain Model** | objects, links, actions (params, preconditions, effects, roles), versions | all | M0 |
-| **Change Check** | impact analysis first (dependency graph, affected set, impact report; ADR-0013); then, on the affected set only: structural, semantic-conflict, scenario-regression, log-replay and NL-conflict checks; preview build (ADR-0009) | ① | M0 |
-| **Domain Compiler** | domain → MCP, greenfield backend (domain API over the event store and projections), execution checks, **domain interface** (objects/fields/links/actions/glossary; versioned by diff, hashed per element) | ① ④ | M0 |
-| **Representation Compiler** | representation layers (defaults → base → host overlay) + interface → A2UI views, component/action catalog for generative UI. Rebuilt independently of the domain | ④ | M0 |
-| **Execution** | checks the matrix cell, roles and non-state preconditions on the projected state; applies effects; runs the **invariant guard** on the resulting state before appending (ADR-0012) | ③ ④ | M0 |
-| **Event Store** | event-sourced system of record (ADR-0012): domain events, decisions, denied attempts, exceptions, effect outcomes, domain changes; projections give current state; upcasters across versions; generated read-only query tools for agents | ① ③ ⑤ | M0 |
+| **Authoring** | sources, drafts, interview questions, provenance and status of every element | ① ② | M0a kernel, then self-compiled in M1 |
+| **Domain Model** | objects, links, actions (params, preconditions, effects, roles), versions | all | M0a |
+| **Change Check** | impact analysis first (dependency graph, affected set, impact report; ADR-0013); then, on the affected set only: structural, semantic-conflict, scenario-regression, log-replay and NL-conflict checks; preview build (ADR-0009) | ① | M0a |
+| **Domain Compiler** | domain → MCP, greenfield backend (domain API over the event store and projections), execution checks, **domain interface** (objects/fields/links/actions/glossary; versioned by diff, hashed per element) | ① ④ | M0a |
+| **Representation Compiler** | representation layers (defaults → base → host overlay) + interface → A2UI views, component/action catalog for generative UI. Rebuilt independently of the domain | ④ | M0b |
+| **Execution** | checks the matrix cell, roles and non-state preconditions on the projected state; applies effects; runs the **invariant guard** on the resulting state before appending (ADR-0012) | ③ ④ | M0a |
+| **Event Store** | event-sourced system of record (ADR-0012): domain events, decisions, denied attempts, exceptions, effect outcomes, domain changes; projections give current state; upcasters across versions; generated read-only query tools for agents (M0b) | ① ③ ⑤ | M0a |
 | **Proposal / Review** | log-mined model diffs; human decisions with their inputs | ⑤ | M4 |
 | **Handoff** | typed requests between domains via published domain interfaces | ⑥ | M5 |
 
@@ -58,7 +58,7 @@ are generated, and only the kernel stays hand-built.
 | `Drafter` | sources → proposed elements with source links | the user's agent (e.g. Claude Code) through the authoring MCP (ADR-0017) | Aegra workflow calling an LLM |
 | `Interviewer` | targeted questions on unknown or conflicting elements, `undecided` matrix cells and candidate invariants, asked in plain domain language: defaults first, grouped cells, prioritized, with a stop rule (ADR-0014) | the user's agent through the authoring MCP (ADR-0017) | Aegra workflow with HITL interrupts |
 | `DomainStore` | versioned domain models | YAML in repo | git-backed registry |
-| `EventStore` | append events (matrix, preconditions and invariants enforced at append); read streams; projections for current state (ADR-0012) | PostgreSQL in its own schema (may share Aegra's server) or SQLite for tests | EventStoreDB, Kafka-backed |
+| `EventStore` | append events (matrix, preconditions and invariants enforced at append); read streams; projections for current state (ADR-0012) | PostgreSQL in its own schema, or SQLite for tests | EventStoreDB, Kafka-backed |
 | `AgentSurface` | expose reads and actions to agents | generated MCP served by `toprope-server` (ADR-0017) | in-process (embedded), OpenAPI, LangGraph tools |
 | `HumanSurface` | expose objects and actions to people | compiled A2UI views rendered in React + CopilotKit; host-injected components via the renderer catalog; LLM generative UI for ad-hoc views, limited to the catalog and allowed actions (ADR-0008) | other generative-UI stacks, OpenDots |
 | `RepresentationStore` | versioned base representations and host overlays | YAML files | host-managed registry |
@@ -103,7 +103,7 @@ edited domain ──► diff vs. current version
 ```
 
 Iteration time (edit → validated preview) is a design constraint: the premise is that
-domains are found by many cheap iterations (P0). The compiler is incremental from M0 (ADR-0013). Impact
+domains are found by many cheap iterations (P0). The compiler is incremental from M0a (ADR-0013). Impact
 analysis is static, because every artifact and test is generated from the declaration. It
 selects conservatively. The deploy gate requires a passing result for every test at the
 current input hashes, mostly cache hits. A background full run checks that no affected test
@@ -130,11 +130,12 @@ action call ─► Execution: matrix + preconditions + invariants ─► append 
      │                     └──► append DeniedAttempt                    ▼
      └─ actor, thread_id, run_id ──────────────────────────► generated read-only MCP query tools
                                                                        │
-                       Aegra workflows (proposal engine, interviewer) ◄┘
+          the user's agents now; an optional runtime (proposal engine) from M4 ◄┘
 ```
 
-The core owns the event store. Aegra's threads and checkpoints are a separate stream of
-agent-execution records, linked to domain events by `thread_id` and `run_id`.
+The core owns the event store. Any runtime's own threads and checkpoints (e.g. Aegra's, from
+M4) are a separate stream of agent-execution records, linked to domain events by
+`thread_id` and `run_id`.
 
 ## Stack (ADR-0007, ADR-0017)
 

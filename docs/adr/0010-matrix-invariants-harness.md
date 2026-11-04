@@ -92,6 +92,10 @@ of the held-out gold scenarios, the post-deploy probes, and people (②). Held-o
 never part of the domain or the harness.
 
 ## Consequences
+
+> Note (ADR-0019): M0 is now split. M0a builds the model, Execution and MCP levels. The A2UI
+> view checks come in M0b.
+
 - The compiler's outputs are now MCP, A2UI views, the domain interface, and the harness.
 - M0 builds harness v0 at the model, Execution and MCP levels, plus A2UI message-level view
   checks. Browser end-to-end tests are added only for host-injected components (ADR-0008).
