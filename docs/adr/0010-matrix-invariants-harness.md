@@ -23,10 +23,16 @@ invariant against every generated surface.
   outcome is one of:
   - a target state, optionally per role
   - `deny` with a reason
-  - `n/a` (the action is not meaningful there)
+  - `n/a` (the action is not meaningful there). At runtime this **denies** with the
+    standard reason "not applicable when <state>", records a denied attempt, and is never
+    shown as an available action. Unlike `deny`, it is not turned into an interview
+    question.
   - `undecided`.
   The matrix is the single source for state-based preconditions. Action `preconditions` hold
   only conditions that do not depend on state (e.g. "at least one guardrail").
+- **Expression language.** Invariants need set membership and boolean combination, so this
+  ADR extends the `check` language (ADR-0004 / domain-schema) with `in`, `not in`, `and`,
+  `or`, `not` and list literals. Nothing else is added.
 - **Invariants** state what must hold in every reachable state (e.g. "a running experiment
   has an approver", "a decided experiment has a readout"). Each has an id, a check and a
   reason, with `source` and `status` like any other element.
@@ -58,7 +64,7 @@ invariant against every generated surface.
 |---|---|
 | **Cell tests** | For every (state, action, role) cell, take a small-world instance in that state, attempt the action, and expect the declared outcome (target state, or a denial with its reason). Every cell is covered by construction. |
 | **Invariant checks** | After every step of every test, check every invariant. |
-| **Bounded exploration** | Stateful property-based exploration of action sequences over the small world, up to a depth bound and a budget (first adapter: Hypothesis stateful testing). It looks for invariant violations and cross-surface disagreements. A counterexample is reported as a minimal flow in domain terms, which the author can keep as a new example. |
+| **Bounded exploration** | Stateful property-based exploration of action sequences over the small world, bounded by depth and by a **fixed number of examples with a fixed seed**, never by wall-clock time, so a run is reproducible (first adapter: Hypothesis stateful testing). It looks for invariant violations and cross-surface disagreements. A counterexample is reported as a minimal flow in domain terms, which the author can keep as a new example. |
 | **Example flows** | The expert's multi-step flows (`do` and `read` steps) run as written. |
 
 Every part runs at **every level**: the model interpreter, Execution (real store and event

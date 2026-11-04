@@ -33,7 +33,9 @@ discovered only after deployment.
   - natural-language conflict: LLM-based, reported as warnings only
 
   Every change also gets a **preview build** (generated MCP and UI on a copy of the state).
-- Domains carry **scenarios** (given / when / expect) as their own tests.
+- Domains carry **scenarios** as their own tests. (The format was superseded by ADR-0010:
+  a scenario is a multi-step flow with `given` and `steps`. "Scenario regression" means
+  running them against the model.)
 - M1's primary comparison is **natural-language skill vs. declaration** on the same frozen
   sequence of change requests with seeded problems. Metrics are pre-deploy recall and
   precision, problems found after deploy, and iteration time. The NL arm gets an LLM
