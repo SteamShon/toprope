@@ -116,7 +116,11 @@ class Outbox:
         try:
             self.ex.store.append(RESOLUTION_PREFIX + p.id, 0, [ev])
         except ConcurrencyError:
-            pass    # another dispatcher resolved it first; its record stands
+            # Another dispatcher resolved it first: its record stands, and is what we report.
+            stored = self.resolution(p.id)
+            if stored is not None:
+                etype = stored.type
+                detail = {k: stored.payload.get(k) for k in ("status", "code", "reason") if k in stored.payload}
         return {"id": p.id, "result": etype, **detail}
 
 

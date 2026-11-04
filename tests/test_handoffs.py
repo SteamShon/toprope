@@ -212,3 +212,22 @@ def test_plus_joins_strings_with_strings_and_integers(src, want):
 def test_plus_refuses_ambiguous_joins(src):
     with pytest.raises(EvalError):
         evaluate(parse(src), Env({}))
+
+
+def test_a_lost_resolution_race_reports_the_stored_outcome():
+    from toprope.types import Event
+    sender, receiver = pair(transport=False)
+    assert sender.submit("t-owen", "approve_version", "V1", idempotency_key="k1").ok
+    (p,) = Outbox(sender).pending()
+
+    class OtherDispatcherWins(LocalTransport):
+        def deliver(self, *a):
+            out = super().deliver(*a)
+            sender.store.append("handoff:" + p.id, 0, [Event("HandoffFailed", "handoff:" + p.id, "Version", None, None,
+                                                                {"code": "other", "reason": "x"}, kind="handoff")])
+            return out
+
+    sender.transport = OtherDispatcherWins({"delivery": receiver})
+    (r,) = sender.dispatch()
+    assert r["result"] == "HandoffFailed" and r["code"] == "other"
+    assert Outbox(sender).resolution(p.id).type == "HandoffFailed"

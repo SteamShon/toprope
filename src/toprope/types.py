@@ -56,7 +56,7 @@ class Event:
     actor: dict[str, Any] | None
     payload: dict[str, Any]
     kind: Literal["domain", "decision", "attempt", "outbox", "handoff"] = "domain"
-    version: int | None = None  # set on append for domain/decision events
+    version: int | None = None  # set on append (every appended kind; attempts have none)
     domain_version: int | None = None
     on_behalf_of: dict[str, Any] | None = None
     grant: str | None = None
