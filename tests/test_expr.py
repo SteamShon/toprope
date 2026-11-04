@@ -96,3 +96,31 @@ def test_parser_only_raises_parse_error(s):
 def test_arithmetic_and_order_match_python(a, b):
     assert ev(f"{a} - {b} < {b}") is (a - b < b)
     assert ev(f"{a} + {b} >= {a}") is (a + b >= a)
+
+
+@pytest.mark.parametrize("src", [
+    "not target.locked",                    # null is not a boolean: fail closed
+    "target.locked or true",
+    "actor.id not in target.blocked",      # null list: error, not "empty"
+    "target.status in 'running'",          # strings are not lists
+    "1 in target.planned_days",            # a number is not a list
+])
+def test_fail_closed_on_null_and_non_lists(src):
+    with pytest.raises(EvalError):
+        ev(src)
+
+
+def test_null_membership_on_left_is_false_not_error():
+    assert ev("target.nope in ['a']") is False
+
+
+@pytest.mark.parametrize("value", ["2026-11-01T00:00:00Z", "2026-11-01", "2026-11-01T09:00:00+09:00"])
+def test_days_since_accepts_aware_naive_and_dates(value):
+    from datetime import date
+    v = date(2026, 11, 1) if value == "2026-11-01" else value
+    assert ev("days_since(target.t) > 18", {"t": v}) is True
+
+
+def test_days_since_bad_string_is_eval_error():
+    with pytest.raises(EvalError):
+        ev("days_since(target.t) > 1", {"t": "yesterday"})

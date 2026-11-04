@@ -10,7 +10,10 @@ from typing import Any
 
 from .models import Domain
 
-TEXT_KEYS = {"description", "reason", "quote", "ref", "deny"}  # deny holds the denial reason text
+# Keys that hold wording or provenance, not shape. A change confined to these is a patch.
+# `deny` holds the denial reason; `source`/`status` are provenance (confirming an element is
+# not an interface change). Note: `ref` is NOT here: Param.ref names an object type.
+TEXT_KEYS = {"description", "reason", "deny", "source", "status"}
 
 
 def _canon(obj: Any) -> str:
@@ -49,7 +52,14 @@ def interface(d: Domain) -> dict[str, Element]:
     for name, link in d.links.items():
         els.append(_el(f"link:{name}", dump(link)))
     for name, a in d.actions.items():
-        els.append(_el(f"action:{name}", dump(a)))
+        # Params and preconditions are their own elements, so adding one is "added" (minor),
+        # not a shape change of the action (ADR-0008). Effects stay in the action: changing
+        # what an action does is a shape change (major), conservatively.
+        els.append(_el(f"action:{name}", {k: v for k, v in dump(a).items() if k not in ("params", "preconditions")}))
+        for p, spec in a.params.items():
+            els.append(_el(f"param:{name}.{p}", dump(spec)))
+        for pre in a.preconditions:
+            els.append(_el(f"precondition:{name}.{pre.id}", dump(pre)))
     for obj, tr in d.transitions.items():
         for state, cells in tr.matrix.items():
             for action, cell in cells.items():

@@ -8,10 +8,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..expr import ParseError, Path, parse, paths_read
-from .models import ActorRule, Deny, Domain, Target
+from .models import ActorRule, ByRole, Deny, Domain, Target
 
 RESERVED_CELLS = {"n/a", "undecided"}
-ROOTS = {"target", "actor", "params", "new", "now"}
+ROOTS = {"target", "actor", "params", "new"}
 
 
 @dataclass(frozen=True)
@@ -92,11 +92,13 @@ def validate_domain(d: Domain) -> list[Issue]:
         for p in a.preconditions:
             issues += _check_expr(d, p.check, f"{where}.preconditions.{p.id}", a.object_type, set(a.params))
         for e in a.effects:
-            for key in (e.set or {}):
+            for key, value in (e.set or {}).items():
                 attr = key.split(".", 1)[1] if key.startswith(("target.", "new.")) else key
                 msg = _resolve(d, a.object_type, tuple(attr.split("."))) if a.object_type in d.objects else None
                 if msg:
                     add(Issue("unknown-path", f"{where}.effects", f"{key}: {msg}"))
+                if isinstance(value, str):  # effect values are check-language expressions
+                    issues += _check_expr(d, value, f"{where}.effects.{key}", a.object_type, set(a.params))
         states = _states(d, a.object_type)
         if a.applies_in and states is not None:
             for s in a.applies_in:
@@ -124,12 +126,25 @@ def validate_domain(d: Domain) -> list[Issue]:
                     add(Issue("unknown-action", cw, f"unknown action '{action}'"))
                 elif d.actions[action].object_type != obj:
                     add(Issue("wrong-object", cw, f"action '{action}' targets {d.actions[action].object_type}, not {obj}"))
-                target = cell.to if isinstance(cell, Target) else (None if isinstance(cell, Deny) else cell)
-                if target is not None and target not in RESERVED_CELLS and target not in states:
-                    add(Issue("unknown-state", cw, f"target state '{target}' is not in {sorted(states)}"))
+                if isinstance(cell, ByRole):
+                    targets = [c for c in cell.by_role.values() if isinstance(c, str)]
+                    for role in cell.by_role:
+                        if roles and role not in roles:
+                            add(Issue("unknown-role", cw, f"unknown role '{role}'"))
+                else:
+                    targets = [cell.to] if isinstance(cell, Target) else ([] if isinstance(cell, Deny) else [cell])
+                for target in targets:
+                    if target not in RESERVED_CELLS and target not in states:
+                        add(Issue("unknown-state", cw, f"target state '{target}' is not in {sorted(states)}"))
         missing = [s for s in sorted(states) if s not in tr.matrix]
         if missing:
             add(Issue("missing-row", where, f"no matrix row for states {missing} (treated as undecided)", "warning"))
+        obj_actions = sorted(n for n, a in d.actions.items() if a.target == obj)
+        for state in sorted(set(tr.matrix) & states):
+            absent = [a for a in obj_actions if a not in tr.matrix[state]]
+            if absent:
+                add(Issue("missing-cell", f"{where}.matrix.{state}",
+                          f"no cell for {absent} (treated as undecided: denied and listed)", "warning"))
 
     for inv in d.invariants:
         where = f"invariants.{inv.id}"

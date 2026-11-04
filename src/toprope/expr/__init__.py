@@ -13,10 +13,13 @@ Grammar (lowest to highest precedence)::
     primary    := NUMBER | STRING | "true" | "false" | "null" | NAME
                 | NAME "(" [expr ("," expr)*] ")" | "[" [expr ("," expr)*] "]" | "(" expr ")"
 
-Paths start at a root name (`target`, `actor`, `params`, `new`, ...). A missing attribute
+Paths start at a root name (`target`, `actor`, `params`, `new`). A missing attribute
 evaluates to `null`. Functions: `count(x)`, `exists(x)`, `now()`, `days_since(t)`.
-Evaluation is pure and never calls into Python's `eval`. Type errors raise `EvalError`;
-callers treat a check that raises as failed (fail closed).
+Evaluation is pure and never calls into Python's `eval`.
+
+Fail closed: `and`/`or`/`not` accept only booleans (null is an error), `in`/`not in` need a
+list on the right (a null list is an error), and type errors raise `EvalError`. Callers
+treat a check that raises as failed.
 """
 
 from .ast import Call, Compare, ListLit, Literal, Logical, Not, Path, Arith, Neg, Node

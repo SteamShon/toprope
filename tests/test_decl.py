@@ -101,3 +101,57 @@ def test_interface_versioning(raw):
 
 def test_yaml12_booleans():
     assert load_yaml("on: Experiment\nyes: 1\nflag: true") == {"on": "Experiment", "yes": 1, "flag": True}
+
+
+def test_yaml12_scalars_and_duplicate_keys():
+    assert load_yaml("a: 12:30\nb: 0o17\nc: 0x1F") == {"a": "12:30", "b": 15, "c": 31}
+    with pytest.raises(Exception):
+        load_yaml("actions:\n  a: 1\n  a: 2\n")
+
+
+def test_param_needs_exactly_one_kind(raw):
+    raw["actions"]["approve_experiment"]["params"]["note"] = {}
+    with pytest.raises(ValidationError):
+        Domain.model_validate(raw)
+
+
+def test_by_role_cells(raw):
+    raw["transitions"]["Experiment"]["matrix"]["draft"]["approve_experiment"] = {
+        "by_role": {"approver": "approved", "pm": {"deny": "PMs request approval instead."}}}
+    assert errors(Domain.model_validate(raw)) == []
+    raw["transitions"]["Experiment"]["matrix"]["draft"]["approve_experiment"] = {"by_role": {"ghost": "nowhere"}}
+    assert {"unknown-role", "unknown-state"} <= {i.code for i in errors(Domain.model_validate(raw))}
+
+
+def test_missing_cell_is_warned(raw):
+    del raw["transitions"]["Experiment"]["matrix"]["draft"]["launch_experiment"]
+    warns = [i for i in validate_domain(Domain.model_validate(raw)) if i.code == "missing-cell"]
+    assert len(warns) == 1 and "launch_experiment" in warns[0].message
+
+
+def test_effect_values_are_checked_expressions(raw):
+    raw["actions"]["launch_experiment"]["effects"] = [{"set": {"target.started_at": "nwo()"}}]
+    assert errors(Domain.model_validate(raw)) == []  # unknown functions are runtime errors, not paths
+    raw["actions"]["launch_experiment"]["effects"] = [{"set": {"target.started_at": "nwo"}}]
+    assert {i.code for i in errors(Domain.model_validate(raw))} == {"unknown-root"}
+
+
+def test_now_is_a_call_not_a_root(raw):
+    raw["invariants"][1]["check"] = "target.started_at == now"
+    assert "unknown-root" in {i.code for i in errors(Domain.model_validate(raw))}
+
+
+def test_interface_bumps_follow_adr_0008(raw):
+    old = interface(Domain.model_validate(raw))
+    ref = copy.deepcopy(raw)
+    ref["actions"]["approve_experiment"]["params"]["note"] = {"ref": "Metric", "optional": True}
+    assert diff_interface(old, interface(Domain.model_validate(ref))).bump == "major"
+    conf = copy.deepcopy(raw)
+    conf["links"]["hypothesis"]["status"] = "confirmed"
+    assert diff_interface(old, interface(Domain.model_validate(conf))).bump == "patch"
+    add = copy.deepcopy(raw)
+    add["actions"]["approve_experiment"]["params"]["tag"] = {"type": "string", "optional": True}
+    add["actions"]["approve_experiment"]["preconditions"].append(
+        {"id": "named", "check": "exists(target.name)", "reason": "Name it first."})
+    d = diff_interface(old, interface(Domain.model_validate(add)))
+    assert d.bump == "minor" and d.added == ["param:approve_experiment.tag", "precondition:approve_experiment.named"]

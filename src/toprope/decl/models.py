@@ -64,6 +64,12 @@ class Param(Strict):
     many: bool = False
     optional: bool = False
 
+    @model_validator(mode="after")
+    def _one_kind(self) -> Param:
+        if sum(x is not None for x in (self.type, self.enum, self.ref)) != 1:
+            raise ValueError("a param has exactly one of `type`, `enum` or `ref`")
+        return self
+
 
 class Precondition(Provenance):
     id: str
@@ -113,8 +119,15 @@ class Target(Provenance):
     to: str
 
 
-# A matrix cell: "<state>" | "n/a" | "undecided" | {deny: reason} | {to: state, source, status}
-Cell = Union[str, Deny, Target]
+class ByRole(Provenance):
+    """Per-role outcome: {by_role: {approver: approved, eng: {deny: "..."}}}. Roles not listed
+    are `n/a` for this cell (docs/semantics.md step 5 resolves the actor's role)."""
+
+    by_role: dict[str, Union[str, Deny]]
+
+
+# A matrix cell: "<state>" | "n/a" | "undecided" | {deny: reason} | {to: state, ...} | {by_role: {...}}
+Cell = Union[str, Deny, Target, ByRole]
 
 
 class Transitions(Strict):

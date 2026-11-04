@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime, timezone
 from typing import Any
 
 from .ast import Arith, Call, Compare, ListLit, Literal, Logical, Neg, Node, Not, Path
@@ -36,16 +36,26 @@ def _get(value: Any, name: str) -> Any:
     return getattr(value, name, None)
 
 
+def _as_utc(t: datetime) -> datetime:
+    return t.replace(tzinfo=timezone.utc) if t.tzinfo is None else t.astimezone(timezone.utc)
+
+
 def _days_since(env: Env, t: Any) -> Any:
     if t is None:
         return None
     if env.clock is None:
         raise EvalError("days_since() needs a clock")
     if isinstance(t, str):
-        t = datetime.fromisoformat(t)
+        try:
+            t = datetime.fromisoformat(t)
+        except ValueError as e:
+            raise EvalError(f"days_since(): not an ISO datetime: {t!r}") from e
+    elif isinstance(t, date) and not isinstance(t, datetime):
+        t = datetime(t.year, t.month, t.day)
     if not isinstance(t, datetime):
         raise EvalError(f"days_since() expects a datetime, got {type(t).__name__}")
-    return (env.clock() - t).total_seconds() / 86400
+    # Naive times are UTC, so aware and naive values compare consistently.
+    return (_as_utc(env.clock()) - _as_utc(t)).total_seconds() / 86400
 
 
 def _call(node: Call, env: Env) -> Any:
@@ -112,12 +122,14 @@ def evaluate(node: Node, env: Env) -> Any:
             if op == "!=":
                 return a != b
             if op in ("in", "not_in"):
-                if b is None:
-                    found = False
-                elif isinstance(b, (list, tuple, set, frozenset, str)):
+                # The right side must be a list. A null list is an error, not "empty", so a
+                # missing list never silently allows (fail closed). Use count()/exists() to be explicit.
+                if not isinstance(b, (list, tuple)):
+                    raise EvalError(f"'{op.replace('_', ' ')}' expects a list, got {type(b).__name__}")
+                try:
                     found = a in b
-                else:
-                    raise EvalError(f"'in' expects a list, got {type(b).__name__}")
+                except TypeError as e:
+                    raise EvalError(f"cannot test membership of {type(a).__name__}") from e
                 return found if op == "in" else not found
             if a is None or b is None:
                 raise EvalError(f"cannot compare null with {op}")
@@ -129,8 +141,8 @@ def evaluate(node: Node, env: Env) -> Any:
 
 
 def _truth(v: Any) -> bool:
+    # Only booleans are truthy/falsy. Null is an error, so `not target.locked` on a missing
+    # `locked` fails the check instead of allowing it (fail closed).
     if isinstance(v, bool):
         return v
-    if v is None:
-        return False
-    raise EvalError(f"expected a boolean, got {type(v).__name__}")
+    raise EvalError(f"expected a boolean, got {'null' if v is None else type(v).__name__}")
