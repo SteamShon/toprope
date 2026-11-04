@@ -6,7 +6,7 @@ several links, but a milestone ends with a verdict. Budget is ~10h+/week. Dates 
 | Milestone | Link | Question | Target |
 |---|---|---|---|
 | M0a | none (enabler) | Thin slice: declaration + semantics, model interpreter, Execution, event store, `toprope-server` MCP and authoring MCP, source readers, world map, harness (model, Execution, MCP), change check incl. log replay and in-flight check, incremental analysis | 4–5 weeks |
-| M1 | ① ② (self) | Model Toprope's own Authoring and Delivery workflows by iterating, joined by a typed handoff (ADR-0022). Do compile-time checks catch what natural-language skills and structured specs without a compiler cannot? | 4–5 weeks (re-estimated in M1's spec PR) |
+| M1 | ① ② ⑥ (self; ⑥ partial via the handoff) | Model Toprope's own Authoring and Delivery workflows by iterating, joined by a typed handoff (ADR-0022). Do compile-time checks catch what natural-language skills and structured specs without a compiler cannot? | 4–5 weeks (re-estimated in M1's spec PR) |
 | M0b | none (enabler) | Surfaces and effects: representation compiler, `toprope-shell` (A2UI + CopilotKit), UI-level harness, GitHub brownfield adapter, embedded shape, migration plans, query tools, timers and functions; regenerate the self domain's UI | 3–4 weeks |
 | M2 | ① ② ③ (dogfood) | Does the same hold on another domain, and does the harness-passing software work in real use? | 3–4 weeks |
 | M3 | ④ | Do people and agents act on the same meaning through the capsule? | 3 weeks |
@@ -14,8 +14,8 @@ several links, but a milestone ends with a verdict. Budget is ~10h+/week. Dates 
 | M5 | ⑥ (partial) | Do typed handoffs between domains preserve intent? Write-up, go public | 3 weeks |
 
 **Order rationale (ADR-0019):** M1 needs only the thin slice, so M1 runs before the
-surfaces and effects are built. That brings the first verdict to about 8–9 weeks, down from
-about 14. This is a target at about 10 h/week, not a commitment.
+surfaces and effects are built. That brings the first verdict to about 9–10 weeks (M0a 4–5 + M1 4–5,
+after ADR-0022 added Delivery), down from about 15. This is a target at about 10 h/week, not a commitment.
 
 **Overrun rule:** if M0a runs past 6 weeks, cut it to what M1 strictly needs (semantics,
 model interpreter, Execution, event store, MCP, authoring MCP, model and Execution-level
@@ -75,6 +75,9 @@ so it is clear what was hand-built and what was generated.
     grouped cells, priorities), answers and confirmations, so the user's own agent runs the
     interview. The authoring UI is CLI/YAML until self-compile produces one. This limit is
     accepted for M1, where the researcher is the only author.
+14. **Handoffs (ADR-0022)**: the `handoffs` construct, delivered through an outbox after the
+    sender's append, plus a **local deploy adapter** (preview → deploy to a local
+    environment), so the M1 Delivery domain has real effects to model.
 
 Done when, on the toy domain:
 - every decided cell is covered at every level
@@ -85,7 +88,7 @@ Done when, on the toy domain:
   harness ≤ 30 s, preview ≤ 60 s)
 - the full run finds no selection miss.
 
-## M1: Self-compile and safe iteration (① ②, 3–4 weeks)
+## M1: Self-compile and safe iteration (① ②, ⑥ partial, 4–5 weeks)
 
 See [`experiments/M1-self-compile.md`](experiments/M1-self-compile.md).
 
@@ -100,9 +103,10 @@ See [`experiments/M1-self-compile.md`](experiments/M1-self-compile.md).
 
 M1 runs on the M0a thin slice only.
 
-Exit: verdicts on H-Iterate and H-Fidelity for the self domain, and a generated authoring
-tool v1. In M1 the tool is the generated authoring MCP, driven by the user's agent, plus
-CLI/YAML. Its UI is generated from the same declaration after M0b.
+Exit: verdicts on H-Iterate and H-Fidelity for both self domains, an observation on the
+handoff (⑥ partial), and generated authoring and delivery tools v1. In M1 the tools are the
+generated MCPs, driven by the user's agent, plus CLI/YAML. Their UIs are generated from the
+same declarations after M0b.
 
 Kill/pivot: if the NL arm with LLM review catches about as much as the compiler, the
 compiler's value narrows to speed and previews, and this is recorded. If the self domain

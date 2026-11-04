@@ -1,6 +1,6 @@
 # M1: Self-compile, and safe iteration vs. natural-language skills
 
-Link: ① iterate safely, ② model is right. Status: design draft.
+Link: ① iterate safely, ② model is right, ⑥ (partial, the handoff). Status: design draft.
 
 **Freeze status.** The metrics and verdict rules below are a **draft proposed by the
 assistant**. The researcher reviews, edits and freezes them in their own commit, together
@@ -50,7 +50,7 @@ iteration:
 | S1 System | the M0 kernel code and schema | agent drafts |
 | S2 Records | this repository's docs, ADRs, notes, and session transcripts | agent enriches, quoting sources |
 | S3 Interview | the researcher as domain owner | agent asks, human answers |
-| S4 Use | the generated authoring tool, used on one small change | human and agent |
+| S4 Use | the generated authoring and delivery tools, used on one small change | human and agent |
 
 Every element carries `source` and `status`. Agents write only `proposed`; only the human
 confirms. The authoring tool used in S4 and handed to M2 is generated from the model.
@@ -72,6 +72,12 @@ the sanity check for P0 (was the first draft already right?).
   This separates the effect of having a structured spec from the effect of the compiler.
 - **Toprope arm.** The same change is applied to the declaration. Pre-deploy check: the
   compiler's change checks plus a preview build.
+
+All three arms carry **both domains and the handoff contract**. The NL skill describes
+Delivery's request interface in prose, and the structured spec includes the `handoffs`
+declaration. Whether handoff-breaking changes are part of the seeded mix is the researcher's
+call when freezing the change list. If they are, recall is reported with and without them,
+because only the Toprope arm has a compiled interface to break.
 
 ### Change requests (researcher-written, frozen in M0 before the checks are built)
 
@@ -122,7 +128,7 @@ counts as **found after deploy**. One that never shows up counts as **silent**.
 Templates, the freeze procedure and the `verify` check:
 [`experiments/m1/`](../../experiments/m1/README.md).
 
-- About 30 scenario questions about the authoring workflow, half held out. Examples:
+- About 30 scenario questions per self domain (Authoring, Delivery, and the handoff between them), half held out. Examples:
   - "Can an agent confirm its own drafted precondition?"
   - "What happens to an element no source supports?"
   - "When does a representation-only change rebuild MCP?"
@@ -147,8 +153,9 @@ Templates, the freeze procedure and the `verify` check:
 | Interview efficiency (ADR-0014) | questions asked; cells decided per question; share of cells decided by confirmed defaults | ① ② |
 | Matrix completeness | share of (state, action) cells decided rather than `undecided`; cells decided through the interview vs. drafted from sources | ② |
 | Harness findings | invariant violations and parity failures found before deploy, and by which part (cell tests, exploration, flows) | ① |
-| Generated vs hand-built | share of the authoring tool that is generated; hand edits to generated code | self-compile |
-| Cost | tokens, $, human minutes per stage and per change | all |
+| Generated vs hand-built | share of each tool (authoring, delivery) that is generated; hand edits to generated code | self-compile |
+| Handoff (⑥ partial) | handoff-breaking changes caught at compile time; requests whose intent survives (checked by gold questions) | ⑥ |
+| Cost | tokens, $, human minutes per stage and per change, **per domain** | all |
 
 ## Verdict rules
 
@@ -169,7 +176,7 @@ Templates, the freeze procedure and the `verify` check:
   points, or precision of 50–70%. It is reported as inconclusive with the numbers, and is
   not read as support. M2 repeats the comparison.
 - **Supports ② (self)**: held-out accuracy ≥ 80%, unsupported rules ≤ 10%, total human time
-  ≤ 4 h for Phase A, and accuracy rising over iterations (the final accuracy is higher than
+  ≤ 4 h **per domain** for Phase A, and accuracy rising over iterations (the final accuracy is higher than
   the first draft's).
 - **Weakens ② (self)**: accuracy plateaus below 70%, or unsupported rules stay above 20%
   after S3.

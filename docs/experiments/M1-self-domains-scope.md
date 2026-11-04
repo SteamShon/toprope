@@ -18,8 +18,10 @@ interview questions; recording answers; confirming or rejecting elements; markin
 compiling a candidate domain version; reading the change report and world-map diff; deciding
 to approve a version; proposals mined from the event history (⑤, later).
 
+**Also in scope:** representation-only changes, as a light path (ADR-0008).
+
 **Out of scope:** running a domain's own work (that belongs to each domain); deploying
-(Delivery); representation-only changes, which stay in Authoring but are light (ADR-0008).
+(Delivery).
 
 **Candidate object types (vocabulary only):** Source, DraftElement (proposal), Question,
 Answer, Confirmation, Unknown, DomainVersion, ChangeReport, Proposal, Decision.
@@ -51,21 +53,22 @@ hosts).
 
 ## The handoff contract (Authoring → Delivery)
 
-- **Trigger:** Authoring approves a `DomainVersion`.
-- **Request:** Authoring calls Delivery's published `request_delivery`. The request carries
-  the domain id, the version, the interface version, the change report reference, the
-  target environment, and the approver.
+- **Trigger:** Authoring approves a domain version or a representation version.
+- **Request:** Authoring calls a request action that Delivery publishes. What the request
+  carries is for the researcher to confirm. The draft: domain id, domain version,
+  representation version (a released UI is the pair, ADR-0008), interface version, change
+  report reference, target environment, approver.
 - **Contract:** Delivery publishes this action and its params through its domain interface
-  (ADR-0008, ADR-0023). Authoring can only send what that interface accepts. A change to
+  (ADR-0008, schema v1). Authoring can only send what that interface accepts. A change to
   the interface that removes or renames something is a major bump and breaks the handoff at
   compile time.
-- **Feedback:** Delivery's outcome (`verified`, `rolled back`, `rejected`) is readable by
-  Authoring through query tools, and can become evidence for proposals (⑤).
+- **Feedback:** Delivery's outcome is readable by Authoring, and can become evidence for
+  proposals (⑤). Which outcomes exist is a Phase A output.
 
 ## Bootstrap (ADR-0022)
-The hand-built kernel pipeline stays the source of truth for deploys until the generated
-Delivery tool passes its harness. After that, the kernel pipeline becomes Delivery's effect
-adapter, and its deploy gate stays as the floor.
+The hand-built kernel pipeline stays the source of truth for deploys until the researcher
+signs off the switch-over. After that, the kernel pipeline becomes Delivery's effect
+adapter, and the kernel keeps a fixed floor of deploy rules that no declaration can weaken.
 
 ## For the researcher to decide when confirming
 - Keep, rename or drop the candidate object types (they only seed the interview vocabulary).

@@ -21,14 +21,21 @@ split from the prior work had disappeared.
    delivery request to Delivery through Delivery's published domain interface. This is the
    first typed handoff, so part of ⑥ (H-Handoff) can be observed inside the self domains
    before M5.
-3. **Delivery rules become declared state.** Examples: a build with a failing harness, taint
-   or stranded objects without a plan cannot be deployed. They get a matrix, invariants, the
-   harness and event history like any other domain.
-4. **Bootstrap, staged.** Until the generated Delivery tool passes its own harness, the
-   hand-built kernel pipeline (M0a/M0b) stays the source of truth for deploys. After that,
-   deploys go through the generated Delivery domain, and the kernel pipeline becomes its
-   effect adapter. The kernel's deploy gate is never removed, so a broken Delivery
-   declaration cannot deploy itself (no self-approval, ADR-0016).
+3. **Delivery rules become declared state.** They get a matrix, invariants, the harness and
+   event history like any other domain. Which rules they are is an output of M1 Phase A, not
+   of this ADR.
+4. **Bootstrap, staged.** Until the switch-over (below), the hand-built kernel pipeline stays
+   the source of truth for deploys. After it, deploys go through the generated Delivery
+   domain, and the kernel pipeline becomes its effect adapter.
+   - **A fixed floor outside the loop.** The kernel keeps a small set of deploy rules in
+     code, which no Delivery declaration can weaken: a harness pass at current hashes, no
+     taint, no stranded objects without a tested migration plan, and a person approving.
+     A harness generated from a Delivery declaration proves conformance to that
+     declaration, not that it is right, so the floor cannot live in the declaration.
+   - **Changes to the Delivery domain itself** are deployed only through the floor, with
+     the researcher's sign-off. Delivery never approves its own changes.
+   - **Switch-over** happens when the researcher signs off after the generated Delivery tool
+     passes its harness and the frozen M1 gold and probe checks for Delivery.
 5. **Scope is the researcher's, the rules are the experiment's.** The boundary, candidate
    object types and the handoff contract are written down before M1 (assistant drafts, the
    researcher confirms): `docs/experiments/M1-self-domains-scope.md`. Matrices, invariants
@@ -37,6 +44,6 @@ split from the prior work had disappeared.
 ## Consequences
 - M1 grows: two Phase A builds, and the change sequence and gold set cover both domains (the
   researcher's call when freezing). The M1 estimate is revisited in M1's spec PR.
-- The language needs a handoff construct, defined in the schema v1 (ADR-0023).
+- The language needs a handoff construct, defined in schema v1 (`docs/domain-schema.md`).
 - The kernel's change check and deploy gate (M0a/M0b) are still built as code. They are the
   bootstrap, and later the effect adapter of the Delivery domain.
