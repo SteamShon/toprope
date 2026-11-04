@@ -85,6 +85,7 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--public-url", help="URL clients use to reach this server (default http://HOST:PORT)")
     ap.add_argument("--no-seed", action="store_true", help="do not load the declaration's fixtures")
+    ap.add_argument("--harness-report", help="harness report JSON (toprope-harness --json) shown in the world map")
     args = ap.parse_args(argv)
 
     domain = load_domain(args.domain)
@@ -97,17 +98,22 @@ def main(argv: list[str] | None = None) -> None:
     if not args.no_seed:
         ex.seed_world()
 
+    import json
+    harness = None
+    if args.harness_report:
+        with open(args.harness_report) as f:
+            harness = json.load(f)
     from . import build_server
     if args.transport == "stdio":
         token = os.environ.get("TOPROPE_TOKEN")
         if ex.identity.resolve(token) is None:
             print("error: TOPROPE_TOKEN is missing or does not resolve to a caller", file=sys.stderr)
             raise SystemExit(1)
-        build_server(ex, lambda: token).run("stdio")
+        build_server(ex, lambda: token, harness=harness).run("stdio")
     else:
         from .http import run_http
         issuer = os.environ.get("TOPROPE_JWT_ISSUER") if args.identity == "jwt" else None
-        run_http(ex, args.host, args.port, args.public_url, issuer)
+        run_http(ex, args.host, args.port, args.public_url, issuer, harness=harness)
 
 
 if __name__ == "__main__":

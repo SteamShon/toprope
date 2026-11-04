@@ -20,6 +20,7 @@ postgres = [
 [project.scripts]
 toprope-server = "toprope.adapters.mcp.cli:main"
 toprope-harness = "toprope.harness.cli:main"
+toprope-worldmap = "toprope.worldmap.cli:main"
 
 [dependency-groups]
 dev = [

@@ -98,8 +98,12 @@ class _RawArgs(FuncMetadata):
         return data
 
 
-def build_server(ex: Execution, credentials: Credentials, **server_kwargs: Any) -> MCPServer:
+def build_server(ex: Execution, credentials: Credentials, *, harness: dict[str, Any] | None = None,
+                 **server_kwargs: Any) -> MCPServer:
+    """`harness` is a harness report (JSON) whose per-edge results the world map shows."""
+    from ...worldmap import build_world_map, how_to_reach as reach
     d = ex.d
+    wmap = build_world_map(d, harness)
     for name, a in d.actions.items():
         clash = RESERVED_PARAMS & set(a.params)
         if clash:
@@ -151,7 +155,29 @@ def build_server(ex: Execution, credentials: Credentials, **server_kwargs: Any) 
                             for n, o in d.objects.items()},
                 "actions": {n: describe_action(d, n, a) for n, a in d.actions.items()}}
 
-    for fn in (get_object, history, attempts, allowed_actions, describe_domain):
+    def world_map() -> dict[str, Any]:
+        """The whole domain as a map (ADR-0020): object types and links; states; one edge per
+        (state, action) with its outcome, who unlocks it and what else it requires; fog where
+        a cell is undecided; and the harness status of each edge."""
+        return wmap
+
+    def how_to_reach(object_id: str, target_state: str) -> dict[str, Any]:
+        """The shortest sequence of actions that takes this object to `target_state`, who may
+        take each step, and whether you can. Preconditions are listed, checked at call time."""
+        c = caller()
+        found = ex.lookup(object_id)
+        if found is None:
+            return {"reachable": False, "reason": f"No object {object_id}."}
+        obj, st = found
+        tr = d.transitions.get(obj)
+        if tr is None:
+            return {"reachable": False, "reason": f"{obj} has no states."}
+        roles = set(c.actor.roles)
+        if c.actor.kind == "agent":               # an agent can do only what its principal can
+            roles &= set(c.on_behalf_of.roles) if c.on_behalf_of is not None else set()
+        return reach(wmap, obj, st.get(tr.field), target_state, tuple(sorted(roles)))
+
+    for fn in (get_object, history, attempts, allowed_actions, describe_domain, world_map, how_to_reach):
         server.add_tool(fn, name=fn.__name__)
     return server
 

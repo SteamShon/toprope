@@ -28,6 +28,7 @@ from .world import Instance, SmallWorld, grow_world
 
 DEFAULT_LEVELS = ("model", "execution", "mcp")
 NOW = datetime(2026, 1, 1, tzinfo=timezone.utc)
+RANK = {"verified": 0, "uncovered": 1, "failed": 2}
 
 
 @dataclass
@@ -270,6 +271,29 @@ class Harness:
         return Report(self.levels, self.findings, self._coverage(cases, results, flows, n_races),
                       [minimal] if minimal else [])
 
+    def _edge_verdicts(self, cases, results) -> dict[str, str]:
+        """Per world-map edge (ADR-0020): failed if any of its cases has a finding at any level,
+        uncovered if any of its cases could not run at every level, else verified."""
+        failed_cases = {f.case.split("#", 1)[0] for f in self.findings}
+        for f in self.findings:
+            if f.kind == "race":
+                failed_cases |= set(f.case.split(" || "))
+        out: dict[str, str] = {}
+        for c in cases:
+            if c.kind not in ("cell", "create"):
+                continue
+            e = _edge_of(c)
+            if c.id in failed_cases:
+                v = "failed"
+            elif c.gap or any(c.id not in results[lv][0] for lv in self.levels):
+                v = "uncovered"
+            else:
+                v = "verified"
+            prev = out.get(e)
+            if prev is None or RANK[v] > RANK[prev]:
+                out[e] = v
+        return dict(sorted(out.items()))
+
     def _coverage(self, cases, results, flows, n_races) -> dict[str, Any]:
         cells = [c for c in cases if c.kind == "cell"]
         decided = [c for c in cells if raw_cell(self.d, c.obj, c.state, c.action, c.role) != "undecided"]
@@ -277,6 +301,7 @@ class Harness:
         covered = {lv: sum(1 for c in decided if c.id in results[lv][0] and (lv, c.id) not in failed)
                    for lv in self.levels}
         return {
+            "edges": self._edge_verdicts(cases, results),
             "cells": {"decided": len(decided), "covered": covered,
                       "undecided": sorted({f"{c.obj}.{c.state}.{c.action}" for c in cells if c not in decided}),
                       "gaps": sorted({f"{c.obj}.{c.state}.{c.action}" for c in decided if c.gap})},
@@ -289,6 +314,10 @@ class Harness:
             "races": n_races,
             "unreachable": self.world.unreachable,
         }
+
+
+def _edge_of(c: Case) -> str:
+    return f"{c.obj}.{c.state}.{c.action}" if c.kind == "cell" else f"{c.obj}.(new).{c.action}"
 
 
 def run_harness(d: Domain, **kw: Any) -> Report:
