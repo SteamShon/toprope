@@ -45,8 +45,11 @@ def load(d: Path, key: str):
     p = d / FILES[key]
     if not p.exists():
         return None
-    doc = yaml.safe_load(p.read_text())
-    return doc if isinstance(doc, dict) else {"__invalid__": True}
+    try:
+        doc = yaml.safe_load(p.read_text())
+    except yaml.YAMLError as e:
+        return {"__invalid__": f"YAML error: {str(e).splitlines()[0]}"}
+    return doc if isinstance(doc, dict) else {"__invalid__": "top level must be a mapping"}
 
 
 def items(doc, key: str) -> list[dict]:
@@ -54,16 +57,18 @@ def items(doc, key: str) -> list[dict]:
     return [x for x in v if isinstance(x, dict)] if isinstance(v, list) else []
 
 
-def validate(d: Path) -> list[str]:
+def validate(d: Path, include_binding: bool = True) -> list[str]:
     errs: list[str] = []
     warn: list[str] = []
     docs = {k: load(d, k) for k in FILES}
+    if not include_binding:
+        docs["binding"] = None
     for k in FILES:
         if docs[k] is None:
             if k in BEFORE_CHECKS:
                 errs.append(f"missing {FILES[k]}")
         elif docs[k].get("__invalid__"):
-            errs.append(f"{FILES[k]}: top level must be a mapping")
+            errs.append(f"{FILES[k]}: {docs[k]['__invalid__']}")
         elif docs[k].get("instrument") != k:
             errs.append(f"{FILES[k]}: instrument must be '{k}'")
     for k, key in (("change-requests", "requests"), ("change-key", "entries"), ("binding", "bindings")):
@@ -74,12 +79,16 @@ def validate(d: Path) -> list[str]:
         return errs
     if g := docs["gold-scenarios"]:
         ids = [s.get("id") for s in items(g, "scenarios")]
-        if len(ids) != len(set(ids)):
+        bad_ids = [i for i in ids if not isinstance(i, str)]
+        if bad_ids:
+            errs.append(f"gold: ids must be strings, got {bad_ids}")
+        elif len(ids) != len(set(ids)):
             errs.append("gold-scenarios: duplicate ids")
         for s in items(g, "scenarios"):
             if not s.get("id"):
                 errs.append("gold: every scenario needs an id")
-            if (s.get("answer") or {}).get("kind") not in ANSWER_KINDS:
+            ans = s.get("answer")
+            if not isinstance(ans, dict) or ans.get("kind") not in ANSWER_KINDS:
                 errs.append(f"gold {s.get('id')}: answer.kind must be one of {sorted(ANSWER_KINDS)}")
             if "<" in str(s.get("question", "")):
                 errs.append(f"gold {s.get('id')}: question still a placeholder")
@@ -125,8 +134,21 @@ def sha(p: Path) -> str:
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
 
+def read_manifest(d: Path) -> tuple[dict, list[str]]:
+    mp = d / "FROZEN.json"
+    if not mp.exists():
+        return {"files": {}}, []
+    try:
+        m = json.loads(mp.read_text())
+        if not isinstance(m, dict) or not isinstance(m.get("files"), dict):
+            raise ValueError("files must be a mapping")
+        return m, []
+    except (json.JSONDecodeError, ValueError) as e:
+        return {"files": {}}, [f"FROZEN.json is malformed: {e}"]
+
+
 def _freeze(d: Path, keys: list[str]) -> list[str]:
-    errs = validate(d)
+    errs = validate(d, include_binding="binding" in keys)
     for k in keys:
         doc = load(d, k)
         if doc is None:
@@ -136,7 +158,9 @@ def _freeze(d: Path, keys: list[str]) -> list[str]:
     if errs:
         return errs
     manifest_path = d / "FROZEN.json"
-    manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else {"files": {}}
+    manifest, merrs = read_manifest(d)
+    if merrs:
+        return merrs
     for k in keys:
         f = FILES[k]
         if f in manifest["files"]:
@@ -157,8 +181,10 @@ def freeze(d: Path) -> list[str]:
 
 
 def freeze_binding(d: Path) -> list[str]:
-    mp = d / "FROZEN.json"
-    frozen = json.loads(mp.read_text())["files"] if mp.exists() else {}
+    manifest, merrs = read_manifest(d)
+    if merrs:
+        return merrs
+    frozen = manifest["files"]
     missing = [FILES[k] for k in BEFORE_CHECKS if FILES[k] not in frozen]
     if missing:
         return [f"stage 1 not done; not frozen yet: {missing}"]
@@ -166,10 +192,12 @@ def freeze_binding(d: Path) -> list[str]:
 
 
 def verify(d: Path, run: bool = False) -> list[str]:
-    mp = d / "FROZEN.json"
-    if not mp.exists():
+    if not (d / "FROZEN.json").exists():
         return ["no FROZEN.json: instruments are not frozen"]
-    files = json.loads(mp.read_text())["files"]
+    manifest, merrs = read_manifest(d)
+    if merrs:
+        return merrs
+    files = manifest["files"]
     required = [FILES[k] for k in BEFORE_CHECKS] + ([FILES["binding"]] if run else [])
     errs = [f"{f} is not frozen" for f in required if f not in files]
     for f, meta in files.items():
