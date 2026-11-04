@@ -22,7 +22,7 @@ readable schemas: [`schema/domain.v1.schema.json`](../schema/domain.v1.schema.js
 | `invariants` with `scope: cross` + `reservations` | [Reservations](#cross-aggregate-invariants-and-reservations) | defined; M0b |
 | `timers`, scenario `advance` steps | [Timers](#timers) | defined; M0b |
 | `functions` | [Functions](#functions) | defined; M0b |
-| `external` sources and `external:<source>` actors | [External events](#external-events) | defined; M0b |
+| `external` sources and `external:<source>` actors | [External events](#external-events) | `external:kernel` and kernel-service effects in M0a (ADR-0028); other sources M0b |
 | representation files and host overlays | [Representation](#representation-layer-adr-0008) | defined; M0b |
 | `create` effects | — | **not in v1** (rejected, ADR-0021) |
 

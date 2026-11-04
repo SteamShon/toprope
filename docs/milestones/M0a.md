@@ -51,11 +51,14 @@ src/toprope/
 | 8 | `feat/m0a-change-check` | diff, structural/semantic/scenario/log-replay/in-flight/NL checks, preview | 6 + **M1 instruments frozen by the researcher** |
 | 9 | `feat/m0a-incremental` | dependency graph, hashes, impact report, result cache, background full run | 8 |
 | 10 | `feat/m0a-sources-authoring` | source readers (redaction, local-only), authoring MCP (ADR-0014) | 5 |
+| 11 | `feat/m0a-kernel-effects` | **added by ADR-0028**: kernel services as declared effects (`call`/`with`/`reply`), compile-time checks, kernel-service port with real and recording-fake adapters, `external:kernel`, `toprope-server --composition`, regeneration check | 5, 6, handoffs (ADR-0024), composition (ADR-0026) |
 
 Sub-PR 8 does not start until `experiments/m1/instruments/FROZEN.json` exists with the five
 stage-1 files (`instruments.py verify` passes without `--run`).
 
 ## Done criteria (from the roadmap; all on the toy domain)
+- (ADR-0028) a domain whose actions call kernel services runs end to end from its declaration
+  alone, and the regeneration check gives the same harness results before and after regenerating
 - every decided cell is covered at every level (model, Execution, MCP)
 - a deliberately broken generator template is caught while model-level regression still
   passes
@@ -64,6 +67,10 @@ stage-1 files (`instruments.py verify` passes without `--run`).
 - a single-cell change meets the draft latency targets (impact report ≤ 2 s, affected
   harness ≤ 30 s, preview ≤ 60 s)
 - the full run finds no selection miss.
+
+Scope change (ADR-0028, decided by the researcher): sub-PR 11 was added after this spec froze, so
+the self domains are generated end to end. It adds about 1–2 weeks. The overrun rule is set aside
+for this addition only.
 
 Overrun rule (roadmap): if M0a passes 6 weeks, cut it to what M1 strictly needs (semantics,
 model interpreter, Execution, event store, MCP, authoring MCP, model and Execution-level
