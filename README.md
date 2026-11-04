@@ -35,9 +35,9 @@ Pre-M0. Documents and plan only. No results are claimed yet.
 
 ## Read in this order
 
-1. [`docs/research-charter.md`](docs/research-charter.md): problem, thesis, questions, hypotheses, non-goals
+1. [`docs/research-charter.md`](docs/research-charter.md): problem, what Toprope is, the claim chain, hypotheses, non-goals
 2. [`docs/roadmap.md`](docs/roadmap.md): milestones with exit and kill criteria
-3. [`docs/experiments/M1-shared-language.md`](docs/experiments/M1-shared-language.md): the first experiment
+3. [`docs/experiments/M1-authoring.md`](docs/experiments/M1-authoring.md): the first experiment (can a domain be built cheaply?), then [`M2-shared-language.md`](docs/experiments/M2-shared-language.md)
 4. [`docs/architecture.md`](docs/architecture.md): bounded contexts, ports and adapters
 5. [`docs/domain-schema.md`](docs/domain-schema.md) and [`examples/domains/`](examples/domains/): the minimal domain core
 6. [`docs/adr/`](docs/adr/): decisions about this project, with provenance and supersession

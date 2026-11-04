@@ -9,8 +9,9 @@ interface shape.
 
 | Context | Owns | Milestone |
 |---|---|---|
+| **Authoring** | sources (system, records, interview, use), drafts, provenance and confirmation status of every element | M0–M1 |
 | **Domain Model** | objects, links, actions (params, preconditions, effects, roles), versions | M0 |
-| **Compiler** | domain → capsule: MCP surface, UI surface, generated checks and tests | M0 (MCP), M2 (UI) |
+| **Compiler** | domain → capsule: MCP surface, UI surface, generated checks and tests | M0 (MCP + minimal UI), M2+ (richer UI) |
 | **Execution** | runs an action: checks preconditions and roles against current state, applies the effect, records it | M0 |
 | **Event Log** | append-only record of calls, verdicts, effects, human decisions | M0 |
 | **Proposal** | turns logs into proposed model diffs with evidence | M3 |
@@ -21,6 +22,9 @@ interface shape.
 
 | Port | Responsibility | First adapter | Later candidates |
 |---|---|---|---|
+| `SourceReader` | read raw material: repository (code/schema/API), records (docs, issues, chats), interview log | repo + markdown/issue export readers | Slack, Notion, DB introspection |
+| `Drafter` | sources → proposed model elements with source links | LLM call (Claude API) | other models |
+| `Interviewer` | ask the owner targeted questions about unknown or conflicting elements | CLI chat | UI panel, voice |
 | `DomainStore` | load/save versioned domain models | YAML in repo | git-backed registry |
 | `StateStore` | object instances and links | SQLite + synthetic generator | Postgres, existing app DBs |
 | `AgentSurface` | expose actions/reads to agents | generated MCP server | OpenAPI, LangGraph tools |

@@ -1,6 +1,6 @@
 # Research Charter
 
-Version 0.2, 2026-11-04 (supersedes 0.1, which framed the work as agent guardrails; see ADR-0007).
+Version 0.3, 2026-11-04. 0.2 reframed the work from agent guardrails to organizational workflows (ADR-0007). 0.3 adds the agreed definition, the claim chain and the load-bearing bet (ADR-0011, ADR-0012).
 
 ## 1. Problem
 
@@ -22,49 +22,78 @@ These workflows are mostly implicit:
 Result: agents can do individual steps but cannot carry the workflow, and humans keep
 doing the connective work by hand.
 
-## 2. Thesis
+## 2. What Toprope is
 
-1. **Workflow ≡ domain.** A workflow can be modeled as a domain: objects (Hypothesis,
-   Experiment, Metric, Decision), links between them, and actions with preconditions,
-   effects and approval roles. This is the same move as an ontology plus action types.
-2. **One model, two surfaces.** The model is compiled into a *domain capsule* that
-   generates the agent surface (typed MCP tools whose descriptions and checks come from the
-   model) and the human surface (a UI over the same objects and actions). The claim is that
-   this is how people and agents come to perceive the work in **the same language**.
-3. **Software-factory loop.** The domain author defines the model, uses the generated
-   UI/MCP, and every run is logged. Agents propose model changes from the logs, and the
-   author decides. The domain improves through use, and decisions accumulate as versioned
-   state.
-4. **Enforcement is a consequence, not the goal.** Because actions run through the model,
-   preconditions and approvals hold on the execution path. This matters, but the research
-   is about shared meaning and accumulation, not safety.
+Toprope is a light, open foundation that turns the hidden workflows between people into a
+domain model that people and agents both use, and keeps that model improving while it is
+used.
 
-## 3. Research questions
+- **Who authors**: everyone involved. Agents draft, domain experts and developers refine
+  and decide. Experts answer questions about the work, never about formats or builds.
+- **What it is**: three things in one body:
+  - an authoring tool (a software factory) for building and changing domains fast
+  - the execution path the work runs through, because actions go through the model
+  - a layer over existing systems that owns meaning, approval and record, while existing
+    code, APIs and databases perform the effects
+- **Workflow ≡ domain**: objects, links and actions (preconditions, effects, roles), in the
+  spirit of an ontology plus action types. One model compiles into a *domain capsule*: MCP
+  for agents and UI for people.
+- **Two kinds of decisions accumulate, with equal weight**:
+  - *work decisions* (approve, ship, kill, exception), recorded with their inputs
+  - *domain-change decisions* (change a rule), recorded with their evidence
 
-- **RQ1, shared language.** Does an agent that works through capsule-generated typed actions
-  make fewer *meaning* errors on a workflow than one given the same knowledge as a process
-  document plus generic data tools? Does it explain its reasoning in the same terms the
-  human UI shows?
-- **RQ2, authoring cost.** With the generate → use → fix loop, how long does it take a domain
-  author to reach a usable domain? What do the second and third changes cost compared with
-  the first build?
-- **RQ3, accumulation.** Do agent proposals mined from run logs, once the author decides on
-  them, reduce clarifying questions and errors in later runs without over-generalizing?
-- **RQ4, handoff.** When two domains hand off (experiment → product delivery), does a typed
-  handoff preserve intent better than a written handoff note?
-- **RQ5, boundary.** What does the model fail to capture? Which judgments must stay with
-  people? Where do the execution guarantees end (bypass paths, `UNKNOWN` effects)?
+  Accumulated work decisions become the evidence for proposing domain changes.
+- **Raw material, in order of how easily it can be automated**: draft from existing
+  systems (code, schema, APIs) → enrich from existing records (docs, issues, chats) →
+  raise accuracy by interviewing the owner → keep improving through use.
+- **Bets that differ from Foundry-style ontologies**: authoring is cheap; agents are
+  first-class users; the domain evolves through operation; it is light and open, so small
+  teams can use it.
+- Enforcement follows from actions running through the model. It is a property, not the goal.
+
+## 3. The claim chain
+
+Toprope's thesis is a chain. Each link only matters if the previous one holds.
+
+```
+① can be built     an implicit workflow can be turned into a domain model cheaply
+② model is right   the model captures how the work actually runs
+③ shared language  MCP and UI generated from it let people and agents act on the same meaning
+④ evolves          use accumulates decisions and the model improves
+⑤ org productivity handoff delay and re-explanation between people go down
+```
+
+**The load-bearing bet is ① + ②** (ADR-0011). If domains cannot be built cheaply, nobody
+builds one, and ③–⑤ never start. It is also the most uncertain link and the one where
+Toprope differs most from existing ontology platforms. ③ comes second, because Foundry-style
+deployments already give some evidence for it.
+
+Research questions, one per link:
+
+- **RQ1 (①)**: Starting from existing systems, records, the owner and use, how much human
+  time does it take to reach a usable domain? What do later changes cost?
+- **RQ2 (②)**: How accurately does the resulting model answer held-out workflow questions?
+  How many of its rules are unsupported?
+- **RQ3 (③)**: Do agents working through capsule-generated actions make fewer meaning errors
+  than agents given the same knowledge as docs plus generic tools?
+- **RQ4 (④)**: Do proposals mined from logs and work decisions, once a human decides on
+  them, improve the model and reduce later clarifications?
+- **RQ5 (⑤, partial)**: Does a typed cross-domain handoff preserve intent better than a note?
+- **RQ6 (boundary)**: What do models fail to capture, which judgments must stay with people,
+  and where do the execution guarantees end?
 
 ## 4. Hypotheses and what would weaken them
 
-| ID | Hypothesis | Weakened if |
-|---|---|---|
-| H-Shared | Capsule-generated typed actions reduce workflow-meaning errors compared with docs plus generic tools, at equal information. | Docs plus generic tools come within noise of the capsule. Or hand-written typed tools with prose semantics match the capsule, in which case the gain is from vocabulary rather than the compiled model. |
-| H-Factory | The generate/use/fix loop gets a domain to usable faster than hand-building tools and UI, and later changes stay cheap. | Each change needs as much manual rework as a hand-built stack, or the author mostly fights the generator. |
-| H-Accumulate | Log → proposal → human decision makes later runs need fewer clarifications and make fewer errors. | Confirming proposals costs more than it saves, or most proposals are noise or over-generalizations. |
-| H-Handoff | Typed cross-domain handoffs lose less intent than notes. | Good notes perform the same. |
+| ID | Link | Hypothesis | Weakened if |
+|---|---|---|---|
+| H-Author | ① | The system → records → interview → use pipeline reaches a usable domain in ≤ 4 human hours, and later changes take ≤ 30 min. | Human time is mostly spent correcting agent drafts, or changes need hand edits to generated surfaces. |
+| H-Fidelity | ② | The model reaches ≥ 80% held-out scenario accuracy with ≤ 10% unsupported rules. | Accuracy plateaus below 70%, or agents invent rules faster than humans can catch them. |
+| H-Shared | ③ | Capsule-generated actions reduce meaning errors compared with docs plus generic tools. | Docs ≈ capsule, or hand-written typed tools ≈ capsule (in which case the gain is vocabulary only). |
+| H-Evolve | ④ | Log → proposal → decision improves accuracy and reduces clarifications. | Confirmation costs more than it saves, or proposals are mostly noise. |
+| H-Handoff | ⑤ | Typed handoffs lose less intent than notes. | Good notes perform the same. |
 
-Each hypothesis is tested separately. Success of one does not imply another.
+Thresholds are initial and preregistered in each experiment document. Success of one
+hypothesis does not imply another.
 
 ## 5. Distinctions kept throughout
 

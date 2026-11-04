@@ -1,6 +1,6 @@
 # ADR-0009: M1 tests H-Shared (shared language)
 
-- Status: accepted · 2026-11-04 · decided by: SteamShon
+- Status: **superseded by [ADR-0011](0011-claim-chain-and-load-bearing-bet.md)** (now M2) · 2026-11-04 · decided by: SteamShon
 - Supersedes: ADR-0003
 
 ## Decision

@@ -1,7 +1,6 @@
-# M1: Does a shared domain model reduce meaning errors?
+# M2: Does a shared domain model reduce meaning errors?
 
-Status: design draft. Tests **H-Shared**. Metrics and verdict rules are fixed here,
-before any results are seen.
+Status: design draft. Tests **H-Shared**. Runs after M1, on the domain model M1 produces (ADR-0011). Metrics and verdict rules are fixed here, before any results are seen.
 
 ## Question
 
@@ -13,7 +12,7 @@ misread metric?
 
 ## Domain
 
-`examples/domains/experiment-lifecycle.domain.yaml`: Hypothesis, Experiment, Variant, Metric,
+The domain produced by M1 (hand-written reference: `examples/domains/experiment-lifecycle.domain.yaml`): Hypothesis, Experiment, Variant, Metric,
 Readout, Decision, plus implicit org rules made explicit:
 
 - An experiment needs a hypothesis, a primary metric, guardrail metrics and a planned

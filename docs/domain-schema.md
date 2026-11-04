@@ -48,6 +48,10 @@ actions:
 
 ## Design rules
 
+- Every element (object, property, link, action, precondition) may carry `source`
+  (system | record | interview | use, with a reference or quote) and `status`
+  (proposed | confirmed | unknown). Agents can only write `proposed`. Only humans confirm.
+  Unknowns are kept explicit instead of guessed.
 - `description`, `reason` and `glossary` are **the** text used in the MCP tool descriptions,
   the UI labels and the denial messages. They are written once.
 - `check` uses a small expression language (path access, comparison, `count`, `exists`,

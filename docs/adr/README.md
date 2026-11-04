@@ -14,5 +14,7 @@ of workflows).
 | [0006](0006-defer-runtime-and-host.md) | No runtime/host choice until a milestone needs it | accepted |
 | [0007](0007-reframe-org-workflow-as-domain.md) | Reframe: org workflows as domains; shared language; factory loop | accepted |
 | [0008](0008-first-domain-experiment-lifecycle.md) | First domain = experiment lifecycle | accepted |
-| [0009](0009-m1-shared-language.md) | M1 tests H-Shared | accepted |
+| [0009](0009-m1-shared-language.md) | M1 tests H-Shared | superseded by 0011 (now M2) |
 | [0010](0010-minimal-domain-core.md) | Minimal domain core: Object, Link, Action | accepted |
+| [0011](0011-claim-chain-and-load-bearing-bet.md) | Claim chain; M1 = ① can be built + ② model is right | accepted |
+| [0012](0012-raw-material-order.md) | Raw material order: system → records → interview → use | accepted |
