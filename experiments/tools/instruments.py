@@ -12,6 +12,8 @@ freeze          stage 1, researcher only, in M0a before the checks are built: fr
                 ignored at this stage.
 freeze-binding  stage 2, researcher only, after Phase A and before any arm runs: freezes
                 binding.yaml. Requires stage 1.
+--sealed        with validate: print nothing derived from change-key.yaml beyond errors
+                (use it whenever an agent runs the validator for you).
 verify          fails if a frozen file changed. It also fails unless all five stage-1 files are
                 frozen, and with --run (used by the harness before every arm run) unless the
                 binding is frozen too.
@@ -34,6 +36,7 @@ FILES = {
     "binding": "binding.yaml",          # written after Phase A
     "verdict-rules": "verdict-rules.yaml",
 }
+SEALED = "--sealed" in sys.argv   # validate without printing anything derived from the sealed key
 BEFORE_CHECKS = ["gold-scenarios", "probe-suite", "change-requests", "change-key", "verdict-rules"]
 ANSWER_KINDS = {"yes_no", "outcome", "state", "actors", "free_text"}
 PROBLEMS = {"none", "conflict", "breakage"}
@@ -110,7 +113,8 @@ def validate(d: Path, include_binding: bool = True) -> list[str]:
             if e.get("problem") != "none" and not (t in TYPES or t.startswith("other:")):
                 errs.append(f"key seq {e.get('seq')}: type must be one of {sorted(TYPES)} or other:<text>")
         counts = {p: sum(1 for e in items(k, "entries") if e.get("problem") == p) for p in PROBLEMS}
-        warn.append(f"key mix: {counts} (target ~6 conflict, ~4 breakage, ~10 none)")
+        if not SEALED:   # the key mix is part of the sealed key: never printed for an agent
+            warn.append(f"key mix: {counts} (target ~6 conflict, ~4 breakage, ~10 none)")
         leaked = [x["seq"] for x in items(r, "requests")
                   if any(w in str(x.get("intent", "")).lower() for w in ("conflict", "break", "seeded"))]
         if leaked:
