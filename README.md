@@ -48,6 +48,7 @@ only when an experiment reaches its preregistered verdict.
 - [`docs/domain-schema.md`](docs/domain-schema.md): minimal domain core
 - [`docs/adr/`](docs/adr/): project decisions with provenance
 - [`notes/ko/`](notes/ko/): working notes in Korean
+- [`AGENTS.md`](AGENTS.md): branching, PR and merge conventions for people and coding agents
 
 ## Ground rules
 
