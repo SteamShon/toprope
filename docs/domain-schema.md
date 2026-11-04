@@ -121,12 +121,15 @@ world:                      # the expert's examples; the compiler grows a small 
   quote) and `status` (`proposed` | `confirmed` | `unknown`). Agents write only `proposed`.
   Only humans confirm. Unknowns stay explicit instead of being guessed.
 - `description`, `reason` and `glossary` are written once and reused by every surface.
-- `check` uses a small expression language (paths, comparison, `in`, `count`, `exists`,
-  `now`). Extending it requires an ADR.
+- `check` uses a small expression language: paths, comparison, `in` / `not in`, `and` / `or` /
+  `not`, list literals, `count`, `exists`, `now`. The set operators and boolean combinators
+  were added by ADR-0010. Any further extension requires an ADR.
 - `records_decision: true` turns an action into an accumulated work decision (⑤).
 - **Transition matrix** (ADR-0010):
   - It is the single source for state-based rules. Every (state, action) cell is one of:
     a target state (optionally per role), `{deny: reason}`, `n/a`, or `undecided`.
+  - `n/a` denies with the standard reason "not applicable when <state>". It is recorded and
+    never shown as available, and it is not asked about in the interview.
   - `undecided` cells deny with the reason "undecided" and are listed in every change report.
     No cell is ever silently allowed.
   - An action is allowed only if its matrix cell allows it, the actor has the role, and every
@@ -158,7 +161,7 @@ A failing cell test, an invariant violation or a parity failure blocks deploymen
 build. The interviewer turns `undecided` cells and candidate invariants into plain
 questions for the expert, so the expert never has to see the matrix.
 
-### Example flows
+### Example scenarios (flows)
 
 Flows are the expert's short stories: a starting state, then `do` (action) and `read`
 (view) steps with expectations.
