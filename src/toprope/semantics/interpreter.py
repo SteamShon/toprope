@@ -9,6 +9,7 @@ later `Execution`). Approvals (step 7) and reservations (step 8) arrive with ADR
 from __future__ import annotations
 
 import copy
+import math
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -62,6 +63,19 @@ class Decision:
     outcome: Outcome
     events: tuple[Event, ...]      # domain + decision events to append at the loaded version
     attempts: tuple[Event, ...]    # DeniedAttempt / InvariantGuardTriggered (attempts stream)
+
+
+def _unstorable(v: Any) -> str | None:
+    """Walk a value like the store codec does; say why it cannot be stored, if it cannot."""
+    if isinstance(v, float) and not math.isfinite(v):
+        return "must contain only finite numbers"
+    if isinstance(v, str) and "\x00" in v:
+        return "must not contain NUL characters"
+    if isinstance(v, dict):
+        return next((w for k, x in v.items() for w in (_unstorable(k), _unstorable(x)) if w), None)
+    if isinstance(v, (list, tuple)):
+        return next((w for x in v if (w := _unstorable(x))), None)
+    return None
 
 
 def _pascal(name: str) -> str:
@@ -285,6 +299,8 @@ class Interpreter:
             if spec.many and not isinstance(params[name], list):
                 return f"Param '{name}' must be a list."
             for v in vals:
+                if (why := _unstorable(v)) is not None:
+                    return f"Param '{name}' {why}."
                 if spec.enum is not None and v not in spec.enum:
                     return f"Param '{name}' must be one of {spec.enum}."
                 if spec.type is not None and (not isinstance(v, py[spec.type]) or

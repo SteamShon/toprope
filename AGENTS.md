@@ -110,6 +110,13 @@ umbrella is up to date with `develop`.
   an assertion, to get green: fix the code, or stop and explain. This applies equally to
   generated harnesses and to the M1 instruments.
 
+## Development
+
+- `uv sync`, then `uv run pytest`.
+- PostgreSQL tests run when `TOPROPE_PG_DSN` is set (e.g. `host=127.0.0.1 port=5432
+  user=postgres dbname=postgres`); each test uses its own throwaway schema. Without it, the
+  same contract tests run on the memory and SQLite stores only.
+
 ## Repository settings (maintainer)
 
 These cannot be enforced from the repository files. Set them in GitHub:

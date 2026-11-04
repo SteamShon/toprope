@@ -187,7 +187,7 @@ def test_idempotency_is_scoped_by_actor_action_target():
     m = model()
     first = do(m, ANA, "approve_experiment", "E-onboarding", idempotency_key="k1")
     again = do(m, ANA, "approve_experiment", "E-onboarding", idempotency_key="k1")
-    assert first.ok and again is first and m.store.version("E-onboarding") == 3
+    assert first.ok and again == first and m.store.version("E-onboarding") == 3
     other = do(m, Actor("abe", "person", ("approver",)), "approve_experiment", "E-onboarding", idempotency_key="k1")
     assert other.code == "matrix", "same key from another actor is a different command"
 
