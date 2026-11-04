@@ -1,0 +1,18 @@
+id: use-pnpm
+version: 1
+status: active
+statement: Use pnpm for JavaScript package management; never npm or yarn.
+reason: The lockfile is pnpm-lock.yaml; npm/yarn create a second lockfile and drift.
+owner: SteamShon
+scope:
+  repos: ["*"]
+since: 2026-11-04
+evidence:
+  - kind: statement
+    source: docs/experiments/M1-enforce.md
+    quote: "D1 Use pnpm, never npm/yarn."
+check:
+  on: [Bash]
+  deny_if_any:
+    - command_matches: '(^|[;&|]\s*)(npm|yarn)\s+(i|install|add|ci)\b'
+on_violation: deny
