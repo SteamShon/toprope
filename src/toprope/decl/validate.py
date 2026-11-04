@@ -92,7 +92,11 @@ def validate_domain(d: Domain) -> list[Issue]:
         for p in a.preconditions:
             issues += _check_expr(d, p.check, f"{where}.preconditions.{p.id}", a.object_type, set(a.params))
         for e in a.effects:
+            if e.create is not None:
+                add(Issue("unsupported-effect", f"{where}.effects", f"create effects are not supported yet ({e.create})"))
             for key, value in (e.set or {}).items():
+                if key.startswith("new.") and a.creates is None:
+                    add(Issue("unsupported-effect", f"{where}.effects", f"{key}: `new.` is only valid in a create action"))
                 attr = key.split(".", 1)[1] if key.startswith(("target.", "new.")) else key
                 msg = _resolve(d, a.object_type, tuple(attr.split("."))) if a.object_type in d.objects else None
                 if msg:
