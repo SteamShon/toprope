@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import replace
-from typing import Any
+from typing import Any, Literal
 
 from ..semantics.types import Event, Outcome
 
@@ -35,17 +35,24 @@ class EventStore(ABC):
     def streams(self) -> list[str]: ...
 
     @abstractmethod
-    def remember(self, key: tuple[Any, ...], outcome: Outcome) -> None: ...
+    def claim(self, key: tuple[Any, ...]) -> Outcome | Literal["pending"] | None:
+        """Atomically claim an idempotency key. Returns the stored outcome if the command already
+        finished, "pending" if another call holds the claim, or None if this call now holds it."""
 
     @abstractmethod
-    def recall(self, key: tuple[Any, ...]) -> Outcome | None: ...
+    def remember(self, key: tuple[Any, ...], outcome: Outcome) -> None:
+        """Store the final outcome for a claimed key."""
+
+    @abstractmethod
+    def release(self, key: tuple[Any, ...]) -> None:
+        """Drop a claim without an outcome (a transient failure), so the key can be retried."""
 
 
 class MemoryEventStore(EventStore):
     def __init__(self) -> None:
         self._streams: dict[str, list[Event]] = {}
         self._attempts: dict[str, list[Event]] = {}
-        self._idem: dict[tuple[Any, ...], Outcome] = {}
+        self._idem: dict[tuple[Any, ...], Outcome | str] = {}
 
     def version(self, stream: str) -> int:
         return len(self._streams.get(stream, []))
@@ -69,8 +76,14 @@ class MemoryEventStore(EventStore):
     def streams(self) -> list[str]:
         return list(self._streams)
 
-    def remember(self, key: tuple[Any, ...], outcome: Outcome) -> None:
+    def claim(self, key):
+        if key in self._idem:
+            return self._idem[key]
+        self._idem[key] = "pending"
+        return None
+
+    def remember(self, key, outcome: Outcome) -> None:
         self._idem[key] = outcome
 
-    def recall(self, key: tuple[Any, ...]) -> Outcome | None:
-        return self._idem.get(key)
+    def release(self, key) -> None:
+        self._idem.pop(key, None)

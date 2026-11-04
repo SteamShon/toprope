@@ -161,3 +161,9 @@ def test_unhashable_yaml_key_is_a_yaml_error():
     import yaml as _yaml
     with pytest.raises(_yaml.YAMLError):
         load_yaml("? [a, b]\n: 1\n")
+
+
+def test_unsupported_effects_are_compile_errors(raw):
+    raw["actions"]["approve_experiment"]["effects"].append({"create": "Readout"})
+    raw["actions"]["launch_experiment"]["effects"].append({"set": {"new.name": "actor.id"}})
+    assert [i.code for i in errors(Domain.model_validate(raw))] == ["unsupported-effect", "unsupported-effect"]

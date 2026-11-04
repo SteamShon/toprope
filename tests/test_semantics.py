@@ -168,7 +168,11 @@ def test_create_action():
     m = model(creatable)
     out = do(m, PAT, "design_experiment", "E-new", params={"name": "New", "planned_days": 7})
     assert out.ok and m.state("E-new") == {"id": "E-new", "name": "New", "planned_days": 7, "status": "draft"}
-    assert do(m, PAT, "design_experiment", "E-new", params={"name": "Again"}).code == "exists"
+    assert do(m, PAT, "design_experiment", "E-new", params={"name": "Again", "planned_days": 7}).code == "exists"
+    assert do(m, PAT, "design_experiment", "E-x", params={"name": "X"}).code == "invalid-command"
+    assert do(m, PAT, "design_experiment", "E-y", params={"name": "Y", "planned_days": 7, "approved_by": "m"}).code == "invalid-command"
+    assert do(m, ELI, "design_experiment", "E-new", params={"name": "N", "planned_days": 7}).code == "actor", \
+        "existence is not revealed to actors whose role cannot act"
 
 
 def test_unknown_actor_and_action():
@@ -208,7 +212,7 @@ def test_race_is_serialized_and_reevaluated():
     def rival(store):
         out = m_holder["m"].interp.decide(Command(Actor("abe", "person", ("approver",)), "approve_experiment",
                                                   "E-onboarding", {}), project(store.read("E-onboarding")),
-                                          m_holder["m"].state)
+                                          m_holder["m"].lookup)
         MemoryEventStore.append(store, "E-onboarding", store.version("E-onboarding"), list(out.events))
 
     store = RacingStore(rival)
@@ -234,3 +238,91 @@ def test_paths_through_links_in_preconditions():
             {"id": "has-statement", "check": "exists(target.hypothesis.statement)", "reason": "State the hypothesis."})
     m = model(needs_statement)
     assert do(m, ANA, "approve_experiment", "E-onboarding").ok
+
+
+# -- regressions from review -------------------------------------------------------------------
+def test_events_and_state_are_isolated_from_callers():
+    m = model()
+    s = m.state("E-onboarding")
+    s["guardrails"].append("M-x")
+    assert m.state("E-onboarding")["guardrails"] == ["M-latency"]
+    params = {"note": "ok"}
+    out = do(m, ANA, "approve_experiment", "E-onboarding", params=params)
+    params["note"] = "changed"
+    out.state["guardrails"].append("M-y")
+    assert m.store.read("E-onboarding")[1].payload["params"] == {"note": "ok"}
+    assert m.state("E-onboarding")["guardrails"] == ["M-latency"]
+
+
+def test_create_effects_and_new_keys_fail_closed():
+    def creates_effect(raw):
+        raw["actions"]["approve_experiment"]["effects"].append({"create": "Readout"})
+    assert do(model(creates_effect), ANA, "approve_experiment", "E-onboarding").code == "unsupported-effect"
+
+    def new_key(raw):
+        raw["actions"]["approve_experiment"]["effects"].append({"set": {"new.name": "actor.id"}})
+    assert do(model(new_key), ANA, "approve_experiment", "E-onboarding").code == "unsupported-effect"
+
+
+def test_by_role_is_order_independent_and_most_restrictive():
+    def cell(raw):
+        raw["actions"]["approve_experiment"]["actor"] = ["approver", "eng"]
+        raw["transitions"]["Experiment"]["matrix"]["draft"]["approve_experiment"] = {
+            "by_role": {"approver": "approved", "eng": {"deny": "Engineers do not approve."}}}
+    for roles in (("eng", "approver"), ("approver", "eng")):
+        assert do(model(cell), Actor("x", "person", roles), "approve_experiment", "E-onboarding").code == "matrix"
+
+
+def test_agent_cell_uses_principal_roles_too():
+    def cell(raw):
+        raw["actions"]["approve_experiment"]["actor"] = ["approver", "eng"]
+        raw["transitions"]["Experiment"]["matrix"]["draft"]["approve_experiment"] = {
+            "by_role": {"approver": "approved", "eng": {"deny": "Engineers do not approve."}}}
+    g = Grant("g", frozenset({"approve_experiment"}))
+    out = do(model(cell), BOT, "approve_experiment", "E-onboarding", on_behalf_of=ELI, grant=g)
+    assert out.code == "matrix", "an approver agent acting for an engineer gets the engineer's deny"
+
+
+def test_principal_must_be_a_person():
+    g = Grant("g", frozenset({"approve_experiment"}))
+    sysadmin = Actor("root", "system", ("approver",))
+    assert do(model(), BOT, "approve_experiment", "E-onboarding", on_behalf_of=sysadmin, grant=g).code == "actor"
+
+
+def test_dangling_and_wrong_type_links_do_not_count():
+    m = model()
+    m.seed("Experiment", {"id": "E-dangle", "status": "draft", "guardrails": ["M-deleted", "H1"]})
+    assert do(m, ANA, "approve_experiment", "E-dangle").code == "has-guardrails"
+
+
+def test_allowed_actions_skip_params_dependent_checks():
+    def needs_note(raw):
+        raw["actions"]["approve_experiment"]["params"]["note"] = {"type": "string"}
+        raw["actions"]["approve_experiment"]["preconditions"].append(
+            {"id": "has-note", "check": "params.note != ''", "reason": "Say why."})
+    m = model(needs_note)
+    assert m.allowed_actions("E-onboarding", ANA) == ["approve_experiment"]
+    assert do(m, ANA, "approve_experiment", "E-onboarding", params={"note": ""}).code == "has-note"
+
+
+def test_type_of_comes_from_the_store():
+    m = model()
+    reloaded = ReferenceModel(m.d, store=m.store, clock=clock, seed_world=False)
+    assert reloaded.type_of("E-onboarding") == "Experiment"
+    assert reloaded.allowed_actions("E-onboarding", ANA) == ["approve_experiment"]
+
+
+def test_idempotency_claims_and_transient_conflicts():
+    m = model()
+    key = ("ana", "approve_experiment", "E-onboarding", "k")
+    assert m.store.claim(key) is None and m.store.claim(key) == "pending"
+    assert do(m, ANA, "approve_experiment", "E-onboarding", idempotency_key="k").code == "in-progress"
+    m.store.release(key)
+    assert do(m, ANA, "approve_experiment", "E-onboarding", idempotency_key="k").ok
+
+
+def test_invalid_params_and_missing_target():
+    m = model()
+    assert do(m, ANA, "approve_experiment", "E-onboarding", params={"note": 3}).code == "invalid-command"
+    assert do(m, ANA, "approve_experiment", "E-onboarding", params={"bogus": 1}).code == "invalid-command"
+    assert m.execute(Command(ANA, "approve_experiment", None)).code == "invalid-command"
