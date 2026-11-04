@@ -252,8 +252,10 @@ class Harness:
         results = {lv: self.run_cases(lv, cases) for lv in self.levels}
         ref = self.levels[0]
         for lv in self.levels[1:]:
-            for key, want in {**results[ref][0], **results[ref][1]}.items():
-                got = results[lv][0].get(key, results[lv][1].get(key))
+            mine = {**results[ref][0], **results[ref][1]}
+            theirs = {**results[lv][0], **results[lv][1]}
+            for key in sorted(mine.keys() | theirs.keys()):
+                want, got = mine.get(key), theirs.get(key)
                 if got != want:
                     self.findings.append(Finding("parity", lv, key, {ref: want, lv: got}))
 

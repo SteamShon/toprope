@@ -42,9 +42,11 @@ def explore(h: Harness, *, examples: int = 200, depth: int = 5) -> dict[str, Any
             if d.actions[action].target != inst.obj:
                 continue
             actor = w.actors[role]
+            tr = d.transitions.get(inst.obj)
+            before = (s.state(ids[i]) or {}).get(tr.field) if tr else None
             o = s.do(actor, action, ids[i], h.planner.params(d.actions[action]), f"x{k}")
             steps.append({"actor": f"{role} {actor.id}", "action": action, "target": inst.id,
-                          "from": inst.state_of(d), "path": [f"{m.role} {m.action}" for m in inst.path],
+                          "from": before, "path": [f"{m.role} {m.action}" for m in inst.path],
                           "outcome": o.get("code") or o.get("status")})
             if o.get("code") == "invariant-guard":
                 inv = next((v.id for v in d.invariants if v.reason == o.get("reason")), o.get("reason"))

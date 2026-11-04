@@ -173,3 +173,34 @@ def test_cli_reports_and_exits_nonzero_on_findings(tmp_path):
     ko = subprocess.run(["uv", "run", "--quiet", "toprope-harness", "--domain", str(bad), "--levels", "model",
                          "--examples", "30"], capture_output=True, text=True, timeout=120)
     assert ko.returncode == 1 and "minimal flow breaking running-has-approver" in ko.stdout
+
+
+def test_minimal_flow_reports_the_state_before_each_step():
+    from toprope.harness.explore import explore
+
+    def seed_bug(raw):   # the break needs two steps: approve, then a launch that skips started_at
+        raw["actions"]["launch_experiment"]["effects"] = []
+
+    h = Harness(dom(seed_bug), levels=("model",))
+    # Start only from drafts, so the break takes two steps on the same object.
+    h.world.instances = {k: v for k, v in h.world.instances.items() if k[1] in (None, "draft")}
+    mf = explore(h, examples=200)
+    assert mf["invariant"] == "running-has-start"
+    assert [(s["action"], s["from"]) for s in mf["steps"]] == [("approve_experiment", "draft"),
+                                                                ("launch_experiment", "approved")]
+
+
+def test_parity_flags_results_present_only_at_another_level(monkeypatch):
+    from toprope.harness import run as run_mod
+    h = Harness(dom(), levels=("model", "execution"))
+    real = h.run_cases
+
+    def extra(level, cases):
+        obs, side = real(level, cases)
+        if level == "execution":
+            side["cell:Experiment.ghost#events"] = [("X", "domain", 1, None, {})]
+        return obs, side
+
+    monkeypatch.setattr(h, "run_cases", extra)
+    r = h.run(explore_examples=0, races=False)
+    assert any(f.kind == "parity" and f.case == "cell:Experiment.ghost#events" for f in r.findings)
