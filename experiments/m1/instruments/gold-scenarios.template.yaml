@@ -5,13 +5,16 @@ instrument: gold-scenarios
 experiment: M1
 status: draft            # draft → frozen (set by the researcher, then `experiments/tools/instruments.py freeze`, in their own commit)
 domains: [toprope-authoring, toprope-delivery]   # the self domains (about 30 items each)
+compositions: [toprope-self]   # optional (ADR-0026): a fact that spans domains (e.g. what the receiver
+                               #   gets when the sender approves) names the composition as its `domain`
+                               #   and is graded against the composed model
 # Ask only what a domain declaration expresses (who may act, what is allowed or denied and
 # why, the resulting state, what always holds). Facts the Toprope kernel guarantees for every
 # domain (idempotent handoffs, compile-time contract checks, the deploy floor in code) are not
 # gold: no model can get them wrong, so they measure nothing.
 scenarios:
   - id: G01               # stable id, never reused
-    domain: toprope-authoring   # which domain's compiled model answers it (one of `domains`)
+    domain: toprope-authoring   # whose compiled model answers it: one of `domains` or `compositions`
     fact: ""              # optional: the same fact asked of another domain shares this key;
                           #   such copies must share held_out, and the fact counts once in scoring
     held_out: true        # true: never shown to any iteration (about half per domain)

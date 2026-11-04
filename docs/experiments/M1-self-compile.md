@@ -129,7 +129,8 @@ Templates, the freeze procedure and the `verify` check:
 [`experiments/m1/`](../../experiments/m1/README.md).
 
 - About 30 scenario questions per self domain (Authoring, Delivery, and the handoff between them), half held out
-  in each domain. Each item names the domain whose compiled model answers it. The same fact
+  in each domain. Each item names the domain whose compiled model answers it, or the
+  composition (ADR-0026) for a fact that spans both domains, graded against the composed model. The same fact
   asked of both domains shares a `fact` key: its copies share `held_out`, and it counts once in
   scoring (each copy weighs 1/n; verdict rules `scoring.unit: fact`). Facts that the Toprope
   kernel guarantees for every domain are not gold, since no model can get them wrong. Examples:

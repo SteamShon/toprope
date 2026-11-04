@@ -68,11 +68,19 @@ def _gold_domains_and_facts(g: dict, warn: list[str]) -> list[str]:
     domains = g.get("domains") or ([g["domain"]] if g.get("domain") else [])
     if not isinstance(domains, list) or not domains:
         return ["gold: `domains` must list the domains the items are about"]
+    # A fact that spans domains is graded against their composition (ADR-0026): such an item
+    # names the composition instead of a domain.
+    compositions = g.get("compositions") or []
+    if not isinstance(compositions, list):
+        return ["gold: `compositions` must be a list"]
+    if set(compositions) & set(domains):
+        return [f"gold: {sorted(set(compositions) & set(domains))} listed as both a domain and a composition"]
+    domains = list(domains) + list(compositions)
     facts: dict[str, list[dict]] = {}
     for s in items(g, "scenarios"):
         dom = s.get("domain") or (domains[0] if len(domains) == 1 else None)
         if dom not in domains:
-            errs.append(f"gold {s.get('id')}: domain must be one of {domains}")
+            errs.append(f"gold {s.get('id')}: domain must be one of {domains} (domains, then compositions)")
         if s.get("fact"):
             facts.setdefault(str(s["fact"]), []).append({**s, "domain": dom})
     for fact, xs in sorted(facts.items()):
