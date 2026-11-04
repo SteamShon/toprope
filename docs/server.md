@@ -42,6 +42,18 @@ Over stdio, the server refuses to start if `TOPROPE_TOKEN` does not resolve. Ove
 request without a valid bearer token gets 401. Behind a proxy, pass `--public-url` so the
 advertised resource URL is the one clients use.
 
+## Compositions and kernel services
+```bash
+# serve one member of a composition; every member runs in this process, wired, one SQLite store each
+uv run toprope-server --composition self.composition.yaml --member domain-authoring \
+  --store-dir .toprope/data --identity static:tokens.yaml --kernel-root .
+```
+- `--kernel-root DIR` runs declared kernel-service calls (ADR-0028) on files under DIR.
+  Without it, calls stay pending.
+- `--workspace` and `--env` give the source services and the preview and deploy services
+  what they need.
+- Several processes, one per served member, share state through the same `--store-dir`.
+
 ## Tools
 - **One tool per action**, named after it. Parameters and types come from the declaration.
   The description is built only from the declaration's words: who, when it is allowed, what

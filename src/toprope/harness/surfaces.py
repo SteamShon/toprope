@@ -15,6 +15,7 @@ from typing import Any
 from ..decl.models import Domain
 from ..exec import Execution
 from ..identity import Caller, StaticIdentity
+from ..kernel import KERNEL
 from ..semantics.model import ReferenceModel
 from ..semantics.types import Actor, Command, Event, Outcome
 from ..store import EventStore, MemoryEventStore
@@ -110,13 +111,15 @@ class ExecutionSurface(Surface):
         self.ex.seed(obj, data)
 
     def do(self, actor, action, target, params, key):
+        if actor.id == KERNEL:   # a kernel reply never comes through credentials (ADR-0028)
+            return observed(self.ex.receive_kernel_reply(key, action, target, dict(params)))
         return observed(self.ex.submit(self.ids.add(actor), action, target, dict(params), key))
 
     def state(self, oid):
         return self.ex.state(oid)
 
     def allowed(self, actor, oid):
-        return self.ex.allowed_actions(oid, Caller(actor))
+        return self.ex.allowed_actions(oid, actor if actor.kind == "system" else Caller(actor))
 
     def lookup(self, oid):
         return self.ex.lookup(oid)
@@ -171,11 +174,15 @@ class MCPSurface(ExecutionSurface):
         return sc if sc is not None else json.loads(res.content[0].text)
 
     def do(self, actor, action, target, params, key):
+        if actor.id == KERNEL:   # the kernel is not an MCP caller: its replies go to Execution
+            return super().do(actor, action, target, params, key)
         spec = self.ex.d.actions[action]
         arg = "new_id" if spec.creates else "target_id"
         return self._tool(actor, action, {arg: target, "idempotency_key": key, **params})
 
     def allowed(self, actor, oid):
+        if actor.id == KERNEL:
+            return super().allowed(actor, oid)
         return self._tool(actor, "allowed_actions", {"object_id": oid})
 
     def state(self, oid):

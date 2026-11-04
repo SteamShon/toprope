@@ -41,8 +41,14 @@ cell = {"oneOf": [
               ["by_role"]),
 ]}
 actor_rule = {"oneOf": [{"type": "string"}, obj({"role": {"type": "string"}, "where": EXPR}, ["role"])]}
-effect = obj({"set": {"type": "object", "additionalProperties":
-                      {"type": ["string", "number", "boolean", "null"]}}})  # `create` is not in v1
+effect = {"oneOf": [  # `create` is not in v1
+    obj({"set": {"type": "object", "additionalProperties": {"type": ["string", "number", "boolean", "null"]}}},
+        ["set"]),
+    obj({"call": {"enum": ["validate", "compile", "check_composition", "run_harness", "world_map",
+                           "read_source", "fetch_source", "preview", "deploy"]},       # kernel services (ADR-0028)
+         "with": {"type": "object", "additionalProperties": EXPR},
+         "reply": {"type": "string"}}, ["call", "reply"]),
+]}
 precondition = with_prov({"id": ID, "check": EXPR, "reason": {"type": "string"}}, ["id", "check", "reason"])
 action = with_prov({
     "description": {"type": "string"},

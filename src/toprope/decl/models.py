@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_vali
 from typing import Annotated
 
 Ident = Annotated[str, StringConstraints(pattern=r"^[A-Za-z_][A-Za-z0-9_-]*$")]
-RESERVED_ACTORS = {"system"}   # `external:<source>` is reserved too (refused until M0b)
+RESERVED_ACTORS = {"system", "external:kernel"}   # other `external:<source>` actors: M0b (ADR-0028)
 
 
 class Strict(BaseModel):
@@ -95,6 +95,19 @@ class ActorRule(Strict):
 class Effect(Strict):
     set: dict[str, Union[str, int, float, bool, None]] | None = None
     create: str | None = None   # not in v1: rejected at compile time (ADR-0021)
+    call: str | None = None     # a kernel service (ADR-0028)
+    with_: dict[str, str] = Field(default_factory=dict, alias="with")   # service input → expression
+    reply: str | None = None    # the action that receives the service's result
+
+    @model_validator(mode="after")
+    def _one_kind(self) -> Effect:
+        if sum(x is not None for x in (self.set, self.create, self.call)) != 1:
+            raise ValueError("an effect is exactly one of `set`, `create` or `call`")
+        if self.call is None and (self.with_ or self.reply):
+            raise ValueError("`with` and `reply` belong to a `call` effect")
+        if self.call is not None and not self.reply:
+            raise ValueError("a `call` effect names the `reply` action that receives the result")
+        return self
 
 
 class Action(Provenance):
@@ -118,8 +131,8 @@ class Action(Provenance):
         if self.approvals is not None:
             raise not_yet("approvals", "M0b")
         for r in self.actor:
-            if isinstance(r, str) and r.startswith("external:"):
-                raise not_yet("external actors (`external:<source>`)", "M0b")
+            if isinstance(r, str) and r.startswith("external:") and r != "external:kernel":
+                raise not_yet("external actors other than `external:kernel` (ADR-0028)", "M0b")
         return self
 
     @property

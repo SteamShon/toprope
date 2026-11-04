@@ -56,11 +56,15 @@ class SmallWorld:
 
 
 def world_actors(d: Domain) -> dict[str, Actor]:
-    """One person per role: the first name the world declares for it, else `<role>-1`."""
+    """One person per role: the first name the world declares for it, else `<role>-1`. If an
+    action is for `external:kernel` (ADR-0028), the kernel is an actor too."""
+    from ..kernel import KERNEL
     out = {}
     for role in d.roles:
         names = d.world.actors.get(role) or [f"{role}-1"]
         out[role] = Actor(names[0], "person", (role,))
+    if any((r.role if hasattr(r, "role") else r) == KERNEL for a in d.actions.values() for r in a.actor):
+        out[KERNEL] = Actor(KERNEL, "system", (KERNEL,))
     return out
 
 

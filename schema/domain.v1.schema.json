@@ -346,22 +346,61 @@
           "effects": {
             "type": "array",
             "items": {
-              "type": "object",
-              "properties": {
-                "set": {
+              "oneOf": [
+                {
                   "type": "object",
-                  "additionalProperties": {
-                    "type": [
-                      "string",
-                      "number",
-                      "boolean",
-                      "null"
-                    ]
-                  }
+                  "properties": {
+                    "set": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": [
+                          "string",
+                          "number",
+                          "boolean",
+                          "null"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "set"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "call": {
+                      "enum": [
+                        "validate",
+                        "compile",
+                        "check_composition",
+                        "run_harness",
+                        "world_map",
+                        "read_source",
+                        "fetch_source",
+                        "preview",
+                        "deploy"
+                      ]
+                    },
+                    "with": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string",
+                        "description": "check-language expression (docs/domain-schema.md)"
+                      }
+                    },
+                    "reply": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "call",
+                    "reply"
+                  ],
+                  "additionalProperties": false
                 }
-              },
-              "required": [],
-              "additionalProperties": false
+              ]
             }
           },
           "records_decision": {

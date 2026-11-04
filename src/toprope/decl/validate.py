@@ -105,7 +105,14 @@ def validate_domain(d: Domain) -> list[Issue]:
             add(Issue("duplicate-id", where, "precondition ids must be unique"))
         for p in a.preconditions:
             issues += _check_expr(d, p.check, f"{where}.preconditions.{p.id}", a.object_type, set(a.params))
-        for e in a.effects:
+        roles_named = {r.role if isinstance(r, ActorRule) else r for r in a.actor}
+        if "external:kernel" in roles_named and roles_named - {"external:kernel"}:
+            add(Issue("mixed-external", f"{where}.actor",
+                      "an action is either for `external:kernel` or for others: declare two actions"))
+        for k, e in enumerate(a.effects):
+            if e.call is not None:
+                issues += _check_call(d, name, a, k, e)
+                continue
             if e.create is not None:
                 add(Issue("unsupported-effect", f"{where}.effects", f"create effects are not supported yet ({e.create})"))
             for key, value in (e.set or {}).items():
@@ -280,3 +287,37 @@ def _compatible(t: str, spec) -> bool:
     if spec.ref is not None or spec.enum is not None:
         return t == "string"
     return t == spec.type or (t == "integer" and spec.type == "number")
+
+
+def _check_call(d: Domain, name: str, a, k: int, e) -> list[Issue]:
+    """A kernel-service call (ADR-0028): the service, its inputs, and the reply action."""
+    from ..kernel import CATALOG, KERNEL
+    out: list[Issue] = []
+    where = f"actions.{name}.effects[{k}]"
+    svc = CATALOG.get(e.call)
+    if svc is None:
+        return [Issue("unknown-service", where, f"no kernel service '{e.call}' (one of {sorted(CATALOG)})")]
+    for i in svc.inputs:
+        if i not in e.with_:
+            out.append(Issue("missing-input", f"{where}.with", f"{e.call} needs '{i}'"))
+    for i, src in e.with_.items():
+        if i not in svc.inputs:
+            out.append(Issue("unknown-input", f"{where}.with.{i}", f"{e.call} has no input '{i}'"))
+        out += _check_expr(d, src, f"{where}.with.{i}", a.object_type, set(a.params))
+    r = d.actions.get(e.reply)
+    if r is None:
+        return out + [Issue("unknown-reply", f"{where}.reply", f"no action '{e.reply}'")]
+    if r.object_type != a.object_type or r.target is None:
+        out.append(Issue("reply-target", f"{where}.reply",
+                         f"{e.reply} must target {a.object_type}, the object that called {e.call}"))
+    if KERNEL not in {x.role if isinstance(x, ActorRule) else x for x in r.actor}:
+        out.append(Issue("reply-actor", f"{where}.reply", f"{e.reply} must allow `{KERNEL}`"))
+    fields = svc.fields()
+    for p, spec in r.params.items():
+        if p not in fields:
+            out.append(Issue("reply-param", f"actions.{e.reply}.params.{p}",
+                             f"{e.call} returns no '{p}' (it returns {sorted(fields)})"))
+        elif spec.many or spec.ref or spec.enum or spec.type != fields[p]:
+            out.append(Issue("reply-param-type", f"actions.{e.reply}.params.{p}",
+                             f"{e.call} returns '{p}' as a {fields[p]}"))
+    return out
