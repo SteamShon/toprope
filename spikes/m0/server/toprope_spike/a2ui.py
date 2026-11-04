@@ -31,8 +31,8 @@ def merge_overlay(base: dict[str, Any], overlay: dict[str, Any] | None) -> dict[
                             tgt.setdefault("sections", []).append(sec)
                 else:
                     tgt[key] = val
-    out["aliases"] = overlay.get("aliases", {})
-    out["host_components"] = overlay.get("components", {})
+    out["aliases"] = {**out.get("aliases", {}), **overlay.get("aliases", {})}
+    out["host_components"] = {**out.get("components", {}), **overlay.get("components", {})}
     return out
 
 
