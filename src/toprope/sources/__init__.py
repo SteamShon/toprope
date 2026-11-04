@@ -44,6 +44,7 @@ class SourceSpec:
     globs: tuple[str, ...] = ()
     local_only: bool = False
     exclude: tuple[str, ...] = ()
+    url: str | None = None                      # a link: fetched once into `path` (a snapshot)
 
 
 @dataclass(frozen=True)
@@ -178,4 +179,61 @@ def read(spec: SourceSpec, root: Path, extra_redactions=None, exclude: tuple[str
     return out
 
 
-__all__ = ["DEFAULT_EXCLUDE", "ELEMENT_KIND", "Chunk", "SourceSpec", "files", "read", "redact"]
+# -- links ---------------------------------------------------------------------------------------
+MAX_FETCH_BYTES = 2 * 1024 * 1024
+SNAPSHOTS = ".toprope/snapshots"
+
+
+class FetchError(Exception):
+    pass
+
+
+def _html_to_text(html: str) -> str:
+    import html as h
+    html = re.sub(r"(?is)<(script|style|noscript)[^>]*>.*?</\1>", " ", html)
+    html = re.sub(r"(?i)<br\s*/?>|</(p|div|li|h[1-6]|tr)>", "\n", html)
+    html = re.sub(r"(?i)<h([1-3])[^>]*>", lambda m: "\n" + "#" * int(m.group(1)) + " ", html)
+    text = h.unescape(re.sub(r"<[^>]+>", " ", html))
+    return "\n".join(line.strip() for line in text.splitlines() if line.strip())
+
+
+def fetch(spec: SourceSpec, root: Path, timeout: float = 20) -> dict:
+    """Fetch a link source once into its snapshot directory (`path`). The snapshot is what the
+    readers read, so every chunk is redacted like any other file, and refs stay stable."""
+    import hashlib
+    import urllib.request
+    from datetime import datetime, timezone
+    if not spec.url or not spec.url.lower().startswith(("http://", "https://")):
+        raise FetchError(f"source {spec.id}: only http(s) links can be fetched")
+    if spec.kind not in ("records", "transcripts"):
+        raise FetchError(f"source {spec.id}: a link can be a records or transcripts source; "
+                         "clone a repository and give its path instead")
+    req = urllib.request.Request(spec.url, headers={"User-Agent": "toprope-author/0", "Accept": "text/*, application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            ctype = r.headers.get("Content-Type", "")
+            body = r.read(MAX_FETCH_BYTES + 1)
+    except Exception as e:
+        raise FetchError(f"source {spec.id}: could not fetch {spec.url} ({type(e).__name__}: {e}). "
+                         "A private document (behind a login) cannot be fetched: download it into the "
+                         "workspace and give its path instead.") from None
+    if len(body) > MAX_FETCH_BYTES:
+        raise FetchError(f"source {spec.id}: larger than {MAX_FETCH_BYTES} bytes")
+    if not (ctype.startswith("text/") or "json" in ctype or "xml" in ctype or not ctype):
+        raise FetchError(f"source {spec.id}: not text ({ctype})")
+    text = body.decode("utf-8", errors="replace")
+    if "html" in ctype or text.lstrip()[:15].lower().startswith(("<!doctype html", "<html")):
+        text = _html_to_text(text)
+    out = (root / spec.path).resolve()
+    if not out.is_relative_to(root.resolve()):
+        raise FetchError(f"source {spec.id}: snapshot path outside the workspace")
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "snapshot.md").write_text(text)
+    meta = {"url": spec.url, "fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "content_type": ctype, "sha256": hashlib.sha256(body).hexdigest(), "bytes": len(body)}
+    (out / "snapshot.json").write_text(json.dumps(meta, indent=2))
+    return meta
+
+
+__all__ = ["DEFAULT_EXCLUDE", "ELEMENT_KIND", "SNAPSHOTS", "Chunk", "FetchError", "SourceSpec", "fetch", "files",
+           "read", "redact"]

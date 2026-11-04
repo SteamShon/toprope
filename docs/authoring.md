@@ -7,7 +7,9 @@ Phase A runs on them.
 ```bash
 uv run toprope-author init .                     # writes toprope.workspace.yaml
 claude mcp add toprope-authoring -- uv run --directory /path/to/toprope toprope-author serve --workspace "$PWD"
-uv run toprope-author questions                  # what the interview asks next
+uv run toprope-author progress                   # where each stage stands
+uv run toprope-author questions                  # the current stage's bundle
+uv run toprope-author fetch                      # fetch link sources into snapshots
 uv run toprope-author confirm actions.approve    # only you confirm
 uv run toprope-author check                      # validate + model-level harness on the draft
 ```
@@ -56,15 +58,36 @@ uv run toprope-author check                      # validate + model-level harnes
   - the MCP `confirm` tool, which shows the owner an elicitation prompt in their client and
     confirms only on acceptance. A client that cannot show one is refused.
 
-## Questions (ADR-0014)
-`questions` lists the interview's next questions, highest priority first:
-1. **Purpose**, when it is missing (ADR-0023).
-2. **Conflicts**: validation errors in the draft.
-3. **Defaults**: one question per action with two or more undecided cells, such as "In
+## Stages (ADR-0025, proposed)
+The interview runs in nine stages, in the order the declaration's parts depend on:
+
+`sources → purpose → cast (roles, objects, links) → actions → transitions → invariants →
+world (fixtures, scenarios) → handoffs → review (confirmations, glossary)`
+
+- **One stage at a time.** `questions` returns the **current stage's bundle**: conflicts
+  first, then what is missing. The current stage is the first one not done, so a later
+  break sends the interview back.
+- **Each round.** For the current stage, the agent:
+  1. drafts what the sources support (citing them)
+  2. asks the whole bundle at once
+  3. shows `progress`: every stage as done, current, todo or skipped, with counts
+  4. records the owner's answer with `answer(bundle_id, ...)`
+- **Skipping.** `skip_stage` records, in the owner's words, that an optional stage
+  (invariants, handoffs) has nothing.
+- **Link sources.** A source may be a link, `{id: wiki, kind: records, url: ...}`.
+  `toprope-author fetch` (or the MCP tool `fetch_source`) fetches it once into
+  `.toprope/snapshots/<id>/`. From there it is read and redacted like a file. A page behind
+  a login cannot be fetched: download it and give its path.
+
+## Questions within a stage (ADR-0014)
+Inside a bundle, conflicts come first. In the transitions stage, ADR-0014's question kinds
+apply, highest priority first:
+1. **Defaults**: one question per action with two or more undecided cells, such as "In
    which states can someone approve a drafted experiment at all?". The answer settles the
    whole column.
-4. **Grouped rows**: one question per state with undecided cells.
-5. **Confirmations**: the drafted elements still `proposed`.
+2. **Grouped rows**: one question per state with undecided cells.
+
+Purpose comes from its own stage, and confirmations from the review stage.
 
 Priority comes from attempts recorded in the event store (×100), then risk (an action with
 effects or a decision record, ×10), then how many cells the answer decides. The **stop

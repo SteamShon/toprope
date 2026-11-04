@@ -44,10 +44,11 @@ def _guard(fn):
 
 def build_authoring_server(ws: Workspace, **server_kwargs: Any) -> MCPServer:
     server = MCPServer(name="toprope-authoring", instructions=(
-        "Draft a Toprope declaration from sources and interview its owner (ADR-0014). Cite a "
-        "source ref for every element you propose. You write only `proposed`; the owner confirms. "
-        "Ask questions() in order: purpose first, then defaults and grouped cells. Record the "
-        "owner's own words with answer(). Stop when questions() says stop."), **server_kwargs)
+        "Draft a Toprope declaration from sources and interview its owner, stage by stage "
+        "(ADR-0025, ADR-0014). For the current stage: draft what the sources support (propose, "
+        "citing a source ref), then ask the owner the stage's whole bundle from questions() at "
+        "once, show them progress, and record their own words with answer(bundle_id, ...). Move "
+        "on when questions() moves to the next stage. You write only `proposed`; the owner confirms."), **server_kwargs)
 
     @_guard
     def list_sources() -> list[dict[str, Any]]:
@@ -80,11 +81,28 @@ def build_authoring_server(ws: Workspace, **server_kwargs: Any) -> MCPServer:
         return ws.propose(path, value, source_ref, quote)
 
     @_guard
-    def questions(limit: int = 10) -> dict[str, Any]:
-        """The next interview questions, highest priority first: purpose, conflicts, defaults
-        for a whole action, grouped rows of undecided cells, then confirmations. Includes the
-        stop rule's verdict."""
-        return ws.questions(limit)
+    def questions(limit: int = 10, stage: str | None = None) -> dict[str, Any]:
+        """The current stage's bundle of questions (ADR-0025), with the progress of every stage.
+        Stages: sources, purpose, cast (roles, objects, links), actions, transitions,
+        invariants, world (fixtures, scenarios), handoffs, review. Ask the whole bundle at once,
+        show the owner the progress, and record their answer with answer(bundle_id, ...)."""
+        return ws.questions(limit, stage=stage)
+
+    @_guard
+    def progress() -> dict[str, Any]:
+        """Where the domain stands: each stage done, current, todo or skipped, with counts."""
+        return ws.progress()
+
+    @_guard
+    def skip_stage(stage: str, reason: str) -> dict[str, Any]:
+        """Record, in the owner's words, that an optional stage (invariants, handoffs) has
+        nothing in this domain."""
+        return ws.skip_stage(stage, reason)
+
+    @_guard
+    def fetch_source(source_id: str) -> list[dict[str, Any]]:
+        """Fetch a link source once into its snapshot, so it can be read and cited."""
+        return ws.fetch(source_id)
 
     @_guard
     def answer(question_id: str, answer: str, decisions: list[dict[str, Any]],
@@ -111,7 +129,7 @@ def build_authoring_server(ws: Workspace, **server_kwargs: Any) -> MCPServer:
         unconfirmed cells: one compiled iteration."""
         return ws.check()
 
-    for fn in (list_sources, read_source, search_sources, get_draft, propose, questions, answer,
-               confirm, check_draft):
+    for fn in (list_sources, read_source, search_sources, fetch_source, get_draft, propose, questions,
+               progress, skip_stage, answer, confirm, check_draft):
         server.add_tool(fn, name=fn.__name__)
     return server
