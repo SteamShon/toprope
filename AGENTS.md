@@ -104,6 +104,11 @@ umbrella is up to date with `develop`.
 - Do not change the claim-status table, ADR decisions or gold sets on your own initiative.
   Propose them in the PR description instead.
 - Do not put model identifiers in commits, PRs or code.
+- **Real tests only.** A new test must fail against the code before your change (or cover
+  behavior the change adds). Never write a test that already passes against the old code
+  and call it coverage. Never skip, delete, `xfail`, comment out or weaken a test, or loosen
+  an assertion, to get green: fix the code, or stop and explain. This applies equally to
+  generated harnesses and to the M1 instruments.
 
 ## Repository settings (maintainer)
 
