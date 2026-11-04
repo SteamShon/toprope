@@ -1,0 +1,1079 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://toprope.dev/schema/domain.v1.schema.json",
+  "title": "Toprope domain declaration v1 (docs/domain-schema.md, ADR-0023)",
+  "$defs": {
+    "source": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "system",
+            "record",
+            "interview",
+            "use"
+          ]
+        },
+        "ref": {
+          "type": "string"
+        },
+        "quote": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "fixed_duration": {
+      "type": "object",
+      "properties": {
+        "days": {
+          "type": "number"
+        },
+        "hours": {
+          "type": "number"
+        },
+        "minutes": {
+          "type": "number"
+        }
+      },
+      "required": [],
+      "additionalProperties": false,
+      "minProperties": 1
+    }
+  },
+  "type": "object",
+  "properties": {
+    "domain": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "owner": {
+      "type": "string"
+    },
+    "purpose": {
+      "type": "object",
+      "properties": {
+        "problem": {
+          "type": "string"
+        },
+        "success_metric": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "definition": {
+              "type": "string"
+            },
+            "direction": {
+              "enum": [
+                "up",
+                "down"
+              ]
+            }
+          },
+          "required": [
+            "name",
+            "direction"
+          ],
+          "additionalProperties": false
+        },
+        "announcement": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "problem"
+      ],
+      "additionalProperties": false
+    },
+    "glossary": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "objects": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "properties": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "enum": [
+                    "string",
+                    "integer",
+                    "number",
+                    "boolean",
+                    "datetime"
+                  ]
+                },
+                "enum": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "optional": {
+                  "type": "boolean"
+                },
+                "min": {
+                  "type": "number"
+                },
+                "max": {
+                  "type": "number"
+                }
+              },
+              "required": [],
+              "additionalProperties": false,
+              "oneOf": [
+                {
+                  "required": [
+                    "type"
+                  ]
+                },
+                {
+                  "required": [
+                    "enum"
+                  ]
+                }
+              ]
+            }
+          },
+          "source": {
+            "$ref": "#/$defs/source"
+          },
+          "status": {
+            "enum": [
+              "proposed",
+              "confirmed",
+              "unknown"
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    "links": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "cardinality": {
+            "enum": [
+              "one-to-one",
+              "one-to-many",
+              "many-to-one",
+              "many-to-many"
+            ]
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "source": {
+            "$ref": "#/$defs/source"
+          },
+          "status": {
+            "enum": [
+              "proposed",
+              "confirmed",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "cardinality"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "actions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "actor": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "role": {
+                      "type": "string"
+                    },
+                    "where": {
+                      "type": "string",
+                      "description": "check-language expression (docs/domain-schema.md)"
+                    }
+                  },
+                  "required": [
+                    "role"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "minItems": 1
+          },
+          "target": {
+            "type": "string"
+          },
+          "creates": {
+            "type": "string"
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "enum": [
+                    "string",
+                    "integer",
+                    "number",
+                    "boolean",
+                    "datetime"
+                  ]
+                },
+                "enum": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "ref": {
+                  "type": "string"
+                },
+                "many": {
+                  "type": "boolean"
+                },
+                "optional": {
+                  "type": "boolean"
+                }
+              },
+              "required": [],
+              "additionalProperties": false,
+              "oneOf": [
+                {
+                  "required": [
+                    "type"
+                  ]
+                },
+                {
+                  "required": [
+                    "enum"
+                  ]
+                },
+                {
+                  "required": [
+                    "ref"
+                  ]
+                }
+              ]
+            }
+          },
+          "preconditions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$"
+                },
+                "check": {
+                  "type": "string",
+                  "description": "check-language expression (docs/domain-schema.md)"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "source": {
+                  "$ref": "#/$defs/source"
+                },
+                "status": {
+                  "enum": [
+                    "proposed",
+                    "confirmed",
+                    "unknown"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "check",
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "effects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "set": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean",
+                      "null"
+                    ]
+                  }
+                }
+              },
+              "required": [],
+              "additionalProperties": false
+            }
+          },
+          "records_decision": {
+            "type": "boolean"
+          },
+          "event": {
+            "type": "string"
+          },
+          "applies_in": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "requires": {
+            "enum": [
+              "human"
+            ]
+          },
+          "approvals": {
+            "type": "object",
+            "properties": {
+              "count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "from_role": {
+                "type": "string"
+              },
+              "distinct": {
+                "type": "boolean"
+              },
+              "within": {
+                "$ref": "#/$defs/fixed_duration"
+              }
+            },
+            "required": [
+              "count",
+              "from_role"
+            ],
+            "additionalProperties": false
+          },
+          "source": {
+            "$ref": "#/$defs/source"
+          },
+          "status": {
+            "enum": [
+              "proposed",
+              "confirmed",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "description",
+          "actor"
+        ],
+        "additionalProperties": false,
+        "oneOf": [
+          {
+            "required": [
+              "target"
+            ]
+          },
+          {
+            "required": [
+              "creates"
+            ]
+          }
+        ]
+      }
+    },
+    "transitions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "initial": {
+            "type": "string"
+          },
+          "matrix": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": {
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "deny": {
+                        "type": "string"
+                      },
+                      "source": {
+                        "$ref": "#/$defs/source"
+                      },
+                      "status": {
+                        "enum": [
+                          "proposed",
+                          "confirmed",
+                          "unknown"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "deny"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "to": {
+                        "type": "string"
+                      },
+                      "source": {
+                        "$ref": "#/$defs/source"
+                      },
+                      "status": {
+                        "enum": [
+                          "proposed",
+                          "confirmed",
+                          "unknown"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "to"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "by_role": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "oneOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "deny": {
+                                  "type": "string"
+                                },
+                                "source": {
+                                  "$ref": "#/$defs/source"
+                                },
+                                "status": {
+                                  "enum": [
+                                    "proposed",
+                                    "confirmed",
+                                    "unknown"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "deny"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ]
+                        }
+                      },
+                      "source": {
+                        "$ref": "#/$defs/source"
+                      },
+                      "status": {
+                        "enum": [
+                          "proposed",
+                          "confirmed",
+                          "unknown"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "by_role"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "field",
+          "matrix"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "invariants": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$"
+          },
+          "on": {
+            "type": "string"
+          },
+          "check": {
+            "type": "string",
+            "description": "check-language expression (docs/domain-schema.md)"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "scope": {
+            "enum": [
+              "aggregate",
+              "cross"
+            ]
+          },
+          "enforced_by": {
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/$defs/source"
+          },
+          "status": {
+            "enum": [
+              "proposed",
+              "confirmed",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "on",
+          "check",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "scope": {
+                  "const": "cross"
+                }
+              },
+              "required": [
+                "scope"
+              ]
+            },
+            "then": {
+              "required": [
+                "enforced_by"
+              ]
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "enforced_by"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "reservations": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "on": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string",
+            "description": "check-language expression (docs/domain-schema.md)"
+          },
+          "while_in": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "capacity": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "on",
+          "key",
+          "while_in"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "timers": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "on": {
+            "type": "string"
+          },
+          "in_state": {
+            "type": "string"
+          },
+          "after": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "days": {
+                    "type": "number"
+                  },
+                  "hours": {
+                    "type": "number"
+                  },
+                  "minutes": {
+                    "type": "number"
+                  }
+                },
+                "required": [],
+                "additionalProperties": false,
+                "minProperties": 1
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "unit": {
+                    "enum": [
+                      "days",
+                      "hours",
+                      "minutes"
+                    ]
+                  }
+                },
+                "required": [
+                  "field",
+                  "unit"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "do": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "on",
+          "in_state",
+          "after",
+          "do"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "functions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "inputs": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "enum": [
+                    "string",
+                    "integer",
+                    "number",
+                    "boolean",
+                    "datetime"
+                  ]
+                },
+                "enum": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "ref": {
+                  "type": "string"
+                },
+                "many": {
+                  "type": "boolean"
+                },
+                "optional": {
+                  "type": "boolean"
+                }
+              },
+              "required": [],
+              "additionalProperties": false,
+              "oneOf": [
+                {
+                  "required": [
+                    "type"
+                  ]
+                },
+                {
+                  "required": [
+                    "enum"
+                  ]
+                },
+                {
+                  "required": [
+                    "ref"
+                  ]
+                }
+              ]
+            }
+          },
+          "output": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "enum": [
+                  "string",
+                  "integer",
+                  "number",
+                  "boolean",
+                  "datetime"
+                ]
+              },
+              "enum": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "ref": {
+                "type": "string"
+              },
+              "many": {
+                "type": "boolean"
+              },
+              "optional": {
+                "type": "boolean"
+              }
+            },
+            "required": [],
+            "additionalProperties": false,
+            "oneOf": [
+              {
+                "required": [
+                  "type"
+                ]
+              },
+              {
+                "required": [
+                  "enum"
+                ]
+              },
+              {
+                "required": [
+                  "ref"
+                ]
+              }
+            ]
+          },
+          "examples": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "properties": {
+                "in": {
+                  "type": "object"
+                },
+                "out": {}
+              },
+              "required": [
+                "in",
+                "out"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "inputs",
+          "output",
+          "examples"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "external": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "actions"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "handoffs": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "when": {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string"
+              },
+              "outcome": {
+                "enum": [
+                  "ok"
+                ]
+              }
+            },
+            "required": [
+              "action"
+            ],
+            "additionalProperties": false
+          },
+          "to": {
+            "type": "object",
+            "properties": {
+              "domain": {
+                "type": "string"
+              },
+              "interface": {
+                "type": "string"
+              },
+              "action": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "domain",
+              "interface",
+              "action"
+            ],
+            "additionalProperties": false
+          },
+          "target": {
+            "type": "string",
+            "description": "check-language expression (docs/domain-schema.md)"
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "check-language expression (docs/domain-schema.md)"
+            }
+          }
+        },
+        "required": [
+          "when",
+          "to",
+          "target"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "world": {
+      "type": "object",
+      "properties": {
+        "fixtures": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "minProperties": 1,
+            "maxProperties": 1,
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "additionalProperties": true
+            }
+          }
+        },
+        "actors": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$"
+          },
+          "given": {
+            "type": "object"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "actor": {
+                  "type": "object",
+                  "minProperties": 1
+                },
+                "do": {
+                  "type": "string"
+                },
+                "read": {
+                  "type": "object"
+                },
+                "advance": {
+                  "type": "object",
+                  "properties": {
+                    "days": {
+                      "type": "number"
+                    },
+                    "hours": {
+                      "type": "number"
+                    },
+                    "minutes": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [],
+                  "additionalProperties": false,
+                  "minProperties": 1
+                },
+                "target": {
+                  "type": "string"
+                },
+                "params": {
+                  "type": "object"
+                },
+                "expect": {
+                  "type": "object"
+                }
+              },
+              "required": [],
+              "additionalProperties": false,
+              "oneOf": [
+                {
+                  "required": [
+                    "do",
+                    "actor"
+                  ]
+                },
+                {
+                  "required": [
+                    "read",
+                    "actor"
+                  ]
+                },
+                {
+                  "required": [
+                    "advance"
+                  ]
+                }
+              ]
+            },
+            "minItems": 1
+          }
+        },
+        "required": [
+          "id",
+          "steps"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "domain",
+    "version"
+  ],
+  "additionalProperties": false
+}

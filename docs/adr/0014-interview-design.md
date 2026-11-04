@@ -9,6 +9,9 @@ states × actions × roles. With 10 states, 15 actions and 4 roles there are 600
 about each cell would make ① fail on cost.
 
 ## Decision
+0. **Open with purpose** (ADR-0023): the problem, one success metric, and a short
+   announcement written before anything is built. If it cannot be written, the domain is not
+   understood yet.
 1. **Defaults first.** The drafter proposes defaults that the owner confirms once, instead
    of cell by cell. Examples:
    - an action **applies only in** the states listed in its `applies_in` field (a field

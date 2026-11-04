@@ -1,13 +1,38 @@
-# Domain schema v0 (draft)
+# Domain schema v1
 
-Link: ① ② ④. The core is **Object, Link, Action**, plus a **transition matrix** and
-**invariants** per stateful object (ADR-0010). How the domain is shown lives in a separate,
-separately compiled **representation** layer (ADR-0008, below). Further concepts (policy,
-execution contract, flow orchestration) are added only when a milestone shows a concrete
-need, each with an ADR naming that need.
+Link: ① ② ③ ④. **The complete declaration language** (ADR-0023). Every construct is defined
+here, with its status. A construct marked *defined* has fixed syntax and meaning, but the
+kernel rejects it with a clear "not implemented yet" error until its milestone. Machine-
+readable schemas: [`schema/domain.v1.schema.json`](../schema/domain.v1.schema.json) and
+[`schema/representation.v1.schema.json`](../schema/representation.v1.schema.json).
+
+| Construct | Section | Status |
+|---|---|---|
+| `domain`, `version`, `owner`, `glossary`, `roles` | core | implemented (M0a) |
+| `objects` (properties, provenance) | core | implemented (M0a) |
+| `links` | core | implemented (M0a) |
+| `actions`: actor rules (role, relation), `target`/`creates`, params, preconditions, `set` effects, `records_decision`, `event`, `applies_in`, `requires: human` | core | implemented (M0a) |
+| `transitions` (matrix cells: state, `deny`, `n/a`, `undecided`, `to`, `by_role`) | core | implemented (M0a) |
+| `invariants` with `scope: aggregate` | core | implemented (M0a) |
+| `world` (fixtures, actors), `scenarios` (`do`, `read` steps) | core, scenarios | implemented (M0a) |
+| `purpose` (problem, success metric, announcement) | [Purpose](#purpose) | M0a (metadata only) |
+| `handoffs` | [Handoffs](#handoffs) | M1 (ADR-0022) |
+| `approvals` on actions | [Approvals](#approvals) | defined; M0b |
+| `invariants` with `scope: cross` + `reservations` | [Reservations](#cross-aggregate-invariants-and-reservations) | defined; M0b |
+| `timers`, scenario `advance` steps | [Timers](#timers) | defined; M0b |
+| `functions` | [Functions](#functions) | defined; M0b |
+| `external` sources and `external:<source>` actors | [External events](#external-events) | defined; M0b |
+| representation files and host overlays | [Representation](#representation-layer-adr-0008) | defined; M0b |
+| `create` effects | — | **not in v1** (rejected, ADR-0021) |
+
+The core is **Object, Link, Action**, plus a **transition matrix** and **invariants** per
+stateful object (ADR-0010). How the domain is shown lives in a separate, separately compiled
+**representation** layer (ADR-0008). Concepts not listed here (policy, execution contract,
+flow orchestration) are added only by an ADR naming the need.
 
 Do not confuse the deferred *execution contract* concept with the **domain interface**. The
-domain interface is a compiler output that the representation layer reads (ADR-0008).
+domain interface is a compiler output that the representation layer and handoffs read
+(ADR-0008).
 
 ```yaml
 domain: example
@@ -212,6 +237,183 @@ the UI level. `read` steps check what a declared view shows in that state, for t
 Scenarios used as an experiment's held-out gold set are kept outside the domain, so they
 cannot be edited by the loop they evaluate.
 
+## Purpose
+
+Why the domain exists. The interview opens with this (ADR-0014, ADR-0023). It is written in
+the owner's words, with no technical terms. A 3–6 sentence "announcement" written *before*
+the domain is built is the test: if it cannot be written, the domain is not understood yet.
+
+```yaml
+purpose:
+  problem: "Experiments get approved and launched by word of mouth, so nobody can tell later why one shipped."
+  success_metric: {name: "decisions with recorded rationale", direction: up,
+                   definition: "share of ship/kill decisions with inputs and rationale on record"}
+  announcement: >
+    Experiments now go through one place. You can see who approved what, why, and on which
+    readout. Launching without approval is no longer possible.
+```
+
+Metadata only: it is shown in the world map and the change report, and it is the first
+interview topic. It never changes behavior.
+
+## Handoffs
+
+A typed request from this domain into another domain's **published interface** (ADR-0022).
+The handoff names an action of the other domain, and maps its params from this domain's
+state with expressions. The compiler checks the mapping against the other domain's interface,
+so a major bump there breaks the handoff at compile time.
+
+```yaml
+handoffs:
+  deliver_approved_version:
+    when: {action: approve_version, outcome: ok}       # fires after this action succeeds
+    to:   {domain: domain-delivery, interface: "1.x", action: request_delivery}
+    params:
+      domain_id: target.domain_id
+      version: target.number
+      environment: "'staging'"
+      approver: actor.id
+    target: "target.domain_id + ':' + target.number"   # id of the request in the receiving domain
+```
+
+How a handoff runs (docs/semantics.md step 12):
+- It is sent from an **outbox after the sender's action is appended**. It never blocks or
+  rolls back the sender's action.
+- The command in the receiving domain names its `target` (an expression, as with `params`).
+  Its actor is the `system` actor `handoff:<name>`, acting on behalf of the person who
+  caused the sender's action (that person's principal, if an agent acted). Its idempotency
+  key is `<handoff name>:<sender event id>`, so retries never deliver twice.
+- The receiving action must allow `system` in its actor rule. It is then evaluated like any
+  other command, with all the receiver's rules.
+- The outcome is recorded in both stores, linked by the handoff id. A denial becomes a
+  `HandoffDenied` event in the sender's domain, which the sender's own rules and proposals
+  can react to.
+
+## Approvals
+
+An action may need several distinct approvers before it fires (ADR-0015).
+
+```yaml
+actions:
+  ship_experiment:
+    description: Ship the winning variant.
+    actor: [approver]
+    target: Experiment
+    approvals: {count: 2, from_role: approver, distinct: true}
+```
+
+Each call records an `ApprovalRecorded` event and returns `pending` until the count is
+reached. Then the transition fires as a normal command (docs/semantics.md step 7). Rules:
+- An approval counts only if its caller passes the action's actor rule **and** holds
+  `from_role`.
+- `distinct` counts **people**. An agent's approval counts as its principal's, so one person
+  cannot meet a two-person rule through agents.
+- Approvals are bound to the target's version. Any change to the target resets them, and
+  firing the action resets them too. An optional `within: {hours: 48}` expires them.
+
+## Cross-aggregate invariants and reservations
+
+An invariant across objects declares `scope: cross` and names the reservation that enforces
+it (ADR-0015). A reservation is a small generated aggregate, keyed by an expression. An
+object holds a claim for as long as it stays in the listed states.
+
+```yaml
+invariants:
+  - id: one-running-per-surface
+    on: Experiment
+    scope: cross
+    enforced_by: running-slot
+    check: "true"       # the reservation enforces it; the check documents intent
+    reason: At most one experiment runs on a surface at a time.
+
+reservations:
+  running-slot:
+    on: Experiment
+    key: target.surface
+    while_in: [running]
+    capacity: 1
+```
+
+Rules:
+- In v1 a `cross` invariant **must** name `enforced_by`. The check language cannot range
+  over other objects, so an "after the fact" cross check could not be written.
+- `enforced_by` is only valid on `scope: cross`.
+- `capacity` defaults to 1.
+- If an effect changes the `key` of an object that holds a claim, the claim moves to the new
+  key in the same saga. It is denied (`denied: reservation`) if the new key is full.
+
+## Timers
+
+A timer issues an action as the `system` actor when an object has been in a state for a
+while (ADR-0015). The fired action must list `system` in its actor rule, or the timer is a
+compile error. Deadlines are timers that fire a "deadline passed" action. The harness runs
+on a virtual clock, and scenarios advance it explicitly.
+
+```yaml
+timers:
+  end-after-planned-days:
+    on: Experiment
+    in_state: running
+    after: {field: planned_days, unit: days}   # or a fixed {days: 14} / {hours: 6}
+    do: end_experiment
+```
+
+Scenario step to move the virtual clock: `- {advance: {days: 15}}`.
+
+## Functions
+
+Typed, pure computations that do not belong in generated code, such as a sample size or a
+statistical readout (ADR-0015). They are implemented outside the declaration (by a person
+or an agent) and must pass their declared examples as contract tests. Checks and effects
+call them by name.
+
+```yaml
+functions:
+  sample_size:
+    description: Users per variant for the minimum detectable effect.
+    inputs: {baseline: {type: number}, mde: {type: number}}
+    output: {type: integer}
+    examples:
+      - {in: {baseline: 0.1, mde: 0.02}, out: 3623}
+```
+
+Usage in a check: `"count(target.variants) * sample_size(target.baseline, target.mde) <= target.traffic"`.
+
+Functions may be called in actor relations, preconditions, effects and invariants (steps
+4–10), and while computing allowed actions for views. So they must be pure, deterministic
+and fast. They may not read the store, the clock or the network: pass `now()` in as an input
+if needed.
+
+## External events
+
+An inbound event (a webhook, for instance) is an action whose actor is an `external:<source>`
+system actor (ADR-0015). It goes through the same matrix, preconditions and invariants.
+The action's actor list holds only external actors, and the action must appear in that
+source's `actions`. Mixing external and human actors in one action is a compile error:
+declare two actions instead.
+
+```yaml
+external:
+  flags:
+    description: The feature-flag service.
+    actions: [record_rollout_finished]
+
+actions:
+  record_rollout_finished:
+    description: The flag service reports a rollout completed.
+    actor: ["external:flags"]
+    target: Experiment
+```
+
+## Actors and agents (runtime, not declared)
+
+People, agents and system actors come from the `Identity` port (ADR-0016). Two actor names
+are reserved and are not roles: `system` (timers, handoffs and fixtures) and
+`external:<source>`. Actor rules may name them directly. Agents act
+`on_behalf_of` a person with a **grant** (actions, targets, expiry), which is issued at
+runtime, not in the declaration. The declaration controls agents with `requires: human` and
+with actor rules: an agent must satisfy the rule both for itself and for its principal.
+
 ## Representation layer (ADR-0008)
 
 Representation lives in separate files. It compiles against the **domain interface**, not
@@ -288,6 +490,7 @@ Rules:
 
 - Should judgment preconditions ("is this hypothesis falsifiable?") be `review` checks
   routed to a role?
-- How do model versions apply to in-flight objects?
-- Should LinkML or JSON Schema be reused for objects, adding only actions on top? To be
-  revisited after M0.
+- Should `create` effects (creating another object from an action) be added? They are
+  rejected for now (ADR-0021).
+- In-flight objects across model versions are handled by migration plans (ADR-0018). The
+  plan syntax is defined with M0b.

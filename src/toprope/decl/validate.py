@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..expr import ParseError, Path, parse, paths_read
-from .models import ActorRule, ByRole, Deny, Domain, Target
+from .models import RESERVED_ACTORS, ActorRule, ByRole, Deny, Domain, Target
 
 RESERVED_CELLS = {"n/a", "undecided"}
 ROOTS = {"target", "actor", "params", "new"}
@@ -82,7 +82,7 @@ def validate_domain(d: Domain) -> list[Issue]:
             add(Issue("unknown-object", where, f"unknown object '{a.object_type}'"))
         for r in a.actor:
             role = r.role if isinstance(r, ActorRule) else r
-            if roles and role not in roles:
+            if roles and role not in roles and role not in RESERVED_ACTORS:
                 add(Issue("unknown-role", where, f"unknown role '{role}'"))
             if isinstance(r, ActorRule) and r.where:
                 issues += _check_expr(d, r.where, f"{where}.actor", a.object_type, set(a.params))
