@@ -163,7 +163,8 @@ class Interpreter:
         if (creating and state is not None) or (not creating and state is None):
             # Existence is only revealed to actors whose role could act at all (ADR-0021).
             roles = {r.role if isinstance(r, ActorRule) else r for r in action.actor}
-            if not roles & set(cmd.actor.roles):
+            principal = cmd.on_behalf_of if cmd.actor.kind == "agent" else None
+            if not roles & set(cmd.actor.roles) or (principal is not None and not roles & set(principal.roles)):
                 return self._attempt(cmd, obj, "actor", f"{cmd.actor.id} may not {cmd.action}.", state)
             code, why = ("exists", f"{cmd.target} already exists.") if creating else ("not-found", f"No {obj} {cmd.target}.")
             return Decision(Outcome("rejected", code, why), (), ())

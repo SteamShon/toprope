@@ -73,30 +73,42 @@ class ReferenceModel:
                 return Outcome("rejected", "in-progress", "The same command is already being processed.")
             if prev is not None:
                 return prev
+        try:
+            out = self._run(cmd)
+        except BaseException:
+            if key is not None:
+                self.store.release(key)        # never leave a key stuck in "pending"
+            raise
+        if key is not None:
+            if out.code == "conflict":
+                self.store.release(key)        # transient: the same key may be retried
+            else:
+                self.store.remember(key, out)
+        return out
+
+    def _run(self, cmd: Command) -> Outcome:
+        action = self.d.actions.get(cmd.action)
         for _ in range(MAX_RETRIES + 1):
             stream = cmd.target or ""
             v = self.store.version(stream)                                     # step 3
-            dec = self.interp.decide(cmd, self.state(stream) if v else None, self.lookup)
+            found = self.lookup(stream) if v else None
+            # A target of another object type does not exist for this action, unless the action
+            # creates: then the id is taken (rejected: exists).
+            state = None if found is None else found[1]
+            if found is not None and action is not None and action.creates is None and found[0] != action.object_type:
+                state = None
+            dec = self.interp.decide(cmd, state, self.lookup)
             for att in dec.attempts:
                 self.store.append_attempt(att)
             if not dec.events:
-                out = dec.outcome
-                break
+                return dec.outcome
             try:                                                               # step 11
                 written = self.store.append(stream, v, list(dec.events))
             except ConcurrencyError:
                 continue
-            out = type(dec.outcome)(dec.outcome.status, dec.outcome.code, dec.outcome.reason,
-                                    self.state(stream), tuple(written))
-            break
-        else:
-            out = Outcome("rejected", "conflict", f"{cmd.target} kept changing; gave up after {MAX_RETRIES} retries.")
-            if key is not None:
-                self.store.release(key)        # transient: the same key may be retried
-            return out
-        if key is not None:
-            self.store.remember(key, out)
-        return out
+            return Outcome(dec.outcome.status, dec.outcome.code, dec.outcome.reason,
+                           self.state(stream), tuple(written))
+        return Outcome("rejected", "conflict", f"{cmd.target} kept changing; gave up after {MAX_RETRIES} retries.")
 
     def allowed_actions(self, oid: str, actor: Actor) -> list[str]:
         found = self.lookup(oid)

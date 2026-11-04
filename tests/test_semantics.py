@@ -326,3 +326,21 @@ def test_invalid_params_and_missing_target():
     assert do(m, ANA, "approve_experiment", "E-onboarding", params={"note": 3}).code == "invalid-command"
     assert do(m, ANA, "approve_experiment", "E-onboarding", params={"bogus": 1}).code == "invalid-command"
     assert m.execute(Command(ANA, "approve_experiment", None)).code == "invalid-command"
+
+
+def test_claim_is_released_when_evaluation_crashes():
+    m = model()
+
+    def boom(*a, **k):
+        raise RuntimeError("store down")
+    m.interp.decide, real = boom, m.interp.decide
+    with pytest.raises(RuntimeError):
+        do(m, ANA, "approve_experiment", "E-onboarding", idempotency_key="k")
+    m.interp.decide = real
+    assert do(m, ANA, "approve_experiment", "E-onboarding", idempotency_key="k").ok
+
+
+def test_target_of_another_type_is_not_found():
+    m = model()
+    assert do(m, ANA, "approve_experiment", "H1").code == "not-found"
+    assert m.store.version("H1") == 1
