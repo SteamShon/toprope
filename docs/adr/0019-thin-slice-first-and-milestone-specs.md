@@ -35,6 +35,7 @@ comparison cannot separate "having a structured spec" from "having a compiler".
    - the total (NL vs. Toprope).
 
 ## Consequences
+- (Later revised by ADR-0022 to about 9–10 weeks, because M1 now builds two self domains.)
 - The time to the first verdict drops from about 14 weeks (M0 6–8 + M1 3–4, plus the
   growth since) to about **8–9 weeks**: M0a, re-estimated at 4–5 weeks after it absorbed
   semantics, identity, the authoring MCP and the world map, plus M1 at 3–4 weeks. This is a
