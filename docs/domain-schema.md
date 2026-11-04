@@ -16,7 +16,7 @@ readable schemas: [`schema/domain.v1.schema.json`](../schema/domain.v1.schema.js
 | `invariants` with `scope: aggregate` | core | implemented (M0a) |
 | `world` (fixtures, actors), `scenarios` (`do`, `read` steps) | core, scenarios | implemented (M0a) |
 | `purpose` (problem, success metric, announcement) | [Purpose](#purpose) | M0a (metadata only) |
-| `handoffs` | [Handoffs](#handoffs) | implemented (M0a, ADR-0024 proposed) |
+| `handoffs` | [Handoffs](#handoffs) | implemented (M0a, ADR-0024) |
 | `approvals` on actions | [Approvals](#approvals) | defined; M0b |
 | `invariants` with `scope: cross` + `reservations` | [Reservations](#cross-aggregate-invariants-and-reservations) | defined; M0b |
 | `timers`, scenario `advance` steps | [Timers](#timers) | defined; M0b |
@@ -153,7 +153,7 @@ world:                      # the expert's examples; the compiler grows a small 
   reserved: every action surface carries them.
 - `check` uses a small expression language: paths, comparison, `in` / `not in`, `and` / `or` /
   `not`, list literals, `+` / `-` on numbers, `count`, `exists`, `now`. `+` also joins a
-  string with a string or an integer (ADR-0024, proposed); floats, booleans, null and lists
+  string with a string or an integer (ADR-0024); floats, booleans, null and lists
   are refused. The set operators and boolean combinators were added by ADR-0010. Any further
   extension requires an ADR.
 - `records_decision: true` turns an action into an accumulated work decision (⑤).
