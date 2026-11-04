@@ -94,3 +94,17 @@ class MemoryEventStore(EventStore):
     def release(self, key) -> None:
         if self._idem.get(key) == "pending":   # never forget a finished outcome
             del self._idem[key]
+
+
+def open_store(spec: str) -> EventStore:
+    """`memory`, `sqlite:PATH` or `postgres:DSN`."""
+    if spec == "memory":
+        return MemoryEventStore()
+    kind, _, arg = spec.partition(":")
+    if kind == "sqlite":
+        from .sqlite import SQLiteEventStore
+        return SQLiteEventStore(arg)
+    if kind == "postgres":
+        from .postgres import PostgresEventStore
+        return PostgresEventStore(arg)
+    raise ValueError(f"unknown store {spec!r}: use memory, sqlite:PATH or postgres:DSN")

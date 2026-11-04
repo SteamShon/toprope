@@ -23,21 +23,16 @@ from typing import Any
 from ...decl import load_domain, load_yaml, validate_domain
 from ...exec import Execution
 from ...identity import Caller, Identity, StaticIdentity, str_list
-from ...store import EventStore, MemoryEventStore
+from ...store import EventStore
+from ...store import open_store as _open_store
 from ...types import Actor, Grant
 
 
 def open_store(spec: str) -> EventStore:
-    if spec == "memory":
-        return MemoryEventStore()
-    kind, _, arg = spec.partition(":")
-    if kind == "sqlite":
-        from ...store.sqlite import SQLiteEventStore
-        return SQLiteEventStore(arg)
-    if kind == "postgres":
-        from ...store.postgres import PostgresEventStore
-        return PostgresEventStore(arg)
-    raise SystemExit(f"unknown store {spec!r}: use memory, sqlite:PATH or postgres:DSN")
+    try:
+        return _open_store(spec)
+    except ValueError as e:
+        raise SystemExit(str(e)) from None
 
 
 def _actor(d: dict[str, Any], kind: str | None = None) -> Actor:
