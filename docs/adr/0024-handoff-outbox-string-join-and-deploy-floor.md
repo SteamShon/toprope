@@ -2,7 +2,8 @@
 
 - Link: ③ works as built, ⑥ org productivity (H-Handoff) · Status: **proposed** (assistant
   draft; the researcher accepts or amends) · 2026-11-04
-- Amends: `docs/semantics.md` step 12 (details only), the check language (ADR-0010)
+- Amends: `docs/semantics.md` step 12 (details only) and §5 (the `causation` field), the
+  check language (ADR-0010, `docs/domain-schema.md`)
 
 ## Context
 Roadmap M0a item 14 implements handoffs (ADR-0022) and a local deploy adapter. The schema
@@ -32,8 +33,10 @@ and one change to the check language that the schema's own example already assum
 
    Resolutions use their own stream so they never bump the sender object's version and never
    cause conflicts with the sender's own commands. The receiver acts as `system`
-   (`handoff:<name>`) on behalf of the origin person (an agent's principal). That actor can
-   only come from a transport, never from credentials (Identity refuses it).
+   (`handoff:<name>`) on behalf of the origin person (an agent's principal). If no person
+   originated the sender's action (a system actor acting for no one), the handoff carries
+   no `on_behalf_of`. The handoff actor can only come from a transport, never from
+   credentials (Identity refuses it).
 4. **String joining in the check language.** `+` joins a string with a string or an
    integer. Floats, booleans, null and lists are refused (fail closed), so no value has two
    renderings. Arithmetic is unchanged.
@@ -48,8 +51,28 @@ and one change to the check language that the schema's own example already assum
 
    Until migration plans exist (M0b), a stranding deploy is refused.
 
+6. **Where the published interface major comes from.** There is no release record yet. In
+   M0a the caller of `check_handoffs` (`toprope-harness --receiver FILE@MAJOR`) states the
+   receiver's published major, default 1. Release records with interface versions come with
+   incremental analysis (ADR-0013, M0a sub-PR 9).
+
+## Limits, stated plainly
+- **Approval in the local adapter is self-declared.** `toprope-deploy --approver ana`
+  trusts the operator at the terminal, which is enough for one local researcher. After the
+  M1 switch-over, approving a deploy is an action of the generated Delivery domain, so the
+  approver is resolved through Identity and must be a person there.
+- **"Untainted" is the hash part of ADR-0013's taint.** The floor checks the declaration and
+  toolchain hashes. A taint raised by a background full run (a selection miss) joins the
+  floor with the result cache (sub-PR 9).
+- **Delivery is in-process.** `toprope-server` does not send handoffs. Two domains hand off
+  only when hosted in one process (`LocalTransport`). A cross-process transport and a
+  background dispatcher come in M0b. Until then, a pending handoff is sent on the sender's
+  next append, or by calling `dispatch()`. Finding pending entries scans the sender's
+  streams.
+
 ## Consequences
-- Handoffs move from "M1" to "implemented (M0a)" in the schema status table.
+- Handoffs move from "M1" to "implemented (M0a)" in the schema status table, and the
+  world map shows which actions hand off and to where (ADR-0020).
 - The cross-domain contract is checked at compile time (`check_handoffs`). It covers an
   unknown domain or action, the interface major, `system` in the receiver's actor rule,
   missing or unknown params, and literal or direct-path type mismatches.

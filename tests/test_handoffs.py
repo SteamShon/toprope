@@ -231,3 +231,29 @@ def test_a_lost_resolution_race_reports_the_stored_outcome():
     (r,) = sender.dispatch()
     assert r["result"] == "HandoffFailed" and r["code"] == "other"
     assert Outbox(sender).resolution(p.id).type == "HandoffFailed"
+
+
+# -- the world map and the CLI contract check ------------------------------------------------------
+def test_world_map_shows_where_actions_hand_off():
+    from toprope.worldmap import build_world_map
+    ds, _ = domains()
+    m = build_world_map(ds)
+    e = next(x for x in m["behavior"]["edges"] if x["id"] == "Version.draft.approve_version")
+    assert e["hands_off"] == [{"handoff": "deliver", "domain": "delivery", "interface": "1.x",
+                               "action": "request_delivery"}]
+    assert m["handoffs"][0]["when"] == "approve_version"
+
+
+def test_harness_cli_checks_the_handoff_contract(tmp_path):
+    import subprocess
+    import yaml
+    s, r = tmp_path / "s.domain.yaml", tmp_path / "r.domain.yaml"
+    s.write_text(yaml.safe_dump(SENDER, sort_keys=False))
+    r.write_text(yaml.safe_dump(RECEIVER, sort_keys=False))
+    base = ["uv", "run", "--quiet", "toprope-harness", "--domain", str(s), "--levels", "model", "--examples", "5"]
+    run = lambda *a: subprocess.run(base + list(a), capture_output=True, text=True, timeout=120)  # noqa: E731
+    assert run("--receiver", str(r)).returncode == 0
+    no_receiver = run()
+    assert no_receiver.returncode == 1 and "unknown-domain" in no_receiver.stderr
+    wrong_major = run("--receiver", f"{r}@2")
+    assert wrong_major.returncode == 1 and "interface-major" in wrong_major.stderr

@@ -68,6 +68,13 @@ Evaluation stops at the first failure, and each failure has its own outcome:
     recorded here as `HandoffDenied` (ADR-0023). Their outcome
     is recorded as `EffectSucceeded`, `EffectFailed`, `EffectUnknown` or `EffectConfirmed`
     (read-back).
+    Handoff details (ADR-0024, proposed): the outbox entry is a `HandoffRequested` event
+    appended atomically in step 11; the sender event id is that entry's
+    `<stream>@<version>`; the receiver's events carry it as `causation`; the sender records
+    exactly one resolution (`HandoffDelivered`, `HandoffDenied` or `HandoffFailed`) in its
+    own stream `handoff:<id>`; a transient outcome or an unreachable receiver stays pending
+    and is retried. With no originating person (a system actor acting for no one), the
+    handoff carries no `on_behalf_of`.
 
 Recording:
 - Every `denied:*` outcome appends a `DeniedAttempt` with the reason, to a separate
@@ -95,7 +102,8 @@ Recording:
 
 ## 5. Events
 - Each event has: `type`, `aggregate`, `id`, `version`, `at`, `actor`, `on_behalf_of`,
-  `grant`, `thread_id`/`run_id` (if from an agent run), `domain_version`, `payload`.
+  `grant`, `thread_id`/`run_id` (if from an agent run), `causation` (the handoff id, if a
+  handoff issued it; ADR-0024, proposed), `domain_version`, `payload`.
 - Projection is a pure fold over events. Replaying the same events yields the same state
   (replay parity).
 - Old events are read through upcasters (ADR-0012). They are never rewritten.

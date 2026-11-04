@@ -99,6 +99,10 @@ def build_world_map(d: Domain, harness: dict[str, Any] | None = None) -> dict[st
                    "status": _status(l)} for n, l in sorted(d.links.items())],
     }
 
+    hands_off: dict[str, list[dict[str, Any]]] = {}
+    for hname, h in sorted(d.handoffs.items()):
+        hands_off.setdefault(h.when.action, []).append(
+            {"handoff": hname, "domain": h.to.domain, "interface": h.to.interface, "action": h.to.action})
     states, edges = [], []
     for obj, tr in sorted(d.transitions.items()):
         outgoing: dict[str, int] = {}
@@ -111,7 +115,8 @@ def build_world_map(d: Domain, harness: dict[str, Any] | None = None) -> dict[st
                 edges.append({"id": eid, "object": obj, "from": state, "action": name, "outcome": o,
                               "fog": o["kind"] == "undecided", "unlock": _unlock(a),
                               "invariants": _touches(d, a), "records_decision": a.records_decision,
-                              "fired_by": [], "harness": verdicts.get(eid, "unknown")})
+                              "fired_by": [], "hands_off": hands_off.get(name, []),
+                              "harness": verdicts.get(eid, "unknown")})
                 outgoing[state] = outgoing.get(state, 0) + bool(_targets(o))
         for name, a in d.actions.items():
             if a.creates == obj:
@@ -119,7 +124,8 @@ def build_world_map(d: Domain, harness: dict[str, Any] | None = None) -> dict[st
                 edges.append({"id": eid, "object": obj, "from": NEW, "action": name,
                               "outcome": {"kind": "to", "to": tr.initial}, "fog": False, "unlock": _unlock(a),
                               "invariants": _touches(d, a), "records_decision": a.records_decision,
-                              "fired_by": [], "harness": verdicts.get(eid, "unknown")})
+                              "fired_by": [], "hands_off": hands_off.get(name, []),
+                              "harness": verdicts.get(eid, "unknown")})
         for state in tr.matrix:
             states.append({"id": f"{obj}.{state}", "object": obj, "state": state, "initial": state == tr.initial,
                            "terminal": outgoing.get(state, 0) == 0})
@@ -131,6 +137,8 @@ def build_world_map(d: Domain, harness: dict[str, Any] | None = None) -> dict[st
     return {"format": FORMAT, "domain": d.domain, "version": d.version,
             "structure": structure,
             "behavior": {"states": states, "roles": roles, "system_actors": reserved, "edges": edges},
+            "handoffs": [{"handoff": n, "when": h.when.action, "to": h.to.model_dump()}
+                         for n, h in sorted(d.handoffs.items())],
             "unreachable": unreachable}
 
 
