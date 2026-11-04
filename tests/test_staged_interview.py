@@ -228,6 +228,8 @@ def test_unfetchable_links_say_why(tmp_path, site):
     ws = link_ws(tmp_path, site)
     with pytest.raises(AuthoringError, match="behind a login"):
         ws.fetch("gone")
+    with pytest.raises(AuthoringError, match="no source 'nosuch'"):
+        ws.fetch("nosuch")
     with pytest.raises(AuthoringError, match="not text"):
         ws.fetch("pic")
     bad = {**CONFIG, "sources": [{"id": "x", "kind": "records", "url": "file:///etc/passwd"}]}

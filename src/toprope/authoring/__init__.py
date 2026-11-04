@@ -172,9 +172,9 @@ class Workspace:
     def fetch(self, source_id: str | None = None) -> list[dict[str, Any]]:
         """Fetch link sources into their snapshots (all, or one). Re-fetching replaces the
         snapshot; refs into it may change, so fetch before drafting from it."""
-        targets = [self.sources[source_id]] if source_id else [s for s in self.sources.values() if s.url]
         if source_id and source_id not in self.sources:
             raise AuthoringError(f"no source {source_id!r}")
+        targets = [self.sources[source_id]] if source_id else [s for s in self.sources.values() if s.url]
         out = []
         for spec in targets:
             if not spec.url:
@@ -345,11 +345,9 @@ class Workspace:
         Answer the whole bundle at once with `answer(bundle_id, ...)`."""
         from .stages import BY_NAME
         plan = self._plan(attempts)
-        if plan.d is None:
-            doc = self.draft()
+        if plan.d is None:   # _plan found the draft does not parse; say why
             try:
-                Domain.model_validate(doc)
-                why = "the draft does not parse"
+                Domain.model_validate(plan.doc)
             except ValidationError as e:
                 why = f"the draft does not parse: {e.errors()[0]['msg']}"
             return {"stage": None, "questions": [], "progress": [], "stop": {"stop": False, "why": why}}
