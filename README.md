@@ -317,7 +317,7 @@ changes only in a PR that reports a preregistered experiment verdict.
 
 | Milestone | Link | What happens |
 |---|---|---|
-| M0a | none | Thin slice: semantics, model interpreter, Execution, event store, `toprope-server` MCP, authoring MCP, harness, change check (incl. log replay and in-flight check), incremental analysis |
+| M0a | none | Thin slice: semantics, model interpreter, Execution, event store, `toprope-server` MCP, authoring MCP, source readers, world map (JSON + MCP tools), harness, change check (incl. log replay and in-flight check), incremental analysis |
 | M1 | ① ② | **Self-compile**: model Toprope's own authoring workflow; a natural-language skill vs. a structured spec without a compiler vs. Toprope, on a frozen change sequence with seeded conflicts |
 | M0b | none | Surfaces and effects: representation compiler and shell, brownfield adapter (GitHub), embedded shape, migration plans, query tools, timers and functions |
 | M2 | ① ② ③ | **Dogfood**: an experiment-lifecycle domain built with the self-compiled tool and used for real |

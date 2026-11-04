@@ -5,7 +5,7 @@ several links, but a milestone ends with a verdict. Budget is ~10h+/week. Dates 
 
 | Milestone | Link | Question | Target |
 |---|---|---|---|
-| M0a | none (enabler) | Thin slice: declaration + semantics, model interpreter, Execution, event store, `toprope-server` MCP and authoring MCP, source readers, harness (model, Execution, MCP), change check incl. log replay and in-flight check, incremental analysis | 4–5 weeks |
+| M0a | none (enabler) | Thin slice: declaration + semantics, model interpreter, Execution, event store, `toprope-server` MCP and authoring MCP, source readers, world map, harness (model, Execution, MCP), change check incl. log replay and in-flight check, incremental analysis | 4–5 weeks |
 | M1 | ① ② (self) | Model Toprope's own authoring workflow by iterating. Do compile-time checks catch what natural-language skills and structured specs without a compiler cannot? | 3–4 weeks |
 | M0b | none (enabler) | Surfaces and effects: representation compiler, `toprope-shell` (A2UI + CopilotKit), UI-level harness, GitHub brownfield adapter, embedded shape, migration plans, query tools, timers and functions; regenerate the self domain's UI | 3–4 weeks |
 | M2 | ① ② ③ (dogfood) | Does the same hold on another domain, and does the harness-passing software work in real use? | 3–4 weeks |
