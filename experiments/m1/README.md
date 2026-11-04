@@ -8,6 +8,9 @@ researcher, and agents must not fill or edit it (AGENTS.md). The one exception i
 `verdict-rules`, whose template carries the assistant's draft values for the researcher to
 review.
 
+A guide for writing them (coverage areas, what makes a good question, and a session
+plan) is in [`interview-guide.md`](interview-guide.md). It holds no content.
+
 ## What to fill, and when
 
 | File (copy from `*.template.yaml`) | Shown to | Written | Frozen |
