@@ -113,6 +113,9 @@ counts as **found after deploy**. One that never shows up counts as **silent**.
 
 ## Gold standard (researcher-written, frozen in M0 before the checks are built)
 
+Templates, the freeze procedure and the `verify` check:
+[`experiments/m1/`](../../experiments/m1/README.md).
+
 - About 30 scenario questions about the authoring workflow, half held out. Examples:
   - "Can an agent confirm its own drafted precondition?"
   - "What happens to an element no source supports?"
