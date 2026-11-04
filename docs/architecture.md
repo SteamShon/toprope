@@ -11,6 +11,7 @@ roles. That, not interface shape, is the test of replaceability.
 |---|---|---|---|
 | **Authoring** | sources, drafts, interview questions, provenance and status of every element | ① ② | M0 kernel, then self-compiled in M1 |
 | **Domain Model** | objects, links, actions (params, preconditions, effects, roles), versions | all | M0 |
+| **Change Check** | diff new vs. current version; structural, semantic-conflict, scenario-regression, log-replay and NL-conflict checks; preview build (ADR-0009) | ① | M0 |
 | **Domain Compiler** | domain → MCP, execution checks, **domain interface** (objects/fields/links/actions/glossary; versioned by diff, hashed per element) | ① ③ | M0 |
 | **Representation Compiler** | representation layers (defaults → base → host overlay) + interface → A2UI views, component/action catalog for generative UI. Rebuilt independently of the domain | ③ | M0 |
 | **Execution** | checks preconditions and roles on current state, applies effects | ③ | M0 |
@@ -37,6 +38,28 @@ are generated, and only the kernel stays hand-built.
 | `EffectAdapter` | real-world effects | in-store only | GitHub, flags, ad APIs (with read-back) |
 | `EventLog` | append events | JSONL | SQLite, OpenTelemetry |
 | `ProposalEngine` | logs → candidate diffs | Aegra cron workflow calling an LLM | Harness²-style probe loops |
+| `ScenarioRunner` | run the domain's given/when/expect scenarios against a version | in-process | — |
+| `LogReplayer` | re-run recorded events against a new version and diff outcomes | EventLog reader | — |
+| `ConflictLinter` | flag contradictions among natural-language parts (descriptions, judgment rules) as warnings | LLM call | other models |
+| `PreviewEnvironment` | generated MCP + UI on a copy of the state for trying a change | local process | per-PR preview deployments |
+
+## Change-check pipeline (ADR-0009): the compiler's core job
+
+```
+edited domain ──► diff vs. current version
+                    ├─ structural (references, types)          deterministic
+                    ├─ semantic conflict (contradictions,      deterministic
+                    │   unreachable states, dead actions)
+                    ├─ scenario regression                     deterministic
+                    ├─ log replay ("12 past actions would      deterministic
+                    │   now be blocked")
+                    └─ NL conflict (descriptions, judgment)    LLM → warnings
+                  ──► report in domain terms ──► preview build (MCP + UI on copied state)
+                  ──► human decides to deploy
+```
+
+Iteration time (edit → validated preview) is a design constraint: the premise is that
+domains are found by many cheap iterations (P0).
 
 ## Two compile pipelines (ADR-0008)
 
