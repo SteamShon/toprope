@@ -130,3 +130,42 @@ def test_cli_checks_a_composition_then_runs_each_member(tmp_path):
     assert wm.returncode == 0 and json.loads(out.read_text())["format"] == "toprope.world-map.composed/1"
     both = run("toprope-harness", "--composition", str(p), "--domain", str(tmp_path / "authoring.domain.yaml"))
     assert both.returncode != 0
+
+
+def test_a_handoff_lands_where_the_system_role_lands(tmp_path):
+    """A receiving action with per-role outcomes: the path follows the outcome for `system`."""
+    receiver = copy.deepcopy(RECEIVER)
+    receiver["roles"] = ["approver"]
+    receiver["objects"]["Slot"] = {"properties": {"status": {"enum": ["free", "booked", "held"]}}}
+    receiver["actions"]["take_slot"] = {"description": "Take a slot.", "actor": ["system", "approver"],
+                                        "target": "Slot"}
+    receiver["actions"]["release"] = {"description": "Release a slot.", "actor": ["approver"], "target": "Slot"}
+    receiver["transitions"]["Slot"] = {"field": "status", "initial": "free", "matrix": {
+        "free": {"take_slot": {"by_role": {"approver": "booked", "system": "held"}}, "release": "n/a"},
+        "booked": {"take_slot": "n/a", "release": "free"},
+        "held": {"take_slot": "n/a", "release": "free"}}}
+    sender = copy.deepcopy(SENDER)
+    sender["handoffs"]["deliver"]["to"]["action"] = "take_slot"
+    sender["handoffs"]["deliver"]["params"] = {}
+    comp = copy.deepcopy(COMPOSITION)
+    comp["wiring"] = [{"from": "authoring.deliver", "to": "delivery.take_slot"}]
+    c = load_composition(write(tmp_path, comp=comp, sender=sender, receiver=receiver))
+    m = composed_world_map(c)
+    p = how_to_reach_across(m, "authoring", "Version", "draft", "delivery", "Slot", "held")
+    assert p["reachable"] and p["steps"][1]["to"] == "held" and p["steps"][1]["assumes"] == "the Slot is free"
+    booked = how_to_reach_across(m, "authoring", "Version", "draft", "delivery", "Slot", "booked")
+    assert [(s["action"], s["to"], s["who"]) for s in booked["steps"][1:]] == [   # system lands it held first
+        ("take_slot", "held", ["system (handoff authoring.deliver)"]), ("release", "free", ["approver"]),
+        ("take_slot", "booked", ["approver"])]
+
+
+def test_worldmap_cli_with_a_composition_reports_errors_and_writes_mermaid(tmp_path):
+    p = write(tmp_path)
+    run = lambda *a: subprocess.run(["uv", "run", "--quiet", "toprope-worldmap", *a],  # noqa: E731
+                                    capture_output=True, text=True, timeout=120)
+    ok = run("--composition", str(p), "--out", str(tmp_path / "m.json"), "--mermaid", str(tmp_path / "mm"))
+    assert ok.returncode == 0, ok.stderr
+    assert (tmp_path / "mm" / "delivery" / "DeliveryRequest.states.mmd").exists()
+    (tmp_path / "delivery.domain.yaml").unlink()
+    gone = run("--composition", str(p), "--out", str(tmp_path / "m.json"))
+    assert gone.returncode == 1 and "Traceback" not in gone.stderr and "member delivery" in gone.stderr

@@ -172,11 +172,12 @@ def _reach(wmap, obj, frm, to, roles):
     return how_to_reach(wmap, obj, frm, to, roles)
 
 
-def _states_taking(wmap: dict[str, Any], obj: str, action: str) -> list[str]:
-    """States of `obj` in which `action` is allowed for some role."""
+def _states_taking(wmap: dict[str, Any], obj: str, action: str, role: str | None = None) -> list[str]:
+    """States of `obj` in which `action` is allowed (for `role`, if given)."""
     from ..worldmap import NEW, _targets
     return [e["from"] for e in wmap["behavior"]["edges"]
-            if e["object"] == obj and e["action"] == action and e["from"] != NEW and _targets(e["outcome"])]
+            if e["object"] == obj and e["action"] == action and e["from"] != NEW
+            and any(role is None or r is None or r == role for r, _ in _targets(e["outcome"]))]
 
 
 def how_to_reach_across(cmap: dict[str, Any], domain: str, obj: str, from_state: str | None,
@@ -209,12 +210,12 @@ def how_to_reach_across(cmap: dict[str, Any], domain: str, obj: str, from_state:
             # 2. In the receiver: the wired action, taken by system, then onward.
             r, ra, robj = w["to"]["domain"], w["to"]["action"], w["to"]["object"]
             rmap = members[r]
-            starts = [NEW] if w["to"]["creates"] else _states_taking(rmap, robj, ra)
+            starts = [NEW] if w["to"]["creates"] else _states_taking(rmap, robj, ra, role="system")
             for rs in starts:
-                after = _after(rmap, robj, rs, ra)
+                after = _after(rmap, robj, rs, ra, role="system")   # a handoff is taken by system
                 if not after:
                     continue
-                landed = sorted(after)[0]
+                landed = sorted(after)[0]                          # one outcome per role: at most one
                 hand = {"domain": r, "action": ra, "from": rs, "to": landed,
                         "who": [f"system (handoff {domain}.{w['from']['handoff']})"], "requires": [],
                         "requires_human": False, **({"you_can": False} if roles is not None else {})}
@@ -251,11 +252,12 @@ def _step(wmap: dict[str, Any], obj: str, state: str, action: str,
     return None
 
 
-def _after(wmap: dict[str, Any], obj: str, state: str, action: str) -> set[str]:
+def _after(wmap: dict[str, Any], obj: str, state: str, action: str, role: str | None = None) -> set[str]:
+    """Where `action` leads from `state`: for `role` if given (its by_role entry, or a plain cell)."""
     from ..worldmap import _targets
     return {to for e in wmap["behavior"]["edges"]
             if e["object"] == obj and e["from"] == state and e["action"] == action
-            for _, to in _targets(e["outcome"])}
+            for r, to in _targets(e["outcome"]) if role is None or r is None or r == role}
 
 
 __all__ = ["FORMAT", "Composition", "CompositionSpec", "accepts", "assemble", "check_composition",
