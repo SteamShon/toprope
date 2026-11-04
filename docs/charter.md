@@ -84,9 +84,10 @@ intelligence layer that proposes actions and an effect layer that performs them 
   - *domain-change decisions* (change a rule), recorded with their evidence
 
   Accumulated work decisions become the evidence for proposing domain changes.
-- **Self-compile.** Authoring a domain is itself a workflow, so Toprope's own authoring
-  process is the first domain modeled. The authoring tool is then generated from that
-  model and used on other domains.
+- **Self-compile.** Making a domain and delivering it are themselves workflows. Toprope's own
+  **Domain Authoring** and **Domain Delivery** are the first domains modeled, joined by a
+  typed handoff (ADR-0022). The tools for both are generated from those models and used on
+  other domains.
 - **Different from Foundry-style ontologies:** authoring is cheap, agents are first-class
   users, the domain evolves through operation, and it is light and open enough for small
   teams.
