@@ -285,7 +285,8 @@ class Workspace:
             src = {"kind": "interview", "ref": ref, "quote": answer}
             _set(doc, segs, self._with_provenance(segs, dec.get("value"), src))
         issues = self._write(doc) if decisions else []
-        self._append(self.log_path, {"at": _now(), "kind": "answer", "question_id": question_id,
+        stage = question_id.split(":")[1] if question_id.startswith("bundle:") else self._current_stage()
+        self._append(self.log_path, {"at": _now(), "kind": "answer", "stage": stage, "question_id": question_id,
                                      "question": text, "answer": answer,
                                      "decisions": [d["path"] for d in decisions]})
         return {"ref": ref, "applied": [d["path"] for d in decisions], "issues": issues}
@@ -380,6 +381,11 @@ class Workspace:
                 out[q.id] = q.text
             out[self._bundle_id(st.name, qs)] = f"[{st.title}] " + " / ".join(q.text for q in qs)
         return out
+
+    def _current_stage(self) -> str | None:
+        plan = self._plan({})
+        cur = plan.current() if plan.d is not None else None
+        return cur.name if cur else None
 
     def progress(self) -> dict[str, Any]:
         plan = self._plan()

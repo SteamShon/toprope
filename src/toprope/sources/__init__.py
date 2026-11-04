@@ -211,8 +211,13 @@ def fetch(spec: SourceSpec, root: Path, timeout: float = 20) -> dict:
     req = urllib.request.Request(spec.url, headers={"User-Agent": "toprope-author/0", "Accept": "text/*, application/json"})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
+            final = r.geturl()
+            if not final.lower().startswith(("http://", "https://")):
+                raise FetchError(f"source {spec.id}: redirected to a non-http(s) address")
             ctype = r.headers.get("Content-Type", "")
             body = r.read(MAX_FETCH_BYTES + 1)
+    except FetchError:
+        raise
     except Exception as e:
         raise FetchError(f"source {spec.id}: could not fetch {spec.url} ({type(e).__name__}: {e}). "
                          "A private document (behind a login) cannot be fetched: download it into the "
@@ -229,7 +234,7 @@ def fetch(spec: SourceSpec, root: Path, timeout: float = 20) -> dict:
         raise FetchError(f"source {spec.id}: snapshot path outside the workspace")
     out.mkdir(parents=True, exist_ok=True)
     (out / "snapshot.md").write_text(text)
-    meta = {"url": spec.url, "fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    meta = {"url": spec.url, "final_url": final, "fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "content_type": ctype, "sha256": hashlib.sha256(body).hexdigest(), "bytes": len(body)}
     (out / "snapshot.json").write_text(json.dumps(meta, indent=2))
     return meta
