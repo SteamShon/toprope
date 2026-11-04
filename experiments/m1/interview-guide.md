@@ -15,6 +15,9 @@ self-compiling compiler is still checked against an external test suite:
 - If the agent picks the questions, the system under test picks its own exam.
 
 So:
+- **This guide is not a Phase A source.** It holds no answers, but it shows which areas
+  the gold probes. The source readers never read `experiments/` (their default exclusion),
+  so keep it there.
 - **Held-out gold, `change-key.yaml` and its mix** are never shown to an agent. When an
   agent runs the validator for you, it uses `--sealed`.
 - **The shown half of the gold, the probe suite and the change intents** may be written
