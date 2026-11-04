@@ -63,7 +63,8 @@ and records what each costs, and the decision follows in its own ADR.
 
 ## Consequences
 - M0 grows: greenfield backend generation, plus one brownfield adapter with adapter-level
-  harness checks. Its target becomes 3 weeks.
+  harness checks. (Its estimate was later revised to 6–8 weeks, split into M0a and M0b, after
+  ADR-0012 and ADR-0013 added more kernel scope; see the roadmap.)
 - M2 gives verdicts on ③ in addition to ① and ②. Dogfood use logs every defect found in
   harness-passing builds, with its class.
 - Evidence level: the "nearly free" claim is *observed, not measured* until M2.
