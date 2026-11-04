@@ -30,6 +30,7 @@ objects:
       status: {enum: [draft, approved, running, ended, decided]}
       planned_days: {type: integer}
       started_at: {type: datetime, optional: true}
+      approved_by: {type: string, optional: true}
     source: {kind: system, ref: "src/models/Experiment.ts"}
     status: confirmed
   Readout:
