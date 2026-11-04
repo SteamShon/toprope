@@ -68,6 +68,10 @@ class Execution:
     def state(self, oid: str) -> dict[str, Any] | None:
         return self._model.state(oid)
 
+    def lookup(self, oid: str) -> tuple[str, dict[str, Any]] | None:
+        """(object type, state) of an object, or None."""
+        return self._model.lookup(oid)
+
     def history(self, oid: str) -> list[Event]:
         return self.store.read(oid)
 

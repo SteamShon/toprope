@@ -50,6 +50,8 @@ advertised resource URL is the one clients use.
 - `get_object`, `history`, `attempts`, `allowed_actions` (for the caller; an agent's
   principal and grant apply), and `describe_domain` (purpose, glossary, objects, actions).
   All but `describe_domain` need a resolved caller.
+- `world_map` and `how_to_reach` (see [`world-map.md`](world-map.md)). Pass
+  `--harness-report` to show the harness status of each edge.
 
 A denial is a normal result, `{"status": "denied", "code": ..., "reason": ...}`, with the
 reason in domain terms. The tool schema advertises each param's type, but values pass to

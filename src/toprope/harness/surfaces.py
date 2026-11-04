@@ -119,7 +119,7 @@ class ExecutionSurface(Surface):
         return self.ex.allowed_actions(oid, Caller(actor))
 
     def lookup(self, oid):
-        return self.ex._model.lookup(oid)
+        return self.ex.lookup(oid)
 
     def events(self, oid):
         return self.ex.history(oid)
