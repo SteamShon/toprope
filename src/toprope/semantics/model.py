@@ -115,8 +115,10 @@ class ReferenceModel:
                 written = self.store.append(stream, v, list(dec.events))
             except ConcurrencyError:
                 continue
+            # The state is the one the decision computed. Replay parity (the harness) checks
+            # that folding the stored events rebuilds exactly this state.
             return Outcome(dec.outcome.status, dec.outcome.code, dec.outcome.reason,
-                           self.state(stream), tuple(written))
+                           dec.outcome.state, tuple(written))
         return Outcome("rejected", "conflict", f"{cmd.target} kept changing; gave up after {MAX_RETRIES} retries.")
 
     def allowed_actions(self, oid: str, actor: Actor, on_behalf_of: Actor | None = None,

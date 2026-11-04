@@ -59,6 +59,11 @@ class Execution:
             n += self._model.seed(obj, data, only_if_new=True)
         return n
 
+    def seed(self, obj: str, data: dict[str, Any]) -> bool:
+        """Load one object as a system-created fixture (not through an action), only if its id
+        is new. For fixtures and harness setup; never exposed to callers."""
+        return self._model.seed(obj, data, only_if_new=True)
+
     # -- reads -------------------------------------------------------------------------------
     def state(self, oid: str) -> dict[str, Any] | None:
         return self._model.state(oid)
