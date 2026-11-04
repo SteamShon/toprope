@@ -17,6 +17,9 @@ iterate:                         # link ①
     most_found_after_deploy: true
   narrowed_if_structured_gap_below: 0.10   # takes precedence over "supports"
   else: inconclusive
+scoring:                         # how gold accuracy is counted (draft)
+  unit: fact                     # items sharing a `fact` key count once: each copy weighs 1/n,
+                                 #   graded against its own domain's compiled model
 fidelity:                        # link ②
   supports:
     held_out_accuracy_min: 0.80

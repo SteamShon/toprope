@@ -40,6 +40,13 @@ So:
 ### What a good question is
 - It asks **one fact** about how the work runs, in domain language, and is answerable from
   the model's read surface (allowed actions, states, denials and reasons, who may act).
+- **The domain's declaration expresses it.** Facts the Toprope kernel guarantees for every
+  domain are not gold, because no model can get them wrong. Examples: a handoff is
+  delivered once, the contract is checked at compile time, the deploy floor in code.
+- It names its `domain`. If the same fact is asked of both domains (often at the handoff),
+  give the copies one shared `fact` key and the same `held_out`. The fact counts once in
+  scoring. Each copy must be answerable from its own domain's declaration; drop a copy that
+  is not.
 - It has one gradable answer. Prefer `yes_no`, `outcome`, `state` and `actors`, and keep
   `free_text` (graded by a person, with a rubric) to about one in six.
 - **Held-out questions avoid facts stated verbatim** in the ADRs, the scope doc or the

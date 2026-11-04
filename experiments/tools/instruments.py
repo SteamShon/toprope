@@ -60,6 +60,32 @@ def items(doc, key: str) -> list[dict]:
     return [x for x in v if isinstance(x, dict)] if isinstance(v, list) else []
 
 
+def _gold_domains_and_facts(g: dict, warn: list[str]) -> list[str]:
+    """Each item names one of the file's domains. Items sharing a `fact` key ask the same fact
+    of different domains: they must share held_out (else a shown copy leaks a held-out answer),
+    and the fact counts once in scoring (verdict-rules `scoring.unit: fact`)."""
+    errs: list[str] = []
+    domains = g.get("domains") or ([g["domain"]] if g.get("domain") else [])
+    if not isinstance(domains, list) or not domains:
+        return ["gold: `domains` must list the domains the items are about"]
+    facts: dict[str, list[dict]] = {}
+    for s in items(g, "scenarios"):
+        dom = s.get("domain") or (domains[0] if len(domains) == 1 else None)
+        if dom not in domains:
+            errs.append(f"gold {s.get('id')}: domain must be one of {domains}")
+        if s.get("fact"):
+            facts.setdefault(str(s["fact"]), []).append({**s, "domain": dom})
+    for fact, xs in sorted(facts.items()):
+        if len({bool(x.get("held_out")) for x in xs}) > 1:
+            errs.append(f"gold fact '{fact}': copies {[x.get('id') for x in xs]} must all be held out or all shown")
+        doms = [x["domain"] for x in xs]
+        if len(doms) != len(set(doms)):
+            warn.append(f"gold fact '{fact}': asked twice of the same domain {[x.get('id') for x in xs]}")
+        if len(xs) == 1:
+            warn.append(f"gold fact '{fact}': only one item; a fact key is for copies across domains")
+    return errs
+
+
 def validate(d: Path, include_binding: bool = True) -> list[str]:
     errs: list[str] = []
     warn: list[str] = []
@@ -81,6 +107,7 @@ def validate(d: Path, include_binding: bool = True) -> list[str]:
     if errs:
         return errs
     if g := docs["gold-scenarios"]:
+        errs += _gold_domains_and_facts(g, warn)
         ids = [s.get("id") for s in items(g, "scenarios")]
         bad_ids = [i for i in ids if not isinstance(i, str)]
         if bad_ids:
@@ -95,10 +122,13 @@ def validate(d: Path, include_binding: bool = True) -> list[str]:
                 errs.append(f"gold {s.get('id')}: answer.kind must be one of {sorted(ANSWER_KINDS)}")
             if "<" in str(s.get("question", "")):
                 errs.append(f"gold {s.get('id')}: question still a placeholder")
-        held = sum(1 for s in items(g, "scenarios") if s.get("held_out"))
-        n = len(ids)
-        if n and not (0.35 <= held / n <= 0.65):
-            warn.append(f"gold: {held}/{n} held out (target about half)")
+        by_domain: dict[str, list[dict]] = {}
+        for s in items(g, "scenarios"):
+            by_domain.setdefault(str(s.get("domain") or g.get("domain")), []).append(s)
+        for dom, xs in sorted(by_domain.items()):
+            held = sum(1 for s in xs if s.get("held_out"))
+            if xs and not (0.35 <= held / len(xs) <= 0.65):
+                warn.append(f"gold {dom}: {held}/{len(xs)} held out (target about half)")
     if (r := docs["change-requests"]) and (k := docs["change-key"]):
         seqs = [x["seq"] for x in items(r, "requests")]
         kseqs = [x["seq"] for x in items(k, "entries")]

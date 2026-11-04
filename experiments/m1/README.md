@@ -15,7 +15,7 @@ plan) is in [`interview-guide.md`](interview-guide.md). It holds no content.
 
 | File (copy from `*.template.yaml`) | Shown to | Written | Frozen |
 |---|---|---|---|
-| `gold-scenarios.yaml` (about 30; half `held_out`) | no arm, ever (held out); answers are graded from the model's read surface | M0a, before change checks are built | M0a |
+| `gold-scenarios.yaml` (about 30 per self domain, in one file; half of each domain `held_out`; shared `fact` keys across domains) | no arm, ever (held out); answers are graded from the model's read surface | M0a, before change checks are built | M0a |
 | `probe-suite.yaml` | no arm before deploy; run after each deploy | M0a | M0a |
 | `change-requests.yaml` (about 20, written as **intents**) | all arms | M0a | M0a |
 | `change-key.yaml` (seeded problems) | **sealed**: no arm, agent or reviewer during the experiment | M0a | M0a |
