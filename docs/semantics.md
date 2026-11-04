@@ -68,6 +68,9 @@ Evaluation stops at the first failure, and each failure has its own outcome:
     recorded here as `HandoffDenied` (ADR-0023). Their outcome
     is recorded as `EffectSucceeded`, `EffectFailed`, `EffectUnknown` or `EffectConfirmed`
     (read-back).
+    Kernel-service calls (ADR-0028) use the same outbox: `EffectRequested` is appended in
+    step 11, the service runs after the append, and its result comes back as a command from
+    `external:kernel` to the declared reply action, keyed by the effect id.
     Handoff details (ADR-0024): the outbox entry is a `HandoffRequested` event
     appended atomically in step 11; the sender event id is that entry's
     `<stream>@<version>`; the receiver's events carry it as `causation`; the sender records

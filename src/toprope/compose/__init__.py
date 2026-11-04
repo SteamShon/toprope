@@ -138,13 +138,14 @@ def accepts(c: Composition) -> dict[str, dict[str, set[str]]]:
 
 
 def assemble(c: Composition, stores: dict[str, Any], identity: Any,
-             clock: Callable[[], datetime] | None = None) -> dict[str, Any]:
+             clock: Callable[[], datetime] | None = None, services: Any = None) -> dict[str, Any]:
     """One Execution per member, wired in process: each sends its handoffs through a local
-    transport, and each receiver accepts only the handoffs wired to it."""
+    transport, each receiver accepts only the handoffs wired to it, and kernel-service calls
+    run on `services` (ADR-0028)."""
     from ..exec import Execution
     from ..handoff import LocalTransport
     acc = accepts(c)
-    exs = {n: Execution(d, stores[n], identity, clock=clock, accepts=acc.get(n, {}))
+    exs = {n: Execution(d, stores[n], identity, clock=clock, accepts=acc.get(n, {}), services=services)
            for n, d in c.domains.items()}
     transport = LocalTransport(exs)
     for ex in exs.values():

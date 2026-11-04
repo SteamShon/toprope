@@ -32,6 +32,9 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--examples", type=int, default=200, help="exploration examples (0 disables)")
     ap.add_argument("--depth", type=int, default=5, help="exploration depth")
     ap.add_argument("--json", help="write the full report as JSON to this path")
+    ap.add_argument("--regen-check", action="store_true",
+                    help="with --composition: the regeneration check (ADR-0028): serve from declarations, run, "
+                         "regenerate, compare, and run every kernel call end to end")
     ap.add_argument("--receiver", action="append", default=[], metavar="FILE[@MAJOR]",
                     help="a receiving domain's declaration, with its published interface major "
                          "(default 1): checks this domain's handoffs against it (ADR-0024)")
@@ -77,6 +80,15 @@ def main(argv: list[str] | None = None) -> None:
 
 
 def _composition(args) -> None:
+    if args.regen_check:
+        from .regen import regen_check
+        levels = tuple(x.strip() for x in args.levels.split(",") if x.strip())
+        out = regen_check(args.composition, levels=levels, examples=args.examples)
+        print(json.dumps(out, indent=2, default=str))
+        if args.json:
+            with open(args.json, "w") as f:
+                json.dump(out, f, indent=2, default=str)
+        raise SystemExit(0 if out["ok"] else 1)
     from ..compose import check_composition, load_composition
     try:
         c = load_composition(args.composition)

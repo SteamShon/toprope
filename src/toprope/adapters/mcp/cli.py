@@ -72,7 +72,15 @@ def open_identity(spec: str) -> Identity:
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(prog="toprope-server", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--domain", required=True)
+    ap.add_argument("--domain", help="one declaration (or --composition with --member)")
+    ap.add_argument("--composition", help="a *.composition.yaml (ADR-0026): every member runs in this process, "
+                                          "wired; --member is the one served")
+    ap.add_argument("--member", help="with --composition: the member domain to serve")
+    ap.add_argument("--store-dir", help="with --composition: one SQLite store per member, <dir>/<member>.db")
+    ap.add_argument("--kernel-root", help="run declared kernel-service effects (ADR-0028) on files under this "
+                                          "directory; without it, kernel calls stay pending")
+    ap.add_argument("--workspace", help="authoring workspace, for the read_source and fetch_source services")
+    ap.add_argument("--env", help="local deploy environment, for the preview and deploy services")
     ap.add_argument("--store", default="memory")
     ap.add_argument("--identity", required=True)
     ap.add_argument("--transport", choices=["stdio", "http"], default="stdio")
@@ -83,15 +91,22 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--harness-report", help="harness report JSON (toprope-harness --json) shown in the world map")
     args = ap.parse_args(argv)
 
-    domain = load_domain(args.domain)
-    errors = [i for i in validate_domain(domain) if i.severity == "error"]
-    if errors:
-        for i in errors:
-            print(f"error {i.code} at {i.where}: {i.message}", file=sys.stderr)
-        raise SystemExit(1)
-    ex = Execution(domain, open_store(args.store), open_identity(args.identity))
-    if not args.no_seed:
-        ex.seed_world()
+    if bool(args.domain) == bool(args.composition) or bool(args.composition) != bool(args.member):
+        ap.error("give --domain, or --composition with --member")
+    services = _kernel(args)
+    identity = open_identity(args.identity)
+    if args.composition:
+        ex = _member(args, identity, services)
+    else:
+        domain = load_domain(args.domain)
+        errors = [i for i in validate_domain(domain) if i.severity == "error"]
+        if errors:
+            for i in errors:
+                print(f"error {i.code} at {i.where}: {i.message}", file=sys.stderr)
+            raise SystemExit(1)
+        ex = Execution(domain, open_store(args.store), identity, services=services)
+        if not args.no_seed:
+            ex.seed_world()
 
     import json
     harness = None
@@ -109,6 +124,49 @@ def main(argv: list[str] | None = None) -> None:
         from .http import run_http
         issuer = os.environ.get("TOPROPE_JWT_ISSUER") if args.identity == "jwt" else None
         run_http(ex, args.host, args.port, args.public_url, issuer, harness=harness)
+
+
+def _kernel(args):
+    if not args.kernel_root:
+        return None
+    from ...kernel.services import LocalKernel
+    ws = env = None
+    if args.workspace:
+        from ...authoring import Workspace
+        ws = Workspace(args.workspace)
+    if args.env:
+        from ...deploy import LocalEnvironment
+        env = LocalEnvironment(args.env)
+    return LocalKernel(args.kernel_root, workspace=ws, environment=env)
+
+
+def _member(args, identity, services):
+    """Every member of the composition, wired in this process; one store per member, so
+    several processes (one per served member) share state through the same files."""
+    from pathlib import Path
+
+    from ...compose import assemble, check_composition, load_composition
+    try:
+        c = load_composition(args.composition)
+    except ValueError as e:
+        raise SystemExit(f"error {e}") from None
+    issues = check_composition(c)
+    if issues:
+        for i in issues:
+            print(f"error {i.code} at {i.where}: {i.message}", file=sys.stderr)
+        raise SystemExit(1)
+    if args.member not in c.domains:
+        raise SystemExit(f"error: no member {args.member!r} in {sorted(c.domains)}")
+    if args.store_dir:
+        Path(args.store_dir).mkdir(parents=True, exist_ok=True)
+        stores = {n: open_store(f"sqlite:{Path(args.store_dir) / (n + '.db')}") for n in c.domains}
+    else:
+        stores = {n: open_store("memory") for n in c.domains}
+    exs = assemble(c, stores, identity, services=services)
+    if not args.no_seed:
+        for ex in exs.values():
+            ex.seed_world()
+    return exs[args.member]
 
 
 if __name__ == "__main__":

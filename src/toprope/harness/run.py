@@ -215,7 +215,7 @@ class Harness:
         return passed
 
     def _flow_step(self, s: Surface, step) -> str | None:
-        role = step.actor.get("role")
+        role = step.actor.get("role") or (f"external:{step.actor['external']}" if "external" in step.actor else None)
         actor = self.world.actors.get(role)
         if actor is None:
             return f"no actor for role {role!r}"

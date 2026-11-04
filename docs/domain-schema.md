@@ -12,6 +12,7 @@ readable schemas: [`schema/domain.v1.schema.json`](../schema/domain.v1.schema.js
 | `objects` (properties, provenance) | core | implemented (M0a) |
 | `links` | core | implemented (M0a) |
 | `actions`: actor rules (role, relation), `target`/`creates`, params, preconditions, `set` effects, `records_decision`, `event`, `applies_in`, `requires: human` | core | implemented (M0a) |
+| `call` effects to kernel services, replies from `external:kernel` | [Kernel services](#kernel-services-adr-0028) | implemented (M0a, ADR-0028) |
 | `transitions` (matrix cells: state, `deny`, `n/a`, `undecided`, `to`, `by_role`) | core | implemented (M0a) |
 | `invariants` with `scope: aggregate` | core | implemented (M0a) |
 | `world` (fixtures, actors), `scenarios` (`do`, `read` steps) | core, scenarios | implemented (M0a) |
@@ -414,6 +415,60 @@ Functions may be called in actor relations, preconditions, effects and invariant
 4–10), and while computing allowed actions for views. So they must be pure, deterministic
 and fast. They may not read the store, the clock or the network: pass `now()` in as an input
 if needed.
+
+## Kernel services (ADR-0028)
+
+An action may call a **kernel service**, and name the action that receives its result. This
+is how a domain does real work without hand-written glue, so a regenerated domain still
+works. The catalog is the kernel itself (ADR-0027):
+
+| Service | Inputs | Result (besides `ok`, `error`) |
+|---|---|---|
+| `validate` | `declaration` | `errors`, `warnings`, `summary` |
+| `compile` | `declaration` | `objects`, `actions`, `elements`, `summary` |
+| `check_composition` | `composition` | `issues`, `summary` |
+| `run_harness` | `declaration` | `findings`, `cells_covered`, `unreachable`, `summary` |
+| `world_map` | `declaration` | `undecided`, `unreachable`, `edges` |
+| `read_source` | `source` | `chunks`, `local_only` |
+| `fetch_source` | `source` | `sha256` |
+| `preview` | `declaration` | `build`, `harness_ok` |
+| `deploy` | `build`, `approver` | `deployed` (under the fixed floor, ADR-0022) |
+
+```yaml
+actions:
+  check_version:
+    description: Check a domain version.
+    actor: [owner]
+    target: DomainVersion
+    effects:
+      - call: run_harness
+        with: {declaration: target.declaration}    # inputs: expressions on the resulting state
+        reply: record_harness_result
+  record_harness_result:
+    description: Record the harness result of a version.
+    actor: ["external:kernel"]                      # only the kernel replies
+    target: DomainVersion
+    params: {ok: {type: boolean}, findings: {type: integer}}
+    effects:
+      - set: {target.harness_ok: params.ok, target.findings: params.findings}
+```
+
+Rules:
+- **The call.** It is appended with the action, as an `EffectRequested` outbox event, and
+  runs after the append (`docs/semantics.md` step 12). A failure never blocks the action.
+- **The reply.** It is a command from `external:kernel` to the `reply` action on the same
+  object, keyed by the effect id, so it is applied at most once. It goes through the matrix,
+  preconditions and invariants like any other command.
+- **Every field, every time.** A result always has every field: `ok`, `error` (`""` when
+  ok), and the service's fields, with defaults when it failed. A failed call (including
+  inputs of the wrong type) still replies, so the declaration decides what a failure means,
+  usually with a gate on a later action.
+- **Compile-time checks.** The service exists; its inputs are all mapped and no others; the
+  reply exists, targets the same object type and allows `external:kernel`; the reply's
+  params are fields of the result, of the same type. An action is either for
+  `external:kernel` or for others, never both.
+- **Testing.** In scenarios, the kernel's results are ordinary steps:
+  `{actor: {external: kernel}, do: record_harness_result, target: V1, params: {ok: true, findings: 0}}`.
 
 ## External events
 

@@ -11,6 +11,16 @@ uv run toprope-harness --domain my.domain.yaml --levels model --examples 500 --j
 It exits 1 on any finding. From Python: `toprope.harness.run_harness(domain)` returns a
 `Report` (`ok`, `findings`, `coverage`, `minimal_flows`, `summary()`, `to_json()`).
 
+## The regeneration check (ADR-0028)
+```bash
+uv run toprope-harness --composition self.composition.yaml --regen-check
+```
+1. It serves every member from its declaration and runs the harness at every level.
+2. It regenerates everything from the files and runs again.
+3. The two runs must agree, and both must pass.
+4. Each action that calls a kernel service is taken once, end to end, with a recording
+   kernel. Its calls must be resolved and its replies accepted.
+
 ## What it runs
 
 | Part | What it checks |
@@ -24,7 +34,7 @@ It exits 1 on any finding. From Python: `toprope.harness.run_harness(domain)` re
 | **Replay parity** | Folding an object's stored events rebuilds exactly the state the command produced. |
 | **Race tests** | Two actors on one cell at once, through Execution on a durable store. The pair of outcomes must be the outcome of one of the two serial orders, and the invariants must hold (`docs/semantics.md` §3). |
 | **Bounded exploration** | Action sequences on the model level, bounded by depth and a fixed number of derandomized examples (Hypothesis `find`), never by wall-clock time. A violation is shrunk to a **minimal flow** in domain terms (who did what, from which state). |
-| **Flows** | The declaration's `scenarios`, run as written at every level. |
+| **Flows** | The declaration's `scenarios`, run as written at every level. A step by `{external: kernel}` states a kernel service's result. |
 | **Coverage** | Decided cells covered per level, undecided cells, cells with no instance (gaps), precondition boundaries, invariants exercised, flows passed, race tests, unreachable states. |
 
 Each case runs on its own clone of a world instance (`<id>~h<n>`), so cases never

@@ -111,7 +111,7 @@ class Planner:
         obj = a.object_type
         for state in self.d.transitions[obj].matrix:
             insts = self.w.in_state(obj, state)
-            for role in self.d.roles:
+            for role in self.w.actors:
                 cid = f"cell:{obj}.{state}.{name}.{role}"
                 if not insts:
                     out.append(Case(cid, "cell", obj, state, name, role, None, gap="no-instance-in-state"))
@@ -136,7 +136,7 @@ class Planner:
                 continue
             found = None
             for state in self.d.transitions[obj].matrix:
-                for role in self.d.roles:
+                for role in self.w.actors:
                     if cell_expectation(raw_cell(self.d, obj, state, name, role), state)["status"] != "ok":
                         continue
                     for inst in self.w.in_state(obj, state):
@@ -160,7 +160,7 @@ class Planner:
         out = []
         obj = a.creates
         tr = self.d.transitions.get(obj)
-        for role in self.d.roles:
+        for role in self.w.actors:
             cid = f"create:{name}.{role}"
             if not self.actor_ok(name, a, role, None):
                 expect: dict[str, Any] = {"status": "denied", "code": "actor"}

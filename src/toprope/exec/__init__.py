@@ -21,7 +21,7 @@ from ..store import EventStore
 class Execution:
     def __init__(self, domain: Domain, store: EventStore, identity: Identity,
                  clock: Callable[[], datetime] | None = None, transport: Any = None,
-                 accepts: dict[str, set[str]] | None = None):
+                 accepts: dict[str, set[str]] | None = None, services: Any = None):
         """`transport` (a HandoffTransport) sends this domain's handoffs after each append.
         `accepts` (from a composition, ADR-0026) maps each receiving action to the handoffs
         wired to it (`<sender domain>.<handoff>`); any other handoff is refused. None: a domain
@@ -32,6 +32,8 @@ class Execution:
         self.clock = clock or (lambda: datetime.now(timezone.utc))
         self.transport = transport
         self.accepts = accepts
+        self.services = services          # KernelServices: runs this domain's kernel calls (ADR-0028)
+        self._dispatching = False
         self._model = ReferenceModel(domain, store, clock=self.clock, seed_world=False)
 
     # -- commands ----------------------------------------------------------------------------
@@ -59,19 +61,47 @@ class Execution:
 
     def _after(self, out: Outcome) -> Outcome:
         """Step 12: send the outbox after the append. It never changes the sender's outcome."""
-        if self.transport is not None and any(e.kind == "outbox" for e in out.events):
+        if ((self.transport is not None or self.services is not None) and not self._dispatching
+                and any(e.kind == "outbox" for e in out.events)):
             try:
                 self.dispatch()
-            except Exception:    # pending handoffs are retried by the next dispatch
+            except Exception:    # pending entries are retried by the next dispatch
                 pass
         return out
 
-    def dispatch(self) -> list[dict[str, Any]]:
-        """Send every pending handoff of this domain through the transport."""
+    def dispatch(self, rounds: int = 20) -> list[dict[str, Any]]:
+        """Send every pending outbox entry: handoffs through the transport, kernel calls through
+        the services. A reply may call again; that is sent in the next round, up to `rounds`."""
         from ..handoff import Outbox
-        if self.transport is None:
-            raise RuntimeError("no handoff transport configured")
-        return Outbox(self).dispatch(self.transport)
+        if self.transport is None and self.services is None:
+            raise RuntimeError("no handoff transport or kernel services configured")
+        report: list[dict[str, Any]] = []
+        self._dispatching = True
+        try:
+            for _ in range(rounds):
+                done = Outbox(self).dispatch(self.transport, self.services)
+                report += done
+                if not any(r["result"] != "pending" for r in done):
+                    break
+        finally:
+            self._dispatching = False
+        return report
+
+    def receive_kernel_reply(self, effect_id: str, action: str, target: str,
+                             params: dict[str, Any]) -> Outcome:
+        """A kernel service's result (ADR-0028): a command from `external:kernel` to the reply
+        action, keyed by the effect id, so it is applied at most once. It goes through the
+        domain's rules like any other command. Only the outbox calls this."""
+        from ..kernel import KERNEL
+        spec = self.d.actions.get(action)
+        if spec is None:
+            return Outcome("rejected", "unknown-action", f"No action {action}.")
+        bad = self._model.interp.invalid_params(spec, dict(params))
+        if bad:
+            return Outcome("rejected", "invalid-command", bad)
+        cmd = Command(Actor(KERNEL, "system", (KERNEL,)), action, target, dict(params), effect_id, self.clock(),
+                      causation=effect_id)
+        return self._after(self._model.execute(cmd))
 
     def receive_handoff(self, handoff: str, action: str, target: str, params: dict[str, Any],
                         handoff_id: str, origin: dict[str, Any] | None) -> Outcome:

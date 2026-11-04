@@ -17,6 +17,7 @@ from typing import Any
 
 from ..decl.models import Action, ActorRule, ByRole, Deny, Domain, Invariant, Target
 from ..expr import Env, EvalError, evaluate, parse, paths_read
+from ..kernel import CATALOG
 from .types import Actor, Command, Event, Grant, Outcome
 
 # lookup(oid) -> (object type, state) or None
@@ -80,6 +81,16 @@ def _unstorable(v: Any) -> str | None:
 
 def _pascal(name: str) -> str:
     return "".join(p[:1].upper() + p[1:] for p in name.split("_"))
+
+
+def _of_type(v: Any, t: str) -> bool:
+    if t == "boolean":
+        return isinstance(v, bool)
+    if t == "integer":
+        return isinstance(v, int) and not isinstance(v, bool)
+    if t == "number":
+        return isinstance(v, (int, float)) and not isinstance(v, bool)
+    return isinstance(v, str)
 
 
 def origin_person(cmd: Command) -> dict[str, Any] | None:
@@ -244,6 +255,8 @@ class Interpreter:
         if tr is not None and next_state is not None:
             new[tr.field] = changes[tr.field] = next_state
         for eff in action.effects:
+            if eff.call is not None:      # a kernel-service call: emitted after the append (step 12)
+                continue
             if eff.create is not None:
                 # Creating another object from an effect is not supported yet: fail closed.
                 return Decision(Outcome("rejected", "unsupported-effect",
@@ -275,7 +288,33 @@ class Interpreter:
             events.append(Event("DecisionRecorded", stream, obj, kind="decision", payload=copy.deepcopy(
                 {"action": cmd.action, "params": cmd.params, "inputs": current}), **meta))
         events += self._handoffs(cmd, obj, new, lookup, meta)                              # step 12
+        events += self._calls(cmd, action, obj, new, lookup, meta)
         return Decision(Outcome("ok", state=copy.deepcopy(new)), tuple(events), ())
+
+    def _calls(self, cmd: Command, action: Action, obj: str, new: dict[str, Any], lookup: Lookup,
+               meta: dict[str, Any]) -> list[Event]:
+        """Kernel-service calls (ADR-0028), as outbox entries appended with the action. Inputs
+        are evaluated on the resulting state; one that cannot be evaluated is recorded with its
+        error, and the service then replies with a failure."""
+        out = []
+        view = ObjectView(self.d, obj, new, lookup)
+        for k, eff in enumerate(action.effects):
+            if eff.call is None:
+                continue
+            payload: dict[str, Any] = {"service": eff.call, "reply": eff.reply, "index": k, "inputs": {}, "error": None}
+            try:
+                env = self._env(view, cmd.actor, cmd.params)
+                payload["inputs"] = {i: evaluate(self._expr(src), env) for i, src in eff.with_.items()}
+                svc = CATALOG.get(eff.call)
+                for i, v in payload["inputs"].items():
+                    want = svc.inputs.get(i) if svc else None
+                    if want and not _of_type(v, want):
+                        raise EvalError(f"input '{i}' must be a {want}, got {v!r}")
+            except EvalError as e:
+                payload["error"] = str(e)
+            out.append(Event("EffectRequested", cmd.target or "", obj, kind="outbox",
+                             payload=copy.deepcopy(payload), **meta))
+        return out
 
     def _handoffs(self, cmd: Command, obj: str, new: dict[str, Any], lookup: Lookup,
                   meta: dict[str, Any]) -> list[Event]:
