@@ -20,12 +20,14 @@ So:
 - **The shown half of the gold, the probe suite and the change intents** may be written
   in a chat interview where the agent asks only the area-level prompts below. You write
   the text, in your own words, into the files yourself.
-- **From M2 on**, gold can be written with the generated authoring tool: the real dogfood.
+- **Later** (from M2, if the researcher decides so), gold could be written with the
+  generated authoring tool, the real dogfood, once M1 gives a reason to trust that tool.
 
 ## Decisions to make first (still open in the scope doc)
-1. **How the instruments split across the two domains.** Option A: about 30 gold per
-   domain plus about 6 on the handoff (the experiment doc's figure). Option B: about 30 in
-   total, weighted toward Authoring (less of your time, weaker evidence for Delivery).
+1. **How the instruments split across the two domains.** Option A: about 30 gold per self
+   domain, with the handoff questions counted inside them (the experiment doc's figure).
+   Option B: about 30 in total, weighted toward Authoring (less of your time, weaker
+   evidence for Delivery).
 2. **Whether handoff-breaking changes are seeded.** For example, a change that removes or
    renames something Delivery's request accepts. Seeding them tests the compile-time
    contract (ADR-0022). Leaving them out keeps the key smaller.
@@ -44,6 +46,9 @@ So:
   outputs. Describe them the way the owner would.
 - It is stable: if the answer depends on a choice you have not made yet, decide it now or
   drop the question.
+- It is not one of the **example questions already printed** in
+  `docs/experiments/M1-self-compile.md` (for instance "What happens to an element no source
+  supports?"). Those are public: use them, if at all, in the shown half.
 
 ### Coverage areas (ask yourself; aim for a spread, not a quota)
 For each domain, pick questions across these areas. The prompts are deliberately generic.
@@ -75,7 +80,7 @@ holding out a whole area.
 - Observable means visible in the tool's outputs or the recorded history, not in intent.
 - No overlap with the gold questions or the domains' own scenarios, and no reference to the
   change key.
-- Size: about 8 to 12 per domain is enough for M1.
+- Size: the experiment doc sets no number. A suggestion: about 8 to 12 per domain.
 
 ## Change requests (`change-requests.yaml`) and the key (`change-key.yaml`)
 - About 20 **intents**, in the order an owner would ask for them, written as the owner

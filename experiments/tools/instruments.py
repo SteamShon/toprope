@@ -107,11 +107,13 @@ def validate(d: Path, include_binding: bool = True) -> list[str]:
         if sorted(seqs) != sorted(kseqs):
             errs.append("change-key: must have exactly one entry per change-request seq")
         for e in items(k, "entries"):
+            # Sealed: never say which seq an error is on, since that tells which requests are seeded.
+            where = "a key entry" if SEALED else f"key seq {e.get('seq')}"
             if e.get("problem") not in PROBLEMS:
-                errs.append(f"key seq {e.get('seq')}: problem must be one of {sorted(PROBLEMS)}")
+                errs.append(f"{where}: problem must be one of {sorted(PROBLEMS)}")
             t = str(e.get("type", ""))
             if e.get("problem") != "none" and not (t in TYPES or t.startswith("other:")):
-                errs.append(f"key seq {e.get('seq')}: type must be one of {sorted(TYPES)} or other:<text>")
+                errs.append(f"{where}: type must be one of {sorted(TYPES)} or other:<text>")
         counts = {p: sum(1 for e in items(k, "entries") if e.get("problem") == p) for p in PROBLEMS}
         if not SEALED:   # the key mix is part of the sealed key: never printed for an agent
             warn.append(f"key mix: {counts} (target ~6 conflict, ~4 breakage, ~10 none)")
