@@ -20,33 +20,39 @@ that ADR for representation.
 
 ### 1. Two layers, two compilations
 - **Domain** (`*.domain.yaml`) holds meaning: objects, links, actions, glossary. Compiling it
-  produces MCP, the execution checks, and a **domain contract**: a versioned, hashed list of
-  objects, fields, actions (params, reasons), and glossary terms.
+  produces MCP, the execution checks, and a **domain interface**: the list of objects,
+  fields, links, actions (params, reasons) and glossary terms. It is versioned by the
+  compiler from the diff (removal or rename = major, addition = minor, text only = patch),
+  and every element has a content hash. The name avoids "contract", which ADR-0004 reserves
+  for a deferred execution concept.
 - **Representation** (`*.representation.yaml`) holds how it is shown: views per object
   (`list`, `detail`, `board`, …), forms per action, field order and grouping, and where
-  actions appear. It declares which domain contract versions it targets.
-- The representation compiler reads **only the domain contract**, never the domain source.
+  actions appear. It declares the interface major range it targets.
+- The representation compiler reads **only the domain interface**, never the domain source.
   - A representation change recompiles only the views. MCP and execution are untouched.
   - A domain change recompiles the domain and re-validates every representation against the
-    new contract. Broken references (a removed field or renamed action) fail the build.
-    Unaffected views are reused.
+    new interface. Broken references (a removed field or renamed action) fail the build.
+    Views whose referenced elements kept their hashes are reused.
 - The two layers are versioned separately. The record of a released UI is a pair:
   (domain version, representation version).
 
 ### 2. Layered representation with host injection
 Representation is resolved in layers, and later layers override earlier ones:
 
-1. **Schema defaults**: generated from the contract for anything undeclared.
+1. **Schema defaults**: generated from the interface for anything undeclared.
 2. **Base representation**: written by the domain author.
 3. **Host overlay**: written by whoever hosts the domain. It can override views, layouts and
-   field widgets.
+   field widgets. It names the base versions it accepts and the interface range it targets,
+   and is re-validated whenever the domain, the base or the overlay changes. Maps merge by
+   key. Keyed lists (sections by title, fields, columns and actions by name) merge by key,
+   and `{replace: [...]}` replaces a whole list (docs/domain-schema.md).
 
 The host can also register **custom components** in the renderer's catalog (for example,
 React components in CopilotKit) and reference them from its overlay. Custom components:
-- receive data and the currently allowed actions through the domain contract
+- receive data and the currently allowed actions through the domain interface
 - invoke actions only through Execution, so preconditions and roles are still enforced on
   the server, whatever the UI does
-- cannot add actions, rules or fields that are not in the contract.
+- cannot add actions, rules or fields that are not in the interface.
 
 ### 3. Generation
 - **Declared views** (any layer) compile deterministically to A2UI and render via
@@ -59,16 +65,18 @@ React components in CopilotKit) and reference them from its overlay. Custom comp
 Representation never redefines meaning. Labels, descriptions and denial reasons come from
 the glossary, `description` and `reason`. A host that needs different wording declares an
 **alias** that maps to the glossary term, so agents and people can still be mapped to the
-same term. A label silently replaced in a custom component is a build warning.
+same term. Host components receive labels with aliases applied. The compiler cannot
+inspect inside opaque host components, so text hardcoded there is the host's
+responsibility and is not checked. Only declared aliases are guaranteed to stay mapped.
 
 ## Rationale
 ③ needs one shared reference for meaning. Separating representation lets the frequent
 change (presentation) move fast without touching the rare, governed change (meaning). The
-contract boundary keeps host customization from becoming a second source of meaning.
+interface boundary keeps host customization from becoming a second source of meaning.
 
 ## Consequences
-- Compiler outputs: from the domain, MCP + execution checks + domain contract. From the
-  representation layers plus the contract, A2UI views + a component/action catalog for the
+- Compiler outputs: from the domain, MCP + execution checks + domain interface. From the
+  representation layers plus the interface, A2UI views + a component/action catalog for the
   generative layer.
 - Representation changes are lighter decisions than domain changes. They are recorded, but
   they do not need a domain-change approval. Whether they count as a third accumulated

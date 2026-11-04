@@ -27,8 +27,8 @@ The bootstrap: the smallest hand-built kernel that later milestones can generate
 - Stack: pure-Python domain core (`uv`), Aegra as the runtime adapter, TypeScript frontend.
 - Domain schema v0 with provenance and status on every element (`domain-schema.md`).
 - Domain compiler v0: domain → MCP (reads, plus one tool per action with preconditions),
-  execution checks, and a versioned domain contract.
-- Representation compiler v0 (ADR-0008): contract + layers (defaults → base → host overlay)
+  execution checks, and a versioned domain interface.
+- Representation compiler v0 (ADR-0008): interface + layers (defaults → base → host overlay)
   → deterministic A2UI views. Done when:
   - a representation-only change rebuilds without touching MCP
   - a domain change flags a broken view
@@ -104,5 +104,5 @@ after; over-generalization incidents).
 ## Later
 
 ⑤ with real teams. Learning from accumulated work decisions. Real external effects with
-read-back. Durable runtime and host adapters. Comparison with automated harness
+read-back. Adapters for other runtimes and hosts (Temporal, OpenDots). Comparison with automated harness
 improvement (Harness²).
