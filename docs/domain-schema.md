@@ -150,6 +150,8 @@ compiled A2UI views, and adapters.
   adapter: Hypothesis). A counterexample is reported as a minimal flow in domain terms.
 - **Example flows**: run as written.
 - **Parity**: the same test must give the same outcome on every surface.
+- **Replay parity**: replaying the events a test produced rebuilds the same projected state
+  (ADR-0012).
 - **Coverage report**: cells, invariants, views, flows, and unreachable states.
 
 A failing cell test, an invariant violation or a parity failure blocks deployment of that

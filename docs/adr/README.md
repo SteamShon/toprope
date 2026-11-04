@@ -17,3 +17,4 @@ A record is superseded rather than deleted when a decision changes. History befo
 | [0009](0009-change-safety-is-the-compiler-core.md) | all | Chain v2 is the backbone: premise P0; ① = iterate safely; change safety is the compiler's core job |
 | [0010](0010-matrix-invariants-harness.md) | ① ② ③ ④ | Transition matrix, invariants and a small world drive a generated harness |
 | [0011](0011-correctness-layer-and-software-factory.md) | ③, all | Correctness layer + software factory; chain v3 adds ③ works as built; greenfield and brownfield from M0; hosting open |
+| [0012](0012-event-sourcing-in-the-core.md) | ③ ⑤ | Event sourcing owned by the core; generated read-only query tools; Aegra consumes |

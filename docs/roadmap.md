@@ -50,7 +50,10 @@ The bootstrap: the smallest hand-built kernel that later milestones can generate
     still passes
   - a seeded invariant-breaking transition is found by exploration and reported as a
     minimal flow.
-- Execution with precondition and role checks, plus an append-only event log.
+- **Event store (ADR-0012)**: event-sourced greenfield backend; schemas, projections and
+  append-time enforcement generated from the declaration; denied attempts, decisions and
+  effect outcomes recorded; generated read-only MCP query tools; replay parity checked by
+  the harness.
 - Source readers: repository, markdown records, session transcripts, interview log.
 
 - **Greenfield backend (ADR-0011)**: the compiler also generates a domain API over the state

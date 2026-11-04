@@ -11,7 +11,7 @@ roles. That, not interface shape, is the test of replaceability.
 Intelligence   agents (Claude Code, Codex, any MCP client) and people
       │        see the world model via generated MCP, UI and the domain interface
       ▼
-Toprope        correctness layer: declaration, matrix, invariants, Execution gate, event log,
+Toprope        correctness layer: declaration, matrix, invariants, Execution gate, event store,
                harness-verified generated surfaces
       │        only allowed actions pass
       ▼
@@ -33,7 +33,7 @@ now). One Execution core serves (a) and (b). M0 builds both shapes on the toy do
 | **Domain Compiler** | domain → MCP, greenfield backend (domain API over the state store), execution checks, **domain interface** (objects/fields/links/actions/glossary; versioned by diff, hashed per element) | ① ④ | M0 |
 | **Representation Compiler** | representation layers (defaults → base → host overlay) + interface → A2UI views, component/action catalog for generative UI. Rebuilt independently of the domain | ④ | M0 |
 | **Execution** | checks preconditions and roles on current state, applies effects | ④ | M0 |
-| **Event Log** | append-only calls, verdicts, effects, human decisions | ⑤ | M0 |
+| **Event Store** | event-sourced system of record (ADR-0012): domain events, decisions, denied attempts, exceptions, effect outcomes, domain changes; projections give current state; upcasters across versions; generated read-only query tools for agents | ① ③ ⑤ | M0 |
 | **Proposal / Review** | log-mined model diffs; human decisions with their inputs | ⑤ | M4 |
 | **Handoff** | typed requests between domains via published domain interfaces | ⑥ | M5 |
 
@@ -48,19 +48,19 @@ are generated, and only the kernel stays hand-built.
 | `Drafter` | sources → proposed elements with source links | Aegra workflow calling an LLM (Claude API) (ADR-0007) | other models or runtimes |
 | `Interviewer` | targeted questions on unknown or conflicting elements, `undecided` matrix cells and candidate invariants, asked in plain domain language | Aegra workflow; each question is a HITL interrupt answered in the generated UI (ADR-0007) | other runtimes |
 | `DomainStore` | versioned domain models | YAML in repo | git-backed registry |
-| `StateStore` | object instances and links | PostgreSQL (shared with Aegra) or SQLite for tests | existing app DBs |
+| `EventStore` | append events (matrix, preconditions and invariants enforced at append); read streams; projections for current state (ADR-0012) | PostgreSQL in its own schema (may share Aegra's server) or SQLite for tests | EventStoreDB, Kafka-backed |
 | `AgentSurface` | expose reads and actions to agents | generated MCP server mounted on Aegra custom routes | OpenAPI, LangGraph tools |
 | `HumanSurface` | expose objects and actions to people | compiled A2UI views rendered in React + CopilotKit; host-injected components via the renderer catalog; LLM generative UI for ad-hoc views, limited to the catalog and allowed actions (ADR-0008) | other generative-UI stacks, OpenDots |
 | `RepresentationStore` | versioned base representations and host overlays | YAML files | host-managed registry |
 | `Runtime` | host long-lived agent workflows (drafter, interviewer, proposal engine) | Aegra (ADR-0007) | LangGraph Platform, Temporal |
 | `EffectAdapter` | real-world effects, with read-back and `UNKNOWN` | greenfield: the generated backend's store; brownfield: GitHub issues/labels in a sandbox repo (ADR-0011) | flags, ad APIs, internal services |
-| `EventLog` | append events | JSONL | SQLite, OpenTelemetry |
+| `EventQuery` | read-only, declaration-typed queries for agents: timelines, decision history, denials per cell, `undecided` hits, exceptions, effect outcomes; exposed as generated MCP tools | in-process over `EventStore` | analytics warehouse |
 | `ProposalEngine` | logs → candidate diffs | Aegra cron workflow calling an LLM | Harness²-style probe loops |
 | `ScenarioRunner` | run the domain's flows against the model (reference interpreter) | in-process | — |
 | `WorldBuilder` | grow the expert's fixtures into a small world: an instance per reachable state, every role, boundary values; report unreachable states | in-process | — |
 | `HarnessGenerator` | compile the matrix, invariants, world and flows into per-surface tests (Execution, MCP client, A2UI view assertions, adapters); parity and coverage reports (ADR-0010) | pytest-based generated suite | browser end-to-end for host components |
 | `Explorer` | bounded stateful exploration of action sequences for invariant violations and parity failures; minimal counterexample flows | Hypothesis stateful testing | TLA+/Alloy model checking |
-| `LogReplayer` | re-run recorded events against a new version and diff outcomes | EventLog reader | — |
+| `LogReplayer` | re-run recorded events against a new version and diff outcomes | `EventStore` reader | — |
 | `ConflictLinter` | flag contradictions among natural-language parts (descriptions, judgment rules) as warnings | LLM call | other models |
 | `PreviewEnvironment` | generated MCP + UI on a copy of the state for trying a change | local process | per-PR preview deployments |
 
@@ -98,6 +98,20 @@ host overlay + components ───┴──► Representation Compiler ──�
 
 A representation change rebuilds only the right-hand side. A domain change rebuilds the
 domain and re-validates every representation against the new interface.
+
+## Event sourcing (ADR-0012)
+
+```
+action call ─► Execution: matrix + preconditions + invariants ─► append event ─► projections
+     │                     │ denied                                    │
+     │                     └──► append DeniedAttempt                    ▼
+     └─ actor, thread_id, run_id ──────────────────────────► generated read-only MCP query tools
+                                                                       │
+                       Aegra workflows (proposal engine, interviewer) ◄┘
+```
+
+The core owns the event store. Aegra's threads and checkpoints are a separate stream of
+agent-execution records, linked to domain events by `thread_id` and `run_id`.
 
 ## Stack (ADR-0007)
 

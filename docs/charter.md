@@ -61,6 +61,10 @@ intelligence layer that proposes actions and an effect layer that performs them 
     model
   - a layer over effects: for **greenfield**, the backend and store that Toprope generates;
     for **brownfield**, existing code, APIs and databases behind adapters
+- **Everything is a record (event sourcing).** Domain events, decisions, denied attempts,
+  exceptions, effect outcomes and domain changes are stored as events. Agents can query them,
+  which is how the next policy or domain improvement gets proposed (ADR-0012). The
+  implementation pattern is DDD + invariants + transition matrix + event sourcing.
 - **Writing the code is nearly free.** It is generated, and it is trusted because the
   harness checks every allowed and denied state transition, not because a call graph was
   tested. This is the researcher's experience with DDD, transition matrices, invariants and
@@ -89,7 +93,7 @@ intelligence layer that proposes actions and an effect layer that performs them 
             ▼                         ▼                                       │
       MCP for agents            UI for people                        agent proposes diff
             └──────► the workflow runs ◄┘                                      │
-                            └─────────────► event log ─────────────────────────┘
+                            └─────────────► event store ───────────────────────┘
 ```
 
 ## 3. The claim chain
