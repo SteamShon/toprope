@@ -31,6 +31,18 @@ class Execution:
     def submit(self, credentials: str | None, action: str, target: str | None,
                params: dict[str, Any] | None = None, idempotency_key: str | None = None,
                thread_id: str | None = None, run_id: str | None = None) -> Outcome:
+        # Step 0 (command validation) before step 1 (identity), as in docs/semantics.md.
+        spec = self.d.actions.get(action)
+        if spec is None:
+            return Outcome("rejected", "unknown-action", f"No action {action}.")
+        if target is None:
+            return Outcome("rejected", "invalid-command", "A target id is required.")
+        if not idempotency_key:
+            # Every command from outside the process carries a key (docs/semantics.md §1).
+            return Outcome("rejected", "invalid-command", "An idempotency key is required.")
+        bad = self._model.interp.invalid_params(spec, dict(params or {}))
+        if bad:
+            return Outcome("rejected", "invalid-command", bad)
         caller = self.identity.resolve(credentials)
         if caller is None:
             return Outcome("rejected", "unauthenticated", "Unknown or missing credentials.")
@@ -44,9 +56,7 @@ class Execution:
         n = 0
         for fx in self.d.world.fixtures:
             ((obj, data),) = fx.items()
-            if self.store.version(data["id"]) == 0:
-                self._model.seed(obj, data)
-                n += 1
+            n += self._model.seed(obj, data, only_if_new=True)
         return n
 
     # -- reads -------------------------------------------------------------------------------

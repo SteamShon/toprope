@@ -74,11 +74,28 @@ def test_durable_across_reopen(open_store, store_kind):
     assert isinstance(b.claim(("k",)), Outcome)
 
 
+def _force_interleave(store, gate):
+    """Make append's version check wait until the other thread has also checked (or until the
+    database serializes us), so both threads really pass the check before either inserts."""
+    real = store.version
+
+    def version(stream):
+        v = real(stream)
+        try:
+            gate.wait(timeout=1.0)   # times out if the store serializes appends (fine)
+        except threading.BrokenBarrierError:
+            pass
+        return v
+    store.version = version
+
+
 def test_real_race_between_connections(open_store, store_kind):
     if store_kind == "memory":
         pytest.skip("needs two connections to one database")
     a, b = open_store(), open_store()
-    results, barrier = [], threading.Barrier(2)
+    results, barrier, gate = [], threading.Barrier(2), threading.Barrier(2)
+    for s in (a, b):
+        _force_interleave(s, gate)
 
     def go(store):
         barrier.wait()
@@ -108,3 +125,46 @@ def test_real_claim_race_between_connections(open_store, store_kind):
     [t.start() for t in ts]
     [t.join() for t in ts]
     assert sorted(map(str, got)) == ["None", "pending"]
+
+
+def test_codec_is_unambiguous_and_identical_across_stores(open_store):
+    from datetime import date
+    s = open_store()
+    tricky = {"$dt": "not a date", "$$x": 1, "d": date(2026, 1, 2), "t": (1, 2)}
+    s.append("C", 0, [ev("C", **tricky)])
+    assert s.read("C")[0].payload["changes"] == {"$dt": "not a date", "$$x": 1, "d": date(2026, 1, 2), "t": [1, 2]}
+
+
+@pytest.mark.parametrize("bad", [float("nan"), "a\x00b"])
+def test_unstorable_values_fail_before_writing(open_store, bad):
+    from toprope.store.codec import CodecError
+    s = open_store()
+    with pytest.raises(CodecError):
+        s.append("N", 0, [ev("N", x=bad)])
+    assert s.version("N") == 0
+
+
+def test_shared_instance_is_thread_safe(open_store, store_kind):
+    """Threads sharing one instance: a failing append must not swallow another thread's write."""
+    s = open_store()
+    s.append("T", 0, [ev("T")])
+    errors = []
+
+    def failing_appends():
+        for _ in range(50):
+            try:
+                s.append("T", 0, [ev("T")])   # always stale -> ConcurrencyError + rollback
+            except ConcurrencyError:
+                pass
+
+    def attempts():
+        for _ in range(50):
+            try:
+                s.append_attempt(ev("T", kind="attempt"))
+            except Exception as e:  # pragma: no cover
+                errors.append(e)
+
+    ts = [threading.Thread(target=failing_appends), threading.Thread(target=attempts)]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    assert not errors and len(s.read_attempts("T")) == 50 and s.version("T") == 1

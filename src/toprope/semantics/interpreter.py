@@ -9,6 +9,7 @@ later `Execution`). Approvals (step 7) and reservations (step 8) arrive with ADR
 from __future__ import annotations
 
 import copy
+import math
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -285,6 +286,10 @@ class Interpreter:
             if spec.many and not isinstance(params[name], list):
                 return f"Param '{name}' must be a list."
             for v in vals:
+                if isinstance(v, float) and not math.isfinite(v):
+                    return f"Param '{name}' must be a finite number."
+                if isinstance(v, str) and "\x00" in v:
+                    return f"Param '{name}' must not contain NUL characters."
                 if spec.enum is not None and v not in spec.enum:
                     return f"Param '{name}' must be one of {spec.enum}."
                 if spec.type is not None and (not isinstance(v, py[spec.type]) or

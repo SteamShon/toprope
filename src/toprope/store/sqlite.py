@@ -24,20 +24,23 @@ CREATE TABLE IF NOT EXISTS idempotency (
 
 
 class SQLiteEventStore(EventStore):
-    """Each instance has its own connection, so several instances on one file really race."""
+    """Each instance owns one connection, and every operation holds the instance lock, so
+    threads sharing an instance are serialized and never write inside another thread's
+    transaction. For parallelism, open several instances on one file; they really race."""
 
     def __init__(self, path: str):
         self._db = sqlite3.connect(path, isolation_level=None, check_same_thread=False, timeout=30)
         self._db.execute("PRAGMA journal_mode=WAL")
         self._db.executescript(SCHEMA)
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
 
     def close(self) -> None:
         self._db.close()
 
     def version(self, stream: str) -> int:
-        row = self._db.execute("SELECT COALESCE(MAX(version), 0) FROM events WHERE stream=?", (stream,)).fetchone()
-        return row[0]
+        with self._lock:
+            row = self._db.execute("SELECT COALESCE(MAX(version), 0) FROM events WHERE stream=?", (stream,)).fetchone()
+            return row[0]
 
     def append(self, stream: str, expected_version: int, events: list[Event]) -> list[Event]:
         out = [replace(e, version=expected_version + i + 1) for i, e in enumerate(events)]
@@ -59,31 +62,38 @@ class SQLiteEventStore(EventStore):
         return out
 
     def read(self, stream: str) -> list[Event]:
-        rows = self._db.execute("SELECT body FROM events WHERE stream=? ORDER BY version", (stream,))
-        return [event_from_json(r[0]) for r in rows]
+        with self._lock:
+            rows = self._db.execute("SELECT body FROM events WHERE stream=? ORDER BY version", (stream,))
+            return [event_from_json(r[0]) for r in rows]
 
     def append_attempt(self, event: Event) -> None:
-        self._db.execute("INSERT INTO attempts (stream, body) VALUES (?, ?)", (event.stream, event_to_json(event)))
+        with self._lock:
+            self._db.execute("INSERT INTO attempts (stream, body) VALUES (?, ?)", (event.stream, event_to_json(event)))
 
     def read_attempts(self, stream: str) -> list[Event]:
-        rows = self._db.execute("SELECT body FROM attempts WHERE stream=? ORDER BY seq", (stream,))
-        return [event_from_json(r[0]) for r in rows]
+        with self._lock:
+            rows = self._db.execute("SELECT body FROM attempts WHERE stream=? ORDER BY seq", (stream,))
+            return [event_from_json(r[0]) for r in rows]
 
     def streams(self) -> list[str]:
-        return [r[0] for r in self._db.execute("SELECT stream FROM events GROUP BY stream ORDER BY MIN(seq)")]
+        with self._lock:
+            return [r[0] for r in self._db.execute("SELECT stream FROM events GROUP BY stream ORDER BY MIN(seq)")]
 
     def claim(self, key: tuple[Any, ...]):
-        k = key_to_text(key)
-        cur = self._db.execute("INSERT OR IGNORE INTO idempotency (key, outcome) VALUES (?, NULL)", (k,))
-        if cur.rowcount == 1:
-            return None
-        row = self._db.execute("SELECT outcome FROM idempotency WHERE key=?", (k,)).fetchone()
-        if row is None:          # released between our insert attempt and the read: try once more
-            return self.claim(key)
-        return "pending" if row[0] is None else outcome_from_json(row[0])
+        with self._lock:
+            k = key_to_text(key)
+            cur = self._db.execute("INSERT OR IGNORE INTO idempotency (key, outcome) VALUES (?, NULL)", (k,))
+            if cur.rowcount == 1:
+                return None
+            row = self._db.execute("SELECT outcome FROM idempotency WHERE key=?", (k,)).fetchone()
+            if row is None:          # released between our insert attempt and the read: try once more
+                return self.claim(key)
+            return "pending" if row[0] is None else outcome_from_json(row[0])
 
     def remember(self, key: tuple[Any, ...], outcome: Outcome) -> None:
-        self._db.execute("UPDATE idempotency SET outcome=? WHERE key=?", (outcome_to_json(outcome), key_to_text(key)))
+        with self._lock:
+            self._db.execute("UPDATE idempotency SET outcome=? WHERE key=?", (outcome_to_json(outcome), key_to_text(key)))
 
     def release(self, key: tuple[Any, ...]) -> None:
-        self._db.execute("DELETE FROM idempotency WHERE key=? AND outcome IS NULL", (key_to_text(key),))
+        with self._lock:
+            self._db.execute("DELETE FROM idempotency WHERE key=? AND outcome IS NULL", (key_to_text(key),))

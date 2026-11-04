@@ -7,6 +7,7 @@ from dataclasses import replace
 from typing import Any, Literal
 
 from ..types import Event, Outcome
+from .codec import event_from_json, event_to_json, outcome_from_json, outcome_to_json
 
 
 class ConcurrencyError(Exception):
@@ -49,10 +50,13 @@ class EventStore(ABC):
 
 
 class MemoryEventStore(EventStore):
+    """In-memory store. Events and outcomes go through the same JSON codec as the durable
+    stores, so every adapter normalizes values identically (replay parity, ADR-0012)."""
+
     def __init__(self) -> None:
-        self._streams: dict[str, list[Event]] = {}
-        self._attempts: dict[str, list[Event]] = {}
-        self._idem: dict[tuple[Any, ...], Outcome | str] = {}
+        self._streams: dict[str, list[str]] = {}
+        self._attempts: dict[str, list[str]] = {}
+        self._idem: dict[tuple[Any, ...], str] = {}   # "pending" or an encoded outcome
 
     def version(self, stream: str) -> int:
         return len(self._streams.get(stream, []))
@@ -61,29 +65,31 @@ class MemoryEventStore(EventStore):
         if self.version(stream) != expected_version:
             raise ConcurrencyError(f"{stream}: expected v{expected_version}, at v{self.version(stream)}")
         out = [replace(e, version=expected_version + i + 1) for i, e in enumerate(events)]
-        self._streams.setdefault(stream, []).extend(out)
-        return out
+        encoded = [event_to_json(e) for e in out]          # encode all first: all-or-nothing
+        self._streams.setdefault(stream, []).extend(encoded)
+        return [event_from_json(t) for t in encoded]
 
     def read(self, stream: str) -> list[Event]:
-        return list(self._streams.get(stream, []))
+        return [event_from_json(t) for t in self._streams.get(stream, [])]
 
     def append_attempt(self, event: Event) -> None:
-        self._attempts.setdefault(event.stream, []).append(event)
+        self._attempts.setdefault(event.stream, []).append(event_to_json(event))
 
     def read_attempts(self, stream: str) -> list[Event]:
-        return list(self._attempts.get(stream, []))
+        return [event_from_json(t) for t in self._attempts.get(stream, [])]
 
     def streams(self) -> list[str]:
         return list(self._streams)
 
     def claim(self, key):
         if key in self._idem:
-            return self._idem[key]
+            v = self._idem[key]
+            return "pending" if v == "pending" else outcome_from_json(v)
         self._idem[key] = "pending"
         return None
 
     def remember(self, key, outcome: Outcome) -> None:
-        self._idem[key] = outcome
+        self._idem[key] = outcome_to_json(outcome)
 
     def release(self, key) -> None:
         if self._idem.get(key) == "pending":   # never forget a finished outcome

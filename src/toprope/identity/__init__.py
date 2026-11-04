@@ -20,7 +20,13 @@ class Caller:
     grant: Grant | None = None
 
     def __post_init__(self) -> None:
-        if self.actor.kind == "agent" and (self.on_behalf_of is None or self.grant is None):
+        a = self.actor
+        if a.kind == "system" or a.id == "system" or a.id.startswith(("external:", "handoff:")) \
+                or any(r == "system" or r.startswith("external:") for r in a.roles):
+            raise ValueError("credentials never resolve to a reserved actor (system, external:*, handoff:*)")
+        if a.kind == "person" and (self.on_behalf_of is not None or self.grant is not None):
+            raise ValueError("a person acts for themselves: no principal or grant")
+        if a.kind == "agent" and (self.on_behalf_of is None or self.grant is None):
             raise ValueError("an agent caller needs a principal and a grant (ADR-0016)")
         if self.on_behalf_of is not None and self.on_behalf_of.kind != "person":
             raise ValueError("a principal must be a person (ADR-0021)")

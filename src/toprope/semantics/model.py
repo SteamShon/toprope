@@ -42,13 +42,22 @@ class ReferenceModel:
                 self.seed(obj, data)
 
     # -- state -------------------------------------------------------------------------
-    def seed(self, obj: str, data: dict[str, Any]) -> None:
-        """Load a fixture as a system-created object (not through an action)."""
+    def seed(self, obj: str, data: dict[str, Any], only_if_new: bool = False) -> bool:
+        """Load a fixture as a system-created object (not through an action). With
+        `only_if_new`, it appends only at version 0, and returns False if the object already
+        exists (another process may be seeding concurrently)."""
         oid = data["id"]
         ev = Event(f"{obj}Created", oid, obj, at=self.clock(), actor=SYSTEM.ref(),
                    payload={"changes": copy.deepcopy(data), "params": {}, "action": None, "fixture": True},
                    domain_version=self.d.version)
+        if only_if_new:
+            try:
+                self.store.append(oid, 0, [ev])
+            except ConcurrencyError:
+                return False
+            return True
         self.store.append(oid, self.store.version(oid), [ev])
+        return True
 
     def state(self, oid: str) -> dict[str, Any] | None:
         return project(self.store.read(oid))
