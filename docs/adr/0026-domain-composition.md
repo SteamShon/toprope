@@ -1,10 +1,12 @@
 # ADR-0026: Domains compose; a composition file declares how
 
-- Link: ④ shared language, ⑥ org productivity, ① iterate safely · Status: **proposed**
-  (assistant draft, from the researcher's preference for composition over inheritance) ·
-  2026-11-04
+- Link: ④ shared language, ⑥ org productivity, ① iterate safely · Status: accepted · 2026-11-04 ·
+  decided by: SteamShon (drafted by the assistant from the researcher's preference for
+  composition over inheritance)
 - Builds on: ADR-0008 (domain interface), ADR-0022 (two self domains and a handoff), ADR-0024
   (handoff outbox)
+- Amends: ADR-0024 (the handoff actor id becomes `handoff:<sender domain>.<name>`, so a receiver
+  knows which domain sent it)
 
 ## Context
 - Organizations run many workflows that hand work to each other. Toprope already joins
@@ -35,10 +37,10 @@
    composition: toprope-self
    version: 1
    members:
-     authoring: {declaration: authoring.domain.yaml, interface: 1}   # published major
-     delivery:  {declaration: delivery.domain.yaml,  interface: 1}
+     domain-authoring: {declaration: authoring.domain.yaml, interface: 1}   # published major
+     domain-delivery:  {declaration: delivery.domain.yaml,  interface: 1}
    wiring:
-     - {from: authoring.deliver, to: delivery.request_delivery}     # sender handoff → receiving action
+     - {from: domain-authoring.deliver_approved_version, to: domain-delivery.request_delivery}
    ```
    Compiling it checks four things:
    - every member validates
@@ -46,10 +48,11 @@
    - every wire passes `check_handoffs` against the member's published major
    - no domain appears twice
 
-   A released system is the tuple of its members' versions.
+   A member's key is its declared domain name. A released system is the tuple of its
+   members' versions.
 3. **Receivers accept only wired senders.** The receiving Execution learns the sender
-   domain and handoff of each command, and records them on its events (the handoff id
-   already links the two stores). It refuses a handoff that the composition does not wire
+   domain and handoff of each command: the actor is `handoff:<sender domain>.<name>`, which
+   every receiver event records (the handoff id already links the two stores). It refuses a handoff that the composition does not wire
    to that action, before evaluation, as `denied: actor`. A domain served alone (no
    composition) keeps today's behavior.
 4. **A composed world map.** The members' maps are joined. Each wire becomes an edge from

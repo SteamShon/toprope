@@ -108,7 +108,7 @@ def test_a_handoff_is_delivered_after_the_append_and_linked_in_both_stores():
     assert receiver.state("shop:3") == {"id": "shop:3", "domain_id": "shop", "version": 3, "approver": "owen",
                                         "environment": "local", "status": "requested"}
     created = receiver.history("shop:3")[0]
-    assert created.actor == {"id": "handoff:deliver", "kind": "system"}
+    assert created.actor == {"id": "handoff:authoring.deliver", "kind": "system"}   # sender-qualified (ADR-0026)
     assert created.on_behalf_of == {"id": "owen", "kind": "person"} and created.causation == hid
     res = Outbox(sender).resolution(hid)
     assert res.type == "HandoffDelivered" and res.causation == hid and res.payload["object"] == "V1"

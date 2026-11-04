@@ -31,4 +31,4 @@ A record is superseded rather than deleted when a decision changes. History befo
 | [0023](0023-schema-v1.md) | ① ② ③ ④ | Schema v1: the whole declaration language defined up front, JSON Schemas, unimplemented constructs refused |
 | [0024](0024-handoff-outbox-string-join-and-deploy-floor.md) | ③ ⑥ | Handoff outbox in the event log, resolutions, string joining, the local deploy floor |
 | [0025](0025-staged-authoring-interview.md) | ① ② | Staged authoring interview: one question bundle per stage (sources → purpose → cast → actions → transitions → invariants → world → handoffs → review), with progress; link sources |
-| [0026](0026-domain-composition.md) | ④ ⑥ ① | **Proposed.** Domains compose, never inherit; a composition file declares members and wiring; receivers accept only wired senders; composed world map |
+| [0026](0026-domain-composition.md) | ④ ⑥ ① | Domains compose, never inherit; a composition file declares members and wiring; receivers accept only wired senders; composed world map |

@@ -12,6 +12,7 @@ from toprope.decl import load_yaml
 ROOT = Path(__file__).resolve().parents[1]
 DOMAIN = Draft202012Validator(json.loads((ROOT / "schema/domain.v1.schema.json").read_text()))
 REPR = Draft202012Validator(json.loads((ROOT / "schema/representation.v1.schema.json").read_text()))
+COMP = Draft202012Validator(json.loads((ROOT / "schema/composition.v1.schema.json").read_text()))
 BLOCKS = [load_yaml(b) for b in re.findall(r"```yaml\n(.*?)```", (ROOT / "docs/domain-schema.md").read_text(), re.S)]
 
 
@@ -36,6 +37,8 @@ def test_doc_example_validates(i):
     block, core = BLOCKS[i], BLOCKS[0]
     if "representation" in block or "overlay" in block:
         assert errors(REPR, block) == []
+    elif "composition" in block:
+        assert errors(COMP, block) == []
     elif "domain" in block:
         assert errors(DOMAIN, block) == []
     else:
@@ -145,3 +148,15 @@ def test_representation_view_kinds_are_closed():
     rep = copy.deepcopy(next(b for b in BLOCKS if "representation" in b))
     rep["views"]["Experiment"]["detial"] = {}
     assert errors(REPR, rep)
+
+
+def test_composition_schema_and_kernel_agree():
+    """The doc's composition example validates, and the kernel's model accepts it too."""
+    from toprope.compose import CompositionSpec
+    block = next(b for b in BLOCKS if "composition" in b)
+    assert errors(COMP, block) == []
+    spec = CompositionSpec.model_validate(block)
+    assert [w.from_ for w in spec.wiring] == ["domain-authoring.deliver_approved_version"]
+    bad = copy.deepcopy(block)
+    bad["wiring"][0]["from"] = "no-dot"
+    assert errors(COMP, bad)
