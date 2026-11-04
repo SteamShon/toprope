@@ -1,61 +1,43 @@
 # Architecture (draft)
 
-First requirement: **domain meaning is independent of any host, runtime, surface or model.**
-DDD bounded contexts with ports and adapters. Swapping an adapter must keep the same
-actions with the same preconditions and roles. That is the test of replaceability, not
-interface shape.
+Link: ① ③ ④ (what the system must support). The first requirement is that domain meaning
+is independent of any host, runtime, surface or model: DDD bounded contexts with ports and
+adapters. Swapping an adapter must keep the same actions with the same preconditions and
+roles. That, not interface shape, is the test of replaceability.
 
 ## Bounded contexts
 
-| Context | Owns | Milestone |
-|---|---|---|
-| **Authoring** | sources (system, records, interview, use), drafts, provenance and confirmation status of every element | M0–M1 |
-| **Domain Model** | objects, links, actions (params, preconditions, effects, roles), versions | M0 |
-| **Compiler** | domain → capsule: MCP surface, UI surface, generated checks and tests | M0 (MCP + minimal UI), M2+ (richer UI) |
-| **Execution** | runs an action: checks preconditions and roles against current state, applies the effect, records it | M0 |
-| **Event Log** | append-only record of calls, verdicts, effects, human decisions | M0 |
-| **Proposal** | turns logs into proposed model diffs with evidence | M3 |
-| **Review** | human decisions on proposals and exceptions, recorded with their inputs | M3 |
-| **Handoff** | typed requests between domains via published contracts | M4 |
+| Context | Owns | Serves | First in |
+|---|---|---|---|
+| **Authoring** | sources, drafts, interview questions, provenance and status of every element | ① ② | M0 kernel, then self-compiled in M1 |
+| **Domain Model** | objects, links, actions (params, preconditions, effects, roles), versions | all | M0 |
+| **Compiler** | domain → capsule: MCP, UI, generated checks | ① ③ | M0 |
+| **Execution** | checks preconditions and roles on current state, applies effects | ③ | M0 |
+| **Event Log** | append-only calls, verdicts, effects, human decisions | ④ | M0 |
+| **Proposal / Review** | log-mined model diffs; human decisions with their inputs | ④ | M4 |
+| **Handoff** | typed requests between domains via published contracts | ⑤ | M5 |
+
+After M1, the Authoring context is itself a Toprope domain (self-compile). Its MCP and UI
+are generated, and only the kernel stays hand-built.
 
 ## Ports
 
 | Port | Responsibility | First adapter | Later candidates |
 |---|---|---|---|
-| `SourceReader` | read raw material: repository (code/schema/API), records (docs, issues, chats), interview log | repo + markdown/issue export readers | Slack, Notion, DB introspection |
-| `Drafter` | sources → proposed model elements with source links | LLM call (Claude API) | other models |
-| `Interviewer` | ask the owner targeted questions about unknown or conflicting elements | CLI chat | UI panel, voice |
-| `DomainStore` | load/save versioned domain models | YAML in repo | git-backed registry |
-| `StateStore` | object instances and links | SQLite + synthetic generator | Postgres, existing app DBs |
-| `AgentSurface` | expose actions/reads to agents | generated MCP server | OpenAPI, LangGraph tools |
-| `HumanSurface` | expose objects/actions to people | generated schema-driven web UI | generative-UI specs, host panel (OpenDots) |
-| `EffectAdapter` | perform real-world effects of an action | in-store only | GitHub, flag service, ad APIs (with read-back) |
+| `SourceReader` | read code/schema, records, transcripts, interview logs | repo + markdown + transcript readers | Slack, Notion, DB introspection |
+| `Drafter` | sources → proposed elements with source links | LLM call (Claude API) | other models |
+| `Interviewer` | targeted questions on unknown or conflicting elements | CLI chat | generated UI |
+| `DomainStore` | versioned domain models | YAML in repo | git-backed registry |
+| `StateStore` | object instances and links | SQLite | Postgres, existing app DBs |
+| `AgentSurface` | expose reads and actions to agents | generated MCP server | OpenAPI, LangGraph tools |
+| `HumanSurface` | expose objects and actions to people | generated schema-driven web UI | generative-UI specs, OpenDots |
+| `EffectAdapter` | real-world effects | in-store only | GitHub, flags, ad APIs (with read-back) |
 | `EventLog` | append events | JSONL | SQLite, OpenTelemetry |
-| `ProposalEngine` | logs → candidate diffs | LLM call (Claude API) | Harness²-style probe loops |
-| `Approver` | other roles' decisions | scripted responder (experiments), human via UI | Slack, email |
+| `ProposalEngine` | logs → candidate diffs | LLM call | Harness²-style probe loops |
 
-## Flow
+## Guarantee boundary
 
-```
-domain.yaml ──compile──► capsule ──► MCP tools ──► agent
-                              └────► UI ─────────► person
-                                         │
-           both call ──► Execution: check preconditions/roles on StateStore
-                                         │ allow → apply effect → EventLog
-                                         │ deny  → reason (from the model) → EventLog
-EventLog ──► ProposalEngine ──► diff ──► Review (person decides) ──► new domain version
-```
-
-## Guarantee boundary (stated up front)
-
-- Guarantees hold only for actions that go through Execution. Direct DB writes or other
-  tools are outside, and M1 measures workaround attempts.
-- The model guarantees an action is *consistent with the model*, not that the model is
-  *right*. That is what the human-decided loop is for.
-- Real external effects (M4+) can be `UNKNOWN`. Read-back is required before claiming success.
-
-## Deferred choices
-
-Runtime (Temporal, LangGraph) and host (OpenDots) are not needed while actions are
-short-lived calls against a local store (ADR-0006). They come in behind `EffectAdapter` /
-`HumanSurface` when a milestone needs durable multi-step work or a shared workspace.
+- Guarantees hold only for actions that go through Execution. Other paths are outside them.
+- The model guarantees consistency with the model, not that the model is right. Keeping it
+  right is the job of ② and ④.
+- Real external effects can be `UNKNOWN`. Read-back is required before claiming success.

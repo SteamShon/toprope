@@ -1,69 +1,61 @@
 # Domain schema v0 (draft)
 
-Minimal core: **Object, Link, Action**. Policy, Contract and Flow from earlier Toprope
-designs are left out until a concrete need appears. Each later addition gets an ADR
-stating which task required it (ADR-0010).
-
-Full example: [`examples/domains/experiment-lifecycle.domain.yaml`](../examples/domains/experiment-lifecycle.domain.yaml).
-
-## Shape
+Link: ① ②. The minimal core is **Object, Link, Action**. Further concepts (policy,
+contract, flow) are added only when a milestone shows a concrete need, each with an ADR
+naming that need.
 
 ```yaml
-domain: experiment-lifecycle
+domain: example
 version: 1
 owner: SteamShon
-glossary:                 # the shared language; terms reused in MCP descriptions and UI labels
+glossary:                   # shared terms reused in MCP descriptions, UI labels, denial reasons
   readout: "The first analysis of an experiment's metrics after its planned duration."
-
-roles: [pm, analyst, approver, eng]
+roles: [pm, analyst, approver]
 
 objects:
   Experiment:
     description: A controlled test of one hypothesis.
     properties:
       status: {enum: [draft, approved, running, ended, decided]}
-      planned_days: {type: integer, min: 7}
-    states: {field: status}            # optional: marks a lifecycle field
+      planned_days: {type: integer}
+    source: {kind: system, ref: "src/models/Experiment.ts"}
+    status: confirmed
 
 links:
-  tests:     {from: Experiment, to: Hypothesis, cardinality: many-to-one, required: true}
+  tests: {from: Experiment, to: Hypothesis, cardinality: many-to-one, required: true,
+          source: {kind: record, ref: "docs/experiments.md", quote: "Every experiment tests one hypothesis."},
+          status: proposed}
 
 actions:
   approve_experiment:
     description: Approve a drafted experiment for launch.
     actor: [approver]
     target: Experiment
-    params: {note: {type: string}}
-    preconditions:                     # each has an id and a human reason; returned on denial
+    preconditions:
       - id: is-draft
         check: target.status == 'draft'
         reason: Only drafted experiments can be approved.
-      - id: has-guardrails
-        check: count(target.guardrails) >= 1
-        reason: An experiment needs at least one guardrail metric before approval.
+        source: {kind: interview, ref: "interview/2026-11-20#q7"}
+        status: confirmed
     effects:
       - set: {target.status: approved, target.approved_by: actor.id}
-    records_decision: true             # writes a Decision object with inputs and rationale
+    records_decision: true  # produces a Decision with who, when, inputs and rationale
 ```
 
-## Design rules
+## Rules
 
-- Every element (object, property, link, action, precondition) may carry `source`
-  (system | record | interview | use, with a reference or quote) and `status`
-  (proposed | confirmed | unknown). Agents can only write `proposed`. Only humans confirm.
-  Unknowns are kept explicit instead of guessed.
-- `description`, `reason` and `glossary` are **the** text used in the MCP tool descriptions,
-  the UI labels and the denial messages. They are written once.
-- `check` uses a small expression language (path access, comparison, `count`, `exists`,
-  `now`). If it becomes insufficient, that is an ADR, not a quiet extension.
-- `records_decision: true` makes the action produce a structured Decision (who, when,
-  inputs, rationale). Accumulation (M3) depends on this.
+- Every element may carry `source` (`system` | `record` | `interview` | `use`, with a ref or
+  quote) and `status` (`proposed` | `confirmed` | `unknown`). Agents write only `proposed`.
+  Only humans confirm. Unknowns stay explicit instead of being guessed.
+- `description`, `reason` and `glossary` are written once and reused by every surface.
+- `check` uses a small expression language (paths, comparison, `count`, `exists`, `now`).
+  Extending it requires an ADR.
+- `records_decision: true` turns an action into an accumulated work decision (④).
 
 ## Open questions
 
-- Should preconditions that need judgment (e.g. "the hypothesis is falsifiable") be
-  allowed as `review` checks, routed to a role instead of evaluated?
-- How do model versions apply to in-flight objects? (Proposal: an object keeps the version
-  it started under, unless a migration is approved.)
-- Is it worth reusing LinkML or JSON Schema for objects, adding only actions on top? This
-  will be revisited after M0.
+- Should judgment preconditions ("is this hypothesis falsifiable?") be `review` checks
+  routed to a role?
+- How do model versions apply to in-flight objects?
+- Should LinkML or JSON Schema be reused for objects, adding only actions on top? To be
+  revisited after M0.

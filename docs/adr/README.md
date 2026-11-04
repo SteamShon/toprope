@@ -1,20 +1,14 @@
-# Architecture & Research Decision Records
+# Decision Records
 
-Each record states the decision, the options, who decided, and its evidence. Superseded
-records are kept, so the project's own decisions have history (the same thing Toprope asks
-of workflows).
+Each record names its link in the claim chain, the decision, who decided, and why.
+A record is superseded rather than deleted when a decision changes. History before
+2026-11-04 was reset when Toprope's definition was agreed; it remains in git.
 
-| ADR | Decision | Status |
+| ADR | Link | Decision |
 |---|---|---|
-| [0001](0001-scope-enforce-plus-author.md) | Scope = enforcement + authoring | superseded by 0007 |
-| [0002](0002-first-domain-dogfood.md) | First domain = own coding-agent work | superseded by 0008 |
-| [0003](0003-m1-enforce-first.md) | M1 = gate vs. prose | superseded by 0009 |
-| [0004](0004-decision-representation.md) | Single-decision YAML + evaluator port | superseded by 0010 |
-| [0005](0005-docs-language-and-visibility.md) | English docs + Korean notes; private until after M1 | accepted |
-| [0006](0006-defer-runtime-and-host.md) | No runtime/host choice until a milestone needs it | accepted |
-| [0007](0007-reframe-org-workflow-as-domain.md) | Reframe: org workflows as domains; shared language; factory loop | accepted |
-| [0008](0008-first-domain-experiment-lifecycle.md) | First domain = experiment lifecycle | accepted |
-| [0009](0009-m1-shared-language.md) | M1 tests H-Shared | superseded by 0011 (now M2) |
-| [0010](0010-minimal-domain-core.md) | Minimal domain core: Object, Link, Action | accepted |
-| [0011](0011-claim-chain-and-load-bearing-bet.md) | Claim chain; M1 = ① can be built + ② model is right | accepted |
-| [0012](0012-raw-material-order.md) | Raw material order: system → records → interview → use | accepted |
+| [0001](0001-claim-chain-is-the-backbone.md) | all | The claim chain is the backbone |
+| [0002](0002-self-compile-first-then-dogfood.md) | ① ② | First domain = Toprope itself, then dogfood |
+| [0003](0003-raw-material-order.md) | ① ② | Raw material order: system → records → interview → use |
+| [0004](0004-minimal-core-with-provenance.md) | ① ② | Minimal core with provenance and status |
+| [0005](0005-docs-language-and-visibility.md) | none | English docs, Korean notes; private until first results |
+| [0006](0006-defer-runtime-and-host.md) | none | Defer runtime and host |

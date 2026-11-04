@@ -1,77 +1,101 @@
 # Roadmap
 
-Budget: ~10h+/week. The milestones follow the claim chain in the charter (§3): each one
-tests one link, and later links use what earlier ones produce. Dates are targets.
+Link: all. Each milestone is defined by the link it gives a verdict on. Work can span
+several links, but a milestone ends with a verdict. Budget is ~10h+/week. Dates are targets.
 
-| | Claim tested | Target |
-|---|---|---|
-| M0 | Skeleton: schema, compiler to MCP/UI, source readers, S1 pilot | 2 weeks |
-| M1 | **① can be built + ② the model is right** (H-Author, H-Fidelity) | 3 weeks |
-| M2 | **③ shared language** (H-Shared) | 3 weeks |
-| M3 | **④ evolves through use** (H-Evolve) | 3 weeks |
-| M4 | Second domain + handoff (toward ⑤), write-up, go public | 3 weeks |
+| Milestone | Link | Question | Target |
+|---|---|---|---|
+| M0 | none (enabler) | A minimal hand-built kernel that can compile a domain into MCP + UI | 2 weeks |
+| M1 | ① ② (self) | Can Toprope's own authoring workflow be modeled cheaply and correctly? | 3 weeks |
+| M2 | ① ② (dogfood) | Does the self-compiled authoring tool build another domain cheaply and correctly? | 3 weeks |
+| M3 | ③ | Do people and agents act on the same meaning through the capsule? | 3 weeks |
+| M4 | ④ | Do logs, proposals and decisions make domains better through use? | 3 weeks |
+| M5 | ⑤ (partial) | Do typed handoffs between domains preserve intent? Write-up, go public | 3 weeks |
+
+If a link is weakened or refuted, later milestones are re-planned before they start. Then
+the claim status in the README is updated.
 
 ---
 
-## M0: Skeleton and S1 pilot (2 weeks)
+## M0: Kernel (no claim, 2 weeks)
 
-- Decide the implementation language and record an ADR. Proposal: TypeScript for the core
-  and generators, Python for analysis.
-- Domain schema v0 with provenance and status on every element (`docs/domain-schema.md`).
-- Compiler v0: domain → MCP (read tools, plus one tool per action with preconditions
-  checked) and a minimal schema-driven UI (enough for S4 use).
-- Source readers: repository (code, schema), records (markdown docs, issues export), and an
-  interview session log.
-- Choose the source system (GrowthBook candidate: check license and feasibility).
-- Write and freeze the scenario gold set. Do the baseline hand-authored slice.
-- **S1 pilot**: agent drafts from the system alone and is scored on held-out scenarios.
+The bootstrap: the smallest hand-built kernel that later milestones can generate from.
 
-Exit: a drafted model compiles to working MCP/UI, and the pilot gate in M1 passes.
+- Implementation language, recorded as an ADR. Proposal: TypeScript for the core and
+  generators, Python for analysis.
+- Domain schema v0 with provenance and status on every element (`domain-schema.md`).
+- Compiler v0: domain → MCP (reads, plus one tool per action with preconditions) and a
+  minimal schema-driven UI.
+- Execution with precondition and role checks, plus an append-only event log.
+- Source readers: repository, markdown records, session transcripts, interview log.
 
-## M1: Authoring pipeline (3 weeks)
+Exit: a small toy domain compiles to working MCP and UI, and calls are logged.
+Kernel code is kept small and listed, so it is clear what was hand-built and what was
+generated.
 
-See [`experiments/M1-authoring.md`](experiments/M1-authoring.md). Stages S1 system → S2 records
-→ S3 interview → S4 use, measured per stage, followed by three change requests.
+## M1: Self-compile (① ②, 3 weeks)
 
-Exit: verdicts on H-Author and H-Fidelity, and per-stage contribution.
+See [`experiments/M1-self-compile.md`](experiments/M1-self-compile.md). Model Toprope's own
+domain-authoring workflow (sources → draft → interview → confirm → compile → use → propose →
+decide) through the pipeline, then generate the authoring tool from it.
 
-Kill/pivot: if human time is mostly spent fixing agent drafts, narrow the scope. Agents
-then draft only some element types (for example, actions and preconditions), and humans
-author the rest. Record what agents can and cannot draft.
+Exit: verdicts on H-Author and H-Fidelity for the self domain, plus a generated authoring
+tool v1.
 
-## M2: Shared language (3 weeks)
+Kill/pivot: if the self domain cannot be modeled within the thresholds, record which
+element types agents cannot draft. Then narrow what is generated before M2.
 
-See [`experiments/M2-shared-language.md`](experiments/M2-shared-language.md). On the model M1
-produced: docs plus generic tools / hand-written typed tools / capsule-generated MCP, with
-intent errors as the primary metric, a pilot gate and a revision probe. The gold scenarios
-from M1 are reused as tasks.
+## M2: Dogfood domain (① ② replicated, 3 weeks)
 
-Exit: verdict on H-Shared. Kill/pivot as stated in the experiment doc.
+Use the self-compiled authoring tool from M1, not the hand-built kernel, to model a
+second, everyday domain. The candidate is the experiment lifecycle (hypothesis → design →
+approval → launch → readout → ship/kill), sourced from an OSS experimentation platform
+plus the researcher as owner. Same metrics and gold-set procedure as M1.
 
-## M3: Evolution through use (3 weeks)
+Questions:
+- Is the second domain cheaper than the first?
+- Did the generated tool hold up, or did it need hand fixes?
 
-- Both decision kinds are recorded as first-class data:
-  - **work decisions** (approve, ship, kill, exception) with inputs and rationale
-  - **domain-change decisions** (accept/reject a proposed model diff) with evidence
-- Proposal engine: from logs (blocked calls, repeated clarifications, exceptions,
-  overrides, patterns in work decisions) propose model diffs with evidence.
-- Review in the UI. Accepted diffs create a new version and regenerate the surfaces.
-- Measure: proposal acceptance rate, scenario accuracy and clarifications before and after,
-  and over-generalization incidents.
+Exit: verdicts on H-Author and H-Fidelity outside the self domain. This is the stronger
+test, because the self domain is one the researcher designed.
 
-Exit: verdict on H-Evolve.
+## M3: Shared language (③, 3 weeks)
 
-## M4: Second domain, handoff, release (3 weeks)
+On the M2 domain, give the same knowledge to agents in three ways:
+- C0: docs plus generic data tools
+- C1: hand-written typed tools with prose rules
+- C2: capsule-generated MCP
 
-- Run the M1 pipeline on code → product delivery. Did it get cheaper the second time? Was
-  any core change needed?
-- A typed handoff (experiment decided "ship" → delivery request) compared with a written note.
-- Write-up: findings, negative results, claims we cannot make.
-- License (Apache-2.0 proposed). Make the repository public (ADR-0005).
+The primary metric is intent errors (attempts and wrong conclusions, not only effects).
+Also measured: task success, vocabulary alignment with the UI, stale actions after a fair
+revision probe, and cost. A pilot gate runs first: C0 must produce ≥ 10% errors.
+The M2 gold scenarios are reused as tasks.
 
-## Later (not planned)
+Exit: verdict on H-Shared. If C1 ≈ C2, the gain is vocabulary, and the compiler's value
+rests on ① (cost).
 
-- ⑤ organizational productivity with real teams.
-- Learning from accumulated work decisions (thread C).
-- Self-compile: model the authoring pipeline itself as a domain.
-- Real external effects with read-back and `UNKNOWN`. Durable runtime and host adapters.
+## M4: Evolution (④, 3 weeks)
+
+- Record both kinds of decisions as first-class data: work decisions and domain-change
+  decisions.
+- Proposal engine: from logs and accumulated work decisions, propose model diffs with
+  evidence. Humans decide in the generated UI. Accepted diffs regenerate the surfaces.
+- Apply this to both domains, including the self domain, so the authoring tool improves
+  itself. No self-approval, and the gold set and verdict checks stay outside the loop.
+
+Exit: verdict on H-Evolve (proposal acceptance rate; accuracy and clarifications before and
+after; over-generalization incidents).
+
+## M5: Handoff and release (⑤ partial, 3 weeks)
+
+- A typed handoff "experiment decided ship → delivery request" into a small third domain
+  (code → product delivery), compared with a written note.
+- State plainly what ⑤ needs that a personal project lacks: real teams and real handoffs.
+- Write-up with findings, negative results and claims we cannot make. Choose a license
+  (Apache-2.0 proposed) and make the repository public.
+
+## Later
+
+⑤ with real teams. Learning from accumulated work decisions. Real external effects with
+read-back. Durable runtime and host adapters. Comparison with automated harness
+improvement (Harness²).
