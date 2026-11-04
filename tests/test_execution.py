@@ -120,3 +120,15 @@ def test_nested_unstorable_params_are_invalid_command(open_store):
     ex.seed_world()
     out = ex.submit("t-ana", "approve_experiment", "E-onboarding", {"tags": ["ok", "b\x00"]}, idempotency_key="z")
     assert out.code == "invalid-command"
+
+
+def test_allowed_actions_for_an_agent_apply_principal_and_grant(open_store):
+    """An agent's view uses its principal's roles and its grant, exactly as submit would."""
+    ex = execution(open_store())
+    narrow = Caller(BOT, ANA, Grant("g2", frozenset({"launch_experiment"})))
+    expired = Caller(BOT, ANA, Grant("g3", frozenset({"approve_experiment"}), expires_at=NOW))
+    weak_principal = Caller(BOT, ELI, Grant("g4", frozenset({"approve_experiment"})))
+    for c in (narrow, expired, weak_principal):     # grant gap, expired grant, principal not an approver
+        assert ex.allowed_actions("E-onboarding", c) == []
+    assert ex.allowed_actions("E-onboarding", BASE["t-bot"]) == ["approve_experiment"]
+    assert ex.submit("t-bot", "approve_experiment", "E-onboarding", idempotency_key=next(KEYS)).ok

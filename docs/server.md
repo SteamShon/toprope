@@ -30,18 +30,31 @@ t-bot: {id: bot, kind: agent, roles: [approver],
 ```
 
 JWT claims: `sub`, `kind` (`person`|`agent`), `roles`, and for agents `act` (the principal:
-`sub`, `roles`) and `grant` (`id`, `actions`, `targets`, `exp`). `exp`, `aud` and `iss` are
-verified. Credentials never resolve to the reserved actors `system`, `external:*` or
-`handoff:*`.
+`sub`, `roles`) and `grant` (`id`, `actions`, `targets`, `exp`). Lists must be lists of
+strings; a malformed claim refuses the token. The server always verifies the signature
+(`TOPROPE_JWT_KEY`, algorithm `TOPROPE_JWT_ALG`, never `none`), `exp`, and `aud`
+(`TOPROPE_JWT_AUDIENCE` is required). It verifies `iss` when `TOPROPE_JWT_ISSUER` is set, and
+then advertises that issuer as the authorization server. Credentials never resolve to the
+reserved actors `system`, `external:*` or `handoff:*`, and a caller is a `person` or an
+`agent`.
+
+Over stdio, the server refuses to start if `TOPROPE_TOKEN` does not resolve. Over HTTP, a
+request without a valid bearer token gets 401. Behind a proxy, pass `--public-url` so the
+advertised resource URL is the one clients use.
 
 ## Tools
 - **One tool per action**, named after it. Parameters and types come from the declaration.
   The description is built only from the declaration's words: who, when it is allowed, what
   stops it. Every call needs an `idempotency_key`; reuse the same key when retrying.
   `thread_id` and `run_id` are optional and recorded on the event.
-- `get_object`, `history`, `attempts`, `allowed_actions` (for the caller), and
-  `describe_domain` (purpose, glossary, objects, actions).
+- `get_object`, `history`, `attempts`, `allowed_actions` (for the caller; an agent's
+  principal and grant apply), and `describe_domain` (purpose, glossary, objects, actions).
+  All but `describe_domain` need a resolved caller.
 
 A denial is a normal result, `{"status": "denied", "code": ..., "reason": ...}`, with the
-reason in domain terms. A param of the wrong type is refused by the tool's schema before it
-reaches Execution, which would refuse it too, as `invalid-command`.
+reason in domain terms. The tool schema advertises each param's type, but values pass to
+Execution unchanged (no coercion: `"5"` is not an integer), so a call through MCP and the same
+call made directly get the same outcome; a mistyped value is `invalid-command`. An argument
+that is not a declared param is refused by the tool schema. `target_id`, `new_id`,
+`idempotency_key`, `thread_id` and `run_id` are reserved and cannot be declared as params
+(`reserved-param`).

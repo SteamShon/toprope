@@ -23,19 +23,24 @@ class IdentityTokenVerifier:
         return AccessToken(token=token, client_id=caller.actor.id, scopes=[], subject=caller.actor.id)
 
 
-def build_http_app(ex: Execution, base_url: str):
+def build_http_app(ex: Execution, public_url: str, issuer_url: str | None = None):
+    """`public_url` is where clients reach this server (it names the protected resource).
+    `issuer_url` is the identity provider that issues the tokens; it defaults to `public_url`
+    only for identities with no external issuer (static tokens)."""
     def credentials() -> str | None:
         tok = get_access_token()
         return tok.token if tok else None
 
+    base = public_url.rstrip("/")
     server = build_server(ex, credentials, token_verifier=IdentityTokenVerifier(ex),
                           # The Identity port validates tokens (JWT audience/issuer included), so
                           # the SDK's resource check is not used.
-                          auth=AuthSettings(issuer_url=base_url, resource_server_url=f"{base_url}/mcp",
+                          auth=AuthSettings(issuer_url=issuer_url or base, resource_server_url=f"{base}/mcp",
                                             validate_token_resource=False))
     return server.streamable_http_app()
 
 
-def run_http(ex: Execution, host: str, port: int) -> None:
+def run_http(ex: Execution, host: str, port: int, public_url: str | None = None,
+             issuer_url: str | None = None) -> None:
     import uvicorn
-    uvicorn.run(build_http_app(ex, f"http://{host}:{port}"), host=host, port=port)
+    uvicorn.run(build_http_app(ex, public_url or f"http://{host}:{port}", issuer_url), host=host, port=port)

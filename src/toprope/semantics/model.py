@@ -13,7 +13,7 @@ from typing import Any
 from ..decl.models import Domain
 from ..store import ConcurrencyError, EventStore, MemoryEventStore
 from .interpreter import Interpreter
-from .types import Actor, Command, Event, Outcome
+from .types import Actor, Command, Event, Grant, Outcome
 
 SYSTEM = Actor("system", "system", ("system",))
 MAX_RETRIES = 3
@@ -119,6 +119,8 @@ class ReferenceModel:
                            self.state(stream), tuple(written))
         return Outcome("rejected", "conflict", f"{cmd.target} kept changing; gave up after {MAX_RETRIES} retries.")
 
-    def allowed_actions(self, oid: str, actor: Actor) -> list[str]:
+    def allowed_actions(self, oid: str, actor: Actor, on_behalf_of: Actor | None = None,
+                        grant: Grant | None = None) -> list[str]:
         found = self.lookup(oid)
-        return [] if found is None else self.interp.allowed_actions(found[0], found[1], actor, self.lookup)
+        return [] if found is None else self.interp.allowed_actions(found[0], found[1], actor, self.lookup,
+                                                                    on_behalf_of, grant)

@@ -17,7 +17,7 @@ from typing import Any
 
 from ..decl.models import Action, ActorRule, ByRole, Deny, Domain, Target
 from ..expr import Env, EvalError, evaluate, parse, paths_read
-from .types import Actor, Command, Event, Outcome
+from .types import Actor, Command, Event, Grant, Outcome
 
 # lookup(oid) -> (object type, state) or None
 Lookup = Callable[[str], "tuple[str, dict[str, Any]] | None"]
@@ -310,21 +310,24 @@ class Interpreter:
                     return f"Param '{name}' must be an id of {spec.ref}."
         return None
 
-    def allowed_actions(self, obj_type: str, state: dict[str, Any], actor: Actor, lookup: Lookup) -> list[str]:
+    def allowed_actions(self, obj_type: str, state: dict[str, Any], actor: Actor, lookup: Lookup,
+                        on_behalf_of: Actor | None = None, grant: Grant | None = None) -> list[str]:
         """Actions this actor could take now: steps 4-6, where preconditions that read
         `params` are skipped (they depend on the input and are checked at call time). An action
-        listed here can succeed with valid params; one not listed cannot succeed with any."""
+        listed here can succeed with valid params; one not listed cannot succeed with any.
+        An agent is checked with its principal and grant, exactly as in `decide`."""
         out = []
+        who = [actor] + ([on_behalf_of] if actor.kind == "agent" and on_behalf_of else [])
         view = ObjectView(self.d, obj_type, state, lookup)
         for name, a in self.d.actions.items():
             if a.target != obj_type:
                 continue
-            cmd = Command(actor, name, state.get("id"), {})
+            cmd = Command(actor, name, state.get("id"), {}, at=self.clock(), on_behalf_of=on_behalf_of, grant=grant)
             if not self.actor_allowed(a, cmd, view)[0]:
                 continue
             tr = self.d.transitions.get(obj_type)
             if tr is not None:
-                c = self.cell(obj_type, state.get(tr.field), name, [actor])
+                c = self.cell(obj_type, state.get(tr.field), name, who)
                 if not isinstance(c, str) or c in ("n/a", "undecided"):
                     continue
             ok = True
