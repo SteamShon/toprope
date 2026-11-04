@@ -2,12 +2,12 @@
 
 **A correctness layer and software factory for any stateful domain where people and agents act.**
 
-Toprope captures a domain, often a workflow that has only ever existed in people's heads,
-through an interview and turns it into a
-declared **world model**: objects, actions, a transition matrix and invariants. From that
-model it compiles working software that people and agents both use, and it verifies every
-allowed and denied state transition before anything is deployed. Every action and decision
-is recorded as an event, so the model can keep improving.
+Toprope is **designed to** capture a domain through an interview, often a workflow that
+has only ever existed in people's heads, and turn it into a declared **world model**:
+objects, actions, a transition matrix and invariants. From that model it is meant to
+compile working software that people and agents both use, and to verify every allowed and
+denied state transition before anything is deployed. Every action and decision is recorded
+as an event, so the model can keep improving. Everything below describes the design.
 
 > Status: **pre-M0, design only.** No code yet, and no claims are measured. See
 > [Claim status](#claim-status).
@@ -137,6 +137,7 @@ transitions:                  # state × action → next state | deny(reason) | 
       draft:    {approve_experiment: approved, launch_experiment: {deny: "Launch requires approval."}}
       approved: {approve_experiment: {deny: "Already approved."}, launch_experiment: running}
       running:  {approve_experiment: {deny: "Only drafted experiments can be approved."}, launch_experiment: n/a}
+      # ended and decided rows omitted here; see docs/domain-schema.md
 
 invariants:
   - id: running-has-approver
@@ -161,7 +162,7 @@ Full schema: [`docs/domain-schema.md`](docs/domain-schema.md).
 |---|---|---|---|
 | Who authors | anyone, in prose | engineers, often deployed on site | domain experts through an interview, with agents drafting |
 | Conflicts found | after deployment | at build time, by engineers | at compile time, reported in domain terms |
-| Behavior verified | not mechanically | per project | every matrix cell, every invariant, on every surface |
+| Behavior verified | not mechanically | per project | designed to check every matrix cell and invariant on every surface |
 | Cost of a change | a text edit, unchecked | an engineering project | an edit, an impact report, a preview |
 | Agents | read text and hope | integrate via APIs | first-class users via generated MCP |
 | Decisions | lost in chat | varies | event-sourced and queryable |
