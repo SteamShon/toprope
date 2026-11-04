@@ -82,11 +82,15 @@ umbrella is up to date with `develop`.
 - **Name the link.** Toprope is organized around the claim chain (P0 premise → ① iterate
   safely → ② model is right → ③ shared language → ④ evolves → ⑤ org productivity). Every PR, experiment
   doc and ADR states which link(s) it serves, or `none` for enablers.
-- **Claim status changes only with a verdict.** The README claim-status table is updated
-  only by a PR that reports a preregistered experiment verdict.
+- **Claim status changes only with a verdict.** The `Status` column of the README
+  claim-status table changes only in a PR that reports a preregistered experiment verdict.
+  The links and hypotheses themselves change only through an accepted ADR.
 - **Decisions go into ADRs** (`docs/adr/`). Supersede an ADR when it changes; do not delete it.
-- **Gold sets are human-only.** Experiment gold sets and verdict rules are written and
-  frozen by the researcher before drafting. Agents must not create or edit them.
+- **Gold sets are human-only.** Gold scenarios and seeded change lists (with their answer
+  keys) are written by the researcher. Agents must not create or edit them. Verdict rules
+  and thresholds may be *drafted* by an agent when the researcher asks. They are marked
+  `draft` until the researcher reviews and freezes them in their own commit, before the
+  experiment's checks are built.
 - **Language.** Docs are in English. Working notes in `notes/ko/` may be in Korean.
 
 ## Rules for coding agents

@@ -1,6 +1,7 @@
 # ADR-0009: Premise P0; ① becomes "iterate safely"; change safety is the compiler's core job
 
-- Link: ① ② (and the chain in ADR-0001) · Status: accepted · 2026-11-04 · decided by: SteamShon
+- Link: ① ② (and the whole chain) · Status: accepted · 2026-11-04 · decided by: SteamShon
+- Supersedes: ADR-0001
 
 ## Context
 The researcher's underlying hypothesis is that **nobody can define a domain correctly in
@@ -14,12 +15,15 @@ none of this is possible. Whether a new instruction conflicts with existing text
 discovered only after deployment.
 
 ## Decision
+- The claim chain remains the backbone of docs, experiments, ADRs and milestones (carried
+  over from ADR-0001). Each milestone ends with a verdict on a link, and progress is tracked
+  in the README claim-status table.
 - Add **P0** under the claim chain: *nobody can define a domain correctly in one go; it is
   found by iterating*. P0 is taken as given. M1 reports first-draft accuracy as a sanity
   check on it.
 - Redefine **①** from "can be built cheaply" to **"iterate safely"**: a domain can be
   changed cheaply and safely, with breakage and conflicts caught at compile time and the
-  change tried before deployment. This amends the chain recorded in ADR-0001.
+  change tried before deployment. This replaces the chain recorded in ADR-0001.
 - The compiler gets a **change-check pipeline**. It diffs the new version against the
   current one and runs these checks:
   - structural: references, types

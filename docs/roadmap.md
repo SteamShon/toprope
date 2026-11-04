@@ -33,6 +33,10 @@ The bootstrap: the smallest hand-built kernel that later milestones can generate
   - a representation-only change rebuilds without touching MCP
   - a domain change flags a broken view
   - a host overlay injects one custom component.
+- **Freeze the M1 instruments first (researcher):** the gold scenarios, the post-deploy probe
+  suite, the change-request list with its seeded-problem key (written by intent), and the
+  verdict rules. Freezing them *before* building the change checks keeps the seeded problems
+  from being written around what the checks can catch (M1 risks).
 - **Change-check pipeline v0 (ADR-0009)**, the core of the compiler: diff against the current
   version; structural and semantic-conflict checks; scenario regression; log replay; LLM
   natural-language conflict warnings; preview build. Done when an edit reaches a validated

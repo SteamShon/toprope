@@ -1,7 +1,12 @@
 # M1: Self-compile, and safe iteration vs. natural-language skills
 
-Link: ① iterate safely, ② model is right. Status: design draft. Metrics and verdict rules
-are fixed here, before any results are seen.
+Link: ① iterate safely, ② model is right. Status: design draft.
+
+**Freeze status.** The metrics and verdict rules below are a **draft proposed by the
+assistant**. The researcher reviews, edits and freezes them in their own commit, together
+with the gold scenarios, the post-deploy probe suite and the change-request list. All of
+this happens in M0, **before the change-check pipeline is built** (AGENTS.md). Until then,
+nothing here is preregistered.
 
 ## Why this design
 
@@ -55,10 +60,14 @@ the sanity check for P0 (was the first draft already right?).
 - **Toprope arm.** The same change is applied to the declaration. Pre-deploy check: the
   compiler's change checks plus a preview build.
 
-### Change requests (frozen before Phase A, researcher-written)
+### Change requests (researcher-written, frozen in M0 before the checks are built)
 
-About 20 realistic change requests to the self domain, in a fixed order. The researcher
-**seeds** known problems and keeps the answer key hidden from both arms:
+About 20 realistic change requests to the self domain, in a fixed order, written as
+**intents** in domain language rather than element names, because the element names are
+an output of Phase A. The researcher **seeds** known problems and keeps the answer key
+hidden from both arms. The key is also written by intent: "conflicts with the
+no-self-approval rule", or "breaks anything that refers to the not-yet-known state".
+Mix:
 - about 6 that conflict with an earlier rule
 - about 4 that break an existing reference, scenario or past behavior
 - about 10 that are clean.
@@ -66,23 +75,40 @@ About 20 realistic change requests to the self domain, in a fixed order. The res
 Examples:
 - "Require a second confirmer for permission-related elements."
 - "Let agents confirm typo fixes." (conflicts with no self-approval)
-- "Rename `unknown` to `open`." (breaks references and past logs)
+- "Rename the not-yet-known element state to `open`." (breaks references and past logs)
+
+**Binding step.** After Phase A, and before either arm runs, the researcher maps each
+intent and key entry to concrete element names in the Phase A model, and freezes that
+mapping in a commit. A request whose target does not exist in the model is recorded as
+unbindable and excluded from recall, and the exclusion is reported.
+
+### Three scenario sets, kept apart
+
+| Set | Who sees it | Purpose |
+|---|---|---|
+| **Domain scenarios** | both arms, before deploy. Toprope runs them as scenario regression. The NL skill includes them as worked examples, and its LLM reviewer gets them too. | the domain's own tests |
+| **Post-deploy probe suite** | neither arm, before deploy | discovers problems after "deploy" |
+| **Held-out gold** | neither arm, ever. Not fed to any iteration. | measures ② |
+
+The probe suite and the held-out gold are written by the researcher and do not overlap
+with the domain scenarios. So no arm's pre-deploy check is the same instrument as
+post-deploy discovery.
 
 ### "Deploy" and post-deploy discovery
 
-After each change, both arms run the scenario suite with an agent. For the NL arm, the
-agent works from the skill. For the Toprope arm, it works through the generated MCP.
-A seeded problem that was not flagged before deploy, but shows up as a scenario failure or
-wrong behavior, counts as **found after deploy**. One that never shows up counts as
-**silent**.
+After each change, both arms run the **post-deploy probe suite** with an agent. In the NL
+arm, the agent works from the skill. In the Toprope arm, it works through the generated MCP.
+A seeded problem that was not flagged before deploy, but shows up in the probe suite,
+counts as **found after deploy**. One that never shows up counts as **silent**.
 
-## Gold standard (frozen before Phase A)
+## Gold standard (researcher-written, frozen in M0 before the checks are built)
 
 - About 30 scenario questions about the authoring workflow, half held out. Examples:
   - "Can an agent confirm its own drafted precondition?"
   - "What happens to an element no source supports?"
   - "When does a representation-only change rebuild MCP?"
-- The change-request list and its seeded-problem key.
+- The post-deploy probe suite (separate from the gold set and the domain scenarios).
+- The change-request list and its seeded-problem key (by intent), and later the binding.
 - Agents never create or edit either one (AGENTS.md).
 
 ## Measures
@@ -110,15 +136,25 @@ wrong behavior, counts as **found after deploy**. One that never shows up counts
 - **Weakens ①**: the NL arm with LLM review comes within 15 points of Toprope's recall, or
   Toprope's precision < 50%, or most seeded breakages are found only after deploy in both
   arms.
+- **Inconclusive ①**: any outcome not covered above. For example, a recall gap of 15–30
+  points, or precision of 50–70%. It is reported as inconclusive with the numbers, and is
+  not read as support. M2 repeats the comparison.
 - **Supports ② (self)**: held-out accuracy ≥ 80%, unsupported rules ≤ 10%, total human time
-  ≤ 4 h for Phase A.
+  ≤ 4 h for Phase A, and accuracy rising over iterations (the final accuracy is higher than
+  the first draft's).
+- **Weakens ② (self)**: accuracy plateaus below 70%, or unsupported rules stay above 20%
+  after S3.
+- **Inconclusive ②**: anything in between.
+- **P0 sanity check** (not a verdict): if the first draft already reaches ≥ 80% held-out
+  accuracy, record that P0 did not show up on this domain.
 - **Self-compile claim** holds only if the tool used in S4 and handed to M2 is generated
   from the model, with hand edits listed.
 
 ## Risks
 
-- **Seeding bias.** The researcher writes both the checks and the seeded problems. Freeze
-  the change list before building the checks. Include problem types the checks were not
+- **Seeding bias.** The researcher writes both the checks and the seeded problems. The
+  change list, the key, the gold set and the probe suite are frozen in M0, before the
+  change-check pipeline is built. Include problem types the checks were not
   designed for, and report per-type recall.
 - **Unequal information.** The NL skill is written from the same confirmed model. A second
   reader checks that every rule appears in both.
