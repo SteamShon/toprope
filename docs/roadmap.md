@@ -57,7 +57,9 @@ so it is clear what was hand-built and what was generated.
    conflict warnings, preview (a server on copied state). Log replay waits for M0b.
 10. **Incremental (ADR-0013)**: hashes, the dependency graph, the impact report,
     affected-only reruns, a result cache with the toolchain hash, and a background full run.
-11. **Authoring MCP (ADR-0014, ADR-0017)**: tools for drafting, interview questions (defaults,
+11. **World map (ADR-0020)**: `world-map.json` plus the `world_map` and `how_to_reach` MCP
+    tools, derived from the declaration and harness results.
+12. **Authoring MCP (ADR-0014, ADR-0017)**: tools for drafting, interview questions (defaults,
     grouped cells, priorities), answers and confirmations, so the user's own agent runs the
     interview. The authoring UI is CLI/YAML until self-compile produces one. This limit is
     accepted for M1, where the researcher is the only author.
@@ -107,7 +109,9 @@ narrow what is generated before M2.
    outbox, read-back and `UNKNOWN`; adapter-level harness checks (never cached).
 5. **Log replay** in the change check (ADR-0009).
 6. **In-flight check and migration plans (ADR-0018)**, plus the deploy gate conditions.
-7. **Timers (virtual clock in the harness), function ports with contract tests, external
+7. **World-map skill-tree view** in the shell, and the map diff in impact reports
+   (ADR-0020).
+8. **Timers (virtual clock in the harness), function ports with contract tests, external
    events and multi-party approvals (ADR-0015)**, as far as the M2 domain needs them.
 
 Done when the toy domain runs as usable software through the shell and the greenfield API,

@@ -40,7 +40,7 @@ adapter joins only for unattended workflows (M4). Semantics: [`semantics.md`](se
 | **Authoring** | sources, drafts, interview questions, provenance and status of every element | ① ② | M0 kernel, then self-compiled in M1 |
 | **Domain Model** | objects, links, actions (params, preconditions, effects, roles), versions | all | M0 |
 | **Change Check** | impact analysis first (dependency graph, affected set, impact report; ADR-0013); then, on the affected set only: structural, semantic-conflict, scenario-regression, log-replay and NL-conflict checks; preview build (ADR-0009) | ① | M0 |
-| **Domain Compiler** | domain → MCP, greenfield backend (domain API over the event store and projections), execution checks, **domain interface** (objects/fields/links/actions/glossary; versioned by diff, hashed per element) | ① ④ | M0 |
+| **Domain Compiler** | domain → MCP, greenfield backend (domain API over the event store and projections), **world map** (ADR-0020), execution checks, **domain interface** (objects/fields/links/actions/glossary; versioned by diff, hashed per element) | ① ④ | M0 |
 | **Representation Compiler** | representation layers (defaults → base → host overlay) + interface → A2UI views, component/action catalog for generative UI. Rebuilt independently of the domain | ④ | M0 |
 | **Execution** | checks the matrix cell, roles and non-state preconditions on the projected state; applies effects; runs the **invariant guard** on the resulting state before appending (ADR-0012) | ③ ④ | M0 |
 | **Event Store** | event-sourced system of record (ADR-0012): domain events, decisions, denied attempts, exceptions, effect outcomes, domain changes; projections give current state; upcasters across versions; generated read-only query tools for agents | ① ③ ⑤ | M0 |
