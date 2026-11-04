@@ -12,6 +12,12 @@ class Strict(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
 
+def not_yet(construct: str, milestone: str) -> ValueError:
+    """A construct defined in schema v1 but not implemented by this kernel (ADR-0023)."""
+    return ValueError(f"`{construct}` is defined in schema v1 (docs/domain-schema.md) but not "
+                      f"implemented until {milestone}; refusing to run it silently")
+
+
 class Status(str, Enum):
     proposed = "proposed"
     confirmed = "confirmed"
@@ -99,11 +105,14 @@ class Action(Provenance):
     event: str | None = None
     applies_in: list[str] | None = None
     requires: Literal["human"] | None = None
+    approvals: dict[str, Any] | None = None
 
     @model_validator(mode="after")
     def _target_or_creates(self) -> Action:
         if (self.target is None) == (self.creates is None):
             raise ValueError("an action has exactly one of `target` or `creates`")
+        if self.approvals is not None:
+            raise not_yet("approvals", "M0b")
         return self
 
     @property
@@ -142,6 +151,13 @@ class Invariant(Provenance):
     check: str
     reason: str
     scope: Literal["aggregate", "cross"] = "aggregate"
+    enforced_by: str | None = None
+
+    @model_validator(mode="after")
+    def _cross_not_yet(self) -> Invariant:
+        if self.scope == "cross":   # would otherwise be skipped by the guard: fail closed
+            raise not_yet("invariants[].scope: cross", "M0b")
+        return self
 
 
 class World(Strict):
@@ -150,7 +166,8 @@ class World(Strict):
 
 
 class Step(Strict):
-    actor: dict[str, Any]
+    actor: dict[str, Any] = Field(default_factory=dict)
+    advance: dict[str, Any] | None = None
     do: str | None = None
     read: dict[str, Any] | None = None
     target: str | None = None
@@ -159,8 +176,12 @@ class Step(Strict):
 
     @model_validator(mode="after")
     def _do_or_read(self) -> Step:
+        if self.advance is not None:
+            raise not_yet("scenario `advance` steps", "M0b")
         if (self.do is None) == (self.read is None):
             raise ValueError("a step has exactly one of `do` or `read`")
+        if not self.actor:
+            raise ValueError("a `do` or `read` step needs an actor")
         return self
 
 
@@ -170,10 +191,34 @@ class Scenario(Strict):
     steps: list[Step]
 
 
+class SuccessMetric(Strict):
+    name: str
+    direction: Literal["up", "down"]
+    definition: str | None = None
+
+
+class Purpose(Strict):
+    """Why the domain exists (metadata only; never changes behavior)."""
+
+    problem: str
+    success_metric: SuccessMetric | None = None
+    announcement: str | None = None
+
+
+NOT_YET = {"handoffs": "M1 (ADR-0022)", "reservations": "M0b", "timers": "M0b",
+           "functions": "M0b", "external": "M0b"}
+
+
 class Domain(Strict):
     domain: str
     version: int
     owner: str | None = None
+    purpose: Purpose | None = None
+    handoffs: dict[str, Any] | None = None
+    reservations: dict[str, Any] | None = None
+    timers: dict[str, Any] | None = None
+    functions: dict[str, Any] | None = None
+    external: dict[str, Any] | None = None
     glossary: dict[str, str] = Field(default_factory=dict)
     roles: list[str] = Field(default_factory=list)
     objects: dict[str, ObjectType] = Field(default_factory=dict)
@@ -183,3 +228,10 @@ class Domain(Strict):
     invariants: list[Invariant] = Field(default_factory=list)
     world: World = Field(default_factory=World)
     scenarios: list[Scenario] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _not_yet(self) -> Domain:
+        for key, milestone in NOT_YET.items():
+            if getattr(self, key):
+                raise not_yet(key, milestone)
+        return self
