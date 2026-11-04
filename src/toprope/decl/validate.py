@@ -5,6 +5,7 @@ Returns issues instead of raising, so a change report can list all of them at on
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from ..expr import ParseError, Path, parse, paths_read
@@ -12,6 +13,12 @@ from .models import RESERVED_ACTORS, ActorRule, ByRole, Deny, Domain, Target
 
 RESERVED_CELLS = {"n/a", "undecided"}
 ROOTS = {"target", "actor", "params", "new"}
+
+
+# Every action surface (MCP tools, generated UI) carries these besides the declared params.
+RESERVED_PARAMS = frozenset({"target_id", "new_id", "idempotency_key", "thread_id", "run_id"})
+# Params are read in expressions as `params.<name>`, so a name is an expression identifier.
+PARAM_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
 
 @dataclass(frozen=True)
@@ -86,6 +93,13 @@ def validate_domain(d: Domain) -> list[Issue]:
                 add(Issue("unknown-role", where, f"unknown role '{role}'"))
             if isinstance(r, ActorRule) and r.where:
                 issues += _check_expr(d, r.where, f"{where}.actor", a.object_type, set(a.params))
+        for pname in a.params:
+            if pname in RESERVED_PARAMS:
+                add(Issue("reserved-param", f"{where}.params.{pname}",
+                          f"'{pname}' is reserved for every action's own arguments: {sorted(RESERVED_PARAMS)}"))
+            elif not PARAM_NAME.fullmatch(pname):
+                add(Issue("invalid-param-name", f"{where}.params.{pname}",
+                          "a param name is letters, digits and underscores, not starting with a digit"))
         ids = [p.id for p in a.preconditions]
         if len(ids) != len(set(ids)):
             add(Issue("duplicate-id", where, "precondition ids must be unique"))

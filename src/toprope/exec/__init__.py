@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from ..decl.models import Domain
-from ..identity import Identity
+from ..identity import Caller, Identity
 from ..semantics.model import ReferenceModel
 from ..types import Actor, Command, Event, Outcome
 from ..store import EventStore
@@ -69,8 +69,12 @@ class Execution:
     def attempts(self, oid: str) -> list[Event]:
         return self.store.read_attempts(oid)
 
-    def allowed_actions(self, oid: str, actor: Actor) -> list[str]:
-        return self._model.allowed_actions(oid, actor)
+    def allowed_actions(self, oid: str, who: Actor | Caller) -> list[str]:
+        """Actions the caller could take on `oid` now. Pass the resolved Caller for an agent, so
+        its principal and grant are applied as they would be at submit time."""
+        if isinstance(who, Caller):
+            return self._model.allowed_actions(oid, who.actor, who.on_behalf_of, who.grant)
+        return self._model.allowed_actions(oid, who)
 
 
 __all__ = ["Execution"]

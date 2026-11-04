@@ -148,6 +148,9 @@ world:                      # the expert's examples; the compiler grows a small 
 - `description`, `reason` and `glossary` are written once and reused by every surface.
 - **Effect values** in `set` are check-language expressions: `actor.id`, `"now()"`,
   `params.note`. A string literal is quoted inside the expression: `"'manual'"`.
+- **Param names** are identifiers (letters, digits, `_`), so expressions can read them as
+  `params.<name>`. `target_id`, `new_id`, `idempotency_key`, `thread_id` and `run_id` are
+  reserved: every action surface carries them.
 - `check` uses a small expression language: paths, comparison, `in` / `not in`, `and` / `or` /
   `not`, list literals, `count`, `exists`, `now`. The set operators and boolean combinators
   were added by ADR-0010. Any further extension requires an ADR.

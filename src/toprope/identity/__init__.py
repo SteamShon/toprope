@@ -2,7 +2,7 @@
 
 Toprope does not manage accounts. The host's identity provider issues credentials, and an
 adapter resolves them into an actor, and for agents also a principal and a grant. M0a ships a
-static adapter for tests and local use. OIDC/JWT comes with the server (M0a sub-PR 5).
+static adapter for tests and local use, and a JWT adapter (identity/jwt.py) for the server.
 """
 
 from __future__ import annotations
@@ -21,6 +21,12 @@ class Caller:
 
     def __post_init__(self) -> None:
         a = self.actor
+        for who in (a, self.on_behalf_of):
+            if who is not None and (not isinstance(who.id, str) or not who.id
+                                    or not all(isinstance(r, str) for r in who.roles)):
+                raise ValueError("actor ids and roles are non-empty strings")
+        if a.kind not in ("person", "agent"):
+            raise ValueError(f"a caller is a person or an agent, not {a.kind!r}")
         if a.kind == "system" or a.id == "system" or a.id.startswith(("external:", "handoff:")) \
                 or any(r == "system" or r.startswith("external:") for r in a.roles):
             raise ValueError("credentials never resolve to a reserved actor (system, external:*, handoff:*)")
@@ -30,6 +36,14 @@ class Caller:
             raise ValueError("an agent caller needs a principal and a grant (ADR-0016)")
         if self.on_behalf_of is not None and self.on_behalf_of.kind != "person":
             raise ValueError("a principal must be a person (ADR-0021)")
+
+
+def str_list(v: object, what: str) -> tuple[str, ...]:
+    """A claim or config value that must be a list of strings (a bare string is refused, so
+    "admin" never becomes the roles a, d, m, i, n)."""
+    if not isinstance(v, list) or not all(isinstance(x, str) for x in v):
+        raise ValueError(f"{what} must be a list of strings")
+    return tuple(v)
 
 
 class Identity(ABC):
@@ -48,4 +62,4 @@ class StaticIdentity(Identity):
         return self._callers.get(credentials) if credentials else None
 
 
-__all__ = ["Caller", "Identity", "StaticIdentity"]
+__all__ = ["Caller", "Identity", "StaticIdentity", "str_list"]
