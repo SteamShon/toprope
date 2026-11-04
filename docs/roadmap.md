@@ -39,7 +39,8 @@ so it is clear what was hand-built and what was generated.
 1. **Spike (1–2 days, ADR-0017).** Run `toprope-server` serving a toy domain over MCP to
    Claude Code. Separately, render one A2UI view with one host component in a CopilotKit
    shell, which de-risks M0b early. If A2UI blocks, record the fallback (ADR-0017).
-2. **Freeze the M1 instruments (researcher).** The gold scenarios, the post-deploy probe
+2. **Freeze the M1 instruments (researcher)**, using the templates and the validate/freeze
+   tool in [`experiments/m1/`](../experiments/m1/README.md). The gold scenarios, the post-deploy probe
    suite, the change-request list with its seeded-problem key (written by intent), and the
    verdict rules, including the structured-spec arm. Freezing them *before* building the
    change checks keeps the seeded problems from being written around what the checks can

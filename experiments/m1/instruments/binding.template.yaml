@@ -1,0 +1,11 @@
+# M1 binding: TEMPLATE (format only). Researcher-written AFTER Phase A and BEFORE any arm runs.
+# Maps each intent (and key entry) to concrete element names in the Phase A model, then frozen.
+instrument: binding
+experiment: M1
+status: draft
+domain_version: ""        # the Phase A model version the binding refers to
+bindings:
+  - seq: 1
+    elements: []           # e.g. ["Element.status", "confirm_element", "matrix[proposed, confirm_element]"]
+    unbindable: false      # true if the intent's target does not exist in the model; excluded from recall
+    note: ""

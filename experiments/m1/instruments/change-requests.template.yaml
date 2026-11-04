@@ -1,0 +1,10 @@
+# M1 change requests: TEMPLATE (format only). Researcher-written; agents must not fill or edit.
+# This file is shown to all arms. Write INTENTS in domain language, not element names
+# (names are an output of Phase A). The seeded-problem answers go in change-key.yaml, never here.
+instrument: change-requests
+experiment: M1
+status: draft
+requests:               # applied in this order, about 20
+  - seq: 1
+    intent: "<the change a domain owner would ask for, in their words>"
+    rationale: "<why the owner wants it>"

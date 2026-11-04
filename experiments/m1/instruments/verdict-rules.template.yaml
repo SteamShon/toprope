@@ -1,0 +1,35 @@
+# M1 verdict rules: TEMPLATE pre-filled with the assistant's DRAFT values from
+# docs/experiments/M1-self-compile.md. The researcher reviews, edits and freezes them in their own commit.
+instrument: verdict-rules
+experiment: M1
+status: draft
+iterate:                         # link ①
+  supports:
+    toprope_recall_min: 0.80
+    toprope_precision_min: 0.70
+    nl_recall_gap_min: 0.30      # Toprope − NL arm
+    structured_recall_gap_min: 0.10  # Toprope − structured-spec arm (compiler contribution)
+    median_iteration_minutes_max: 5
+    hand_edits_to_generated_max: 0
+  weakens:
+    nl_within: 0.15              # NL arm within this of Toprope recall
+    toprope_precision_below: 0.50
+    most_found_after_deploy: true
+  narrowed_if_structured_gap_below: 0.10   # takes precedence over "supports"
+  else: inconclusive
+fidelity:                        # link ②
+  supports:
+    held_out_accuracy_min: 0.80
+    unsupported_rules_max: 0.10
+    phase_a_human_hours_max: 4
+    accuracy_must_rise_over_iterations: true
+  weakens:
+    accuracy_plateau_below: 0.70
+    unsupported_rules_above_after_s3: 0.20
+  else: inconclusive
+p0_sanity:
+  first_draft_accuracy_note_if_at_least: 0.80
+latency_targets:                 # ADR-0013 drafts, confirmed here
+  impact_report_seconds: 2
+  affected_harness_seconds: 30
+  preview_seconds: 60

@@ -1,0 +1,13 @@
+# M1 post-deploy probe suite: TEMPLATE (format only). Researcher-written; agents must not fill or edit.
+# Run against every arm after each "deploy" (docs/experiments/M1-self-compile.md). It must not
+# overlap with the domain scenarios or the gold scenarios, and it does not reference the change key.
+instrument: probe-suite
+experiment: M1
+status: draft
+probes:
+  - id: P01
+    task: "<a task an agent is asked to do in the authoring workflow, in domain language>"
+    starting_state: "<short description of the state the task starts from>"
+    must: []              # observable behaviors that must happen, e.g. "asks the owner before confirming"
+    must_not: []          # behaviors that must not happen, e.g. "confirms its own drafted element"
+    notes: ""

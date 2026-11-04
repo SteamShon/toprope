@@ -1,0 +1,20 @@
+# M1 gold scenarios: TEMPLATE (format only). Researcher-written; agents must not fill or edit (AGENTS.md).
+# Copy to gold-scenarios.yaml, fill, then freeze (see ../README.md).
+# Link: ② model is right (held-out accuracy), P0 sanity check (first-draft accuracy).
+instrument: gold-scenarios
+experiment: M1
+status: draft            # draft → frozen (only via experiments/tools/freeze.py, in the researcher's own commit)
+domain: toprope-authoring # the self domain
+scenarios:
+  - id: G01               # stable id, never reused
+    held_out: true        # true: never shown to any iteration (about half)
+    question: "<a question about the authoring workflow, in domain language>"
+    answer:
+      kind: yes_no        # yes_no | outcome | state | actors | free_text
+      expected: "<yes|no>"
+      # outcome:    {result: allowed|denied, reason: "<denial reason in domain terms, optional>"}
+      # state:      "<the resulting state>"
+      # actors:     ["<role or actor>", ...]   (order-insensitive)
+      # free_text:  rubric: ["<point that must be present>", ...]   (graded by a person)
+    covers: []            # optional, free labels for later analysis, e.g. [self-approval, unsupported-elements]
+    notes: ""
