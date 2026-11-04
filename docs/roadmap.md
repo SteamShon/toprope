@@ -150,6 +150,6 @@ after; over-generalization incidents).
 
 ## Later
 
-⑥ with real teams. Learning from accumulated work decisions. Real external effects with
-read-back. Adapters for other runtimes and hosts (Temporal, OpenDots). Comparison with automated harness
+⑥ with real teams. Learning from accumulated work decisions. More brownfield adapters
+(feature flags, ad APIs, internal services) beyond the M0 GitHub adapter. Adapters for other runtimes and hosts (Temporal, OpenDots). Comparison with automated harness
 improvement (Harness²).
