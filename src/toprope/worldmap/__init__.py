@@ -127,7 +127,7 @@ def build_world_map(d: Domain, harness: dict[str, Any] | None = None) -> dict[st
     roles = [{"id": r, "people": d.world.actors.get(r, [])} for r in d.roles]
     reserved = sorted({r.role if isinstance(r, ActorRule) else r for a in d.actions.values() for r in a.actor
                        if (r.role if isinstance(r, ActorRule) else r) not in d.roles})
-    unreachable = (harness or {}).get("coverage", {}).get("unreachable", {})
+    unreachable = ((harness or {}).get("coverage") or {}).get("unreachable") or {}
     return {"format": FORMAT, "domain": d.domain, "version": d.version,
             "structure": structure,
             "behavior": {"states": states, "roles": roles, "system_actors": reserved, "edges": edges},

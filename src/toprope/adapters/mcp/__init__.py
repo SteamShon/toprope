@@ -173,8 +173,8 @@ def build_server(ex: Execution, credentials: Credentials, *, harness: dict[str, 
         if tr is None:
             return {"reachable": False, "reason": f"{obj} has no states."}
         roles = set(c.actor.roles)
-        if c.actor.kind == "agent" and c.on_behalf_of is not None:
-            roles &= set(c.on_behalf_of.roles)    # an agent can do only what its principal can
+        if c.actor.kind == "agent":               # an agent can do only what its principal can
+            roles &= set(c.on_behalf_of.roles) if c.on_behalf_of is not None else set()
         return reach(wmap, obj, st.get(tr.field), target_state, tuple(sorted(roles)))
 
     for fn in (get_object, history, attempts, allowed_actions, describe_domain, world_map, how_to_reach):

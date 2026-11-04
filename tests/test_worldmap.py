@@ -155,3 +155,8 @@ def test_cli_writes_map_and_mermaid(tmp_path):
     m = json.loads(out.read_text())
     assert m["format"] == "toprope.world-map/1" and edge(m, "Experiment.draft.approve_experiment")["harness"] == "verified"
     assert (tmp_path / "mm" / "Experiment.states.mmd").read_text().startswith("stateDiagram-v2")
+
+
+def test_a_report_without_coverage_is_tolerated():
+    m = build_world_map(dom(), {"ok": False, "coverage": None})
+    assert m["unreachable"] == {} and all(e["harness"] == "unknown" for e in m["behavior"]["edges"])
