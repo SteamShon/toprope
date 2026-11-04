@@ -11,7 +11,7 @@ roles. That, not interface shape, is the test of replaceability.
 |---|---|---|---|
 | **Authoring** | sources, drafts, interview questions, provenance and status of every element | ① ② | M0 kernel, then self-compiled in M1 |
 | **Domain Model** | objects, links, actions (params, preconditions, effects, roles), versions | all | M0 |
-| **Compiler** | domain → capsule: MCP, UI, generated checks | ① ③ | M0 |
+| **Compiler** | domain + representation → capsule: MCP, A2UI views, component/action catalog for generative UI, generated checks | ① ③ | M0 |
 | **Execution** | checks preconditions and roles on current state, applies effects | ③ | M0 |
 | **Event Log** | append-only calls, verdicts, effects, human decisions | ④ | M0 |
 | **Proposal / Review** | log-mined model diffs; human decisions with their inputs | ④ | M4 |
@@ -30,7 +30,7 @@ are generated, and only the kernel stays hand-built.
 | `DomainStore` | versioned domain models | YAML in repo | git-backed registry |
 | `StateStore` | object instances and links | PostgreSQL (shared with Aegra) or SQLite for tests | existing app DBs |
 | `AgentSurface` | expose reads and actions to agents | generated MCP server mounted on Aegra custom routes | OpenAPI, LangGraph tools |
-| `HumanSurface` | expose objects and actions to people | deterministic A2UI generated from the model, rendered in React + CopilotKit; LLM generative UI (e.g. OpenUI) only for explanation views (ADR-0008) | OpenDots |
+| `HumanSurface` | expose objects and actions to people | declared `representation` → deterministic A2UI, rendered in React + CopilotKit; schema defaults where undeclared; LLM generative UI for ad-hoc views, limited to declared components and allowed actions (ADR-0008) | other generative-UI stacks, OpenDots |
 | `Runtime` | host long-lived agent workflows (drafter, interviewer, proposal engine) | Aegra (ADR-0007) | LangGraph Platform, Temporal |
 | `EffectAdapter` | real-world effects | in-store only | GitHub, flags, ad APIs (with read-back) |
 | `EventLog` | append events | JSONL | SQLite, OpenTelemetry |

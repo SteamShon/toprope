@@ -1,7 +1,7 @@
 # Domain schema v0 (draft)
 
-Link: ① ②. The minimal core is **Object, Link, Action**. Further concepts (policy,
-contract, flow) are added only when a milestone shows a concrete need, each with an ADR
+Link: ① ② ③. The minimal core is **Object, Link, Action**, plus **`representation`**
+(ADR-0008). Further concepts (policy, contract, flow) are added only when a milestone shows a concrete need, each with an ADR
 naming that need.
 
 ```yaml
@@ -40,10 +40,26 @@ actions:
     effects:
       - set: {target.status: approved, target.approved_by: actor.id}
     records_decision: true  # produces a Decision with who, when, inputs and rationale
+
+representation:             # how the domain is shown to people (ADR-0008); never redefines meaning
+  Experiment:
+    list:   {columns: [name, status, primary_metric], group_by: status, sort: -started_at}
+    detail:
+      sections:
+        - {title: Design, fields: [hypothesis, primary_metric, guardrails, planned_days]}
+        - {title: Result, fields: [readout]}
+      actions: [approve_experiment, launch_experiment, decide]   # shown only when allowed in the current state
+    board:  {by: status}
+  approve_experiment:
+    form:   {fields: [note], confirm: "Approve this experiment for launch?"}
 ```
 
 ## Rules
 
+- `representation` declares views per object (`list`, `detail`, `board`, …) and forms per
+  action. Declared views compile deterministically to A2UI. Undeclared ones get schema
+  defaults. Ad-hoc screens are composed by an LLM from declared components and allowed
+  actions only. Labels and reasons always come from the glossary, `description` and `reason`.
 - Every element may carry `source` (`system` | `record` | `interview` | `use`, with a ref or
   quote) and `status` (`proposed` | `confirmed` | `unknown`). Agents write only `proposed`.
   Only humans confirm. Unknowns stay explicit instead of being guessed.

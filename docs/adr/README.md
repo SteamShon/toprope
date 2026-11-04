@@ -13,4 +13,4 @@ A record is superseded rather than deleted when a decision changes. History befo
 | [0005](0005-docs-language-and-visibility.md) | none | English docs, Korean notes; private until first results |
 | [0006](0006-defer-runtime-and-host.md) | none | Defer runtime and host (superseded by 0007) |
 | [0007](0007-aegra-adapter-python-core.md) | ① ④ | Python core; Aegra as runtime adapter; TypeScript frontend |
-| [0008](0008-deterministic-ui-plus-llm-layer.md) | ③ | Deterministic base UI plus LLM explanation layer |
+| [0008](0008-representation-in-domain-spec.md) | ③ | Representation declared in the domain spec; UI generated from it |

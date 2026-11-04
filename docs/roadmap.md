@@ -22,12 +22,12 @@ the claim status in the README is updated.
 The bootstrap: the smallest hand-built kernel that later milestones can generate from.
 
 - **Spike first (1–2 days, ADR-0007):** Aegra running a toy graph, an MCP server mounted on
-  its custom routes with auth checked, CopilotKit connected, one A2UI form rendered from a
-  toy model. If any part fails, record it and choose a fallback before building the kernel.
+  its custom routes with auth checked, CopilotKit connected, one A2UI view rendered from a
+  toy model's `representation`. If any part fails, record it and choose a fallback before building the kernel.
 - Stack: pure-Python domain core (`uv`), Aegra as the runtime adapter, TypeScript frontend.
 - Domain schema v0 with provenance and status on every element (`domain-schema.md`).
-- Compiler v0: domain → MCP (reads, plus one tool per action with preconditions) and a
-  deterministic A2UI base surface (ADR-0008).
+- Compiler v0: domain → MCP (reads, plus one tool per action with preconditions); declared
+  `representation` → deterministic A2UI views; schema defaults where undeclared (ADR-0008).
 - Execution with precondition and role checks, plus an append-only event log.
 - Source readers: repository, markdown records, session transcripts, interview log.
 
