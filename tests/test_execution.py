@@ -110,3 +110,13 @@ def test_concurrent_seeding_never_duplicates(open_store, store_kind):
     s = open_store()
     a, b = execution(s), execution(open_store())   # both seed; the second finds everything present
     assert b.seed_world() == 0 and len(s.read("E-onboarding")) == 1
+
+
+def test_nested_unstorable_params_are_invalid_command(open_store):
+    from toprope.decl import Domain
+    raw = schema_doc_domain()
+    raw["actions"]["approve_experiment"]["params"]["tags"] = {"type": "string", "many": True, "optional": True}
+    ex = Execution(Domain.model_validate(raw), open_store(), IDS, clock=lambda: NOW)
+    ex.seed_world()
+    out = ex.submit("t-ana", "approve_experiment", "E-onboarding", {"tags": ["ok", "b\x00"]}, idempotency_key="z")
+    assert out.code == "invalid-command"

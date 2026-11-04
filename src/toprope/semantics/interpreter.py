@@ -65,6 +65,19 @@ class Decision:
     attempts: tuple[Event, ...]    # DeniedAttempt / InvariantGuardTriggered (attempts stream)
 
 
+def _unstorable(v: Any) -> str | None:
+    """Walk a value like the store codec does; say why it cannot be stored, if it cannot."""
+    if isinstance(v, float) and not math.isfinite(v):
+        return "must contain only finite numbers"
+    if isinstance(v, str) and "\x00" in v:
+        return "must not contain NUL characters"
+    if isinstance(v, dict):
+        return next((w for k, x in v.items() for w in (_unstorable(k), _unstorable(x)) if w), None)
+    if isinstance(v, (list, tuple)):
+        return next((w for x in v if (w := _unstorable(x))), None)
+    return None
+
+
 def _pascal(name: str) -> str:
     return "".join(p[:1].upper() + p[1:] for p in name.split("_"))
 
@@ -286,10 +299,8 @@ class Interpreter:
             if spec.many and not isinstance(params[name], list):
                 return f"Param '{name}' must be a list."
             for v in vals:
-                if isinstance(v, float) and not math.isfinite(v):
-                    return f"Param '{name}' must be a finite number."
-                if isinstance(v, str) and "\x00" in v:
-                    return f"Param '{name}' must not contain NUL characters."
+                if (why := _unstorable(v)) is not None:
+                    return f"Param '{name}' {why}."
                 if spec.enum is not None and v not in spec.enum:
                     return f"Param '{name}' must be one of {spec.enum}."
                 if spec.type is not None and (not isinstance(v, py[spec.type]) or
