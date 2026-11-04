@@ -19,15 +19,21 @@ to try the change.
 The natural rival is the natural-language skill (SKILL.md, AGENTS.md). Its changes cannot be
 checked against the existing text before deployment. M1 compares the two directly.
 
-Toprope's own authoring workflow is the domain (self-compile). It is a hidden workflow the
-researcher knows well, and the authoring tool generated from it is used in every later
-milestone.
+Toprope's own workflows are the domains (self-compile, ADR-0022). There are two:
+**Domain Authoring** and **Domain Delivery**, joined by a typed handoff. They are hidden
+workflows the researcher knows well, and the tools generated from them are used in every
+later milestone. Scope: [`M1-self-domains-scope.md`](M1-self-domains-scope.md).
 
-## Domain in scope
+## Domains in scope
 
-Toprope's authoring workflow, roughly: source → draft element → interview question →
-confirmation (human) → domain version → compile and change check → preview → deploy →
-event store → proposal → decision (human). Optionally, the self domain also declares Toprope's own components (core, compilers,
+- **Domain Authoring**, roughly: source → draft element → interview question → confirmation
+  (human) → domain version → change report → approval → proposal → decision (human).
+- **Domain Delivery**, roughly: delivery request → build → harness run → preview → deploy
+  approval (human) → deploy → activate → verify → rollback.
+- **Handoff**: an approved domain version becomes a delivery request through Delivery's
+  published interface.
+
+Boundaries and candidate vocabulary: [`M1-self-domains-scope.md`](M1-self-domains-scope.md). Optionally, the self domain also declares Toprope's own components (core, compilers,
 server, shell, harness, event store) as object types with links, so the structure layer of
 its world map can replace the README's component diagram (ADR-0020). The researcher decides
 this when freezing the gold set, and adds gold questions for it if included. The actual

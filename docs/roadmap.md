@@ -6,7 +6,7 @@ several links, but a milestone ends with a verdict. Budget is ~10h+/week. Dates 
 | Milestone | Link | Question | Target |
 |---|---|---|---|
 | M0a | none (enabler) | Thin slice: declaration + semantics, model interpreter, Execution, event store, `toprope-server` MCP and authoring MCP, source readers, world map, harness (model, Execution, MCP), change check incl. log replay and in-flight check, incremental analysis | 4–5 weeks |
-| M1 | ① ② (self) | Model Toprope's own authoring workflow by iterating. Do compile-time checks catch what natural-language skills and structured specs without a compiler cannot? | 3–4 weeks |
+| M1 | ① ② (self) | Model Toprope's own Authoring and Delivery workflows by iterating, joined by a typed handoff (ADR-0022). Do compile-time checks catch what natural-language skills and structured specs without a compiler cannot? | 4–5 weeks (re-estimated in M1's spec PR) |
 | M0b | none (enabler) | Surfaces and effects: representation compiler, `toprope-shell` (A2UI + CopilotKit), UI-level harness, GitHub brownfield adapter, embedded shape, migration plans, query tools, timers and functions; regenerate the self domain's UI | 3–4 weeks |
 | M2 | ① ② ③ (dogfood) | Does the same hold on another domain, and does the harness-passing software work in real use? | 3–4 weeks |
 | M3 | ④ | Do people and agents act on the same meaning through the capsule? | 3 weeks |
@@ -89,8 +89,9 @@ Done when, on the toy domain:
 
 See [`experiments/M1-self-compile.md`](experiments/M1-self-compile.md).
 
-- **Phase A**: model Toprope's own authoring workflow by iterating through system → records
-  → interview → use, then generate the authoring tool from it. Recorded: accuracy over
+- **Phase A**: model Toprope's own **Domain Authoring** and **Domain Delivery** workflows
+  (ADR-0022) by iterating through system → records → interview → use, then generate both
+  tools from them, joined by a typed handoff. Recorded: accuracy over
   iterations and first-draft accuracy (a P0 sanity check).
 - **Phase B**: apply a frozen sequence of about 20 change requests with seeded conflicts and
   breakages to three arms: a natural-language skill (with LLM conflict review), a

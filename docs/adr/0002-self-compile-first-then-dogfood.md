@@ -1,6 +1,6 @@
 # ADR-0002: First domain is Toprope itself (self-compile), then dogfood domains
 
-- Link: ① ② · Status: accepted · 2026-11-04 · decided by: SteamShon
+- Link: ① ② · Status: accepted (amended by ADR-0022: two self domains, Authoring and Delivery) · 2026-11-04 · decided by: SteamShon
 
 ## Decision
 M1 models Toprope's own domain-authoring workflow and generates the authoring tool from
