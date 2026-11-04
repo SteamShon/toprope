@@ -109,7 +109,8 @@ counts as **found after deploy**. One that never shows up counts as **silent**.
   - "When does a representation-only change rebuild MCP?"
 - The post-deploy probe suite (separate from the gold set and the domain scenarios).
 - The change-request list and its seeded-problem key (by intent), and later the binding.
-- Agents never create or edit either one (AGENTS.md).
+- Agents never create or edit any of these: gold scenarios, probe suite, change list, key or
+  binding (AGENTS.md).
 
 ## Measures
 

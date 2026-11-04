@@ -86,8 +86,8 @@ umbrella is up to date with `develop`.
   claim-status table changes only in a PR that reports a preregistered experiment verdict.
   The links and hypotheses themselves change only through an accepted ADR.
 - **Decisions go into ADRs** (`docs/adr/`). Supersede an ADR when it changes; do not delete it.
-- **Gold sets are human-only.** Gold scenarios and seeded change lists (with their answer
-  keys) are written by the researcher. Agents must not create or edit them. Verdict rules
+- **Gold sets are human-only.** Gold scenarios, post-deploy probe suites, and seeded change
+  lists (with their answer keys and bindings) are written by the researcher. Agents must not create or edit them. Verdict rules
   and thresholds may be *drafted* by an agent when the researcher asks. They are marked
   `draft` until the researcher reviews and freezes them in their own commit, before the
   experiment's checks are built.
