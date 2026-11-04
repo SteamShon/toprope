@@ -299,3 +299,12 @@ def test_cli_init_writes_a_starter_workspace(tmp_path):
     assert r.returncode == 0
     Workspace(tmp_path)   # parses
     assert "local_only" in Path(tmp_path / "toprope.workspace.yaml").read_text()
+
+
+def test_bad_values_and_config_are_authoring_errors(ws):
+    _seed_example(ws)
+    with pytest.raises(AuthoringError, match="must be an object"):
+        ws.propose("scenarios.s1", "just text", "docs:docs/process.md#L7-L8")
+    (ws.root / "toprope.workspace.yaml").write_text(yaml.safe_dump({**CONFIG, "event_store": "mongo:x"}))
+    with pytest.raises(AuthoringError, match="event_store"):
+        Workspace(ws.root).questions()

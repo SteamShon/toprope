@@ -98,6 +98,8 @@ def _set(doc: dict, segs: list[str], value: Any) -> None:
             cur[s] = [] if nxt_is_list else {}
         cur = cur[s]
     last = segs[-1]
+    if isinstance(cur, list) and value is not None and not isinstance(value, dict):
+        raise AuthoringError(f"{'.'.join(segs)}: an item of {segs[-2]} must be an object")
     if isinstance(cur, list):
         idx = next((k for k, x in enumerate(cur) if isinstance(x, dict) and x.get("id") == last), None)
         if value is None:
@@ -290,7 +292,10 @@ class Workspace:
         if not self.event_store:
             return {}
         from ..store import open_store
-        store = open_store(self.event_store)
+        try:
+            store = open_store(self.event_store)
+        except ValueError as e:
+            raise AuthoringError(f"event_store: {e}") from None
         out: dict[str, int] = {}
         for stream in store.streams():
             for e in store.read_attempts(stream):
