@@ -124,21 +124,27 @@ researcher's choice and are repeated as open questions below.
    toolchain, as it does today, so an approved commit may need a fresh harness run before it
    can be deployed.
 
-## Open questions (not decided; answered before the parts they affect are implemented)
-1. **What counts as "changed directly".** Which reference changes make an element directly
-   changed? For example, an action whose referenced object was renamed. Today's element hash
-   counts any change in an element's own content, references included.
-2. **When a cited Answer changes.** If an Answer that a confirmation cites changes, is that
-   confirmation reopened?
-3. **Branch and merge (an M2 candidate).** Element-level 3-way merge would stop direct
-   conflicts, and running the change check on the merge result would stop indirect ones,
-   with the merge commit approved as a new candidate. Is this the shape for M2?
-4. **Reply-creates (revision 1).** Should a kernel reply be allowed to create an object of
-   another type, so Commits are real objects? This amends ADR-0028 and, narrowly, ADR-0021.
-5. **What a commit covers (revision 4).** Should representations be inside the commit, or
-   should the domain and its representation be committed separately and paired at release?
-6. **Delivery ordering (revision 6).** Is it "newest approved wins, older requests are
-   superseded", or strict arrival order?
+## Resolved questions (researcher, 2026-11-04)
+1. **What counts as "changed directly":** an element whose **review hash** changed. The
+   review hash covers the element's own content, references included, and excludes only
+   provenance. A rename therefore makes every element that references it direct. Rename
+   detection, which would treat pure reference substitutions as indirect, is considered in M2.
+2. **A cited Answer changes:** the interview log is append-only, so an Answer never changes.
+   A later Answer can contradict it. A confirmation is **not reopened automatically**. The
+   change report lists "confirmations that cite a superseded answer", consistent with
+   "indirect effects are reported, not re-reviewed".
+3. **Branch and merge:** not in M1. The intended M2 shape is element-level 3-way merge plus
+   the change check on the merge result, with the merge commit approved as a new candidate.
+   It is decided in M2's spec PR. To keep that open at no cost, a commit records its
+   **parents as a list** (one parent in M1), and `diff` works between any two commits.
+4. **Reply-creates:** accepted. A kernel reply action may `creates:` an object of another
+   type, so Commits are real, immutable objects. This amends ADR-0028 and, narrowly,
+   ADR-0021: creation by a kernel reply only.
+5. **What a commit covers:** the declaration **and** its representations, plus the derived
+   interface version. A representation-only change still makes a new commit and takes
+   ADR-0008's light path.
+6. **Delivery ordering:** the newest approved commit wins. An older request is refused as
+   superseded, and there are no downgrades without an explicit rollback (M2).
 
 ## Affected ADRs, documents and code
 

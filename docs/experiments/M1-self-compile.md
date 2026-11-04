@@ -1,6 +1,7 @@
 # M1: Self-compile, and safe iteration vs. natural-language skills
 
-Link: ① iterate safely, ② model is right, ⑥ (partial, the handoff). Status: design draft.
+Link: ① iterate safely, ⑥ (partial, the handoff); self-compile feasibility. ② model is right
+moved to M2 (ADR-0030). Status: design draft.
 
 **Freeze status.** The metrics and verdict rules below are a **draft proposed by the
 assistant**. The researcher reviews, edits and freezes them in their own commit, together
@@ -154,14 +155,13 @@ Templates, the freeze procedure and the `verify` check:
 | **Iteration time** (primary) | edit → validated preview, wall time and human minutes, per change; broken down into impact report, affected harness and preview (ADR-0013) | ① |
 | Selection misses | tests that failed in the background full run but were passing from cache, i.e. impact-analysis bugs (target: 0) | ① |
 | Check breakdown | which check caught what: structural, semantic, scenario regression, log replay, NL lint | ① |
-| **Held-out accuracy** (primary) | after Phase A, and after Phase B | ② |
-| Accuracy-over-iterations | Phase A curve; accuracy of the first draft | ② and the P0 sanity check |
-| Unsupported rules | rules with no source and no confirmation | ② |
-| Interview efficiency (ADR-0014) | questions asked; cells decided per question; share of cells decided by confirmed defaults | ① ② |
-| Matrix completeness | share of (state, action) cells decided rather than `undecided`; cells decided through the interview vs. drafted from sources | ② |
+| Correctness set | the small frozen set for the self tools' critical rules (ADR-0030); a guard on the tool M2 depends on, not a ② verdict | self-compile, ⑥ |
+| Unsupported rules | rules with no source and no confirmation (reported, no verdict) | — |
+| Interview efficiency (ADR-0014, ADR-0025) | questions and minutes per stage; cells decided per question; share of cells decided by confirmed defaults | ① |
+| Matrix completeness | share of (state, action) cells decided rather than `undecided`; cells decided through the interview vs. drafted from sources | reported |
 | Harness findings | invariant violations and parity failures found before deploy, and by which part (cell tests, exploration, flows) | ① |
-| Generated vs hand-built | share of each tool (authoring, delivery) that is generated; hand edits to generated code | self-compile |
-| Handoff (⑥ partial) | handoff-breaking changes caught at compile time; requests whose intent survives (checked by gold questions) | ⑥ |
+| Generated vs hand-built | share of each tool (authoring, delivery) that is generated; hand edits to generated code; the regeneration check (ADR-0028) | self-compile |
+| Handoff (⑥ partial) | handoff-breaking changes caught at compile time; requests whose intent survives (checked by the correctness set) | ⑥ |
 | Cost | tokens, $, human minutes per stage and per change, **per domain** | all |
 
 ## Verdict rules
@@ -182,16 +182,14 @@ Templates, the freeze procedure and the `verify` check:
 - **Inconclusive ①**: any outcome not covered above. For example, a recall gap of 15–30
   points, or precision of 50–70%. It is reported as inconclusive with the numbers, and is
   not read as support. M2 repeats the comparison.
-- **Supports ② (self)**: held-out accuracy ≥ 80%, unsupported rules ≤ 10%, total human time
-  ≤ 4 h **per domain** for Phase A, and accuracy rising over iterations (the final accuracy is higher than
-  the first draft's).
-- **Weakens ② (self)**: accuracy plateaus below 70%, or unsupported rules stay above 20%
-  after S3.
-- **Inconclusive ②**: anything in between.
-- **P0 sanity check** (not a verdict): if the first draft already reaches ≥ 80% held-out
-  accuracy, record that P0 did not show up on this domain.
-- **Self-compile claim** holds only if the tool used in S4 and handed to M2 is generated
-  from the model, with hand edits listed.
+- **② is not judged in M1** (ADR-0030). Its verdict rules, held-out accuracy and the P0
+  sanity check move to M2, on an application domain whose expert is not Toprope's builder.
+- **Self-compile claim** (a feasibility result) holds only if all of these hold:
+  - the tools used in S4 and handed to M2 are generated from the declarations, with hand
+    edits listed (target 0)
+  - the regeneration check (ADR-0028) passes
+  - the correctness set passes
+  - the switch-over (ADR-0022) happens with the researcher's sign-off
 
 ## Risks
 
