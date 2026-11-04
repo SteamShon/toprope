@@ -31,10 +31,14 @@ is built**, so the seeded problems cannot be written around what the checks catc
    held-out ratio. It also warns about the key mix, and about request wording that may leak
    the key ("conflict", "break", "seeded").
 2. Set `status: frozen` in each file yourself.
-3. Run `freeze`. It writes `FROZEN.json` with a sha256 per file. Commit the files and
-   `FROZEN.json` in **your own commit**.
-4. The harness runs `verify` before every M1 run. Any change after freezing fails it.
-   Refreezing a changed file is refused.
+3. Run `freeze` (stage 1, in M0a). It freezes the five pre-check files into `FROZEN.json`,
+   with a sha256 per file. The binding is ignored at this stage. Commit in **your own
+   commit**.
+4. After Phase A, write `binding.yaml`, set it `frozen`, and run `freeze-binding`
+   (stage 2). This requires stage 1. Commit again.
+5. The harness runs `verify --run` before every arm run. It fails if any frozen file changed,
+   if any stage-1 file is not frozen, or if the binding is not frozen. Refreezing a changed
+   file is refused.
 
 ## Keeping the key sealed
 `change-key.yaml` lives in the repository for provenance, but no agent run (arm, probe or

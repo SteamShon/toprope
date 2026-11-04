@@ -3,7 +3,7 @@
 # Link: ② model is right (held-out accuracy), P0 sanity check (first-draft accuracy).
 instrument: gold-scenarios
 experiment: M1
-status: draft            # draft → frozen (only via experiments/tools/freeze.py, in the researcher's own commit)
+status: draft            # draft → frozen (set by the researcher, then `experiments/tools/instruments.py freeze`, in their own commit)
 domain: toprope-authoring # the self domain
 scenarios:
   - id: G01               # stable id, never reused
