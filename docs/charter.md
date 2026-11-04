@@ -22,6 +22,14 @@ These workflows are implicit:
 Toprope is a light, open foundation. It turns hidden workflows into a domain model that
 people and agents both use, and keeps the model improving while it is used.
 
+- **Premise: nobody can define a domain correctly in one go.** Domains become right only
+  through many iterations. Each iteration must be extremely cheap and testable, and rebuilds
+  will be very frequent.
+- **The compiler's core job is change safety, not code generation.** When a domain expert
+  changes something, the compiler compares it with the existing declaration and reports
+  **before deployment** what breaks or conflicts. It also lets the expert try the change in a
+  preview. A rule added to a natural-language skill cannot be checked against the existing
+  text until it is deployed and used. Declaring the domain moves that check to compile time.
 - **Workflow ≡ domain.** A workflow is modeled as objects, links and actions
   (preconditions, effects, roles), in the spirit of an ontology plus action types.
 - **One model, two surfaces.** The model compiles into a *domain capsule*: MCP for agents
@@ -61,24 +69,46 @@ people and agents both use, and keeps the model improving while it is used.
 ## 3. The claim chain
 
 ```
-① can be built      an implicit workflow can be turned into a domain model cheaply
-② model is right    the model captures how the work actually runs
+P0 premise          nobody can define a domain correctly in one go; it is found by iterating
+      ↓
+① iterate safely    a domain can be changed cheaply and safely: breakage and conflicts are
+                    caught at compile time and the change can be tried before deployment
+      ↓
+② model is right    through those iterations, the model comes to capture how the work runs
+      ↓
 ③ shared language   MCP and UI generated from the model let people and agents act on the same meaning
-④ evolves           use accumulates decisions, and the model improves
+      ↓
+④ evolves           use accumulates decisions, and the model keeps improving
+      ↓
 ⑤ org productivity  handoff delay and re-explanation between people go down
 ```
 
-Each link only matters if the previous one holds. **① + ② is the load-bearing bet.** If
-domains cannot be built cheaply and correctly, nobody builds them and ③–⑤ never start. It is
-also the most uncertain link, and the one where Toprope differs most from existing
-ontology platforms.
+P0 is taken as given and is not tested directly. M1 will report whether the model was
+right on the first attempt, as a sanity check on it. Each link only matters if the previous
+one holds. **① + ② is the load-bearing bet.** If changing a domain is expensive or unsafe,
+nobody iterates, and the model never becomes right. This is also where Toprope differs most
+from natural-language skills, whose changes cannot be checked before deployment, and from
+ontology platforms that are expensive to change.
+
+### What "iterate safely" requires of the compiler (ADR-0009)
+
+| Check | Example | Nature |
+|---|---|---|
+| Structural | a removed field is still referenced by an action or a representation | deterministic |
+| Semantic conflict | two rules allow and forbid the same case; unreachable states; dead actions | deterministic |
+| Scenario regression | an example scenario attached to the domain changes outcome | deterministic |
+| Log replay | "with this change, 12 past actions would have been blocked" | deterministic |
+| Natural-language conflict | descriptions or judgment rules contradict each other | LLM, reported as warnings |
+
+Every change also produces a **preview build**: generated MCP and UI on a copy of the state.
+The expert can try the change there before deploying it.
 
 ## 4. Hypotheses
 
 | Link | ID | Hypothesis | Weakened if |
 |---|---|---|---|
-| ① | H-Author | The system → records → interview → use pipeline reaches a usable domain in ≤ 4 human hours, and later changes take ≤ 30 min with no hand edits to generated surfaces. | Human time is mostly spent correcting agent drafts, or changes need hand edits. |
-| ② | H-Fidelity | The model reaches ≥ 80% accuracy on held-out workflow scenarios, with ≤ 10% unsupported rules. | Accuracy plateaus below 70%, or agents invent rules faster than humans catch them. |
+| ① | H-Iterate | Compile-time checks catch most seeded conflicts and breakages **before deployment**. A natural-language skill baseline, even with an LLM conflict review, catches clearly fewer. A change goes from edit to validated preview in minutes. | The baseline with LLM review catches about as many; or most breakages surface only after deployment; or false alarms are so frequent that experts ignore the checks. |
+| ② | H-Fidelity | Over the iterations, held-out scenario accuracy reaches ≥ 80% with ≤ 10% unsupported rules. Accuracy rises with the number of iterations, not with the first draft. | Accuracy plateaus below 70%, or agents invent rules faster than checks and humans catch them. |
 | ③ | H-Shared | Agents working through capsule-generated actions make fewer meaning errors than agents given the same knowledge as docs plus generic tools. | Docs ≈ capsule, or hand-written typed tools ≈ capsule (in which case the gain is vocabulary only). |
 | ④ | H-Evolve | Log → proposal → human decision improves accuracy and reduces clarifications in later use. | Confirming costs more than it saves, or proposals are mostly noise. |
 | ⑤ | H-Handoff | A typed handoff between domains loses less intent than a written note. | Good notes perform the same. |

@@ -14,3 +14,4 @@ A record is superseded rather than deleted when a decision changes. History befo
 | [0006](0006-defer-runtime-and-host.md) | none | Defer runtime and host (superseded by 0007) |
 | [0007](0007-aegra-adapter-python-core.md) | ① ④ | Python core; Aegra as runtime adapter; TypeScript frontend |
 | [0008](0008-representation-layer.md) | ③ | Representation is a separately compiled layer that hosts can override |
+| [0009](0009-change-safety-is-the-compiler-core.md) | ① ② | Premise P0; ① = iterate safely; change safety is the compiler's core job |

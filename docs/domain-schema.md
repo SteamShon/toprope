@@ -54,6 +54,26 @@ actions:
   Extending it requires an ADR.
 - `records_decision: true` turns an action into an accumulated work decision (④).
 
+## Scenarios (ADR-0009)
+
+Domains carry their own tests. The change-check pipeline re-runs them on every edit, and a
+changed outcome is a regression to confirm or fix.
+
+```yaml
+scenarios:
+  - id: no-approve-running
+    given: {Experiment: {id: E1, status: running}}
+    when:  {action: approve_experiment, actor: {role: approver}, target: E1}
+    expect: {denied_by: is-draft}
+  - id: approve-draft
+    given: {Experiment: {id: E2, status: draft}}
+    when:  {action: approve_experiment, actor: {role: approver}, target: E2}
+    expect: {state: {E2.status: approved}, decision_recorded: true}
+```
+
+Scenarios used as an experiment's held-out gold set are kept outside the domain, so they
+cannot be edited by the loop they evaluate.
+
 ## Representation layer (ADR-0008)
 
 Representation lives in separate files and compiles against the **domain contract** (the

@@ -3,7 +3,8 @@
 - Link: all · Status: accepted · 2026-11-04 · decided by: SteamShon
 
 ## Decision
-Toprope's thesis is five chained claims: ① can be built → ② model is right → ③ shared
+Toprope's thesis is five chained claims (amended by ADR-0009: premise P0 added, ① is now
+"iterate safely"): ① can be built → ② model is right → ③ shared
 language → ④ evolves → ⑤ org productivity. Docs, experiments, ADRs and milestones are
 organized around them:
 - Every document names its link.

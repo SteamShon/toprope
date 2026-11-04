@@ -11,13 +11,16 @@ down, and the decisions made along the way do not accumulate, so nobody can lear
 
 ## The claim chain
 
-Everything in this repository is organized around five claims. Each one only matters if
-the one before it holds.
+Everything in this repository is organized around one premise and five claims. Each claim
+only matters if the one before it holds.
 
 ```
-① can be built      an implicit workflow can be turned into a domain model cheaply
+P0 premise          nobody can define a domain correctly in one go; it is found by iterating
       ↓
-② model is right    the model captures how the work actually runs
+① iterate safely    a domain can be changed cheaply and safely: breakage and conflicts are
+                    caught at compile time and the change can be tried before deployment
+      ↓
+② model is right    through those iterations, the model comes to capture how the work runs
       ↓
 ③ shared language   MCP and UI generated from the model let people and agents act on the same meaning
       ↓
@@ -30,7 +33,7 @@ the one before it holds.
 
 | Link | Hypothesis | Verdict in | Status |
 |---|---|---|---|
-| ① can be built | H-Author | M1 (self), M2 (dogfood) | untested |
+| ① iterate safely | H-Iterate | M1 (self), M2 (dogfood) | untested |
 | ② model is right | H-Fidelity | M1 (self), M2 (dogfood) | untested |
 | ③ shared language | H-Shared | M3 | untested |
 | ④ evolves | H-Evolve | M4 | untested |
