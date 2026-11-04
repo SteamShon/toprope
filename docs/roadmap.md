@@ -6,7 +6,7 @@ several links, but a milestone ends with a verdict. Budget is ~10h+/week. Dates 
 | Milestone | Link | Question | Target |
 |---|---|---|---|
 | M0a | none (enabler) | Thin slice: declaration + semantics, model interpreter, Execution, event store, `toprope-server` MCP and authoring MCP, source readers, world map, harness (model, Execution, MCP), change check incl. log replay and in-flight check, incremental analysis; kernel services as declared effects so the self domains are generated end to end (ADR-0028) | 5–7 weeks |
-| M1 | ① ② ⑥ (self; ⑥ partial via the handoff) | Model Toprope's own Authoring and Delivery workflows by iterating, joined by a typed handoff (ADR-0022). Do compile-time checks catch what natural-language skills and structured specs without a compiler cannot? | 4–5 weeks (re-estimated in M1's spec PR) |
+| M1 | ① ⑥ (self; ⑥ partial via the handoff); self-compile feasibility. ② moved to M2 (ADR-0030) | Model Toprope's own Authoring and Delivery workflows by iterating, joined by a typed handoff (ADR-0022). Do compile-time checks catch what natural-language skills and structured specs without a compiler cannot? | 4–5 weeks (re-estimated in M1's spec PR) |
 | M0b | none (enabler) | Surfaces and effects: representation compiler, `toprope-shell` (A2UI + CopilotKit), UI-level harness, GitHub brownfield adapter, embedded shape, migration plans, query tools, timers and functions, external sources other than `kernel`; regenerate the self domain's UI | 3–4 weeks |
 | M2 | ① ② ③ (dogfood) | Does the same hold on another domain, and does the harness-passing software work in real use? | 3–4 weeks |
 | M3 | ④ | Do people and agents act on the same meaning through the capsule? | 3 weeks |
@@ -88,14 +88,14 @@ Done when, on the toy domain:
   harness ≤ 30 s, preview ≤ 60 s)
 - the full run finds no selection miss.
 
-## M1: Self-compile and safe iteration (① ②, ⑥ partial, 4–5 weeks)
+## M1: Self-compile and safe iteration (①, ⑥ partial, 4–5 weeks; ② moved to M2 by ADR-0030)
 
 See [`experiments/M1-self-compile.md`](experiments/M1-self-compile.md).
 
 - **Phase A**: model Toprope's own **Domain Authoring** and **Domain Delivery** workflows
   (ADR-0022) by iterating through system → records → interview → use, then generate both
-  tools from them, joined by a typed handoff. Recorded: accuracy over
-  iterations and first-draft accuracy (a P0 sanity check).
+  tools from them, joined by a typed handoff. Recorded: human time, edits, and a small frozen
+  correctness set for the self tools' critical rules and ⑥ (ADR-0030; not a ② verdict).
 - **Phase B**: apply a frozen sequence of about 20 change requests with seeded conflicts and
   breakages to three arms: a natural-language skill (with LLM conflict review), a
   structured spec (the same YAML, with LLM review and no compiler), and the Toprope
@@ -143,7 +143,11 @@ migration, and its harness passes on every surface.
 Use the self-compiled authoring tool from M1, not the hand-built kernel, to model a
 second, everyday domain. The candidate is the experiment lifecycle (hypothesis → design →
 approval → launch → readout → ship/kill), sourced from an OSS experimentation platform
-plus the researcher as owner. Same metrics and gold-set procedure as M1.
+plus the researcher as owner. **② is judged here (ADR-0030)** and needs, as an entry
+criterion, a domain expert who is not Toprope's builder; without one, ② stays untested. The
+held-out protocol built for M1 (`experiments/m1/interview-guide.md`, sealed validation,
+fact keys, kernel-fact exclusion) is the starting point. M2's estimate is redone in its spec
+PR, and M3 may use M2's gold only after M2's verdict is frozen.
 
 Phase B (the change sequence vs. a natural-language skill) is repeated on this domain.
 

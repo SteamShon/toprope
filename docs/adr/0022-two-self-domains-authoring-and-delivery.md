@@ -44,6 +44,8 @@ split from the prior work had disappeared.
    and answers are not written in advance, because Phase A must produce them.
 
 ## Consequences
+- (ADR-0030) M1 judges ① and ⑥ (partial) on the self domains, and reports self-compile as a
+  feasibility result. ② is judged in M2 on an application domain.
 - M1 grows: two Phase A builds, and the change sequence and gold set cover both domains (the
   researcher's call when freezing). The M1 estimate is revisited in M1's spec PR.
 - The language needs a handoff construct, defined in schema v1 (`docs/domain-schema.md`).
