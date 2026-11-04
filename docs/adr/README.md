@@ -11,4 +11,6 @@ A record is superseded rather than deleted when a decision changes. History befo
 | [0003](0003-raw-material-order.md) | ① ② | Raw material order: system → records → interview → use |
 | [0004](0004-minimal-core-with-provenance.md) | ① ② | Minimal core with provenance and status |
 | [0005](0005-docs-language-and-visibility.md) | none | English docs, Korean notes; private until first results |
-| [0006](0006-defer-runtime-and-host.md) | none | Defer runtime and host |
+| [0006](0006-defer-runtime-and-host.md) | none | Defer runtime and host (superseded by 0007) |
+| [0007](0007-aegra-adapter-python-core.md) | ① ④ | Python core; Aegra as runtime adapter; TypeScript frontend |
+| [0008](0008-deterministic-ui-plus-llm-layer.md) | ③ | Deterministic base UI plus LLM explanation layer |

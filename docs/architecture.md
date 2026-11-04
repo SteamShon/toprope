@@ -28,12 +28,20 @@ are generated, and only the kernel stays hand-built.
 | `Drafter` | sources → proposed elements with source links | LLM call (Claude API) | other models |
 | `Interviewer` | targeted questions on unknown or conflicting elements | CLI chat | generated UI |
 | `DomainStore` | versioned domain models | YAML in repo | git-backed registry |
-| `StateStore` | object instances and links | SQLite | Postgres, existing app DBs |
-| `AgentSurface` | expose reads and actions to agents | generated MCP server | OpenAPI, LangGraph tools |
-| `HumanSurface` | expose objects and actions to people | generated schema-driven web UI | generative-UI specs, OpenDots |
+| `StateStore` | object instances and links | PostgreSQL (shared with Aegra) or SQLite for tests | existing app DBs |
+| `AgentSurface` | expose reads and actions to agents | generated MCP server mounted on Aegra custom routes | OpenAPI, LangGraph tools |
+| `HumanSurface` | expose objects and actions to people | deterministic A2UI generated from the model, rendered in React + CopilotKit; LLM generative UI (e.g. OpenUI) only for explanation views (ADR-0008) | OpenDots |
+| `Runtime` | host long-lived agent workflows (drafter, interviewer, proposal engine) | Aegra (ADR-0007) | LangGraph Platform, Temporal |
 | `EffectAdapter` | real-world effects | in-store only | GitHub, flags, ad APIs (with read-back) |
 | `EventLog` | append events | JSONL | SQLite, OpenTelemetry |
 | `ProposalEngine` | logs → candidate diffs | LLM call | Harness²-style probe loops |
+
+## Stack (ADR-0007)
+
+- Domain core: pure Python (`uv`), with no Aegra or LangGraph imports.
+- Server: Aegra (FastAPI + LangGraph + PostgreSQL + Redis) hosting the agent workflows and the
+  generated MCP/domain API as custom routes.
+- Frontend: TypeScript, React + CopilotKit over AG-UI.
 
 ## Guarantee boundary
 
