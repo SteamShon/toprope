@@ -14,8 +14,8 @@ several links, but a milestone ends with a verdict. Budget is ~10h+/week. Dates 
 | M5 | ⑥ (partial) | Do typed handoffs between domains preserve intent? Write-up, go public | 3 weeks |
 
 **Order rationale (ADR-0019):** M1 needs only the thin slice, so M1 runs before the
-surfaces and effects are built. That brings the first verdict to about 9–10 weeks (M0a 4–5 + M1 4–5,
-after ADR-0022 added Delivery), down from about 15. This is a target at about 10 h/week, not a commitment.
+surfaces and effects are built. That brings the first verdict to about 10–12 weeks (M0a 5–7 + M1 4–5,
+after ADR-0022 added Delivery and ADR-0028 added kernel effects), down from about 15. This is a target at about 10 h/week, not a commitment.
 
 **Overrun rule:** if M0a runs past 6 weeks, cut it to what M1 strictly needs (semantics,
 model interpreter, Execution, event store, MCP, authoring MCP, model and Execution-level
@@ -31,7 +31,7 @@ the claim status in the README is updated.
 
 ---
 
-## M0a: Thin slice (no claim, 4–5 weeks)
+## M0a: Thin slice (no claim, 5–7 weeks incl. ADR-0028)
 
 The hand-built kernel that M1 needs, and nothing more. Kernel code is kept small and listed,
 so it is clear what was hand-built and what was generated.
