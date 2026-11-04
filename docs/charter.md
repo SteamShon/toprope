@@ -34,6 +34,11 @@ Toprope        correctness layer: declaration, transition matrix, invariants, Ex
 Effects        greenfield: the backend Toprope generates · brownfield: existing servers, APIs, DBs
 ```
 
+The work between people is where this started (§1) and what ⑥ tests. It is not the
+boundary. Toprope applies to any stateful domain where people or agents act: people ↔
+people, people ↔ agents, agents ↔ agents, end users ↔ a product, or one person's tool. It
+fits poorly where nothing stateful can be declared.
+
 On its own the correctness layer means little. It matters when it sits between an
 intelligence layer that proposes actions and an effect layer that performs them (ADR-0011).
 
