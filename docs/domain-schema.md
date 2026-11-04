@@ -67,7 +67,7 @@ actions:
     actor: [eng]
     target: Experiment
     effects:
-      - set: {target.started_at: now}
+      - set: {target.started_at: "now()"}
 
 transitions:                # state × action → target state | deny(reason) | n/a | undecided
   Experiment:
@@ -121,13 +121,17 @@ world:                      # the expert's examples; the compiler grows a small 
   quote) and `status` (`proposed` | `confirmed` | `unknown`). Agents write only `proposed`.
   Only humans confirm. Unknowns stay explicit instead of being guessed.
 - `description`, `reason` and `glossary` are written once and reused by every surface.
+- **Effect values** in `set` are check-language expressions: `actor.id`, `"now()"`,
+  `params.note`. A string literal is quoted inside the expression: `"'manual'"`.
 - `check` uses a small expression language: paths, comparison, `in` / `not in`, `and` / `or` /
   `not`, list literals, `count`, `exists`, `now`. The set operators and boolean combinators
   were added by ADR-0010. Any further extension requires an ADR.
 - `records_decision: true` turns an action into an accumulated work decision (⑤).
 - **Transition matrix** (ADR-0010):
   - It is the single source for state-based rules. Every (state, action) cell is one of:
-    a target state (optionally per role), `{deny: reason}`, `n/a`, or `undecided`.
+    a target state, `{deny: reason}`, `n/a`, `undecided`, or a per-role cell
+    `{by_role: {approver: approved, eng: {deny: "..."}}}` (roles not listed are `n/a`).
+  - A cell missing from a declared row is `undecided`, and the validator warns about it.
   - `n/a` denies with the standard reason "not applicable when <state>". It is recorded and
     never shown as available, and it is not asked about in the interview.
   - `undecided` cells deny with the reason "undecided" and are listed in every change report.
