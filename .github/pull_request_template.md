@@ -4,7 +4,7 @@
 
 ## Link
 
-<!-- Which claim-chain link(s) this serves: P0 premise, ① iterate safely, ② model is right, ③ shared language, ④ evolves, ⑤ org productivity, or none (enabler). -->
+<!-- Which claim-chain link(s) this serves: P0 premise, ① iterate safely, ② model is right, ③ works as built, ④ shared language, ⑤ evolves, ⑥ org productivity, or none (enabler). -->
 
 ## Checked by
 

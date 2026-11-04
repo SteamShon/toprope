@@ -1,8 +1,19 @@
 # Toprope
 
-Toprope is a light, open foundation. It turns the hidden workflows between people into a
-**domain model that people and agents both use**, and it keeps that model improving while
-it is used.
+Toprope is a light, open **correctness layer and software factory**. It turns the hidden
+workflows between people into a **domain model that people and agents both use**. From
+that model it produces working software, and it keeps the model improving while it is used.
+
+```
+Intelligence   agents (Claude Code, Codex, any MCP client) and people
+      │        perceive the world model and its allowed boundary
+      ▼
+Toprope        correctness layer: declaration, transition matrix, invariants, Execution gate,
+               harness-verified generated MCP, UI and backend
+      │        only allowed actions pass, through adapters
+      ▼
+Effects        greenfield: the backend Toprope generates · brownfield: existing servers, APIs, DBs
+```
 
 Agents raised individual productivity. Organizational productivity did not follow, because
 the work *between* people runs on implicit, oral process: getting code into the product,
@@ -11,7 +22,7 @@ down, and the decisions made along the way do not accumulate, so nobody can lear
 
 ## The claim chain
 
-Everything in this repository is organized around one premise and five claims. Each claim
+Everything in this repository is organized around one premise and six claims. Each claim
 only matters if the one before it holds.
 
 ```
@@ -22,11 +33,14 @@ P0 premise          nobody can define a domain correctly in one go; it is found 
       ↓
 ② model is right    through those iterations, the model comes to capture how the work runs
       ↓
-③ shared language   MCP and UI generated from the model let people and agents act on the same meaning
+③ works as built    software generated from a harness-passing declaration works in real use;
+                    writing the code is nearly free (the software factory)
       ↓
-④ evolves           use accumulates decisions, and the model improves
+④ shared language   MCP and UI generated from the model let people and agents act on the same meaning
       ↓
-⑤ org productivity  handoff delay and re-explanation between people go down
+⑤ evolves           use accumulates decisions, and the model improves
+      ↓
+⑥ org productivity  handoff delay and re-explanation between people go down
 ```
 
 ## Claim status
@@ -35,9 +49,10 @@ P0 premise          nobody can define a domain correctly in one go; it is found 
 |---|---|---|---|
 | ① iterate safely | H-Iterate | M1 (self), M2 (dogfood) | untested |
 | ② model is right | H-Fidelity | M1 (self), M2 (dogfood) | untested |
-| ③ shared language | H-Shared | M3 | untested |
-| ④ evolves | H-Evolve | M4 | untested |
-| ⑤ org productivity | H-Handoff (partial) | M5 | untested |
+| ③ works as built | H-Factory | M2 (dogfood use) | untested |
+| ④ shared language | H-Shared | M3 | untested |
+| ⑤ evolves | H-Evolve | M4 | untested |
+| ⑥ org productivity | H-Handoff (partial) | M5 | untested |
 
 Status values: `untested` · `supported` · `weakened` · `refuted`. This table is updated
 only when an experiment reaches its preregistered verdict.

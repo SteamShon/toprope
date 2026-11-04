@@ -1,6 +1,6 @@
 # Domain schema v0 (draft)
 
-Link: ① ② ③. The core is **Object, Link, Action**, plus a **transition matrix** and
+Link: ① ② ④. The core is **Object, Link, Action**, plus a **transition matrix** and
 **invariants** per stateful object (ADR-0010). How the domain is shown lives in a separate,
 separately compiled **representation** layer (ADR-0008, below). Further concepts (policy,
 execution contract, flow orchestration) are added only when a milestone shows a concrete
@@ -124,7 +124,7 @@ world:                      # the expert's examples; the compiler grows a small 
 - `check` uses a small expression language: paths, comparison, `in` / `not in`, `and` / `or` /
   `not`, list literals, `count`, `exists`, `now`. The set operators and boolean combinators
   were added by ADR-0010. Any further extension requires an ADR.
-- `records_decision: true` turns an action into an accumulated work decision (④).
+- `records_decision: true` turns an action into an accumulated work decision (⑤).
 - **Transition matrix** (ADR-0010):
   - It is the single source for state-based rules. Every (state, action) cell is one of:
     a target state (optionally per role), `{deny: reason}`, `n/a`, or `undecided`.

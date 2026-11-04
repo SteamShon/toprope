@@ -80,7 +80,7 @@ umbrella is up to date with `develop`.
 ## Project conventions every PR follows
 
 - **Name the link.** Toprope is organized around the claim chain (P0 premise → ① iterate
-  safely → ② model is right → ③ shared language → ④ evolves → ⑤ org productivity). Every PR, experiment
+  safely → ② model is right → ③ works as built → ④ shared language → ⑤ evolves → ⑥ org productivity). Every PR, experiment
   doc and ADR states which link(s) it serves, or `none` for enablers.
 - **Claim status changes only with a verdict.** The `Status` column of the README
   claim-status table changes only in a PR that reports a preregistered experiment verdict.

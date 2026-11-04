@@ -1,6 +1,6 @@
 # ADR-0010: Transition matrix, invariants and a small world drive a generated harness
 
-- Link: ① iterate safely, ② model is right, ③ shared language · Status: accepted · 2026-11-04 · decided by: SteamShon
+- Link: ① iterate safely, ② model is right, ③ works as built, ④ shared language · Status: accepted · 2026-11-04 · decided by: SteamShon
 
 ## Context
 - The researcher's preferred way to keep a domain correct, from DDD and agent-based coding,
@@ -74,7 +74,7 @@ fields shown per role and state, and forms that submit the same action), and ada
 
 ### 5. Parity and coverage
 - The same test must give the same outcome on every surface. A disagreement is a **parity
-  failure**. This is the mechanical check behind ③.
+  failure**. This is the mechanical check behind ④.
 - Coverage is reported for: matrix cells (100% by construction once decided), invariants
   exercised, declared views, flows, and unreachable states.
 

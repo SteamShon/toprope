@@ -2,6 +2,8 @@
 
 - Link: ① ② (and the whole chain) · Status: accepted · 2026-11-04 · decided by: SteamShon
 - Supersedes: ADR-0001
+- Note: the chain definition below was superseded by ADR-0011 (chain v3 adds ③ works as
+  built). The change-safety decisions stand.
 
 ## Context
 The researcher's underlying hypothesis is that **nobody can define a domain correctly in

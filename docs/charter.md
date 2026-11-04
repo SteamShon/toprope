@@ -19,8 +19,23 @@ These workflows are implicit:
 
 ## 2. What Toprope is
 
-Toprope is a light, open foundation. It turns hidden workflows into a domain model that
-people and agents both use, and keeps the model improving while it is used.
+Toprope is a light, open **correctness layer and software factory**. It turns hidden
+workflows into a domain model that people and agents both use. From that model it
+produces working software, and it keeps the model improving while it is used.
+
+```
+Intelligence   agents (Claude Code, Codex, any MCP client) and people
+      │        perceive the world model and its allowed boundary
+      ▼
+Toprope        correctness layer: declaration, transition matrix, invariants, Execution gate,
+               harness-verified generated MCP, UI and backend
+      │        only allowed actions pass, through adapters
+      ▼
+Effects        greenfield: the backend Toprope generates · brownfield: existing servers, APIs, DBs
+```
+
+On its own the correctness layer means little. It matters when it sits between an
+intelligence layer that proposes actions and an effect layer that performs them (ADR-0011).
 
 - **Premise: nobody can define a domain correctly in one go.** Domains become right only
   through many iterations. Each iteration must be extremely cheap and testable, and rebuilds
@@ -39,10 +54,17 @@ people and agents both use, and keeps the model improving while it is used.
 - **One model, two surfaces.** The model compiles into a *domain capsule*: MCP for agents
   and UI for people. Both get the same terms, rules and reasons.
 - **Three things in one body:**
-  - an authoring tool (a software factory) for building and changing domains fast
-  - the execution path the work runs through, because actions go through the model
-  - a layer over existing systems that owns meaning, approval and record, while existing
-    code, APIs and databases perform the effects
+  - a **software factory**: a person who is not a developer defines the world model through
+    the interview, and the output is software they can actually use (internal tools,
+    external tools, consumer products). It is not a spec handed to developers.
+  - the **correctness layer** the work runs through, because every action goes through the
+    model
+  - a layer over effects: for **greenfield**, the backend and store that Toprope generates;
+    for **brownfield**, existing code, APIs and databases behind adapters
+- **Writing the code is nearly free.** It is generated, and it is trusted because the
+  harness checks every allowed and denied state transition, not because a call graph was
+  tested. This is the researcher's experience with DDD, transition matrices, invariants and
+  coding agents (*observed, not measured*). It is tested as link ③.
 - **Everyone authors.** Agents draft. Domain experts and developers refine and decide.
   Experts are asked about the work, never about formats or builds.
 - **Raw material, in order of how easily it can be automated:** draft from existing
@@ -80,11 +102,14 @@ P0 premise          nobody can define a domain correctly in one go; it is found 
       ↓
 ② model is right    through those iterations, the model comes to capture how the work runs
       ↓
-③ shared language   MCP and UI generated from the model let people and agents act on the same meaning
+③ works as built    software generated from a harness-passing declaration works in real use;
+                    writing the code is nearly free (the software factory)
       ↓
-④ evolves           use accumulates decisions, and the model keeps improving
+④ shared language   MCP and UI generated from the model let people and agents act on the same meaning
       ↓
-⑤ org productivity  handoff delay and re-explanation between people go down
+⑤ evolves           use accumulates decisions, and the model keeps improving
+      ↓
+⑥ org productivity  handoff delay and re-explanation between people go down
 ```
 
 P0 is taken as given and is not tested directly. M1 will report whether the model was
@@ -115,12 +140,13 @@ against that build, because generated code that was never exercised is not known
 |---|---|---|---|
 | ① | H-Iterate | Compile-time checks catch most seeded conflicts and breakages **before deployment**. A natural-language skill baseline, even with an LLM conflict review, catches clearly fewer. A change goes from edit to validated preview in minutes. | The baseline with LLM review catches about as many; or most breakages surface only after deployment; or false alarms are so frequent that experts ignore the checks. |
 | ② | H-Fidelity | Over the iterations, held-out scenario accuracy reaches ≥ 80% with ≤ 10% unsupported rules. Accuracy rises with the number of iterations, not with the first draft. | Accuracy plateaus below 70%, or agents invent rules faster than checks and humans catch them. |
-| ③ | H-Shared | Agents working through capsule-generated actions make fewer meaning errors than agents given the same knowledge as docs plus generic tools. | Docs ≈ capsule, or hand-written typed tools ≈ capsule (in which case the gain is vocabulary only). |
-| ④ | H-Evolve | Log → proposal → human decision improves accuracy and reduces clarifications in later use. | Confirming costs more than it saves, or proposals are mostly noise. |
-| ⑤ | H-Handoff | A typed handoff between domains loses less intent than a written note. | Good notes perform the same. |
+| ③ | H-Factory | Software generated from a declaration that passes the harness (every matrix cell, every invariant, parity) has **no state-permission defects** in real use: no action allowed or denied differently from the declaration. Other defects (UX, performance, external API quirks) are counted separately and stay few. No hand edits to generated code are needed. | Harness-passing builds show state-permission defects in use, or routinely need hand edits to work, or other defect classes dominate so much that "nearly free" does not hold. |
+| ④ | H-Shared | Agents working through capsule-generated actions make fewer meaning errors than agents given the same knowledge as docs plus generic tools. | Docs ≈ capsule, or hand-written typed tools ≈ capsule (in which case the gain is vocabulary only). |
+| ⑤ | H-Evolve | Log → proposal → human decision improves accuracy and reduces clarifications in later use. | Confirming costs more than it saves, or proposals are mostly noise. |
+| ⑥ | H-Handoff | A typed handoff between domains loses less intent than a written note. | Good notes perform the same. |
 
-Thresholds are initial. Each experiment preregisters its own. ⑤ can only be tested in part
-without a real organization, and that limit is stated wherever ⑤ is discussed.
+Thresholds are initial. Each experiment preregisters its own. ⑥ can only be tested in part
+without a real organization, and that limit is stated wherever ⑥ is discussed.
 
 ## 5. Distinctions kept throughout
 
@@ -133,7 +159,8 @@ without a real organization, and that limit is stated wherever ⑤ is discussed.
 
 ## 6. Non-goals
 
-- A full ontology platform, a hosted multi-tenant service, or a marketplace.
+- A full ontology platform, a hosted multi-tenant service, or a marketplace. (How the
+  correctness layer is *deployed* for one team is an open question, ADR-0011.)
 - Choosing a durable runtime or host before a milestone needs one.
 - Learning response models from outcomes. The decision log is a future dataset for that.
 - Monetization as a success criterion.
