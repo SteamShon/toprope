@@ -121,17 +121,26 @@ world:                      # the expert's examples; the compiler grows a small 
   quote) and `status` (`proposed` | `confirmed` | `unknown`). Agents write only `proposed`.
   Only humans confirm. Unknowns stay explicit instead of being guessed.
 - `description`, `reason` and `glossary` are written once and reused by every surface.
-- `check` uses a small expression language (paths, comparison, `in`, `count`, `exists`,
-  `now`). Extending it requires an ADR.
+- `check` uses a small expression language: paths, comparison, `in` / `not in`, `and` / `or` /
+  `not`, list literals, `count`, `exists`, `now`. The set operators and boolean combinators
+  were added by ADR-0010. Any further extension requires an ADR.
 - `records_decision: true` turns an action into an accumulated work decision (⑤).
 - **Transition matrix** (ADR-0010):
   - It is the single source for state-based rules. Every (state, action) cell is one of:
     a target state (optionally per role), `{deny: reason}`, `n/a`, or `undecided`.
+  - `n/a` denies with the standard reason "not applicable when <state>". It is recorded and
+    never shown as available, and it is not asked about in the interview.
   - `undecided` cells deny with the reason "undecided" and are listed in every change report.
     No cell is ever silently allowed.
   - An action is allowed only if its matrix cell allows it, the actor has the role, and every
-    non-state precondition holds.
-- **Invariants** are checked after every step of every generated test, at every level.
+    non-state precondition holds. At runtime, an **invariant guard** also checks the
+    resulting state before the event is appended (ADR-0012). If the guard triggers, the
+    declaration is inconsistent: its matrix allows a transition that its invariants forbid.
+    It is not a normal denial.
+- **Invariants** are checked after every step of every generated test, at every level. The
+  model interpreter runs **without** the guard, so it reports the violation itself. Runtime
+  levels run **with** it, so they report an `InvariantGuardTriggered` event at the same step.
+  Parity treats the two as the same outcome, and either one fails the harness.
 - **World**: fixtures are the expert's realistic examples, not test data written for the
   harness. The compiler grows them into a small world: at least one instance per reachable
   state, every role as an actor, and boundary values for each non-state precondition. It
@@ -159,7 +168,7 @@ build. Only tests affected by a change are re-run. Every other test keeps its ca
 result, keyed by the hashes of its inputs (ADR-0013). The interviewer turns `undecided` cells and candidate invariants into plain
 questions for the expert, so the expert never has to see the matrix.
 
-### Example flows
+### Example scenarios (flows)
 
 Flows are the expert's short stories: a starting state, then `do` (action) and `read`
 (view) steps with expectations.

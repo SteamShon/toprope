@@ -15,7 +15,15 @@ belongs: Aegra (the runtime) or the Toprope core and compiler.
 - Domain events are the system of record. Each allowed matrix transition is a typed event
   (e.g. `ExperimentApproved`). Current state is a **projection** of the event stream.
 - The **compiler generates** from the declaration: the event schemas, the projections, and the
-  append path. The append path enforces the matrix, the preconditions and the invariants.
+  append path. The append path enforces the matrix and the preconditions, and runs an
+  **invariant guard** on the resulting state.
+- **The invariant guard is defense in depth, not a rule source.** A consistent declaration
+  never triggers it, because invariants should follow from the matrix and the effects. If it
+  does trigger, the append is rejected and an `InvariantGuardTriggered` event is recorded.
+  That event is an inconsistency alarm, not a normal denied attempt. In the harness
+  (ADR-0010), the model level runs without the guard and reports the violation, runtime
+  levels report the guard trigger at the same step, and parity treats these as the same
+  outcome. Either one fails the build.
 - Event schemas are versioned with the domain interface (ADR-0008). A domain change that
   alters an event comes with an **upcaster**, so old events still project under the new
   version. Log replay (ADR-0009) and the harness (ADR-0010) run on this store.
