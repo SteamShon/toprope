@@ -5,7 +5,7 @@ several links, but a milestone ends with a verdict. Budget is ~10h+/week. Dates 
 
 | Milestone | Link | Question | Target |
 |---|---|---|---|
-| M0a | none (enabler) | Thin slice: declaration + semantics, model interpreter, Execution, event store, `toprope-server` MCP and authoring MCP, source readers, harness (model, Execution, MCP), change check incl. log replay and in-flight check, incremental analysis | 4–5 weeks |
+| M0a | none (enabler) | Thin slice: declaration + semantics, model interpreter, Execution, event store, `toprope-server` MCP and authoring MCP, source readers, world map, harness (model, Execution, MCP), change check incl. log replay and in-flight check, incremental analysis | 4–5 weeks |
 | M1 | ① ② (self) | Model Toprope's own authoring workflow by iterating. Do compile-time checks catch what natural-language skills and structured specs without a compiler cannot? | 3–4 weeks |
 | M0b | none (enabler) | Surfaces and effects: representation compiler, `toprope-shell` (A2UI + CopilotKit), UI-level harness, GitHub brownfield adapter, embedded shape, migration plans, query tools, timers and functions; regenerate the self domain's UI | 3–4 weeks |
 | M2 | ① ② ③ (dogfood) | Does the same hold on another domain, and does the harness-passing software work in real use? | 3–4 weeks |
@@ -66,9 +66,11 @@ so it is clear what was hand-built and what was generated.
    checks must exist before M1.
 10. **Incremental (ADR-0013)**: hashes, the dependency graph, the impact report,
     affected-only reruns, a result cache with the toolchain hash, and a background full run.
-11. **Source readers**: repository (code, schema), markdown records, session transcripts,
+11. **World map (ADR-0020)**: `world-map.json` plus the `world_map` and `how_to_reach` MCP
+    tools, derived from the declaration and harness results.
+12. **Source readers**: repository (code, schema), markdown records, session transcripts,
     interview log, with redaction and local-only sources (ADR-0014). M1 Phase A needs them.
-12. **Authoring MCP (ADR-0014, ADR-0017)**: tools for drafting, interview questions (defaults,
+13. **Authoring MCP (ADR-0014, ADR-0017)**: tools for drafting, interview questions (defaults,
     grouped cells, priorities), answers and confirmations, so the user's own agent runs the
     interview. The authoring UI is CLI/YAML until self-compile produces one. This limit is
     accepted for M1, where the researcher is the only author.
@@ -121,7 +123,9 @@ narrow what is generated before M2.
 6. **Migration plans (ADR-0018)**, plus the deploy gate conditions.
    Then **regenerate the self domain's authoring UI** from the M1 declaration, so M2 uses a
    fully generated authoring tool.
-7. **Timers (virtual clock in the harness), function ports with contract tests, external
+7. **World-map skill-tree view** in the shell, and the map diff in impact reports
+   (ADR-0020).
+8. **Timers (virtual clock in the harness), function ports with contract tests, external
    events and multi-party approvals (ADR-0015)**, as far as the M2 domain needs them.
 
 Done when the toy domain runs as usable software through the shell and the greenfield API,

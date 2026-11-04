@@ -127,6 +127,108 @@ Domain events are the system of record. Decisions (with inputs and rationale), *
 attempts**, exceptions and effect outcomes are recorded too. Agents query this history to
 propose the next domain change. A human decides, and the loop starts again.
 
+### 6. See the whole world: the world map
+The compiler also emits a **world map**, a skill-tree view of the domain (ADR-0020).
+- Pick an actor and where an object stands. Unlocked actions light up, locked ones show
+  exactly what would unlock them, and undecided cells sit in fog.
+- Agents get the same map through MCP (`world_map`, `how_to_reach`).
+- Every impact report includes the map diff: what a change newly unlocks or locks, and for
+  whom.
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> draft
+    draft --> approved: approve_experiment<br/>role approver · needs ≥1 guardrail
+    approved --> running: launch_experiment<br/>role eng
+    running --> ended: end_experiment<br/>timer · after planned_days
+    ended --> decided: decide<br/>role pm · needs readout
+    note right of ended
+        fog: relaunch from ended is undecided
+    end note
+```
+
+## Components and relations
+
+*Hand-drawn placeholder. If the M1 self domain declares Toprope's components as object types
+and links, this diagram is replaced by the structure layer of its generated world map
+(ADR-0020).*
+
+```mermaid
+flowchart TB
+    subgraph INT["Intelligence layer"]
+        AG["Agents<br/>Claude Code · Codex · any MCP client"]
+        PP["People<br/>domain experts · users"]
+    end
+
+    subgraph AUTH["Authoring"]
+        SRC["Sources<br/>systems → records → interview → use"]
+        DECL["Declaration<br/>objects · links · actions<br/>matrix · invariants · timers<br/>functions · actors · scenarios · world"]
+        REP["Representation<br/>base + host overlay"]
+    end
+
+    subgraph CORE["toprope-core (library)"]
+        DC["Domain compiler"]
+        RC["Representation compiler"]
+        IF["Domain interface<br/>versioned · hashed"]
+        CC["Change check<br/>impact analysis · checks · preview"]
+        HR["Harness<br/>small world · cell tests<br/>exploration · parity"]
+        EX["Execution gate<br/>semantics · invariant guard"]
+        ES[("Event store<br/>events · projections")]
+        WM["World map"]
+    end
+
+    subgraph SURF["Surfaces"]
+        SRV["toprope-server<br/>MCP · HTTP · query tools · authoring MCP"]
+        SH["toprope-shell<br/>A2UI + CopilotKit · skill-tree view"]
+    end
+
+    subgraph EFF["Effects"]
+        GF["Greenfield backend<br/>(the event store is the record)"]
+        BF["Brownfield adapters<br/>GitHub · flags · internal APIs"]
+    end
+
+    RT["Optional runtime<br/>Aegra / LangGraph / Temporal<br/>(unattended proposals, from M4)"]
+
+    SRC -->|"agent drafts, human confirms"| DECL
+    DECL --> DC
+    REP --> RC
+    DC --> IF --> RC
+    DC --> WM
+    DECL --> CC
+    CC --> HR
+    HR -->|"verifies"| EX
+    HR -->|"verifies"| SRV
+    HR -->|"verifies"| SH
+    DC --> EX
+    RC --> SH
+    EX --> ES
+    ES --> GF
+    EX -->|"outbox · read-back · UNKNOWN"| BF
+    AG <-->|"MCP"| SRV
+    PP <--> SH
+    SRV --> EX
+    SH --> EX
+    ES -->|"query tools"| SRV
+    WM --> SRV
+    WM --> SH
+    RT -.->|"reads history, proposes diffs"| SRV
+    AG -.->|"proposes diffs"| DECL
+    PP -->|"decides"| DECL
+```
+
+How to read it:
+- The **declaration** is the only source of each domain's software: the MCP, backend,
+  views, harness and world map are generated per domain. `toprope-core` itself starts as a
+  hand-built kernel (M0a). Self-compile moves more of Toprope into generated form over time.
+  Function ports are always hand- or agent-written.
+- Every action, from an agent or a person, passes the **Execution gate**, and it lands in
+  the **event store**.
+- The **harness** verifies the gate and every surface against the same declaration before
+  a build can deploy.
+- The loop closes when agents read the event history, propose a change to the declaration,
+  and a person decides.
+
 ## A taste of the declaration
 
 ```yaml
@@ -215,7 +317,7 @@ changes only in a PR that reports a preregistered experiment verdict.
 
 | Milestone | Link | What happens |
 |---|---|---|
-| M0a | none | Thin slice: semantics, model interpreter, Execution, event store, `toprope-server` MCP, authoring MCP, harness, change check (incl. log replay and in-flight check), incremental analysis |
+| M0a | none | Thin slice: semantics, model interpreter, Execution, event store, `toprope-server` MCP, authoring MCP, source readers, world map (JSON + MCP tools), harness, change check (incl. log replay and in-flight check), incremental analysis |
 | M1 | ① ② | **Self-compile**: model Toprope's own authoring workflow; a natural-language skill vs. a structured spec without a compiler vs. Toprope, on a frozen change sequence with seeded conflicts |
 | M0b | none | Surfaces and effects: representation compiler and shell, brownfield adapter (GitHub), embedded shape, migration plans, query tools, timers and functions |
 | M2 | ① ② ③ | **Dogfood**: an experiment-lifecycle domain built with the self-compiled tool and used for real |

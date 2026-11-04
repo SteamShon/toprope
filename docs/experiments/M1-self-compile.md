@@ -27,7 +27,11 @@ milestone.
 
 Toprope's authoring workflow, roughly: source → draft element → interview question →
 confirmation (human) → domain version → compile and change check → preview → deploy →
-event store → proposal → decision (human). The actual objects and actions are an output of
+event store → proposal → decision (human). Optionally, the self domain also declares Toprope's own components (core, compilers,
+server, shell, harness, event store) as object types with links, so the structure layer of
+its world map can replace the README's component diagram (ADR-0020). The researcher decides
+this when freezing the gold set, and adds gold questions for it if included. The actual
+objects and actions are an output of
 the experiment and are not written in advance.
 
 ## Phase A: Build by iterating (① ②)
