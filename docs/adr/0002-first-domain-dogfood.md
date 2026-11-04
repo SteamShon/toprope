@@ -1,6 +1,6 @@
 # ADR-0002 — First domain: own coding-agent work, then a synthetic business domain
 
-- Status: accepted · 2026-11-04 · decided by: SteamShon
+- Status: **superseded by [ADR-0008](0008-first-domain-experiment-lifecycle.md)** · 2026-11-04 · decided by: SteamShon
 - Evidence: notes/ko/2026-11-04-grilling.md
 
 ## Options

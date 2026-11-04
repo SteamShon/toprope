@@ -1,6 +1,6 @@
 # ADR-0003 — M1 tests H-Enforce before H-Author
 
-- Status: accepted · 2026-11-04 · decided by: SteamShon
+- Status: **superseded by [ADR-0009](0009-m1-shared-language.md)** · 2026-11-04 · decided by: SteamShon
 
 ## Decision
 The first experiment compares a pre-tool gate with `CLAUDE.md` prose (see

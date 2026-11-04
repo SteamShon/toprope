@@ -1,6 +1,6 @@
 # ADR-0001 — Scope: enforcement + authoring
 
-- Status: accepted · 2026-11-04 · decided by: SteamShon (grilling session)
+- Status: **superseded by [ADR-0007](0007-reframe-org-workflow-as-domain.md)** · 2026-11-04 · decided by: SteamShon (grilling session)
 - Evidence: notes/ko/2026-11-04-grilling.md
 
 ## Context

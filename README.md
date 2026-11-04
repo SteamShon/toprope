@@ -1,47 +1,53 @@
 # Toprope
 
-> A decision is state, not a note.
+> Individual productivity went up. Organizational productivity did not.
 
-Toprope is a personal, non-commercial research project on one question:
+Coding agents made writing code fast. But getting that code into the product, or designing
+an experiment and actually moving a metric, still runs through **implicit workflows between
+people**: who approves what, when a result counts, what must be true before the next step.
+These rules live in oral tradition. Agents cannot automate what is not written down, and
+because the decisions made at each step are not recorded as anything structured, the
+organization cannot learn from them.
 
-**When a person makes a decision about how an agent should work, can that decision be
-captured from ordinary work, approved once, and then actually hold on the execution
-path — without the person re-explaining it every session?**
+Toprope is a personal research project on one bet:
 
-Today those decisions live in prompts, `CLAUDE.md`/`AGENTS.md`, wikis, and people's heads.
-Agents are *asked* to read them. Nothing stops a call that contradicts them, nothing
-notices when the copy in one place goes stale, and nothing turns repeated corrections
-into an explicit, revisable rule.
-
-Toprope studies the loop:
+**Treat a workflow as a domain.** Model its entities, relationships and allowed actions —
+in the spirit of an ontology plus action types — so that **people and agents perceive the
+work in the same language**. Compile that model into a *domain capsule* that generates the
+agent surface (MCP) and a human surface (UI) from one source. Let the person who defines the
+domain use what was generated, log every run, have agents propose changes from those logs,
+and let the person decide. Decisions then accumulate as versioned state instead of being lost.
 
 ```
-work history ──► decision candidates ──► human approval ──► declared decision (state)
-     ▲                                                              │
-     │                                                              ▼
- corrections / exceptions ◄── read-back & audit ◄── gate on the execution path
+            ┌──────────── domain model (objects · links · actions) ◄──────────┐
+            │                         │                                       │
+            ▼ compile                 ▼ compile                        human decides
+      MCP for agents            UI for people                                 │
+            │                         │                              agent proposes diff
+            └──────► use the workflow ◄┘                                      │
+                          │                                                   │
+                          └──────────────────► event log ─────────────────────┘
 ```
 
 ## Status
 
-Pre-M0. Documents and plan only. No claims of results yet — see
-[`docs/roadmap.md`](docs/roadmap.md) for what will be measured and what would falsify it.
+Pre-M0. Documents and plan only. No results are claimed yet.
 
 ## Read in this order
 
-1. [`docs/research-charter.md`](docs/research-charter.md) — problem, scope, questions, hypotheses, non-goals
-2. [`docs/roadmap.md`](docs/roadmap.md) — milestones with exit and kill criteria
-3. [`docs/experiments/M1-enforce.md`](docs/experiments/M1-enforce.md) — the first experiment
-4. [`docs/architecture.md`](docs/architecture.md) — domain model and ports/adapters
-5. [`docs/decision-schema.md`](docs/decision-schema.md) — draft declaration format
-6. [`docs/adr/`](docs/adr/) — decisions made about this project, with provenance
-7. [`docs/lineage.md`](docs/lineage.md) — where these ideas come from and what is *not* carried over
+1. [`docs/research-charter.md`](docs/research-charter.md): problem, thesis, questions, hypotheses, non-goals
+2. [`docs/roadmap.md`](docs/roadmap.md): milestones with exit and kill criteria
+3. [`docs/experiments/M1-shared-language.md`](docs/experiments/M1-shared-language.md): the first experiment
+4. [`docs/architecture.md`](docs/architecture.md): bounded contexts, ports and adapters
+5. [`docs/domain-schema.md`](docs/domain-schema.md) and [`examples/domains/`](examples/domains/): the minimal domain core
+6. [`docs/adr/`](docs/adr/): decisions about this project, with provenance and supersession
+7. [`docs/lineage.md`](docs/lineage.md): where the ideas come from
 
-Working notes in Korean live under [`notes/ko/`](notes/ko/).
+Working notes in Korean live in [`notes/ko/`](notes/ko/).
 
 ## Ground rules
 
-- Small, falsifiable milestones. Evening/weekend time budget (~10h+/week).
+- Small, falsifiable milestones. Evenings and weekends (~10h+/week).
 - Reuse OSS for everything that is not the research question.
 - Every claim states its evidence level: *measured*, *observed once*, or *hypothesis*.
-- Domain meaning never lives inside a host UI or a specific runtime (DDD, ports/adapters).
+- Domain meaning never lives inside a host UI, a runtime, or a model prompt (DDD, ports/adapters).

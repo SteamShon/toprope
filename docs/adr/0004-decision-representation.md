@@ -1,6 +1,6 @@
 # ADR-0004 — Decision representation: minimal YAML + PolicyEvaluator port
 
-- Status: accepted · 2026-11-04 · decided by: SteamShon
+- Status: **superseded by [ADR-0010](0010-minimal-domain-core.md)** · 2026-11-04 · decided by: SteamShon
 
 ## Options
 **Minimal own YAML + evaluator port** · Cedar/OPA directly · own DSL
