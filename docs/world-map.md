@@ -23,6 +23,7 @@ uv run toprope-server --domain my.domain.yaml --identity static:tokens.yaml --ha
     `requires_human`, plus `approvals` and `reservations` (empty until M0b)
   - `invariants`: those on the object that read a field the action writes
   - `records_decision`
+  - `hands_off`: the handoffs this action sends (domain, interface, action), ADR-0024
   - `harness`: `verified`, `failed`, `uncovered` or `unknown` (no report)
 - `unreachable`: states the harness's small world never reached.
 

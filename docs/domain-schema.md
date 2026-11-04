@@ -152,8 +152,10 @@ world:                      # the expert's examples; the compiler grows a small 
   `params.<name>`. `target_id`, `new_id`, `idempotency_key`, `thread_id` and `run_id` are
   reserved: every action surface carries them.
 - `check` uses a small expression language: paths, comparison, `in` / `not in`, `and` / `or` /
-  `not`, list literals, `count`, `exists`, `now`. The set operators and boolean combinators
-  were added by ADR-0010. Any further extension requires an ADR.
+  `not`, list literals, `+` / `-` on numbers, `count`, `exists`, `now`. `+` also joins a
+  string with a string or an integer (ADR-0024, proposed); floats, booleans, null and lists
+  are refused. The set operators and boolean combinators were added by ADR-0010. Any further
+  extension requires an ADR.
 - `records_decision: true` turns an action into an accumulated work decision (⑤).
 - **Transition matrix** (ADR-0010):
   - It is the single source for state-based rules. Every (state, action) cell is one of:

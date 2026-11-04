@@ -17,7 +17,8 @@ authoring.submit(token, "approve_version", "V1", idempotency_key="k1")   # hands
 authoring.dispatch()                                                      # retry anything still pending
 ```
 
-- **Contract at compile time.** `toprope.decl.check_handoffs(sender, {"delivery":
+- **Contract at compile time.** `toprope-harness --domain authoring.domain.yaml --receiver
+  delivery.domain.yaml@1` runs it before the harness and fails on any issue. In code: `toprope.decl.check_handoffs(sender, {"delivery":
   (delivery_domain, 1)})` checks each handoff against the receiver's published interface:
   - the domain, the action, and the interface major
   - `system` in the receiver's actor rule
@@ -47,3 +48,10 @@ uv run toprope-server $(uv run toprope-deploy --env .toprope/envs/local server-a
 - no object in the environment would be stranded (migration plans come in M0b)
 
 Refusals are logged in `deployments.jsonl` next to the deploys.
+
+## Limits (ADR-0024)
+- Delivery is in-process only: `toprope-server` does not send handoffs yet (M0b).
+- `--approver` is self-declared in the local adapter. After the M1 switch-over, approval is a
+  Delivery action resolved through Identity.
+- The floor's taint check covers the declaration and toolchain hashes. Taint from a
+  background full run comes with the result cache (sub-PR 9).
