@@ -1,9 +1,10 @@
 # Domain schema v0 (draft)
 
-Link: ① ② ③. The minimal core is **Object, Link, Action**. How the domain is shown lives
-in a separate, separately compiled **representation** layer (ADR-0008, below). Further
-concepts (policy, execution contract, flow) are added only when a milestone shows a
-concrete need, each with an ADR naming that need.
+Link: ① ② ③. The core is **Object, Link, Action**, plus a **transition matrix** and
+**invariants** per stateful object (ADR-0010). How the domain is shown lives in a separate,
+separately compiled **representation** layer (ADR-0008, below). Further concepts (policy,
+execution contract, flow orchestration) are added only when a milestone shows a concrete
+need, each with an ADR naming that need.
 
 Do not confuse the deferred *execution contract* concept with the **domain interface**. The
 domain interface is a compiler output that the representation layer reads (ADR-0008).
@@ -54,25 +55,64 @@ actions:
     target: Experiment
     params:
       note: {type: string, optional: true}
-    preconditions:
-      - id: is-draft
-        check: target.status == 'draft'
-        reason: Only drafted experiments can be approved.
-        source: {kind: interview, ref: "interview/2026-11-20#q7"}
-        status: confirmed
+    preconditions:          # only conditions that do NOT depend on state; state lives in the matrix
+      - id: has-guardrails
+        check: count(target.guardrails) >= 1
+        reason: An experiment needs at least one guardrail metric before approval.
     effects:
-      - set: {target.status: approved, target.approved_by: actor.id}
+      - set: {target.approved_by: actor.id}
     records_decision: true  # produces a Decision with who, when, inputs and rationale
   launch_experiment:
     description: Start traffic to an approved experiment.
     actor: [eng]
     target: Experiment
-    preconditions:
-      - id: is-approved
-        check: target.status == 'approved'
-        reason: Launch requires approval.
     effects:
-      - set: {target.status: running, target.started_at: now}
+      - set: {target.started_at: now}
+
+transitions:                # state × action → target state | deny(reason) | n/a | undecided
+  Experiment:
+    field: status
+    initial: draft
+    matrix:
+      draft:
+        approve_experiment: approved
+        launch_experiment: {deny: "Launch requires approval."}
+      approved:
+        approve_experiment: {deny: "This experiment is already approved."}
+        launch_experiment: running
+      running:
+        approve_experiment: {deny: "Only drafted experiments can be approved.",
+                             source: {kind: interview, ref: "interview/2026-11-20#q7"}, status: confirmed}
+        launch_experiment: n/a
+      ended:                # reached by actions omitted from this example
+        approve_experiment: n/a
+        launch_experiment: undecided      # "can an ended experiment be relaunched?" → asked in the interview
+      decided:
+        approve_experiment: n/a
+        launch_experiment: n/a
+
+invariants:                 # must hold in every reachable state, after every step
+  - id: running-has-approver
+    on: Experiment
+    check: target.status not in ['running', 'ended', 'decided'] or exists(target.approved_by)
+    reason: Nothing runs without someone having approved it.
+    source: {kind: interview, ref: "interview/2026-11-20#q9"}
+    status: confirmed
+  - id: running-has-start
+    on: Experiment
+    check: target.status not in ['running', 'ended', 'decided'] or exists(target.started_at)
+    reason: A launched experiment records when it started.
+
+world:                      # the expert's examples; the compiler grows a small world from them
+  fixtures:
+    - Hypothesis: {id: H1, statement: "A shorter signup raises activation."}
+    - Metric: {id: M-activation, name: activation_rate}
+    - Metric: {id: M-latency, name: p95_latency}
+    - Experiment: {id: E-onboarding, name: "New onboarding", status: draft, planned_days: 14,
+                   hypothesis: H1, primary_metric: M-activation, guardrails: [M-latency]}
+    - Experiment: {id: E-bare, name: "No guardrails yet", status: draft, planned_days: 7,
+                   hypothesis: H1, primary_metric: M-activation, guardrails: []}   # boundary for has-guardrails
+  actors: {approver: [ana], eng: [eli], pm: [pat], analyst: [ann]}
 ```
 
 ## Rules
@@ -81,43 +121,73 @@ actions:
   quote) and `status` (`proposed` | `confirmed` | `unknown`). Agents write only `proposed`.
   Only humans confirm. Unknowns stay explicit instead of being guessed.
 - `description`, `reason` and `glossary` are written once and reused by every surface.
-- `check` uses a small expression language (paths, comparison, `count`, `exists`, `now`).
-  Extending it requires an ADR.
+- `check` uses a small expression language (paths, comparison, `in`, `count`, `exists`,
+  `now`). Extending it requires an ADR.
 - `records_decision: true` turns an action into an accumulated work decision (④).
+- **Transition matrix** (ADR-0010):
+  - It is the single source for state-based rules. Every (state, action) cell is one of:
+    a target state (optionally per role), `{deny: reason}`, `n/a`, or `undecided`.
+  - `undecided` cells deny with the reason "undecided" and are listed in every change report.
+    No cell is ever silently allowed.
+  - An action is allowed only if its matrix cell allows it, the actor has the role, and every
+    non-state precondition holds.
+- **Invariants** are checked after every step of every generated test, at every level.
+- **World**: fixtures are the expert's realistic examples, not test data written for the
+  harness. The compiler grows them into a small world: at least one instance per reachable
+  state, every role as an actor, and boundary values for each non-state precondition. It
+  reports unreachable states.
 
-## Scenarios and flows (ADR-0009, ADR-0010)
+## Generated harness (ADR-0009, ADR-0010)
 
-Domains carry their own examples as tests. A scenario is a **flow**: a starting state, then
-ordered steps, each with expectations. Single-step scenarios are flows of length one.
+From the matrix, invariants, world and flows, the compiler generates a harness that runs at
+every level: the model interpreter, Execution, an MCP client against the generated server,
+compiled A2UI views, and adapters.
 
-On every rebuild, the compiler generates a **flow test harness** from these flows and runs
-it at each level: model, Execution, generated MCP, compiled A2UI views, and adapters. The
-same flow must give the same outcome everywhere. A failing step or a cross-surface
-disagreement (a parity failure) blocks deployment of that build. Elements that no flow
-exercises are reported as coverage gaps.
+- **Cell tests**: every (state, action, role) cell is tried from a small-world instance in
+  that state.
+- **Invariant checks**: after every step.
+- **Bounded exploration**: stateful property-based search over action sequences (first
+  adapter: Hypothesis). A counterexample is reported as a minimal flow in domain terms.
+- **Example flows**: run as written.
+- **Parity**: the same test must give the same outcome on every surface.
+- **Coverage report**: cells, invariants, views, flows, and unreachable states.
+
+A failing cell test, an invariant violation or a parity failure blocks deployment of that
+build. The interviewer turns `undecided` cells and candidate invariants into plain
+questions for the expert, so the expert never has to see the matrix.
+
+### Example flows
+
+Flows are the expert's short stories: a starting state, then `do` (action) and `read`
+(view) steps with expectations.
 
 ```yaml
 scenarios:
   - id: no-approve-running
-    given: {Experiment: {id: E1, status: running}}
+    given: {Experiment: {id: E1, status: running, approved_by: ana, started_at: "2026-11-01"}}
     steps:
       - {actor: {role: approver}, do: approve_experiment, target: E1,
-         expect: {denied_by: is-draft, reason_shown: true}}
+         expect: {denied_by: matrix, reason_shown: true}}
 
   - id: draft-to-running
-    given:
-      Experiment: {id: E2, name: "New onboarding", status: draft}
+    given: {from_world: E-onboarding}
     steps:
-      - {actor: {role: pm}, read: {view: Experiment.detail, target: E2},
+      - {actor: {role: pm}, read: {view: Experiment.detail, target: E-onboarding},
          expect: {actions_shown: [], fields_include: [hypothesis, primary_metric]}}   # pm sees no actions
-      - {actor: {role: eng}, do: launch_experiment, target: E2,
-         expect: {denied_by: is-approved}}
-      - {actor: {role: approver}, do: approve_experiment, target: E2, params: {note: "ok"},
-         expect: {state: {E2.status: approved}, decision_recorded: true}}
-      - {actor: {role: eng}, read: {view: Experiment.detail, target: E2},
+      - {actor: {role: eng}, do: launch_experiment, target: E-onboarding,
+         expect: {denied_by: matrix}}
+      - {actor: {role: approver}, do: approve_experiment, target: E-onboarding, params: {note: "ok"},
+         expect: {state: {E-onboarding.status: approved}, decision_recorded: true}}
+      - {actor: {role: eng}, read: {view: Experiment.detail, target: E-onboarding},
          expect: {actions_shown: [launch_experiment]}}
-      - {actor: {role: eng}, do: launch_experiment, target: E2,
-         expect: {state: {E2.status: running}}}
+      - {actor: {role: eng}, do: launch_experiment, target: E-onboarding,
+         expect: {state: {E-onboarding.status: running}}}
+
+  - id: no-approve-without-guardrails
+    given: {from_world: E-bare}
+    steps:
+      - {actor: {role: approver}, do: approve_experiment, target: E-bare,
+         expect: {denied_by: has-guardrails}}
 ```
 
 `do` steps run as action calls at the Execution and MCP levels, and as form submissions at

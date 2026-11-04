@@ -124,6 +124,8 @@ counts as **found after deploy**. One that never shows up counts as **silent**.
 | **Held-out accuracy** (primary) | after Phase A, and after Phase B | ② |
 | Accuracy-over-iterations | Phase A curve; accuracy of the first draft | ② and the P0 sanity check |
 | Unsupported rules | rules with no source and no confirmation | ② |
+| Matrix completeness | share of (state, action) cells decided rather than `undecided`; cells decided through the interview vs. drafted from sources | ② |
+| Harness findings | invariant violations and parity failures found before deploy, and by which part (cell tests, exploration, flows) | ① |
 | Generated vs hand-built | share of the authoring tool that is generated; hand edits to generated code | self-compile |
 | Cost | tokens, $, human minutes per stage and per change | all |
 
