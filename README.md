@@ -150,8 +150,9 @@ stateDiagram-v2
 
 ## Components and relations
 
-*Hand-drawn placeholder. In M1, Toprope's own components are declared as a Toprope domain,
-and this diagram is replaced by its generated world map (ADR-0020).*
+*Hand-drawn placeholder. If the M1 self domain declares Toprope's components as object types
+and links, this diagram is replaced by the structure layer of its generated world map
+(ADR-0020).*
 
 ```mermaid
 flowchart TB
@@ -217,8 +218,10 @@ flowchart TB
 ```
 
 How to read it:
-- The **declaration** is the only source. Everything inside `toprope-core` is generated
-  from it, except the kernel itself and the function ports.
+- The **declaration** is the only source of each domain's software: the MCP, backend,
+  views, harness and world map are generated per domain. `toprope-core` itself starts as a
+  hand-built kernel (M0a). Self-compile moves more of Toprope into generated form over time.
+  Function ports are always hand- or agent-written.
 - Every action, from an agent or a person, passes the **Execution gate**, and it lands in
   the **event store**.
 - The **harness** verifies the gate and every surface against the same declaration before

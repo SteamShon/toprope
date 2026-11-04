@@ -17,9 +17,12 @@ Toprope's own components and authoring workflow can be declared as a Toprope dom
 ### 1. A compile output, deterministic
 The domain compiler emits `world-map.json`, a graph derived only from the declaration plus
 the build's harness results:
-- **Nodes**: the states of each stateful object (and terminal states), roles and actors
-  (persons, agents with grants, system/external), and linked objects.
-- **Edges**: one per (state, action) cell, with its outcome: target state, `deny`, `n/a` or
+- **Structure layer**: object types as nodes and declared **links** as edges (e.g.
+  `Experiment —hypothesis→ Hypothesis`, or for Toprope itself `DomainCompiler —emits→
+  DomainInterface`). This is the domain's ontology graph.
+- **Behavior layer, nodes**: the states of each stateful object (and terminal states),
+  roles and actors (persons, agents with grants, system/external).
+- **Behavior layer, edges**: one per (state, action) cell, with its outcome: target state, `deny`, `n/a` or
   `undecided`. Each edge also carries:
   - its **unlock requirements**: the role or relation, the non-state preconditions,
     approvals, reservations, and `requires: human`
@@ -47,8 +50,9 @@ It is part of the domain capsule and is rebuilt incrementally like any other art
 - **Agent view**: the generated MCP exposes `world_map` (read-only) and
   `how_to_reach(object, target_state, actor)`. Agents plan within the same map people see
   (④).
-- **Docs view**: a Mermaid export (state diagrams per object, plus a component graph), so
-  documentation embeds generated diagrams instead of hand-drawn ones.
+- **Docs view**: a Mermaid export: a flowchart of the structure layer (object types and
+  links), and a state diagram per stateful object (the behavior layer). Documentation
+  embeds these instead of hand-drawn diagrams.
 
 ### 3. World-map diff in every impact report
 A change's impact report (ADR-0013) includes the map diff. It shows edges newly unlocked
@@ -56,8 +60,12 @@ or locked for each actor, fog cleared or added, and states that became unreachab
 often the fastest way for a domain expert to see what a change *means*.
 
 ### 4. Toprope's own map
-In M1, the self domain declares Toprope's components and authoring workflow. Its generated
-world map replaces the hand-drawn component diagram in the README. Until then, the README
+In M1, the self domain declares Toprope's authoring workflow. It may also declare Toprope's
+components as object types, with links such as `depends_on`, `emits` and `verifies`, and
+lifecycles where they have one. If it does, the structure layer of its generated world map
+replaces the hand-drawn component diagram in the README. Whether components are in scope
+is the researcher's call when freezing the M1 gold set, because adding them adds gold
+questions. Until then, the README
 diagram is a hand-drawn placeholder and is labeled as one.
 
 ## Consequences
