@@ -7,8 +7,8 @@ session transcripts, or the interview log. Readers split it into chunks with a s
 Every chunk is redacted before anyone reads it: secrets (keys, tokens, private keys,
 password assignments) and personal data (emails, phone numbers, resident registration
 numbers). A source marked `local_only` is never served to a hosted model: the authoring
-tools list it but refuse its content. Paths matching `exclude` (by default the held-out
-experiment instruments) are never read at all.
+tools list it but refuse its content. Paths matching `exclude` (by default everything under
+`experiments/`: the instruments and the guides that describe them) are never read at all.
 """
 
 from __future__ import annotations
@@ -23,8 +23,9 @@ from typing import Literal
 Kind = Literal["repository", "records", "transcripts", "interview-log"]
 # Source kind → the `source.kind` a drafted element records (docs/domain-schema.md).
 ELEMENT_KIND = {"repository": "system", "records": "record", "transcripts": "record", "interview-log": "interview"}
-DEFAULT_EXCLUDE = (".git/**", ".venv/**", "**/node_modules/**", "**/__pycache__/**",
-                   "experiments/*/instruments/**")   # held-out gold is never source material
+# Experiment material is never source material: the held-out gold and its key, and the
+# guides and templates that reveal what the gold probes.
+DEFAULT_EXCLUDE = (".git/**", ".venv/**", "**/node_modules/**", "**/__pycache__/**", "experiments/**")
 DEFAULT_GLOBS = {
     "repository": ["**/*.py", "**/*.sql", "**/*.json", "**/*.yaml", "**/*.yml", "**/*.toml"],
     "records": ["**/*.md"],
