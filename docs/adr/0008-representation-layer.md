@@ -1,6 +1,6 @@
 # ADR-0008: Representation is a separately compiled layer that hosts can override
 
-- Link: ③ shared language · Status: accepted · 2026-11-04 · decided by: SteamShon
+- Link: ④ shared language · Status: accepted · 2026-11-04 · decided by: SteamShon
 
 ## Context
 - A domain author should declare how a domain is *represented* to people, and the
@@ -70,7 +70,7 @@ inspect inside opaque host components, so text hardcoded there is the host's
 responsibility and is not checked. Only declared aliases are guaranteed to stay mapped.
 
 ## Rationale
-③ needs one shared reference for meaning. Separating representation lets the frequent
+④ needs one shared reference for meaning. Separating representation lets the frequent
 change (presentation) move fast without touching the rare, governed change (meaning). The
 interface boundary keeps host customization from becoming a second source of meaning.
 
@@ -80,7 +80,7 @@ interface boundary keeps host customization from becoming a second source of mea
   generative layer.
 - Representation changes are lighter decisions than domain changes. They are recorded, but
   they do not need a domain-change approval. Whether they count as a third accumulated
-  decision kind is open (④).
+  decision kind is open (⑤).
 - M0 proves this with a toy domain:
   - a representation-only change rebuilds without touching MCP
   - a domain change flags a broken view

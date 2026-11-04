@@ -1,6 +1,6 @@
 # ADR-0007: Python core; Aegra as the runtime adapter; TypeScript frontend
 
-- Link: ① ④ (authoring agents, proposal loop) · Status: accepted · 2026-11-04 · decided by: SteamShon
+- Link: ① ⑤ (authoring agents, proposal loop) · Status: accepted · 2026-11-04 · decided by: SteamShon
 - Supersedes: ADR-0006
 
 ## Context

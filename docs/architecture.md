@@ -1,9 +1,27 @@
 # Architecture (draft)
 
-Link: ① ③ ④ (what the system must support). The first requirement is that domain meaning
+Link: ① ④ ⑤ (what the system must support). The first requirement is that domain meaning
 is independent of any host, runtime, surface or model: DDD bounded contexts with ports and
 adapters. Swapping an adapter must keep the same actions with the same preconditions and
 roles. That, not interface shape, is the test of replaceability.
+
+## Layers (ADR-0011)
+
+```
+Intelligence   agents (Claude Code, Codex, any MCP client) and people
+      │        see the world model via generated MCP, UI and the domain interface
+      ▼
+Toprope        correctness layer: declaration, matrix, invariants, Execution gate, event log,
+               harness-verified generated surfaces
+      │        only allowed actions pass
+      ▼
+Effects        greenfield: generated backend (domain API over Toprope's state store)
+               brownfield: existing servers, APIs, DBs behind EffectAdapters (read-back, UNKNOWN)
+```
+
+**Hosting is open** (ADR-0011): (a) a gateway or sidecar in front of brownfield servers,
+(b) embedded in the generated greenfield backend, or (c) a hosted service (a non-goal for
+now). One Execution core serves (a) and (b). M0 builds both shapes on the toy domain.
 
 ## Bounded contexts
 
@@ -12,12 +30,12 @@ roles. That, not interface shape, is the test of replaceability.
 | **Authoring** | sources, drafts, interview questions, provenance and status of every element | ① ② | M0 kernel, then self-compiled in M1 |
 | **Domain Model** | objects, links, actions (params, preconditions, effects, roles), versions | all | M0 |
 | **Change Check** | diff new vs. current version; structural, semantic-conflict, scenario-regression, log-replay and NL-conflict checks; preview build (ADR-0009) | ① | M0 |
-| **Domain Compiler** | domain → MCP, execution checks, **domain interface** (objects/fields/links/actions/glossary; versioned by diff, hashed per element) | ① ③ | M0 |
-| **Representation Compiler** | representation layers (defaults → base → host overlay) + interface → A2UI views, component/action catalog for generative UI. Rebuilt independently of the domain | ③ | M0 |
-| **Execution** | checks preconditions and roles on current state, applies effects | ③ | M0 |
-| **Event Log** | append-only calls, verdicts, effects, human decisions | ④ | M0 |
-| **Proposal / Review** | log-mined model diffs; human decisions with their inputs | ④ | M4 |
-| **Handoff** | typed requests between domains via published domain interfaces | ⑤ | M5 |
+| **Domain Compiler** | domain → MCP, greenfield backend (domain API over the state store), execution checks, **domain interface** (objects/fields/links/actions/glossary; versioned by diff, hashed per element) | ① ④ | M0 |
+| **Representation Compiler** | representation layers (defaults → base → host overlay) + interface → A2UI views, component/action catalog for generative UI. Rebuilt independently of the domain | ④ | M0 |
+| **Execution** | checks preconditions and roles on current state, applies effects | ④ | M0 |
+| **Event Log** | append-only calls, verdicts, effects, human decisions | ⑤ | M0 |
+| **Proposal / Review** | log-mined model diffs; human decisions with their inputs | ⑤ | M4 |
+| **Handoff** | typed requests between domains via published domain interfaces | ⑥ | M5 |
 
 After M1, the Authoring context is itself a Toprope domain (self-compile). Its MCP and UI
 are generated, and only the kernel stays hand-built.
@@ -35,7 +53,7 @@ are generated, and only the kernel stays hand-built.
 | `HumanSurface` | expose objects and actions to people | compiled A2UI views rendered in React + CopilotKit; host-injected components via the renderer catalog; LLM generative UI for ad-hoc views, limited to the catalog and allowed actions (ADR-0008) | other generative-UI stacks, OpenDots |
 | `RepresentationStore` | versioned base representations and host overlays | YAML files | host-managed registry |
 | `Runtime` | host long-lived agent workflows (drafter, interviewer, proposal engine) | Aegra (ADR-0007) | LangGraph Platform, Temporal |
-| `EffectAdapter` | real-world effects | in-store only | GitHub, flags, ad APIs (with read-back) |
+| `EffectAdapter` | real-world effects, with read-back and `UNKNOWN` | greenfield: the generated backend's store; brownfield: GitHub issues/labels in a sandbox repo (ADR-0011) | flags, ad APIs, internal services |
 | `EventLog` | append events | JSONL | SQLite, OpenTelemetry |
 | `ProposalEngine` | logs → candidate diffs | Aegra cron workflow calling an LLM | Harness²-style probe loops |
 | `ScenarioRunner` | run the domain's flows against the model (reference interpreter) | in-process | — |
@@ -92,5 +110,5 @@ domain and re-validates every representation against the new interface.
 
 - Guarantees hold only for actions that go through Execution. Other paths are outside them.
 - The model guarantees consistency with the model, not that the model is right. Keeping it
-  right is the job of ② and ④.
+  right is the job of ② and ⑤.
 - Real external effects can be `UNKNOWN`. Read-back is required before claiming success.
