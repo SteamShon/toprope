@@ -214,8 +214,28 @@ class Purpose(Strict):
     announcement: str | None = None
 
 
-NOT_YET = {"handoffs": "M1 (ADR-0022)", "reservations": "M0b", "timers": "M0b",
-           "functions": "M0b", "external": "M0b"}
+NOT_YET = {"reservations": "M0b", "timers": "M0b", "functions": "M0b", "external": "M0b"}
+
+
+class HandoffWhen(Strict):
+    action: str
+    outcome: Literal["ok"] = "ok"
+
+
+class HandoffTo(Strict):
+    domain: Ident
+    interface: Annotated[str, StringConstraints(pattern=r"^[0-9]+\.x$")]   # a major range, e.g. "1.x"
+    action: str
+
+
+class Handoff(Provenance):
+    """A typed request into another domain's published interface, sent from the outbox after
+    the sender's action is appended (ADR-0022, docs/semantics.md step 12)."""
+
+    when: HandoffWhen
+    to: HandoffTo
+    params: dict[str, str] = Field(default_factory=dict)   # receiver param → expression
+    target: str                                              # expression: the receiver's target id
 
 
 class Domain(Strict):
@@ -223,7 +243,7 @@ class Domain(Strict):
     version: Annotated[int, Field(ge=1)]
     owner: str | None = None
     purpose: Purpose | None = None
-    handoffs: dict[str, Any] | None = None
+    handoffs: dict[str, Handoff] = Field(default_factory=dict)
     reservations: dict[str, Any] | None = None
     timers: dict[str, Any] | None = None
     functions: dict[str, Any] | None = None

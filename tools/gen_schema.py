@@ -117,9 +117,10 @@ domain = {
         "external": {"type": "object", "additionalProperties": obj(
             {"description": {"type": "string"}, "actions": {"type": "array", "items": {"type": "string"}}},
             ["actions"])},
-        "handoffs": {"type": "object", "additionalProperties": obj(
+        "handoffs": {"type": "object", "additionalProperties": with_prov(
             {"when": obj({"action": {"type": "string"}, "outcome": {"enum": ["ok"]}}, ["action"]),
-             "to": obj({"domain": {"type": "string"}, "interface": {"type": "string"}, "action": {"type": "string"}},
+             "to": obj({"domain": ID, "interface": {"type": "string", "pattern": r"^[0-9]+\.x$"},
+                        "action": {"type": "string"}},
                        ["domain", "interface", "action"]),
              "target": EXPR,
              "params": {"type": "object", "additionalProperties": EXPR}}, ["when", "to", "target"])},

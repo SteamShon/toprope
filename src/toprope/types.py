@@ -44,6 +44,7 @@ class Command:
     grant: Grant | None = None
     thread_id: str | None = None
     run_id: str | None = None
+    causation: str | None = None   # the handoff id when a handoff issued this command
 
 
 @dataclass(frozen=True)
@@ -54,13 +55,14 @@ class Event:
     at: datetime | None
     actor: dict[str, Any] | None
     payload: dict[str, Any]
-    kind: Literal["domain", "decision", "attempt"] = "domain"
-    version: int | None = None  # set on append for domain/decision events
+    kind: Literal["domain", "decision", "attempt", "outbox", "handoff"] = "domain"
+    version: int | None = None  # set on append (every appended kind; attempts have none)
     domain_version: int | None = None
     on_behalf_of: dict[str, Any] | None = None
     grant: str | None = None
     thread_id: str | None = None
     run_id: str | None = None
+    causation: str | None = None   # the handoff id that caused it (linked in both domains)
 
 
 Status = Literal["ok", "denied", "rejected", "pending"]
