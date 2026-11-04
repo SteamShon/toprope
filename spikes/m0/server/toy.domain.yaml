@@ -1,0 +1,61 @@
+domain: experiment-toy
+version: 1
+glossary:
+  approve_experiment: "Approve a drafted experiment for launch."
+roles: [pm, approver, eng]
+
+objects:
+  Experiment:
+    description: A controlled test of one hypothesis.
+    properties:
+      name: {type: string}
+      status: {enum: [draft, approved, running]}
+      guardrails: {type: integer}
+      approved_by: {type: string, optional: true}
+
+actions:
+  approve_experiment:
+    description: Approve a drafted experiment for launch.
+    actor: [approver]
+    target: Experiment
+    params:
+      note: {type: string, optional: true}
+    preconditions:
+      - id: has-guardrails
+        check: "target['guardrails'] >= 1"
+        reason: An experiment needs at least one guardrail metric before approval.
+    effects:
+      - set: {approved_by: actor.id}
+    records_decision: true
+    event: ExperimentApproved
+  launch_experiment:
+    description: Start traffic to an approved experiment.
+    actor: [eng]
+    target: Experiment
+    effects: []
+    event: ExperimentLaunched
+
+transitions:
+  Experiment:
+    field: status
+    matrix:
+      draft:
+        approve_experiment: approved
+        launch_experiment: {deny: "Launch requires approval."}
+      approved:
+        approve_experiment: {deny: "This experiment is already approved."}
+        launch_experiment: running
+      running:
+        approve_experiment: {deny: "Only drafted experiments can be approved."}
+        launch_experiment: n/a
+
+invariants:
+  - id: running-has-approver
+    on: Experiment
+    check: "target['status'] != 'running' or target.get('approved_by') is not None"
+    reason: Nothing runs without someone having approved it.
+
+world:
+  fixtures:
+    - Experiment: {id: E1, name: "New onboarding", status: draft, guardrails: 1}
+    - Experiment: {id: E2, name: "No guardrails yet", status: draft, guardrails: 0}

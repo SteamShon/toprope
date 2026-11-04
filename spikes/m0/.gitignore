@@ -1,0 +1,4 @@
+server/.venv/
+shell/node_modules/
+shell/public/app.js
+__pycache__/
