@@ -43,6 +43,9 @@ So:
 - **The domain's declaration expresses it.** Facts the Toprope kernel guarantees for every
   domain are not gold, because no model can get them wrong. Examples: a handoff is
   delivered once, the contract is checked at compile time, the deploy floor in code.
+- A fact that spans the two domains (what the receiver gets when the sender approves) names
+  the composition (`toprope-self`, listed under `compositions`) as its `domain`. It is graded
+  against the composed model (ADR-0026).
 - It names its `domain`. If the same fact is asked of both domains (often at the handoff),
   give the copies one shared `fact` key and the same `held_out`. The fact counts once in
   scoring. Each copy must be answerable from its own domain's declaration; drop a copy that

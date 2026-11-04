@@ -14,12 +14,14 @@ instruments = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(instruments)
 
 
-def filled(tmp_path, gold_items=None, domains=("toprope-authoring", "toprope-delivery")):
+def filled(tmp_path, gold_items=None, domains=("toprope-authoring", "toprope-delivery"), compositions=None):
     for f in ("probe-suite", "change-requests", "change-key", "verdict-rules"):
         text = (INST / f"{f}.template.yaml").read_text()
         (tmp_path / f"{f}.yaml").write_text(re.sub(r"<[^>]*>", "filler", text))
     gold = yaml.safe_load(re.sub(r"<[^>]*>", "filler", (INST / "gold-scenarios.template.yaml").read_text()))
     gold["domains"] = list(domains)
+    if compositions is not None:
+        gold["compositions"] = list(compositions)
     if gold_items is not None:
         gold["scenarios"] = [{"answer": {"kind": "yes_no", "expected": "yes"}, "question": "filler", **x}
                              for x in gold_items]
@@ -35,7 +37,8 @@ def run(d, capsys):
 def test_items_name_one_of_the_files_domains(tmp_path, capsys):
     errs, _ = run(filled(tmp_path, [{"id": "A1", "domain": "toprope-authoring", "held_out": True},
                                     {"id": "X1", "domain": "billing", "held_out": False}]), capsys)
-    assert errs == ["gold X1: domain must be one of ['toprope-authoring', 'toprope-delivery']"]
+    assert errs == ["gold X1: domain must be one of ['toprope-authoring', 'toprope-delivery', 'toprope-self'] "
+                    "(domains, then compositions)"]
 
 
 def test_copies_of_a_fact_share_held_out(tmp_path, capsys):
@@ -57,3 +60,13 @@ def test_fact_key_warnings_and_per_domain_ratio(tmp_path, capsys):
     assert "gold fact 'lone': only one item" in out
     assert "gold toprope-delivery: 2/2 held out" in out
 
+
+
+def test_a_fact_spanning_domains_names_the_composition(tmp_path, capsys):
+    item = {"id": "S1", "domain": "toprope-self", "held_out": True}
+    errs, _ = run(filled(tmp_path, [item], compositions=["toprope-self"]), capsys)
+    assert errs == []
+    errs, _ = run(filled(tmp_path, [item], compositions=[]), capsys)
+    assert errs and "domain must be one of" in errs[0]
+    errs, _ = run(filled(tmp_path, [item], compositions=["toprope-authoring"]), capsys)
+    assert errs == ["gold: ['toprope-authoring'] listed as both a domain and a composition"]
