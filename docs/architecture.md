@@ -38,7 +38,8 @@ are generated, and only the kernel stays hand-built.
 | `EffectAdapter` | real-world effects | in-store only | GitHub, flags, ad APIs (with read-back) |
 | `EventLog` | append events | JSONL | SQLite, OpenTelemetry |
 | `ProposalEngine` | logs → candidate diffs | Aegra cron workflow calling an LLM | Harness²-style probe loops |
-| `ScenarioRunner` | run the domain's given/when/expect scenarios against a version | in-process | — |
+| `ScenarioRunner` | run the domain's flows against the model (reference interpreter) | in-process | — |
+| `HarnessGenerator` | compile flows into per-surface tests: Execution, MCP client, A2UI view assertions, adapter checks; parity and coverage reports (ADR-0010) | pytest-based generated suite | browser end-to-end for host components |
 | `LogReplayer` | re-run recorded events against a new version and diff outcomes | EventLog reader | — |
 | `ConflictLinter` | flag contradictions among natural-language parts (descriptions, judgment rules) as warnings | LLM call | other models |
 | `PreviewEnvironment` | generated MCP + UI on a copy of the state for trying a change | local process | per-PR preview deployments |
@@ -50,7 +51,10 @@ edited domain ──► diff vs. current version
                     ├─ structural (references, types)          deterministic
                     ├─ semantic conflict (contradictions,      deterministic
                     │   unreachable states, dead actions)
-                    ├─ scenario regression                     deterministic
+                    ├─ scenario regression (model level)       deterministic
+                    ├─ flow test harness on the preview build: deterministic
+                    │   Execution, MCP, A2UI views, adapters; parity across surfaces;
+                    │   coverage gaps (ADR-0010)
                     ├─ log replay ("12 past actions would      deterministic
                     │   now be blocked")
                     └─ NL conflict (descriptions, judgment)    LLM → warnings

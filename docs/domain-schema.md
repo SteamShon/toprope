@@ -85,22 +85,43 @@ actions:
   Extending it requires an ADR.
 - `records_decision: true` turns an action into an accumulated work decision (④).
 
-## Scenarios (ADR-0009)
+## Scenarios and flows (ADR-0009, ADR-0010)
 
-Domains carry their own tests. The change-check pipeline re-runs them on every edit, and a
-changed outcome is a regression to confirm or fix.
+Domains carry their own examples as tests. A scenario is a **flow**: a starting state, then
+ordered steps, each with expectations. Single-step scenarios are flows of length one.
+
+On every rebuild, the compiler generates a **flow test harness** from these flows and runs
+it at each level: model, Execution, generated MCP, compiled A2UI views, and adapters. The
+same flow must give the same outcome everywhere. A failing step or a cross-surface
+disagreement (a parity failure) blocks deployment of that build. Elements that no flow
+exercises are reported as coverage gaps.
 
 ```yaml
 scenarios:
   - id: no-approve-running
     given: {Experiment: {id: E1, status: running}}
-    when:  {action: approve_experiment, actor: {role: approver}, target: E1}
-    expect: {denied_by: is-draft}
-  - id: approve-draft
-    given: {Experiment: {id: E2, status: draft}}
-    when:  {action: approve_experiment, actor: {role: approver}, target: E2}
-    expect: {state: {E2.status: approved}, decision_recorded: true}
+    steps:
+      - {actor: {role: approver}, do: approve_experiment, target: E1,
+         expect: {denied_by: is-draft, reason_shown: true}}
+
+  - id: draft-to-running
+    given:
+      Experiment: {id: E2, name: "New onboarding", status: draft}
+    steps:
+      - {actor: {role: pm}, read: {view: Experiment.detail, target: E2},
+         expect: {actions_shown: [], fields_include: [hypothesis, primary_metric]}}   # pm sees no actions
+      - {actor: {role: eng}, do: launch_experiment, target: E2,
+         expect: {denied_by: is-approved}}
+      - {actor: {role: approver}, do: approve_experiment, target: E2, params: {note: "ok"},
+         expect: {state: {E2.status: approved}, decision_recorded: true}}
+      - {actor: {role: eng}, read: {view: Experiment.detail, target: E2},
+         expect: {actions_shown: [launch_experiment]}}
+      - {actor: {role: eng}, do: launch_experiment, target: E2,
+         expect: {state: {E2.status: running}}}
 ```
+
+`do` steps run as action calls at the Execution and MCP levels, and as form submissions at
+the UI level. `read` steps check what a declared view shows in that state, for that actor.
 
 Scenarios used as an experiment's held-out gold set are kept outside the domain, so they
 cannot be edited by the loop they evaluate.

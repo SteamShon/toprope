@@ -97,11 +97,13 @@ ontology platforms that are expensive to change.
 | Structural | a removed field is still referenced by an action or a representation | deterministic |
 | Semantic conflict | two rules allow and forbid the same case; unreachable states; dead actions | deterministic |
 | Scenario regression | an example scenario attached to the domain changes outcome | deterministic |
+| Flow test harness | generated from the same scenarios, run against the generated MCP, UI views, Execution and adapters; the same flow must give the same outcome on every surface (ADR-0010) | deterministic |
 | Log replay | "with this change, 12 past actions would have been blocked" | deterministic |
 | Natural-language conflict | descriptions or judgment rules contradict each other | LLM, reported as warnings |
 
 Every change also produces a **preview build**: generated MCP and UI on a copy of the state.
-The expert can try the change there before deploying it.
+The expert can try the change there before deploying it. The generated flow harness runs
+against that build, because generated code that was never exercised is not known to work.
 
 ## 4. Hypotheses
 
