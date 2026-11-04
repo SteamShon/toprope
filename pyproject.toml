@@ -9,6 +9,7 @@ dependencies = [
     "mcp>=2.3,<3",
     "pyjwt>=2.9",
     "uvicorn>=0.30",
+    "hypothesis>=6.100",
 ]
 
 [project.optional-dependencies]
@@ -18,11 +19,11 @@ postgres = [
 
 [project.scripts]
 toprope-server = "toprope.adapters.mcp.cli:main"
+toprope-harness = "toprope.harness.cli:main"
 
 [dependency-groups]
 dev = [
     "pytest>=8",
-    "hypothesis>=6.100",
     "jsonschema>=4.20",
     "psycopg[binary]>=3.2",
 ]

@@ -919,6 +919,7 @@ name = "toprope"
 version = "0.0.0"
 source = { editable = "." }
 dependencies = [
+    { name = "hypothesis" },
     { name = "mcp" },
     { name = "pydantic" },
     { name = "pyjwt" },
@@ -933,7 +934,6 @@ postgres = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "hypothesis" },
     { name = "jsonschema" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pytest" },
@@ -941,6 +941,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "hypothesis", specifier = ">=6.100" },
     { name = "mcp", specifier = ">=2.3,<3" },
     { name = "psycopg", extras = ["binary"], marker = "extra == 'postgres'", specifier = ">=3.2" },
     { name = "pydantic", specifier = ">=2.7,<3" },
@@ -952,7 +953,6 @@ provides-extras = ["postgres"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "hypothesis", specifier = ">=6.100" },
     { name = "jsonschema", specifier = ">=4.20" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2" },
     { name = "pytest", specifier = ">=8" },

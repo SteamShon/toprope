@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
-from ..decl.models import Action, ActorRule, ByRole, Deny, Domain, Target
+from ..decl.models import Action, ActorRule, ByRole, Deny, Domain, Invariant, Target
 from ..expr import Env, EvalError, evaluate, parse, paths_read
 from .types import Actor, Command, Event, Grant, Outcome
 
@@ -252,18 +252,10 @@ class Interpreter:
                     value = value.isoformat()
                 new[attr] = changes[attr] = value
 
-        new_view = ObjectView(d, obj, new, lookup)                                          # step 10
-        for inv in d.invariants:
-            if inv.on != obj or inv.scope != "aggregate":
-                continue
-            try:
-                holds = evaluate(self._expr(inv.check), self._env(new_view, cmd.actor, cmd.params)) is True
-            except EvalError:
-                holds = False
-            if not holds:
-                ev = Event("InvariantGuardTriggered", stream, obj, kind="attempt",
-                           payload={"action": cmd.action, "invariant": inv.id, "reason": inv.reason}, **meta)
-                return Decision(Outcome("rejected", "invariant-guard", inv.reason, state), (), (ev,))
+        for inv in self.violated_invariants(obj, new, lookup, cmd.actor, cmd.params):        # step 10
+            ev = Event("InvariantGuardTriggered", stream, obj, kind="attempt",
+                       payload={"action": cmd.action, "invariant": inv.id, "reason": inv.reason}, **meta)
+            return Decision(Outcome("rejected", "invariant-guard", inv.reason, state), (), (ev,))
 
         etype = action.event or (f"{obj}Created" if creating else f"{obj}{_pascal(cmd.action)}")
         # Events own deep copies, so no caller can mutate history (replay parity).
@@ -273,6 +265,23 @@ class Interpreter:
             events.append(Event("DecisionRecorded", stream, obj, kind="decision", payload=copy.deepcopy(
                 {"action": cmd.action, "params": cmd.params, "inputs": current}), **meta))
         return Decision(Outcome("ok", state=copy.deepcopy(new)), tuple(events), ())
+
+    def violated_invariants(self, obj_type: str, state: Mapping[str, Any], lookup: Lookup,
+                            actor: Actor | None = None, params: dict[str, Any] | None = None) -> list[Invariant]:
+        """The aggregate invariants on `obj_type` that `state` breaks, in declaration order. An
+        invariant that cannot be evaluated counts as broken (fail closed)."""
+        view = ObjectView(self.d, obj_type, state, lookup)
+        out = []
+        for inv in self.d.invariants:
+            if inv.on != obj_type or inv.scope != "aggregate":
+                continue
+            try:
+                holds = evaluate(self._expr(inv.check), self._env(view, actor, params or {})) is True
+            except EvalError:
+                holds = False
+            if not holds:
+                out.append(inv)
+        return out
 
     def _attempt(self, cmd: Command, obj: str, code: str, reason: str, state: Any) -> Decision:
         a = cmd.actor
