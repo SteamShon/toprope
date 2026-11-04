@@ -1,0 +1,74 @@
+# ADR-0030: Fidelity (②) is measured on an application domain, not on the self domains
+
+- Link: ① iterate safely, ② model is right · Status: **proposed** (assistant draft, from the
+  researcher's view that held-out accuracy on the self domains matters little) · 2026-11-04
+- Would amend: ADR-0002 and ADR-0022 (what M1 gives a verdict on), the roadmap and README
+  milestone table, `docs/experiments/M1-self-compile.md`; ADR-0019's ordering is unchanged
+
+## Context
+M1 was to give verdicts on ① (iterate safely) and ② (the model is right) on Toprope's own
+self domains, with held-out gold accuracy as the primary measure of ②. Writing that gold set
+showed three problems:
+- **The answers are not independent.** The researcher who knows the answers also designs the
+  system. The agent family that drafts the model also builds the kernel. Keeping held-out
+  answers away from the builder took a protocol of its own: isolated sessions, sealed
+  validation, excluded sources, fact keys. Even so it stays fragile.
+- **Little is left to hold out.**
+  - Kernel facts were excluded (ADR-0027).
+  - Stage logic and versions were simplified to a commit log (ADR-0029).
+  - The public documents state most remaining rules, and Phase A may read them.
+
+  So the self domains offer few facts that are both declarable and unwritten.
+- **Toprope's builders are not the users ② is about.** ② is about whether a domain owner's
+  tacit knowledge ends up in the model. An application domain, whose expert is not
+  Toprope's builder, tests that cleanly. The self domains do not.
+
+## Decision (proposed)
+1. **M1 gives verdicts on ① and on self-compile, not on ②.**
+   - **① (primary, unchanged)**: on the frozen change sequence with seeded problems, do
+     Toprope's compile-time checks catch what the natural-language and structured-spec arms
+     miss (pre-deploy recall and precision, problems found after deploy, iteration time)?
+   - **Self-compile (a feasibility result, not a link verdict)**:
+     - Are Authoring and Delivery generated end to end from their declarations?
+     - Does the regeneration check pass (ADR-0028)?
+     - Are there zero hand edits to generated code?
+     - Does the switch-over (ADR-0022) happen?
+   - **⑥ (partial, unchanged)**: does the typed handoff between the two domains hold across
+     changes?
+2. **② moves to M2**, on an application domain (the experiment-lifecycle dogfood domain, or
+   another chosen in M2's spec PR) whose expert is not Toprope's builder:
+   - held-out accuracy (primary), accuracy over iterations, unsupported rules, and human time
+   - the P0 sanity check (first-draft accuracy)
+   - the gold-set writing protocol built for M1 (`experiments/m1/interview-guide.md`,
+     sealed validation, fact keys and compositions, the kernel-fact exclusion), carried over
+     as M2's starting point
+3. **The self-domain gold set becomes optional.** It is not a verdict input. If kept, it is a
+   small, entirely shown smoke set: a regression check that the self domains still answer
+   basic questions. It is not frozen as a pre-check instrument.
+4. **M1's pre-check instruments become four**: the probe suite, the change requests, the
+   change key, and the verdict rules (with the ② rules removed). Sub-PR 8 (the change check)
+   waits for those four, not for gold.
+
+## Alternatives considered
+- **Keep ② on the self domains, with fewer items.** This was rejected (proposed) because
+  the independence problem does not shrink with the item count.
+- **Measure ② on both, and weight the application domain.** This was rejected (proposed)
+  because it keeps the full cost of the self-domain protocol for evidence it calls weak.
+
+## Affected ADRs, documents and tools (to change only after acceptance)
+
+| Item | Change |
+|---|---|
+| README claim-status table, milestones table | M1: ① ⑥ (+ self-compile); M2: ① ② ③. The `Status` column is untouched (no verdict yet) |
+| `docs/roadmap.md` | M1 question and links; M2 gains ② and its held-out protocol |
+| `docs/experiments/M1-self-compile.md` | Remove ② from the measures and verdicts; the gold set becomes an optional smoke set; the self-compile measures become explicit |
+| ADR-0002, ADR-0022 | Note that M1's self-compile result is a feasibility result; ② is judged in M2 |
+| `experiments/tools/instruments.py` | Stage-1 freeze requires the four pre-check files; gold becomes optional (a tool change, not instrument content) |
+| `experiments/m1/` instruments and guide | Not read or changed by the assistant. The researcher decides what to keep of the drafted gold items |
+| `docs/milestones/M0a.md` | Sub-PR 8's gate names the four files |
+
+## Open questions (for the researcher)
+1. Keep a small self-domain smoke gold set (shown only), or drop gold from M1 entirely?
+2. M2's application domain: the experiment-lifecycle dogfood domain as planned, or another?
+3. The gold items another session has already drafted for the self domains: keep them as
+   the smoke set, set them aside for reference, or discard them?

@@ -1,13 +1,12 @@
 # ADR-0029: Authoring and Delivery as a semantic-diff git
 
-- Link: ① iterate safely, ② model is right, ⑥ org productivity · Status: **proposed**
-  (assistant draft of the researcher's decisions; implementation waits for acceptance) ·
-  2026-11-04
+- Link: ① iterate safely, ② model is right, ⑥ org productivity · Status: accepted · 2026-11-04 ·
+  decided by: SteamShon (drafted by the assistant from the researcher's decisions)
 - Builds on: ADR-0004 (provenance), ADR-0008 (domain interface, element hashes, versioning by
   diff), ADR-0009 (change check), ADR-0012 (event sourcing), ADR-0013 (impact report),
   ADR-0022 (two self domains), ADR-0024 (handoff, deploy floor), ADR-0026 (composition),
   ADR-0028 (kernel services)
-- Would amend: ADR-0022 and the M1 scope document (the handoff contract fields, the version
+- Amends: ADR-0022 and the M1 scope document (the handoff contract fields, the version
   vocabulary), ADR-0026 (what a released system is), ADR-0028 (two services)
 
 ## Context
@@ -55,7 +54,7 @@ Toprope already has the parts that make this semantic rather than textual:
    - The deploy floor in code (`toprope-deploy`) cannot be weakened by a declaration.
    - Migrations, rollback and read-back stay in M2.
 
-## Proposed details (assistant, for the researcher to accept or change)
+## Details (proposed by the assistant, accepted with this ADR)
 - **A commit's identity.** A commit is identified by the content hash of its declaration
   (as `toprope-deploy` builds are today) plus a sequence number per domain. The declaration's
   `version` field becomes that sequence number, set when compiling, never by hand. Events
@@ -73,7 +72,7 @@ Toprope already has the parts that make this semantic rather than textual:
   commit determines all three.
 - **A released system** (ADR-0026) is the tuple of its members' commits.
 
-## Open questions (not decided; to be answered before implementation)
+## Open questions (not decided; answered before the parts they affect are implemented)
 1. **What counts as "changed directly".** Which reference changes make an element directly
    changed? For example, an action whose referenced object was renamed. Today's element hash
    counts any change in an element's own content, references included.
