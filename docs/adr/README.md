@@ -29,4 +29,4 @@ A record is superseded rather than deleted when a decision changes. History befo
 | [0021](0021-semantics-clarifications-from-the-oracle.md) | ① ③ | Semantics clarifications from the oracle: command validation, existence after role check, multi-role cells, principals are people, fail-closed effects, idempotency claims |
 | [0022](0022-two-self-domains-authoring-and-delivery.md) | ① ② ③ ⑥ | Two self domains, Authoring and Delivery, joined by a typed handoff; staged bootstrap |
 | [0023](0023-schema-v1.md) | ① ② ③ ④ | Schema v1: the whole declaration language defined up front, JSON Schemas, unimplemented constructs refused |
-| [0024](0024-handoff-outbox-string-join-and-deploy-floor.md) | ③ ⑥ | **Proposed.** Handoff outbox in the event log, resolutions, string joining, the local deploy floor |
+| [0024](0024-handoff-outbox-string-join-and-deploy-floor.md) | ③ ⑥ | Handoff outbox in the event log, resolutions, string joining, the local deploy floor |

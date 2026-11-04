@@ -1,6 +1,6 @@
 # Handoffs and the local deploy adapter
 
-Link: ③ ⑥. M0a item 14 (ADR-0022, ADR-0024 proposed). This is what the M1 Delivery domain
+Link: ③ ⑥. M0a item 14 (ADR-0022, ADR-0024). This is what the M1 Delivery domain
 models: Authoring hands an approved version to Delivery, and Delivery previews and deploys
 it locally.
 

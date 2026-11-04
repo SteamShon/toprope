@@ -1,7 +1,6 @@
 # ADR-0024: The handoff outbox, string joining, and the local deploy floor
 
-- Link: ③ works as built, ⑥ org productivity (H-Handoff) · Status: **proposed** (assistant
-  draft; the researcher accepts or amends) · 2026-11-04
+- Link: ③ works as built, ⑥ org productivity (H-Handoff) · Status: accepted · 2026-11-04 · decided by: SteamShon
 - Amends: `docs/semantics.md` step 12 (details only) and §5 (the `causation` field), the
   check language (ADR-0010, `docs/domain-schema.md`)
 
