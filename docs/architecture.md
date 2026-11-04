@@ -15,7 +15,7 @@ Toprope        correctness layer: declaration, matrix, invariants, Execution gat
                harness-verified generated surfaces
       │        only allowed actions pass
       ▼
-Effects        greenfield: generated backend (domain API over Toprope's state store)
+Effects        greenfield: generated backend (domain API over Toprope's event store + projections)
                brownfield: existing servers, APIs, DBs behind EffectAdapters (read-back, UNKNOWN)
 ```
 
@@ -30,9 +30,9 @@ now). One Execution core serves (a) and (b). M0 builds both shapes on the toy do
 | **Authoring** | sources, drafts, interview questions, provenance and status of every element | ① ② | M0 kernel, then self-compiled in M1 |
 | **Domain Model** | objects, links, actions (params, preconditions, effects, roles), versions | all | M0 |
 | **Change Check** | diff new vs. current version; structural, semantic-conflict, scenario-regression, log-replay and NL-conflict checks; preview build (ADR-0009) | ① | M0 |
-| **Domain Compiler** | domain → MCP, greenfield backend (domain API over the state store), execution checks, **domain interface** (objects/fields/links/actions/glossary; versioned by diff, hashed per element) | ① ④ | M0 |
+| **Domain Compiler** | domain → MCP, greenfield backend (domain API over the event store and projections), execution checks, **domain interface** (objects/fields/links/actions/glossary; versioned by diff, hashed per element) | ① ④ | M0 |
 | **Representation Compiler** | representation layers (defaults → base → host overlay) + interface → A2UI views, component/action catalog for generative UI. Rebuilt independently of the domain | ④ | M0 |
-| **Execution** | checks preconditions and roles on current state, applies effects | ④ | M0 |
+| **Execution** | checks the matrix cell, roles and non-state preconditions on the projected state; applies effects; runs the **invariant guard** on the resulting state before appending (ADR-0012) | ③ ④ | M0 |
 | **Event Store** | event-sourced system of record (ADR-0012): domain events, decisions, denied attempts, exceptions, effect outcomes, domain changes; projections give current state; upcasters across versions; generated read-only query tools for agents | ① ③ ⑤ | M0 |
 | **Proposal / Review** | log-mined model diffs; human decisions with their inputs | ⑤ | M4 |
 | **Handoff** | typed requests between domains via published domain interfaces | ⑥ | M5 |

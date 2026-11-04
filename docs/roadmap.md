@@ -56,8 +56,8 @@ The bootstrap: the smallest hand-built kernel that later milestones can generate
   the harness.
 - Source readers: repository, markdown records, session transcripts, interview log.
 
-- **Greenfield backend (ADR-0011)**: the compiler also generates a domain API over the state
-  store, so the toy domain runs as usable software with no other system.
+- **Greenfield backend (ADR-0011)**: the compiler also generates a domain API over the event
+  store and its projections (ADR-0012), so the toy domain runs as usable software with no other system.
 - **Brownfield adapter (ADR-0011)**: one `EffectAdapter` to GitHub issues/labels in a sandbox
   repository, with read-back and `UNKNOWN` on timeout. Adapter-level harness checks run
   against it.
