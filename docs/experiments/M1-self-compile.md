@@ -27,7 +27,7 @@ milestone.
 
 Toprope's authoring workflow, roughly: source → draft element → interview question →
 confirmation (human) → domain version → compile and change check → preview → deploy →
-event log → proposal → decision (human). The actual objects and actions are an output of
+event store → proposal → decision (human). The actual objects and actions are an output of
 the experiment and are not written in advance.
 
 ## Phase A: Build by iterating (① ②)

@@ -28,8 +28,8 @@ On its own, the correctness layer has little meaning. It sits between:
 - **Toprope (correctness layer)**: declaration, transition matrix, invariants, Execution
   gate, event log, and harness-verified generated surfaces.
 - **Effects**:
-  - *greenfield*: Toprope generates the backend (a domain API over its own state store,
-    which is the system of record)
+  - *greenfield*: Toprope generates the backend (a domain API over its event store and
+    projections, which are the system of record; ADR-0012)
   - *brownfield*: existing servers, APIs and databases behind `EffectAdapter`s, with
     read-back and `UNKNOWN` outcomes.
 
@@ -45,8 +45,8 @@ P0 → ① iterate safely → ② model is right → ③ works as built → ④ 
   labels in existing documents and ADRs were renumbered mechanically. No decision changed.
 
 ### 3. Greenfield and brownfield from M0
-- **Greenfield**: the compiler also generates a backend, a domain API over the state store,
-  so a declared domain is usable software without any other system.
+- **Greenfield**: the compiler also generates a backend, a domain API over the event store and
+  its projections (ADR-0012), so a declared domain is usable software without any other system.
 - **Brownfield**: one adapter to a real external HTTP API, with read-back and `UNKNOWN`
   handling. GitHub (issues and labels) is the candidate: it is real, free and easy to
   observe. The harness runs adapter-level checks against it (a sandbox repository).

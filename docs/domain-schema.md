@@ -133,8 +133,14 @@ world:                      # the expert's examples; the compiler grows a small 
   - `undecided` cells deny with the reason "undecided" and are listed in every change report.
     No cell is ever silently allowed.
   - An action is allowed only if its matrix cell allows it, the actor has the role, and every
-    non-state precondition holds.
-- **Invariants** are checked after every step of every generated test, at every level.
+    non-state precondition holds. At runtime, an **invariant guard** also checks the
+    resulting state before the event is appended (ADR-0012). If the guard triggers, the
+    declaration is inconsistent: its matrix allows a transition that its invariants forbid.
+    It is not a normal denial.
+- **Invariants** are checked after every step of every generated test, at every level. The
+  model interpreter runs **without** the guard, so it reports the violation itself. Runtime
+  levels run **with** it, so they report an `InvariantGuardTriggered` event at the same step.
+  Parity treats the two as the same outcome, and either one fails the harness.
 - **World**: fixtures are the expert's realistic examples, not test data written for the
   harness. The compiler grows them into a small world: at least one instance per reachable
   state, every role as an actor, and boundary values for each non-state precondition. It
@@ -153,6 +159,8 @@ compiled A2UI views, and adapters.
   adapter: Hypothesis). A counterexample is reported as a minimal flow in domain terms.
 - **Example flows**: run as written.
 - **Parity**: the same test must give the same outcome on every surface.
+- **Replay parity**: replaying the events a test produced rebuilds the same projected state
+  (ADR-0012).
 - **Coverage report**: cells, invariants, views, flows, and unreachable states.
 
 A failing cell test, an invariant violation or a parity failure blocks deployment of that

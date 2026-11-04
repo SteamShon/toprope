@@ -67,8 +67,8 @@ invariant against every generated surface.
 | **Bounded exploration** | Stateful property-based exploration of action sequences over the small world, bounded by depth and by a **fixed number of examples with a fixed seed**, never by wall-clock time, so a run is reproducible (first adapter: Hypothesis stateful testing). It looks for invariant violations and cross-surface disagreements. A counterexample is reported as a minimal flow in domain terms, which the author can keep as a new example. |
 | **Example flows** | The expert's multi-step flows (`do` and `read` steps) run as written. |
 
-Every part runs at **every level**: the model interpreter, Execution (real store and event
-log), an MCP client against the generated server, compiled A2UI views (allowed actions and
+Every part runs at **every level**: the model interpreter, Execution (the event store and
+projections, ADR-0012), an MCP client against the generated server, compiled A2UI views (allowed actions and
 fields shown per role and state, and forms that submit the same action), and adapters
 (read-back, with timeouts as `UNKNOWN`).
 
