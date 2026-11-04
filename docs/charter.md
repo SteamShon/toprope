@@ -32,6 +32,10 @@ people and agents both use, and keeps the model improving while it is used.
   text until it is deployed and used. Declaring the domain moves that check to compile time.
 - **Workflow ≡ domain.** A workflow is modeled as objects, links and actions
   (preconditions, effects, roles), in the spirit of an ontology plus action types.
+  Each stateful object has a **transition matrix** and **invariants** (DDD-style). Domain
+  experts do not think in matrices, so the interview fills them cell by cell in plain
+  questions. The compiler then generates a harness that checks the whole matrix, which no
+  person can test by hand.
 - **One model, two surfaces.** The model compiles into a *domain capsule*: MCP for agents
   and UI for people. Both get the same terms, rules and reasons.
 - **Three things in one body:**
@@ -97,11 +101,13 @@ ontology platforms that are expensive to change.
 | Structural | a removed field is still referenced by an action or a representation | deterministic |
 | Semantic conflict | two rules allow and forbid the same case; unreachable states; dead actions | deterministic |
 | Scenario regression | an example scenario attached to the domain changes outcome | deterministic |
+| Generated harness | from the declared **transition matrix**, **invariants**, a **small world** grown from the expert's examples, and example flows: every cell tried, invariants checked after every step, bounded exploration for violations. It runs against the generated MCP, UI views, Execution and adapters, and the same test must give the same outcome on every surface (ADR-0010) | deterministic |
 | Log replay | "with this change, 12 past actions would have been blocked" | deterministic |
 | Natural-language conflict | descriptions or judgment rules contradict each other | LLM, reported as warnings |
 
 Every change also produces a **preview build**: generated MCP and UI on a copy of the state.
-The expert can try the change there before deploying it.
+The expert can try the change there before deploying it. The generated flow harness runs
+against that build, because generated code that was never exercised is not known to work.
 
 ## 4. Hypotheses
 

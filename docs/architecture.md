@@ -28,7 +28,7 @@ are generated, and only the kernel stays hand-built.
 |---|---|---|---|
 | `SourceReader` | read code/schema, records, transcripts, interview logs | repo + markdown + transcript readers | Slack, Notion, DB introspection |
 | `Drafter` | sources → proposed elements with source links | Aegra workflow calling an LLM (Claude API) (ADR-0007) | other models or runtimes |
-| `Interviewer` | targeted questions on unknown or conflicting elements | Aegra workflow; each question is a HITL interrupt answered in the generated UI (ADR-0007) | other runtimes |
+| `Interviewer` | targeted questions on unknown or conflicting elements, `undecided` matrix cells and candidate invariants, asked in plain domain language | Aegra workflow; each question is a HITL interrupt answered in the generated UI (ADR-0007) | other runtimes |
 | `DomainStore` | versioned domain models | YAML in repo | git-backed registry |
 | `StateStore` | object instances and links | PostgreSQL (shared with Aegra) or SQLite for tests | existing app DBs |
 | `AgentSurface` | expose reads and actions to agents | generated MCP server mounted on Aegra custom routes | OpenAPI, LangGraph tools |
@@ -38,7 +38,10 @@ are generated, and only the kernel stays hand-built.
 | `EffectAdapter` | real-world effects | in-store only | GitHub, flags, ad APIs (with read-back) |
 | `EventLog` | append events | JSONL | SQLite, OpenTelemetry |
 | `ProposalEngine` | logs → candidate diffs | Aegra cron workflow calling an LLM | Harness²-style probe loops |
-| `ScenarioRunner` | run the domain's given/when/expect scenarios against a version | in-process | — |
+| `ScenarioRunner` | run the domain's flows against the model (reference interpreter) | in-process | — |
+| `WorldBuilder` | grow the expert's fixtures into a small world: an instance per reachable state, every role, boundary values; report unreachable states | in-process | — |
+| `HarnessGenerator` | compile the matrix, invariants, world and flows into per-surface tests (Execution, MCP client, A2UI view assertions, adapters); parity and coverage reports (ADR-0010) | pytest-based generated suite | browser end-to-end for host components |
+| `Explorer` | bounded stateful exploration of action sequences for invariant violations and parity failures; minimal counterexample flows | Hypothesis stateful testing | TLA+/Alloy model checking |
 | `LogReplayer` | re-run recorded events against a new version and diff outcomes | EventLog reader | — |
 | `ConflictLinter` | flag contradictions among natural-language parts (descriptions, judgment rules) as warnings | LLM call | other models |
 | `PreviewEnvironment` | generated MCP + UI on a copy of the state for trying a change | local process | per-PR preview deployments |
@@ -50,7 +53,11 @@ edited domain ──► diff vs. current version
                     ├─ structural (references, types)          deterministic
                     ├─ semantic conflict (contradictions,      deterministic
                     │   unreachable states, dead actions)
-                    ├─ scenario regression                     deterministic
+                    ├─ scenario regression (model level)       deterministic
+                    ├─ generated harness on the preview build: deterministic
+                    │   every matrix cell, invariants after every step, bounded
+                    │   exploration, example flows; at Execution, MCP, A2UI views,
+                    │   adapters; parity across surfaces; coverage (ADR-0010)
                     ├─ log replay ("12 past actions would      deterministic
                     │   now be blocked")
                     └─ NL conflict (descriptions, judgment)    LLM → warnings

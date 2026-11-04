@@ -41,10 +41,20 @@ The bootstrap: the smallest hand-built kernel that later milestones can generate
   version; structural and semantic-conflict checks; scenario regression; log replay; LLM
   natural-language conflict warnings; preview build. Done when an edit reaches a validated
   preview in minutes on the toy domain.
+- **Harness v0 (ADR-0010)**: transition matrix and invariants in the schema; a small world
+  grown from fixtures; generated cell tests, invariant checks, bounded exploration
+  (Hypothesis) and example flows, run at the model, Execution and MCP levels plus A2UI
+  message-level view checks; parity and coverage reports. Done when, on the toy domain:
+  - every decided cell is covered
+  - a deliberately broken generator template is caught while model-level regression
+    still passes
+  - a seeded invariant-breaking transition is found by exploration and reported as a
+    minimal flow.
 - Execution with precondition and role checks, plus an append-only event log.
 - Source readers: repository, markdown records, session transcripts, interview log.
 
-Exit: a small toy domain compiles to working MCP and UI, and calls are logged.
+Exit: a small toy domain compiles to working MCP and UI, its generated flow harness passes
+on every surface, and calls are logged.
 Kernel code is kept small and listed, so it is clear what was hand-built and what was
 generated.
 
