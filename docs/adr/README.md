@@ -15,5 +15,5 @@ A record is superseded rather than deleted when a decision changes. History befo
 | [0007](0007-aegra-adapter-python-core.md) | ① ⑤ | Python core; Aegra as runtime adapter; TypeScript frontend |
 | [0008](0008-representation-layer.md) | ④ | Representation is a separately compiled layer that hosts can override |
 | [0009](0009-change-safety-is-the-compiler-core.md) | all | Chain v2 is the backbone: premise P0; ① = iterate safely; change safety is the compiler's core job |
-| [0010](0010-matrix-invariants-harness.md) | ① ② ④ | Transition matrix, invariants and a small world drive a generated harness |
+| [0010](0010-matrix-invariants-harness.md) | ① ② ③ ④ | Transition matrix, invariants and a small world drive a generated harness |
 | [0011](0011-correctness-layer-and-software-factory.md) | ③, all | Correctness layer + software factory; chain v3 adds ③ works as built; greenfield and brownfield from M0; hosting open |

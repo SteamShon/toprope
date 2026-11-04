@@ -1,6 +1,6 @@
 # ADR-0010: Transition matrix, invariants and a small world drive a generated harness
 
-- Link: ① iterate safely, ② model is right, ④ shared language · Status: accepted · 2026-11-04 · decided by: SteamShon
+- Link: ① iterate safely, ② model is right, ③ works as built, ④ shared language · Status: accepted · 2026-11-04 · decided by: SteamShon
 
 ## Context
 - The researcher's preferred way to keep a domain correct, from DDD and agent-based coding,
