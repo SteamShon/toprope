@@ -1,0 +1,10 @@
+representation: experiment-ui
+version: 1
+targets: {domain: experiment-toy, interface: "1.x"}
+views:
+  Experiment:
+    detail:
+      sections:
+        - {title: Design, fields: [name, guardrails]}
+        - {title: Status, fields: [status, approved_by]}
+      actions: [approve_experiment, launch_experiment]

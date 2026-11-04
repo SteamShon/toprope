@@ -1,0 +1,11 @@
+overlay: acme
+extends: {representation: experiment-ui, version: "1.x"}
+components:
+  AcmeStatusBadge: {package: "@acme/toprope-ui", props: [status]}
+aliases:
+  approve_experiment: "Sign off"
+views:
+  Experiment:
+    detail:
+      sections:
+        - {title: Status, component: AcmeStatusBadge, fields: [status]}
