@@ -32,3 +32,4 @@ A record is superseded rather than deleted when a decision changes. History befo
 | [0024](0024-handoff-outbox-string-join-and-deploy-floor.md) | ③ ⑥ | Handoff outbox in the event log, resolutions, string joining, the local deploy floor |
 | [0025](0025-staged-authoring-interview.md) | ① ② | Staged authoring interview: one question bundle per stage (sources → purpose → cast → actions → transitions → invariants → world → handoffs → review), with progress; link sources |
 | [0026](0026-domain-composition.md) | ④ ⑥ ① | Domains compose, never inherit; a composition file declares members and wiring; receivers accept only wired senders; composed world map |
+| [0027](0027-what-the-kernel-is.md) | ② ③ | The kernel is the hand-built toolchain (Execution semantics, compiler and change check, harness runtime, deploy floor); hand-built self-domain tools are not; a test for borderline facts |

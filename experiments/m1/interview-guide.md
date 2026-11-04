@@ -40,7 +40,12 @@ So:
 ### What a good question is
 - It asks **one fact** about how the work runs, in domain language, and is answerable from
   the model's read surface (allowed actions, states, denials and reasons, who may act).
-- **The domain's declaration expresses it.** Facts the Toprope kernel guarantees for every
+- **The domain's declaration expresses it** (ADR-0027). The kernel is the hand-built
+  toolchain: Execution's semantics, the compiler and change check, the harness runtime, and
+  the deploy floor. Today's hand-built authoring tool is not the kernel: its rules are
+  declaration facts. When unsure, ask: "if the declaration omitted or inverted this, would
+  the compiled domain still answer the same?" If yes, it is not gold. Agent behavior the
+  schema cannot express goes to the probe suite. Facts the Toprope kernel guarantees for every
   domain are not gold, because no model can get them wrong. Examples: a handoff is
   delivered once, the contract is checked at compile time, the deploy floor in code.
 - A fact that spans the two domains (what the receiver gets when the sender approves) names
