@@ -37,6 +37,12 @@ The bootstrap: the smallest hand-built kernel that later milestones can generate
   suite, the change-request list with its seeded-problem key (written by intent), and the
   verdict rules. Freezing them *before* building the change checks keeps the seeded problems
   from being written around what the checks can catch (M1 risks).
+- **Incremental from the start (ADR-0013)**: content hashes, the declaration → artifact → test
+  dependency graph, an impact report before anything runs, affected-only rebuild and
+  retest, a result cache keyed by input hashes, and a background full run that counts
+  selection misses. Done when a single-cell change on the toy domain meets the draft
+  targets (impact report ≤ 2 s, affected harness ≤ 30 s, preview ≤ 60 s) and a full run
+  finds no selection miss.
 - **Change-check pipeline v0 (ADR-0009)**, the core of the compiler: diff against the current
   version; structural and semantic-conflict checks; scenario regression; log replay; LLM
   natural-language conflict warnings; preview build. Done when an edit reaches a validated

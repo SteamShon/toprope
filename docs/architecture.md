@@ -29,7 +29,7 @@ now). One Execution core serves (a) and (b). M0 builds both shapes on the toy do
 |---|---|---|---|
 | **Authoring** | sources, drafts, interview questions, provenance and status of every element | ① ② | M0 kernel, then self-compiled in M1 |
 | **Domain Model** | objects, links, actions (params, preconditions, effects, roles), versions | all | M0 |
-| **Change Check** | diff new vs. current version; structural, semantic-conflict, scenario-regression, log-replay and NL-conflict checks; preview build (ADR-0009) | ① | M0 |
+| **Change Check** | impact analysis first (dependency graph, affected set, impact report; ADR-0013); then, on the affected set only: structural, semantic-conflict, scenario-regression, log-replay and NL-conflict checks; preview build (ADR-0009) | ① | M0 |
 | **Domain Compiler** | domain → MCP, greenfield backend (domain API over the state store), execution checks, **domain interface** (objects/fields/links/actions/glossary; versioned by diff, hashed per element) | ① ④ | M0 |
 | **Representation Compiler** | representation layers (defaults → base → host overlay) + interface → A2UI views, component/action catalog for generative UI. Rebuilt independently of the domain | ④ | M0 |
 | **Execution** | checks preconditions and roles on current state, applies effects | ④ | M0 |
@@ -63,11 +63,16 @@ are generated, and only the kernel stays hand-built.
 | `LogReplayer` | re-run recorded events against a new version and diff outcomes | `EventStore` reader | — |
 | `ConflictLinter` | flag contradictions among natural-language parts (descriptions, judgment rules) as warnings | LLM call | other models |
 | `PreviewEnvironment` | generated MCP + UI on a copy of the state for trying a change | local process | per-PR preview deployments |
+| `ImpactAnalyzer` | dependency graph from declaration elements to artifacts and tests; content hashes; affected set; impact report in domain terms (ADR-0013) | in-process | — |
+| `ResultCache` | test results keyed by the hashes of all their inputs; deploy gate reads it | local file / SQLite | shared remote cache |
 
 ## Change-check pipeline (ADR-0009): the compiler's core job
 
 ```
 edited domain ──► diff vs. current version
+                  ──► impact analysis: affected elements → artifacts → tests (ADR-0013)
+                  ──► impact report (before anything runs)
+                  ──► on the affected set only, with cached results reused:
                     ├─ structural (references, types)          deterministic
                     ├─ semantic conflict (contradictions,      deterministic
                     │   unreachable states, dead actions)
@@ -84,7 +89,11 @@ edited domain ──► diff vs. current version
 ```
 
 Iteration time (edit → validated preview) is a design constraint: the premise is that
-domains are found by many cheap iterations (P0).
+domains are found by many cheap iterations (P0). The compiler is incremental from M0 (ADR-0013). Impact
+analysis is static, because every artifact and test is generated from the declaration. It
+selects conservatively. The deploy gate requires a passing result for every test at the
+current input hashes, mostly cache hits. A background full run checks that no affected test
+was missed.
 
 ## Two compile pipelines (ADR-0008)
 

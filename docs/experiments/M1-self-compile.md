@@ -119,7 +119,8 @@ counts as **found after deploy**. One that never shows up counts as **silent**.
 | **Pre-deploy recall** (primary) | seeded problems flagged before deploy / all seeded problems | ① |
 | **Pre-deploy precision** | flags that were real problems / all flags (false alarms matter: experts stop reading noisy checks) | ① |
 | Found after deploy / silent | seeded problems missed before deploy, then surfaced / never surfaced | ① |
-| **Iteration time** (primary) | edit → validated preview, wall time and human minutes, per change | ① |
+| **Iteration time** (primary) | edit → validated preview, wall time and human minutes, per change; broken down into impact report, affected harness and preview (ADR-0013) | ① |
+| Selection misses | tests that failed in the background full run but were passing from cache, i.e. impact-analysis bugs (target: 0) | ① |
 | Check breakdown | which check caught what: structural, semantic, scenario regression, log replay, NL lint | ① |
 | **Held-out accuracy** (primary) | after Phase A, and after Phase B | ② |
 | Accuracy-over-iterations | Phase A curve; accuracy of the first draft | ② and the P0 sanity check |

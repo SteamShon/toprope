@@ -155,7 +155,8 @@ compiled A2UI views, and adapters.
 - **Coverage report**: cells, invariants, views, flows, and unreachable states.
 
 A failing cell test, an invariant violation or a parity failure blocks deployment of that
-build. The interviewer turns `undecided` cells and candidate invariants into plain
+build. Only tests affected by a change are re-run. Every other test keeps its cached
+result, keyed by the hashes of its inputs (ADR-0013). The interviewer turns `undecided` cells and candidate invariants into plain
 questions for the expert, so the expert never has to see the matrix.
 
 ### Example flows

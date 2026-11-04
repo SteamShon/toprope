@@ -18,3 +18,4 @@ A record is superseded rather than deleted when a decision changes. History befo
 | [0010](0010-matrix-invariants-harness.md) | ① ② ③ ④ | Transition matrix, invariants and a small world drive a generated harness |
 | [0011](0011-correctness-layer-and-software-factory.md) | ③, all | Correctness layer + software factory; chain v3 adds ③ works as built; greenfield and brownfield from M0; hosting open |
 | [0012](0012-event-sourcing-in-the-core.md) | ③ ⑤ | Event sourcing owned by the core; generated read-only query tools; Aegra consumes |
+| [0013](0013-incremental-impact-and-test-selection.md) | ① | Incremental rebuilds: impact analysis, affected-only testing, result cache, background soundness run |
