@@ -130,7 +130,7 @@ ontology platforms that are expensive to change.
 | Structural | a removed field is still referenced by an action or a representation | deterministic |
 | Semantic conflict | two rules allow and forbid the same case; unreachable states; dead actions | deterministic |
 | Scenario regression | an example scenario attached to the domain changes outcome | deterministic |
-| Generated harness | from the declared **transition matrix**, **invariants**, a **small world** grown from the expert's examples, and example flows: every cell tried, invariants checked after every step, bounded exploration for violations. It runs against the generated MCP, UI views, Execution and adapters, and the same test must give the same outcome on every surface (ADR-0010) | deterministic |
+| Generated harness | from the declared **transition matrix**, **invariants**, a **small world** grown from the expert's examples, and example flows: every cell tried, invariants checked after every step, bounded exploration for violations (fixed seed and example count in the deploy gate; deeper exploration in the background). It runs against the generated MCP, UI views, Execution and adapters, and the same test must give the same outcome on every surface (ADR-0010) | deterministic |
 | Impact analysis | before anything runs: "changes 2 cells; affects 14 cell tests, 1 invariant, 2 views, 3 flows". Only the affected set is rebuilt and retested, and cached results cover the rest (ADR-0013) | deterministic |
 | Log replay | "with this change, 12 past actions would have been blocked" | deterministic |
 | Natural-language conflict | descriptions or judgment rules contradict each other | LLM, reported as warnings |

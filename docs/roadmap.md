@@ -5,7 +5,7 @@ several links, but a milestone ends with a verdict. Budget is ~10h+/week. Dates 
 
 | Milestone | Link | Question | Target |
 |---|---|---|---|
-| M0 | none (enabler) | A minimal hand-built kernel that compiles a domain into working software (MCP, UI, greenfield backend) and gates one brownfield API | 3 weeks |
+| M0 | none (enabler) | The hand-built kernel: compiles a domain into working software (MCP, UI, event-sourced backend), generates its harness incrementally, and gates one brownfield API | 6–8 weeks (M0a + M0b) |
 | M1 | ① ② (self) | Model Toprope's own authoring workflow by iterating; do compile-time checks catch what natural-language skills cannot? | 3–4 weeks |
 | M2 | ① ② ③ (dogfood) | Does the same hold on another domain, and does the harness-passing software work in real use? | 3–4 weeks |
 | M3 | ④ | Do people and agents act on the same meaning through the capsule? | 3 weeks |
@@ -17,9 +17,22 @@ the claim status in the README is updated.
 
 ---
 
-## M0: Kernel (no claim, 3 weeks)
+## M0: Kernel (no claim, 6–8 weeks, re-estimated after ADR-0012 and ADR-0013)
 
-The bootstrap: the smallest hand-built kernel that later milestones can generate from.
+The bootstrap is the hand-built kernel that later milestones generate from. ADR-0010 to
+ADR-0013 made it much larger than the first estimate. At ~10h/week it is split so that each
+part ends with something runnable:
+- **M0a, 3–4 weeks: core loop.** Spike, schema, domain compiler (MCP and event-sourced
+  backend), Execution with the invariant guard, event store, harness v0 at the model,
+  Execution and MCP levels, incremental impact analysis and result cache, and the M1
+  instruments frozen first.
+- **M0b, 3–4 weeks: surfaces and effects.** Representation compiler and A2UI views, UI-level
+  harness checks, the change-check pipeline's remaining checks (log replay, NL conflict),
+  the GitHub brownfield adapter, both hosting shapes, and the generated query tools.
+
+If M0a runs past 5 weeks, cut M0b scope before starting M1, rather than extending M0.
+
+Items below are listed by topic; the M0a/M0b split above decides the order.
 
 - **Spike first (1–2 days, ADR-0007):** Aegra running a toy graph, an MCP server mounted on
   its custom routes with auth checked, CopilotKit connected, one A2UI view rendered from a

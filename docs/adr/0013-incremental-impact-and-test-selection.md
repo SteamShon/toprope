@@ -25,8 +25,11 @@ element (object, field, link, action, matrix cell, invariant, glossary term, vie
 
 - Every element and artifact has a **content hash**.
 - Dependencies of `check` expressions (preconditions, invariants) come from the paths they
-  read. If an expression cannot be analyzed precisely, it depends on the whole object. This
-  is conservative: when the analysis is unsure, it over-selects. It never under-selects.
+  read, **including every link they traverse and the target objects and fixtures reached
+  through those links** (e.g. `count(target.guardrails)` depends on the `guardrails` link,
+  `Metric`, and the Metric fixtures). If an expression cannot be resolved statically, it
+  depends on the **whole domain**. This is conservative: when the analysis is unsure, it
+  over-selects. It never under-selects.
 - Small-world instances record which fixtures and transitions produced them.
 
 ### 2. Impact analysis is the first step of every change check
@@ -39,12 +42,25 @@ element (object, field, link, action, matrix cell, invariant, glossary term, vie
 
 ### 3. Only the affected set runs; results are cached
 - Rebuild only affected artifacts. Unchanged artifacts are reused by hash.
-- Each test result is cached under the hashes of all its inputs: the elements, artifacts,
-  fixtures and seed it depends on. A test whose inputs did not change is a **cache hit** and
-  does not run again.
-- Bounded exploration (ADR-0010) is scoped to the affected cells and invariants, under a
-  time budget, while the author is iterating. Deeper exploration runs in the background and
-  reports later.
+- Each test result is cached under the hashes of all its inputs:
+  - the declaration elements, artifacts, fixtures and seed it depends on
+  - the **toolchain hash**: the hand-built kernel (Execution, compiler, harness runtime) and
+    the dependency lockfile
+  - for representation tests, the host component packages and versions.
+
+  A test whose inputs did not change is a **cache hit** and does not run again.
+- **Adapter-level tests are never cached.** They depend on external state that no hash
+  captures (e.g. the GitHub sandbox's labels and permissions), so the deploy gate always
+  re-runs them. There are few of them.
+- Bounded exploration (ADR-0010) has two tiers:
+  - **Gate tier**: scoped to the affected cells and invariants, with a fixed seed and a fixed
+    example count. It is reproducible and cacheable like any other test, and it is part of
+    the deploy gate.
+  - **Background tier**: deeper (more examples, varied seeds), outside the gate. A
+    counterexample it finds **marks every build that contains the offending declaration as
+    tainted**. Such a build cannot be deployed again, and an already deployed build is flagged
+    for a human rollback-or-fix decision. The minimal flow is added to the gate tier, so it
+    is checked from then on.
 - Log replay (ADR-0009) replays only the events whose types, or whose target objects' cells,
   are affected.
 - A representation-only change touches only the UI-level tests of the affected views
@@ -52,8 +68,9 @@ element (object, field, link, action, matrix cell, invariant, glossary term, vie
 
 ### 4. Deploy gate and soundness
 - **Deploy gate.** Deployment requires every test to have a passing result for the current
-  input hashes. Most of these are cache hits, so the gate is incremental too. Nothing is
-  skipped. Unaffected tests are only *not re-run*.
+  input hashes (including the toolchain hash), a fresh pass of every adapter-level test, and
+  no taint on the build. Most results are cache hits, so the gate is incremental too.
+  Nothing is skipped. Unaffected tests are only *not re-run*.
 - **Soundness check.** A full uncached run happens in the background (e.g. nightly, and
   before each release PR). Any test that fails there but was passing from cache is a
   **selection miss**: a bug in impact analysis. It is fixed as a priority.

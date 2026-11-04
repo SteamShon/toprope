@@ -77,7 +77,8 @@ edited domain ──► diff vs. current version
                     ├─ semantic conflict (contradictions,      deterministic
                     │   unreachable states, dead actions)
                     ├─ scenario regression (model level)       deterministic
-                    ├─ generated harness on the preview build: deterministic
+                    ├─ generated harness on the preview build: deterministic (gate tier;
+                    │   background exploration is outside the gate, ADR-0013)
                     │   every matrix cell, invariants after every step, bounded
                     │   exploration, example flows; at Execution, MCP, A2UI views,
                     │   adapters; parity across surfaces; coverage (ADR-0010)
