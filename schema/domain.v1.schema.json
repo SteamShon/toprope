@@ -912,10 +912,12 @@
             "type": "object",
             "properties": {
               "domain": {
-                "type": "string"
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$"
               },
               "interface": {
-                "type": "string"
+                "type": "string",
+                "pattern": "^[0-9]+\\.x$"
               },
               "action": {
                 "type": "string"
@@ -938,6 +940,16 @@
               "type": "string",
               "description": "check-language expression (docs/domain-schema.md)"
             }
+          },
+          "source": {
+            "$ref": "#/$defs/source"
+          },
+          "status": {
+            "enum": [
+              "proposed",
+              "confirmed",
+              "unknown"
+            ]
           }
         },
         "required": [

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from .interface import Element, InterfaceDiff, diff_interface, interface
 from .models import Domain
-from .validate import Issue, validate_domain
+from .validate import Issue, check_handoffs, validate_domain
 from .yamlio import load_yaml
 
 
@@ -16,5 +16,5 @@ def load_domain(path: str | Path) -> Domain:
         return Domain.model_validate(load_yaml(f.read()))
 
 
-__all__ = ["Domain", "Element", "Issue", "InterfaceDiff", "diff_interface", "interface",
+__all__ = ["Domain", "Element", "check_handoffs", "Issue", "InterfaceDiff", "diff_interface", "interface",
            "load_domain", "load_yaml", "validate_domain"]

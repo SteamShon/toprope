@@ -82,6 +82,15 @@ def _pascal(name: str) -> str:
     return "".join(p[:1].upper() + p[1:] for p in name.split("_"))
 
 
+def origin_person(cmd: Command) -> dict[str, Any] | None:
+    """The person a handoff acts on behalf of: the caller if a person, an agent's principal,
+    or whoever a system actor itself acted for (docs/domain-schema.md, Handoffs)."""
+    a = cmd.actor
+    if a is not None and a.kind == "person":
+        return a.ref()
+    return cmd.on_behalf_of.ref() if cmd.on_behalf_of is not None else None
+
+
 class Interpreter:
     def __init__(self, domain: Domain, clock: Callable[[], datetime] | None = None):
         self.d = domain
@@ -185,7 +194,8 @@ class Interpreter:
 
         meta = dict(at=at, actor=cmd.actor.ref(), domain_version=d.version,
                     on_behalf_of=cmd.on_behalf_of.ref() if cmd.on_behalf_of else None,
-                    grant=cmd.grant.id if cmd.grant else None, thread_id=cmd.thread_id, run_id=cmd.run_id)
+                    grant=cmd.grant.id if cmd.grant else None, thread_id=cmd.thread_id, run_id=cmd.run_id,
+                    causation=cmd.causation)
         stream = cmd.target or ""
 
         def deny(code: str, reason: str) -> Decision:
@@ -264,7 +274,34 @@ class Interpreter:
         if action.records_decision:
             events.append(Event("DecisionRecorded", stream, obj, kind="decision", payload=copy.deepcopy(
                 {"action": cmd.action, "params": cmd.params, "inputs": current}), **meta))
+        events += self._handoffs(cmd, obj, new, lookup, meta)                              # step 12
         return Decision(Outcome("ok", state=copy.deepcopy(new)), tuple(events), ())
+
+    def _handoffs(self, cmd: Command, obj: str, new: dict[str, Any], lookup: Lookup,
+                  meta: dict[str, Any]) -> list[Event]:
+        """Outbox entries, appended atomically with the sender's events and sent after the
+        append (step 12). A mapping that cannot be evaluated is recorded with its error and
+        never blocks the sender's action."""
+        out = []
+        view = ObjectView(self.d, obj, new, lookup)
+        origin = origin_person(cmd)
+        for name, h in self.d.handoffs.items():
+            if h.when.action != cmd.action:
+                continue
+            payload: dict[str, Any] = {"handoff": name, "to": h.to.model_dump(), "origin": origin,
+                                       "target": None, "params": {}, "error": None}
+            try:
+                env = self._env(view, cmd.actor, cmd.params)
+                target = evaluate(self._expr(h.target), env)
+                if not isinstance(target, str) or not target:
+                    raise EvalError(f"target must be a non-empty string, got {target!r}")
+                params = {k: evaluate(self._expr(src), env) for k, src in h.params.items()}
+                payload.update(target=target, params=params)
+            except EvalError as e:
+                payload["error"] = str(e)
+            out.append(Event("HandoffRequested", cmd.target or "", obj, kind="outbox",
+                             payload=copy.deepcopy(payload), **meta))
+        return out
 
     def violated_invariants(self, obj_type: str, state: Mapping[str, Any], lookup: Lookup,
                             actor: Actor | None = None, params: dict[str, Any] | None = None) -> list[Invariant]:

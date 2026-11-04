@@ -22,6 +22,7 @@ toprope-server = "toprope.adapters.mcp.cli:main"
 toprope-harness = "toprope.harness.cli:main"
 toprope-worldmap = "toprope.worldmap.cli:main"
 toprope-author = "toprope.authoring.cli:main"
+toprope-deploy = "toprope.deploy.cli:main"
 
 [dependency-groups]
 dev = [

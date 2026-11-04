@@ -60,13 +60,24 @@ def test_every_construct_in_the_status_table_has_an_example():
         assert construct in keys, construct
 
 
-@pytest.mark.parametrize("fragment_key", ["handoffs", "reservations", "timers", "functions", "external"])
+@pytest.mark.parametrize("fragment_key", ["reservations", "timers", "functions", "external"])
 def test_kernel_refuses_defined_but_unimplemented_constructs(fragment_key):
     from pydantic import ValidationError
     from toprope.decl import Domain
     fragment = next(b for b in BLOCKS if fragment_key in b)
     with pytest.raises(ValidationError, match="not implemented until"):
         Domain.model_validate(merged(BLOCKS[0], {fragment_key: fragment[fragment_key]}))
+
+
+def test_kernel_parses_the_handoffs_example():
+    """Handoffs are implemented (M0a item 14). The doc's example names a sender action of the
+    self domains, so on the experiment example it parses and the validator flags that action."""
+    from toprope.decl import Domain, validate_domain
+    fragment = next(b for b in BLOCKS if "handoffs" in b)
+    d = Domain.model_validate(merged(BLOCKS[0], {"handoffs": fragment["handoffs"]}))
+    h = d.handoffs["deliver_approved_version"]
+    assert (h.to.domain, h.to.interface, h.to.action) == ("domain-delivery", "1.x", "request_delivery")
+    assert ("unknown-action", "handoffs.deliver_approved_version.when") in {(i.code, i.where) for i in validate_domain(d)}
 
 
 def test_kernel_refuses_cross_invariants_and_approvals_and_accepts_purpose():

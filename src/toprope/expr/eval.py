@@ -112,6 +112,12 @@ def evaluate(node: Node, env: Env) -> Any:
             return _truth(evaluate(left, env)) or _truth(evaluate(right, env))
         case Arith(op, left, right):
             a, b = evaluate(left, env), evaluate(right, env)
+            if op == "+" and (isinstance(a, str) or isinstance(b, str)):
+                # String joining (ADR-0024): a string with a string or an integer. Floats,
+                # booleans, null and lists fail closed, so no value is rendered ambiguously.
+                if all(isinstance(x, str) or (isinstance(x, int) and not isinstance(x, bool)) for x in (a, b)):
+                    return f"{a}{b}"
+                raise EvalError(f"cannot join {type(a).__name__} and {type(b).__name__}")
             if any(isinstance(x, bool) or not isinstance(x, (int, float)) for x in (a, b)):
                 raise EvalError(f"cannot apply {op} to {type(a).__name__} and {type(b).__name__}")
             return a + b if op == "+" else a - b

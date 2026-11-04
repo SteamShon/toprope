@@ -16,7 +16,7 @@ readable schemas: [`schema/domain.v1.schema.json`](../schema/domain.v1.schema.js
 | `invariants` with `scope: aggregate` | core | implemented (M0a) |
 | `world` (fixtures, actors), `scenarios` (`do`, `read` steps) | core, scenarios | implemented (M0a) |
 | `purpose` (problem, success metric, announcement) | [Purpose](#purpose) | M0a (metadata only) |
-| `handoffs` | [Handoffs](#handoffs) | M1 (ADR-0022) |
+| `handoffs` | [Handoffs](#handoffs) | implemented (M0a, ADR-0024 proposed) |
 | `approvals` on actions | [Approvals](#approvals) | defined; M0b |
 | `invariants` with `scope: cross` + `reservations` | [Reservations](#cross-aggregate-invariants-and-reservations) | defined; M0b |
 | `timers`, scenario `advance` steps | [Timers](#timers) | defined; M0b |
@@ -288,7 +288,9 @@ How a handoff runs (docs/semantics.md step 12):
   key is `<handoff name>:<sender event id>`, so retries never deliver twice.
 - The receiving action must allow `system` in its actor rule. It is then evaluated like any
   other command, with all the receiver's rules.
-- The outcome is recorded in both stores, linked by the handoff id. A denial becomes a
+- The outcome is recorded in both stores, linked by the handoff id (ADR-0024: the
+  receiver's events carry it as `causation`; the sender records `HandoffDelivered`,
+  `HandoffDenied` or `HandoffFailed`). A denial becomes a
   `HandoffDenied` event in the sender's domain, which the sender's own rules and proposals
   can react to.
 

@@ -20,11 +20,13 @@ from ..store import EventStore
 
 class Execution:
     def __init__(self, domain: Domain, store: EventStore, identity: Identity,
-                 clock: Callable[[], datetime] | None = None):
+                 clock: Callable[[], datetime] | None = None, transport: Any = None):
+        """`transport` (a HandoffTransport) sends this domain's handoffs after each append."""
         self.d = domain
         self.store = store
         self.identity = identity
         self.clock = clock or (lambda: datetime.now(timezone.utc))
+        self.transport = transport
         self._model = ReferenceModel(domain, store, clock=self.clock, seed_world=False)
 
     # -- commands ----------------------------------------------------------------------------
@@ -48,7 +50,40 @@ class Execution:
             return Outcome("rejected", "unauthenticated", "Unknown or missing credentials.")
         cmd = Command(caller.actor, action, target, dict(params or {}), idempotency_key, self.clock(),
                       caller.on_behalf_of, caller.grant, thread_id, run_id)
-        return self._model.execute(cmd)
+        return self._after(self._model.execute(cmd))
+
+    def _after(self, out: Outcome) -> Outcome:
+        """Step 12: send the outbox after the append. It never changes the sender's outcome."""
+        if self.transport is not None and any(e.kind == "outbox" for e in out.events):
+            try:
+                self.dispatch()
+            except Exception:    # pending handoffs are retried by the next dispatch
+                pass
+        return out
+
+    def dispatch(self) -> list[dict[str, Any]]:
+        """Send every pending handoff of this domain through the transport."""
+        from ..handoff import Outbox
+        if self.transport is None:
+            raise RuntimeError("no handoff transport configured")
+        return Outbox(self).dispatch(self.transport)
+
+    def receive_handoff(self, handoff: str, action: str, target: str, params: dict[str, Any],
+                        handoff_id: str, origin: dict[str, Any] | None) -> Outcome:
+        """A command from another domain's handoff (step 12): actor `system` (`handoff:<name>`),
+        on behalf of the originating person, keyed by the handoff id. In-process transports
+        call this; it never goes through credentials, so no caller can impersonate it."""
+        spec = self.d.actions.get(action)
+        if spec is None:
+            return Outcome("rejected", "unknown-action", f"No action {action}.")
+        bad = self._model.interp.invalid_params(spec, dict(params or {}))
+        if bad:
+            return Outcome("rejected", "invalid-command", bad)
+        actor = Actor(f"handoff:{handoff}", "system", ("system",))
+        principal = Actor(origin["id"], "person") if origin else None
+        cmd = Command(actor, action, target, dict(params or {}), handoff_id, self.clock(),
+                      on_behalf_of=principal, causation=handoff_id)
+        return self._after(self._model.execute(cmd))
 
     def seed_world(self) -> int:
         """Load the declaration's fixtures into an empty store. Idempotent: existing ids are

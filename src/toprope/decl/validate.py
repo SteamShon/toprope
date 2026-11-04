@@ -197,4 +197,86 @@ def validate_domain(d: Domain) -> list[Issue]:
             role = st.actor.get("role")
             if role and roles and role not in roles:
                 add(Issue("unknown-role", f"scenarios.{sc.id}.steps[{j}]", f"unknown role '{role}'"))
+    for name, h in d.handoffs.items():
+        where = f"handoffs.{name}"
+        a = d.actions.get(h.when.action)
+        if a is None:
+            add(Issue("unknown-action", f"{where}.when", f"unknown action '{h.when.action}'"))
+            continue
+        obj = a.object_type
+        issues += _check_expr(d, h.target, f"{where}.target", obj, set(a.params))
+        for p, src in h.params.items():
+            issues += _check_expr(d, src, f"{where}.params.{p}", obj, set(a.params))
+
     return issues
+
+
+def check_handoffs(sender: Domain, published: dict[str, tuple[Domain, int]]) -> list[Issue]:
+    """The compile-time contract of each handoff against the receiving domain's published
+    interface (ADR-0022). `published` maps a domain name to (its declaration, its interface
+    major version). A removal or rename on the receiving side breaks the handoff here."""
+    out: list[Issue] = []
+    for name, h in sender.handoffs.items():
+        where = f"handoffs.{name}"
+        pub = published.get(h.to.domain)
+        if pub is None:
+            out.append(Issue("unknown-domain", f"{where}.to", f"no published domain '{h.to.domain}'"))
+            continue
+        recv, major = pub
+        want = int(h.to.interface.split(".")[0])
+        if want != major:
+            out.append(Issue("interface-major", f"{where}.to",
+                             f"targets {h.to.domain} {h.to.interface}, published interface is {major}.x"))
+        ra = recv.actions.get(h.to.action)
+        if ra is None:
+            out.append(Issue("unknown-action", f"{where}.to", f"{h.to.domain} has no action '{h.to.action}'"))
+            continue
+        roles = {r.role if isinstance(r, ActorRule) else r for r in ra.actor}
+        if "system" not in roles:
+            out.append(Issue("handoff-actor", f"{where}.to",
+                             f"{h.to.domain}.{h.to.action} must allow `system` in its actor rule"))
+        if ra.requires == "human":
+            out.append(Issue("handoff-actor", f"{where}.to",
+                             f"{h.to.domain}.{h.to.action} requires a person; a handoff acts as `system`"))
+        for p in h.params:
+            if p not in ra.params:
+                out.append(Issue("unknown-param", f"{where}.params.{p}", f"{h.to.domain}.{h.to.action} has no param '{p}'"))
+        for p, spec in ra.params.items():
+            if not spec.optional and p not in h.params:
+                out.append(Issue("missing-param", f"{where}.params", f"{h.to.domain}.{h.to.action} requires '{p}'"))
+            elif p in h.params and (t := _static_type(sender, h, p)) and not _compatible(t, spec):
+                out.append(Issue("param-type", f"{where}.params.{p}",
+                                 f"maps a {t} to {h.to.domain}.{h.to.action}.{p}"))
+    return out
+
+
+def _static_type(d: Domain, h, param: str) -> str | None:
+    """The type of a mapping that is a literal or a direct property path, when known."""
+    try:
+        node = parse(h.params[param])
+    except ParseError:
+        return None
+    from ..expr.ast import Literal as Lit
+    if isinstance(node, Lit):
+        v = node.value
+        return ("boolean" if isinstance(v, bool) else "integer" if isinstance(v, int)
+                else "number" if isinstance(v, float) else "string" if isinstance(v, str) else None)
+    if isinstance(node, Path) and node.root == "target" and len(node.attrs) == 1:
+        a = d.actions.get(h.when.action)
+        obj = d.objects.get(a.object_type) if a else None
+        prop = obj.properties.get(node.attrs[0]) if obj else None
+        if prop is not None:
+            return "string" if prop.enum else prop.type
+        if node.attrs[0] == "id":
+            return "string"
+    if isinstance(node, Path) and node.root == "actor" and node.attrs == ("id",):
+        return "string"
+    return None
+
+
+def _compatible(t: str, spec) -> bool:
+    if spec.many:
+        return False
+    if spec.ref is not None or spec.enum is not None:
+        return t == "string"
+    return t == spec.type or (t == "integer" and spec.type == "number")
