@@ -1,7 +1,7 @@
 # ADR-0025: A staged authoring interview: one bundle per stage, with progress
 
-- Link: ① iterate safely, ② model is right · Status: **proposed** (drafted by the assistant
-  from the researcher's design, 2026-11-04; the researcher accepts or amends) · 2026-11-04
+- Link: ① iterate safely, ② model is right · Status: accepted · 2026-11-04 · decided by: SteamShon
+  (drafted by the assistant from the researcher's design)
 - Amends: ADR-0014 (question order). Defaults, grouped cells, priorities, the stop rule,
   "answers are elements" and privacy are kept.
 
@@ -47,10 +47,14 @@ they want to see how far the domain has come.
    skipped.
 5. **Sources may be links.** A link source is fetched once into a snapshot inside the
    workspace (`.toprope/snapshots/<id>/`, http(s), text only, at most 2 MB). It is then read,
-   chunked and redacted like a file, so refs stay stable. Local-only applies to links too. A
-   private document behind a login is downloaded by the owner and given as a path.
+   chunked and redacted like a file, so refs stay stable. Local-only applies to links too, and
+   snapshots stay out of version control (`.toprope/` is ignored). A redirect away from
+   http(s) is refused. A private document behind a login is downloaded by the owner and
+   given as a path.
 6. **The glossary is collected throughout** and settled in review, because terms come up
-   while describing people and things, not in a stage of their own.
+   while describing people and things, not in a stage of their own. The drafter is told to
+   propose `glossary.<term>` in the owner's words whenever such a term comes up.
+7. **Every answer records its stage**, so M1 can count questions and minutes per stage.
 
 ## Consequences
 - `questions()` returns the current stage's bundle with progress. `progress()` and

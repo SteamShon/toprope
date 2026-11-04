@@ -32,6 +32,7 @@ sources:
   # - {id: sessions, kind: transcripts, path: notes/sessions, local_only: true}
   - {id: interview, kind: interview-log, path: interview/log.jsonl}
   # - {id: wiki, kind: records, url: "https://example.com/process"}   # a link: run `toprope-author fetch`
+# Snapshots of links are kept in .toprope/snapshots/: keep .toprope/ out of version control.
 # redact:                        # extra patterns, on top of secrets and personal data
 #   - {name: internal-host, pattern: "[a-z0-9-]+\\\\.corp\\\\.example"}
 # exclude: ["private/**"]        # never read (held-out instruments are always excluded)

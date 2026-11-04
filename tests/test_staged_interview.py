@@ -167,6 +167,7 @@ def test_a_whole_bundle_is_answered_at_once(ws):
     assert out["applied"] == ["purpose"] and current(ws) == "cast"
     entry = json.loads(ws.log_path.read_text().splitlines()[-1])
     assert entry["question_id"] == b["bundle_id"] and entry["question"].startswith("[Purpose]")
+    assert entry["stage"] == "purpose"                         # minutes and questions per stage (ADR-0025)
 
 
 # -- link sources ------------------------------------------------------------------------------
@@ -181,6 +182,7 @@ class Pages(http.server.BaseHTTPRequestHandler):
         if page is None:
             self.send_error(404)
             return
+
         self.send_response(200)
         self.send_header("Content-Type", page[0])
         self.end_headers()
@@ -230,6 +232,7 @@ def test_unfetchable_links_say_why(tmp_path, site):
         ws.fetch("gone")
     with pytest.raises(AuthoringError, match="no source 'nosuch'"):
         ws.fetch("nosuch")
+
     with pytest.raises(AuthoringError, match="not text"):
         ws.fetch("pic")
     bad = {**CONFIG, "sources": [{"id": "x", "kind": "records", "url": "file:///etc/passwd"}]}

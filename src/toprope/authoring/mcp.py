@@ -48,7 +48,8 @@ def build_authoring_server(ws: Workspace, **server_kwargs: Any) -> MCPServer:
         "(ADR-0025, ADR-0014). For the current stage: draft what the sources support (propose, "
         "citing a source ref), then ask the owner the stage's whole bundle from questions() at "
         "once, show them progress, and record their own words with answer(bundle_id, ...). Move "
-        "on when questions() moves to the next stage. You write only `proposed`; the owner confirms."), **server_kwargs)
+        "on when questions() moves to the next stage. Whenever a term comes up that a newcomer could "
+        "misread, propose glossary.<term> in the owner's words. You write only `proposed`; the owner confirms."), **server_kwargs)
 
     @_guard
     def list_sources() -> list[dict[str, Any]]:

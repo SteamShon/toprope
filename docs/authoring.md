@@ -58,7 +58,7 @@ uv run toprope-author check                      # validate + model-level harnes
   - the MCP `confirm` tool, which shows the owner an elicitation prompt in their client and
     confirms only on acceptance. A client that cannot show one is refused.
 
-## Stages (ADR-0025, proposed)
+## Stages (ADR-0025)
 The interview runs in nine stages, in the order the declaration's parts depend on:
 
 `sources → purpose → cast (roles, objects, links) → actions → transitions → invariants →
@@ -76,7 +76,8 @@ world (fixtures, scenarios) → handoffs → review (confirmations, glossary)`
   (invariants, handoffs) has nothing.
 - **Link sources.** A source may be a link, `{id: wiki, kind: records, url: ...}`.
   `toprope-author fetch` (or the MCP tool `fetch_source`) fetches it once into
-  `.toprope/snapshots/<id>/`. From there it is read and redacted like a file. A page behind
+  `.toprope/snapshots/<id>/` (keep `.toprope/` out of version control). From there it is
+  read and redacted like a file. A page behind
   a login cannot be fetched: download it and give its path.
 
 ## Questions within a stage (ADR-0014)
