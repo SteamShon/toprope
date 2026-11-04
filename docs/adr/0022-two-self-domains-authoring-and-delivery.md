@@ -34,8 +34,10 @@ split from the prior work had disappeared.
      declaration, not that it is right, so the floor cannot live in the declaration.
    - **Changes to the Delivery domain itself** are deployed only through the floor, with
      the researcher's sign-off. Delivery never approves its own changes.
-   - **Switch-over** happens when the researcher signs off after the generated Delivery tool
-     passes its harness and the frozen M1 gold and probe checks for Delivery.
+   - **Switch-over** happens **at the end of M1**, when the researcher signs off after the
+     generated Delivery tool passes its harness and the frozen M1 gold and probe checks for
+     Delivery. In M1, Delivery is thin; migrations, read-back, timers and rollback join it in
+     M2 (scope document).
 5. **Scope is the researcher's, the rules are the experiment's.** The boundary, candidate
    object types and the handoff contract are written down before M1 (assistant drafts, the
    researcher confirms): `docs/experiments/M1-self-domains-scope.md`. Matrices, invariants

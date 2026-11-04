@@ -48,7 +48,7 @@ iteration:
 | Stage | Raw material | Who works |
 |---|---|---|
 | S1 System | the M0 kernel code and schema | agent drafts |
-| S2 Records | this repository's docs, ADRs, notes, and session transcripts | agent enriches, quoting sources |
+| S2 Records | this repository's docs, ADRs, notes, the scope document and session transcripts (allowed, scope decisions) | agent enriches, quoting sources |
 | S3 Interview | the researcher as domain owner | agent asks, human answers |
 | S4 Use | the generated authoring and delivery tools, used on one small change | human and agent |
 

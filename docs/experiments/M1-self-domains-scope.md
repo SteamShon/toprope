@@ -1,6 +1,7 @@
-# M1 self domains: scope (DRAFT)
+# M1 self domains: scope
 
-Link: ① ② ⑥ (partial). **Status: draft by the assistant; the researcher edits and confirms.**
+Link: ① ② ⑥ (partial). **Status: confirmed by the researcher (2026-11-04)**, as drafted by the
+assistant, with the decisions below.
 Per ADR-0022, this file fixes **what is in scope**, not how it behaves. It deliberately
 contains **no matrices, invariants, preconditions or answers**, because M1 Phase A must
 produce those from sources and the interview. Candidate names below are vocabulary for the
@@ -36,10 +37,12 @@ environment, and nothing unverified reaches it.
 **Success metric (draft).** Share of approved versions that reach "verified in use"
 without a manual fix or rollback (higher is better), and the time it takes.
 
-**In scope:** receiving a delivery request; building artifacts (MCP, backend, views, harness,
-world map); running the harness and change-check results as gates; preview; approval to
-deploy; deploy and activate; in-flight checks and migration plans; post-deploy verification
-(read-back, first use); rollback or roll-forward.
+**In scope for M1 (thin, decided):** receiving a delivery request; building artifacts (MCP,
+harness, world map); running the harness and change-check results as gates; preview;
+approval to deploy; deploy to a **local** environment; verification (harness and probes).
+
+**Added in M2** (when M0b provides them): migration plans and in-flight handling,
+post-deploy read-back, timers, rollback or roll-forward, views and the greenfield backend.
 
 **Out of scope:** deciding what the domain means (Authoring); running the domain's own
 work.
@@ -70,10 +73,19 @@ The hand-built kernel pipeline stays the source of truth for deploys until the r
 signs off the switch-over. After that, the kernel pipeline becomes Delivery's effect
 adapter, and the kernel keeps a fixed floor of deploy rules that no declaration can weaken.
 
-## For the researcher to decide when confirming
-- Keep, rename or drop the candidate object types (they only seed the interview vocabulary).
-- Whether Toprope's components (core, compilers, server, shell) are part of Delivery's
-  `Build` (ADR-0020's structure layer), or stay out of scope.
-- The two purposes and success metrics.
-- How the gold set and change sequence split across the two domains, decided when freezing
-  the M1 instruments.
+## Decisions (researcher, 2026-11-04)
+- **Delivery in M1 is thin** (see above). The rest comes in M2.
+- **Switch-over at the end of M1**, with the researcher's sign-off, after the generated
+  Delivery tool passes its harness and the frozen M1 gold and probe checks. From M2,
+  deploys go through the generated Delivery domain, above the kernel's fixed floor.
+- **Phase A may read this repository's ADRs and this scope document** as records (S2).
+  Extracting rules from records is what S2 is for. To keep the measurement honest:
+  held-out gold questions avoid facts stated verbatim in these documents, and first-draft
+  accuracy (the P0 sanity check) is measured after S1, which sees the system only.
+- The purposes, success metrics, candidate vocabulary and handoff fields above are
+  **confirmed as drafted**.
+- Toprope's components are **not** part of Delivery's `Build` in M1. ADR-0020's structure
+  layer for Toprope itself waits.
+- **Still open, decided when freezing the M1 instruments:** how the gold set, probe suite
+  and change list split across the two domains, and whether handoff-breaking changes are
+  seeded.
