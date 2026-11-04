@@ -128,7 +128,11 @@ counts as **found after deploy**. One that never shows up counts as **silent**.
 Templates, the freeze procedure and the `verify` check:
 [`experiments/m1/`](../../experiments/m1/README.md).
 
-- About 30 scenario questions per self domain (Authoring, Delivery, and the handoff between them), half held out. Examples:
+- About 30 scenario questions per self domain (Authoring, Delivery, and the handoff between them), half held out
+  in each domain. Each item names the domain whose compiled model answers it. The same fact
+  asked of both domains shares a `fact` key: its copies share `held_out`, and it counts once in
+  scoring (each copy weighs 1/n; verdict rules `scoring.unit: fact`). Facts that the Toprope
+  kernel guarantees for every domain are not gold, since no model can get them wrong. Examples:
   - "Can an agent confirm its own drafted precondition?"
   - "What happens to an element no source supports?"
   - "When does a representation-only change rebuild MCP?"
