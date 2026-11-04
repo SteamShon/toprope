@@ -1,8 +1,9 @@
 # Domain schema v0 (draft)
 
-Link: ① ② ③. The minimal core is **Object, Link, Action**, plus **`representation`**
-(ADR-0008). Further concepts (policy, contract, flow) are added only when a milestone shows a concrete need, each with an ADR
-naming that need.
+Link: ① ② ③. The minimal core is **Object, Link, Action**. How the domain is shown lives
+in a separate, separately compiled **representation** layer (ADR-0008, below). Further
+concepts (policy, contract, flow) are added only when a milestone shows a concrete need,
+each with an ADR naming that need.
 
 ```yaml
 domain: example
@@ -41,25 +42,10 @@ actions:
       - set: {target.status: approved, target.approved_by: actor.id}
     records_decision: true  # produces a Decision with who, when, inputs and rationale
 
-representation:             # how the domain is shown to people (ADR-0008); never redefines meaning
-  Experiment:
-    list:   {columns: [name, status, primary_metric], group_by: status, sort: -started_at}
-    detail:
-      sections:
-        - {title: Design, fields: [hypothesis, primary_metric, guardrails, planned_days]}
-        - {title: Result, fields: [readout]}
-      actions: [approve_experiment, launch_experiment, decide]   # shown only when allowed in the current state
-    board:  {by: status}
-  approve_experiment:
-    form:   {fields: [note], confirm: "Approve this experiment for launch?"}
 ```
 
 ## Rules
 
-- `representation` declares views per object (`list`, `detail`, `board`, …) and forms per
-  action. Declared views compile deterministically to A2UI. Undeclared ones get schema
-  defaults. Ad-hoc screens are composed by an LLM from declared components and allowed
-  actions only. Labels and reasons always come from the glossary, `description` and `reason`.
 - Every element may carry `source` (`system` | `record` | `interview` | `use`, with a ref or
   quote) and `status` (`proposed` | `confirmed` | `unknown`). Agents write only `proposed`.
   Only humans confirm. Unknowns stay explicit instead of being guessed.
@@ -67,6 +53,56 @@ representation:             # how the domain is shown to people (ADR-0008); neve
 - `check` uses a small expression language (paths, comparison, `count`, `exists`, `now`).
   Extending it requires an ADR.
 - `records_decision: true` turns an action into an accumulated work decision (④).
+
+## Representation layer (ADR-0008)
+
+Representation lives in separate files and compiles against the **domain contract** (the
+hashed list of objects, fields, actions and glossary produced by compiling the domain), not
+the domain source. Layers resolve in order: schema defaults → base (domain author) → host
+overlay.
+
+```yaml
+# experiment.representation.yaml  (base, written by the domain author)
+representation: experiment-ui
+version: 7
+targets: {domain: example, contract: ">=1 <2"}   # validated on every domain change
+views:
+  Experiment:
+    list:   {columns: [name, status, primary_metric], group_by: status, sort: -started_at}
+    detail:
+      sections:
+        - {title: Design, fields: [hypothesis, primary_metric, guardrails, planned_days]}
+        - {title: Result, fields: [readout]}
+      actions: [approve_experiment, launch_experiment, decide]  # shown only when allowed now
+    board:  {by: status}
+forms:
+  approve_experiment: {fields: [note], confirm: "Approve this experiment for launch?"}
+```
+
+```yaml
+# acme.overlay.representation.yaml  (host overlay)
+overlay: acme
+extends: experiment-ui@7
+components:                                  # host components registered in the renderer catalog
+  AcmeMetricChart: {package: "@acme/toprope-ui", props_from: [Readout]}
+aliases:                                     # host wording, mapped to glossary terms
+  readout: "Result review"
+views:
+  Experiment:
+    detail:
+      sections:
+        - {title: Result, component: AcmeMetricChart, fields: [readout]}
+```
+
+Rules:
+- A representation may reference only what is in the contract. A broken reference fails
+  the build when either layer changes.
+- Host components get data and the currently allowed actions, and act only through
+  Execution. They cannot add actions, rules or fields.
+- Wording changes are declared as `aliases` of glossary terms. Silently replaced labels are
+  build warnings.
+- Declared views compile deterministically to A2UI. Undeclared views get schema defaults.
+  Ad-hoc screens are composed by an LLM from the catalog and the allowed actions only.
 
 ## Open questions
 
