@@ -40,13 +40,14 @@ src/toprope/
 ## Sub-PRs (into `umbrella/m0a`, in order)
 | # | Branch | Delivers | Depends on |
 |---|---|---|---|
+| — | (done) | roadmap item 1, the spike: done in #11 ([`docs/experiments/M0-spike-report.md`](../experiments/M0-spike-report.md)) | — |
 | 1 | `docs/m0a-spec` | this spec; `docs/semantics.md` frozen | — |
-| 2 | `feat/m0a-decl-expr` | package skeleton, declaration models + loader + structural validation, check language with dependency extraction | 1 |
-| 3 | `feat/m0a-interpreter` | model interpreter per semantics §2–§6, projection, memory event store, idempotency, concurrency | 2 |
-| 4 | `feat/m0a-identity-exec` | Identity port, Execution, SQLite store, actor rules incl. relations, grants, `requires: human` | 3 |
+| 2 | `feat/m0a-decl-expr` | package skeleton; declaration models (objects, links, actions, matrix, invariants, world fixtures, scenarios, with `source`/`status` on every element) + loader + structural validation; versioned domain interface with per-element hashes; check language with dependency extraction | 1 |
+| 3 | `feat/m0a-interpreter` | model interpreter per semantics §2–§6, event schemas, projection, memory event store, idempotency, concurrency | 2 |
+| 4 | `feat/m0a-identity-exec` | Identity port, Execution, SQLite and **PostgreSQL** event stores, actor rules incl. relations, grants, `requires: human` | 3 |
 | 5 | `feat/m0a-mcp-server` | `toprope-server` MCP adapter generated from the declaration, query/world-map tools | 4 |
 | 6 | `feat/m0a-harness` | small world, cell tests, invariant checks, gate-tier exploration, flows, replay parity, concurrency tests, parity + coverage | 5 |
-| 7 | `feat/m0a-worldmap` | `world-map.json`, `world_map` / `how_to_reach` | 3 |
+| 7 | `feat/m0a-worldmap` | `world-map.json` (declaration + harness results), `world_map` / `how_to_reach` MCP tools | 5, 6 |
 | 8 | `feat/m0a-change-check` | diff, structural/semantic/scenario/log-replay/in-flight/NL checks, preview | 6 + **M1 instruments frozen by the researcher** |
 | 9 | `feat/m0a-incremental` | dependency graph, hashes, impact report, result cache, background full run | 8 |
 | 10 | `feat/m0a-sources-authoring` | source readers (redaction, local-only), authoring MCP (ADR-0014) | 5 |
@@ -64,5 +65,7 @@ stage-1 files (`instruments.py verify` passes without `--run`).
   harness ≤ 30 s, preview ≤ 60 s)
 - the full run finds no selection miss.
 
-Overrun rule (roadmap): if M0a passes 6 weeks, cut it to what M1 strictly needs, and move the
-rest to M0b.
+Overrun rule (roadmap): if M0a passes 6 weeks, cut it to what M1 strictly needs (semantics,
+model interpreter, Execution, event store, MCP, authoring MCP, model and Execution-level
+harness, structural/semantic/scenario/log-replay/in-flight checks), and move the rest to M0b.
+Do not extend M0a.
