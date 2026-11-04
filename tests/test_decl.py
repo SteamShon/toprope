@@ -155,3 +155,9 @@ def test_interface_bumps_follow_adr_0008(raw):
         {"id": "named", "check": "exists(target.name)", "reason": "Name it first."})
     d = diff_interface(old, interface(Domain.model_validate(add)))
     assert d.bump == "minor" and d.added == ["param:approve_experiment.tag", "precondition:approve_experiment.named"]
+
+
+def test_unhashable_yaml_key_is_a_yaml_error():
+    import yaml as _yaml
+    with pytest.raises(_yaml.YAMLError):
+        load_yaml("? [a, b]\n: 1\n")

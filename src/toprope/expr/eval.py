@@ -126,10 +126,7 @@ def evaluate(node: Node, env: Env) -> Any:
                 # missing list never silently allows (fail closed). Use count()/exists() to be explicit.
                 if not isinstance(b, (list, tuple)):
                     raise EvalError(f"'{op.replace('_', ' ')}' expects a list, got {type(b).__name__}")
-                try:
-                    found = a in b
-                except TypeError as e:
-                    raise EvalError(f"cannot test membership of {type(a).__name__}") from e
+                found = a in b
                 return found if op == "in" else not found
             if a is None or b is None:
                 raise EvalError(f"cannot compare null with {op}")

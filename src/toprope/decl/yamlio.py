@@ -24,6 +24,11 @@ class Yaml12Loader(yaml.SafeLoader):
         seen = set()
         for key_node, _ in node.value:
             key = self.construct_object(key_node, deep=deep)
+            try:
+                hash(key)
+            except TypeError:
+                raise ConstructorError("while constructing a mapping", node.start_mark,
+                                       "found an unhashable key", key_node.start_mark) from None
             if key in seen:
                 raise ConstructorError("while constructing a mapping", node.start_mark,
                                        f"found duplicate key {key!r}", key_node.start_mark)

@@ -139,6 +139,8 @@ def validate_domain(d: Domain) -> list[Issue]:
         missing = [s for s in sorted(states) if s not in tr.matrix]
         if missing:
             add(Issue("missing-row", where, f"no matrix row for states {missing} (treated as undecided)", "warning"))
+        # Only actions on an existing object (`target`) have a cell per source state. Actions
+        # that `create` the object have no source state, so they are not matrix columns.
         obj_actions = sorted(n for n, a in d.actions.items() if a.target == obj)
         for state in sorted(set(tr.matrix) & states):
             absent = [a for a in obj_actions if a not in tr.matrix[state]]
