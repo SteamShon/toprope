@@ -5,89 +5,82 @@ several links, but a milestone ends with a verdict. Budget is ~10h+/week. Dates 
 
 | Milestone | Link | Question | Target |
 |---|---|---|---|
-| M0 | none (enabler) | The hand-built kernel: compiles a domain into working software (MCP, UI, event-sourced backend), generates its harness incrementally, and gates one brownfield API | 6–8 weeks (M0a + M0b) |
-| M1 | ① ② (self) | Model Toprope's own authoring workflow by iterating; do compile-time checks catch what natural-language skills cannot? | 3–4 weeks |
+| M0a | none (enabler) | Thin slice: declaration + semantics, model interpreter, Execution, event store, `toprope-server` MCP and authoring MCP, source readers, harness (model, Execution, MCP), change check incl. log replay and in-flight check, incremental analysis | 4–5 weeks |
+| M1 | ① ② (self) | Model Toprope's own authoring workflow by iterating. Do compile-time checks catch what natural-language skills and structured specs without a compiler cannot? | 3–4 weeks |
+| M0b | none (enabler) | Surfaces and effects: representation compiler, `toprope-shell` (A2UI + CopilotKit), UI-level harness, GitHub brownfield adapter, embedded shape, migration plans, query tools, timers and functions; regenerate the self domain's UI | 3–4 weeks |
 | M2 | ① ② ③ (dogfood) | Does the same hold on another domain, and does the harness-passing software work in real use? | 3–4 weeks |
 | M3 | ④ | Do people and agents act on the same meaning through the capsule? | 3 weeks |
-| M4 | ⑤ | Do logs, proposals and decisions make domains better through use? | 3 weeks |
+| M4 | ⑤ | Do logs, proposals and decisions make domains better through use? (Runtime adapter, Aegra first, enters here) | 3 weeks |
 | M5 | ⑥ (partial) | Do typed handoffs between domains preserve intent? Write-up, go public | 3 weeks |
+
+**Order rationale (ADR-0019):** M1 needs only the thin slice, so M1 runs before the
+surfaces and effects are built. That brings the first verdict to about 8–9 weeks, down from
+about 14. This is a target at about 10 h/week, not a commitment.
+
+**Overrun rule:** if M0a runs past 6 weeks, cut it to what M1 strictly needs (semantics,
+model interpreter, Execution, event store, MCP, authoring MCP, model and Execution-level
+harness, structural/semantic/scenario/log-replay/in-flight checks) and move the rest to M0b.
+Do not extend M0a.
+
+**Milestone spec PRs (ADR-0019):** before a milestone starts, a PR freezes its
+requirements, done criteria and verdict rules. Gold sets, probe suites and seeded change
+lists are frozen by the researcher (AGENTS.md).
 
 If a link is weakened or refuted, later milestones are re-planned before they start. Then
 the claim status in the README is updated.
 
 ---
 
-## M0: Kernel (no claim, 6–8 weeks, re-estimated after ADR-0012 and ADR-0013)
+## M0a: Thin slice (no claim, 4–5 weeks)
 
-The bootstrap is the hand-built kernel that later milestones generate from. ADR-0010 to
-ADR-0013 made it much larger than the first estimate. At ~10h/week it is split so that each
-part ends with something runnable:
-- **M0a, 3–4 weeks: core loop.** Spike, schema, domain compiler (MCP and event-sourced
-  backend), Execution with the invariant guard, event store, harness v0 at the model,
-  Execution and MCP levels, incremental impact analysis and result cache, and the M1
-  instruments frozen first.
-- **M0b, 3–4 weeks: surfaces and effects.** Representation compiler and A2UI views, UI-level
-  harness checks, the change-check pipeline's remaining checks (log replay, NL conflict),
-  the GitHub brownfield adapter, both hosting shapes, and the generated query tools.
+The hand-built kernel that M1 needs, and nothing more. Kernel code is kept small and listed,
+so it is clear what was hand-built and what was generated.
 
-If M0a runs past 5 weeks, cut M0b scope before starting M1, rather than extending M0.
+1. **Spike (1–2 days, ADR-0017).** Run `toprope-server` serving a toy domain over MCP to
+   Claude Code. Separately, render one A2UI view with one host component in a CopilotKit
+   shell, which de-risks M0b early. If A2UI blocks, record the fallback (ADR-0017).
+2. **Freeze the M1 instruments (researcher).** The gold scenarios, the post-deploy probe
+   suite, the change-request list with its seeded-problem key (written by intent), and the
+   verdict rules, including the structured-spec arm. Freezing them *before* building the
+   change checks keeps the seeded problems from being written around what the checks can
+   catch.
+3. **Semantics (`docs/semantics.md`) frozen**, then the **model interpreter** implementing
+   it. It is the oracle.
+4. **Domain schema v0**: objects, links, actions, the transition matrix, invariants
+   (aggregate scope), world fixtures and scenarios, with provenance and status on every
+   element.
+5. **Domain compiler v0**: MCP tools (reads, one tool per action), execution checks, event
+   schemas and projections, and the versioned domain interface.
+6. **Execution + event store (ADR-0012)**: append-time enforcement, the invariant guard,
+   optimistic concurrency, idempotency keys, denied attempts and decisions recorded. SQLite
+   for tests, PostgreSQL for the server.
+7. **Identity and actors (ADR-0016)**: persons and agents with `on_behalf_of` and grants;
+   `requires: human`.
+8. **Harness v0 (ADR-0010)**: small world, cell tests, invariant checks, gate-tier
+   exploration, flows, replay parity, concurrency tests. It runs at the model, Execution and
+   MCP levels, with parity and coverage reports.
+9. **Change check v0 (ADR-0009, ADR-0018)**: structural, semantic conflict, scenario
+   regression, **log replay**, **in-flight check** (stranded objects are listed; migration
+   plans come in M0b), NL conflict warnings, and a preview (a server on copied state).
+   M1's seeded changes include ones that break past logs and strand objects, so these
+   checks must exist before M1.
+10. **Incremental (ADR-0013)**: hashes, the dependency graph, the impact report,
+    affected-only reruns, a result cache with the toolchain hash, and a background full run.
+11. **Source readers**: repository (code, schema), markdown records, session transcripts,
+    interview log, with redaction and local-only sources (ADR-0014). M1 Phase A needs them.
+12. **Authoring MCP (ADR-0014, ADR-0017)**: tools for drafting, interview questions (defaults,
+    grouped cells, priorities), answers and confirmations, so the user's own agent runs the
+    interview. The authoring UI is CLI/YAML until self-compile produces one. This limit is
+    accepted for M1, where the researcher is the only author.
 
-Items below are listed by topic; the M0a/M0b split above decides the order.
-
-- **Spike first (1–2 days, ADR-0007):** Aegra running a toy graph, an MCP server mounted on
-  its custom routes with auth checked, CopilotKit connected, one A2UI view rendered from a
-  toy representation, plus one host-injected custom component. If any part fails, record it and choose a fallback before building the kernel.
-- Stack: pure-Python domain core (`uv`), Aegra as the runtime adapter, TypeScript frontend.
-- Domain schema v0 with provenance and status on every element (`domain-schema.md`).
-- Domain compiler v0: domain → MCP (reads, plus one tool per action with preconditions),
-  execution checks, and a versioned domain interface.
-- Representation compiler v0 (ADR-0008): interface + layers (defaults → base → host overlay)
-  → deterministic A2UI views. Done when:
-  - a representation-only change rebuilds without touching MCP
-  - a domain change flags a broken view
-  - a host overlay injects one custom component.
-- **Freeze the M1 instruments first (researcher):** the gold scenarios, the post-deploy probe
-  suite, the change-request list with its seeded-problem key (written by intent), and the
-  verdict rules. Freezing them *before* building the change checks keeps the seeded problems
-  from being written around what the checks can catch (M1 risks).
-- **Incremental from the start (ADR-0013)**: content hashes, the declaration → artifact → test
-  dependency graph, an impact report before anything runs, affected-only rebuild and
-  retest, a result cache keyed by input hashes, and a background full run that counts
-  selection misses. Done when a single-cell change on the toy domain meets the draft
-  targets (impact report ≤ 2 s, affected harness ≤ 30 s, preview ≤ 60 s) and a full run
-  finds no selection miss.
-- **Change-check pipeline v0 (ADR-0009)**, the core of the compiler: diff against the current
-  version; structural and semantic-conflict checks; scenario regression; log replay; LLM
-  natural-language conflict warnings; preview build. Done when an edit reaches a validated
-  preview in minutes on the toy domain.
-- **Harness v0 (ADR-0010)**: transition matrix and invariants in the schema; a small world
-  grown from fixtures; generated cell tests, invariant checks, bounded exploration
-  (Hypothesis) and example flows, run at the model, Execution and MCP levels plus A2UI
-  message-level view checks; parity and coverage reports. Done when, on the toy domain:
-  - every decided cell is covered
-  - a deliberately broken generator template is caught while model-level regression
-    still passes
-  - a seeded invariant-breaking transition is found by exploration and reported as a
-    minimal flow.
-- **Event store (ADR-0012)**: event-sourced greenfield backend; schemas, projections and
-  append-time enforcement generated from the declaration; denied attempts, decisions and
-  effect outcomes recorded; generated read-only MCP query tools; replay parity checked by
-  the harness.
-- Source readers: repository, markdown records, session transcripts, interview log.
-
-- **Greenfield backend (ADR-0011)**: the compiler also generates a domain API over the event
-  store and its projections (ADR-0012), so the toy domain runs as usable software with no other system.
-- **Brownfield adapter (ADR-0011)**: one `EffectAdapter` to GitHub issues/labels in a sandbox
-  repository, with read-back and `UNKNOWN` on timeout. Adapter-level harness checks run
-  against it.
-- **Hosting shapes (ADR-0011)**: run the same Execution core as (a) a gateway in front of the
-  GitHub adapter and (b) embedded in the generated backend. Record the cost of each, and
-  write the hosting decision as its own ADR.
-
-Exit: a small toy domain compiles to working MCP, UI and greenfield backend, its generated harness passes
-on every surface, and calls are logged.
-Kernel code is kept small and listed, so it is clear what was hand-built and what was
-generated.
+Done when, on the toy domain:
+- every decided cell is covered at every level
+- a deliberately broken generator template is caught while model-level regression still passes
+- a seeded invariant-breaking transition is found by exploration as a minimal flow
+- a race on one cell yields only outcomes the semantics allow
+- a single-cell change meets the draft latency targets (impact report ≤ 2 s, affected
+  harness ≤ 30 s, preview ≤ 60 s)
+- the full run finds no selection miss.
 
 ## M1: Self-compile and safe iteration (① ②, 3–4 weeks)
 
@@ -97,16 +90,43 @@ See [`experiments/M1-self-compile.md`](experiments/M1-self-compile.md).
   → interview → use, then generate the authoring tool from it. Recorded: accuracy over
   iterations and first-draft accuracy (a P0 sanity check).
 - **Phase B**: apply a frozen sequence of about 20 change requests with seeded conflicts and
-  breakages to two arms: a natural-language skill (with LLM conflict review) and the
-  Toprope declaration (with compiler checks and a preview).
+  breakages to three arms: a natural-language skill (with LLM conflict review), a
+  structured spec (the same YAML, with LLM review and no compiler), and the Toprope
+  declaration (with compiler checks and a preview).
+
+M1 runs on the M0a thin slice only.
 
 Exit: verdicts on H-Iterate and H-Fidelity for the self domain, and a generated authoring
-tool v1.
+tool v1. In M1 the tool is the generated authoring MCP, driven by the user's agent, plus
+CLI/YAML. Its UI is generated from the same declaration after M0b.
 
 Kill/pivot: if the NL arm with LLM review catches about as much as the compiler, the
 compiler's value narrows to speed and previews, and this is recorded. If the self domain
 cannot be modeled within thresholds, record which element types agents cannot draft and
 narrow what is generated before M2.
+
+## M0b: Surfaces and effects (no claim, 3–4 weeks, after M1)
+
+1. **Representation compiler v0 (ADR-0008)**: interface + layers (defaults → base → host
+   overlay) → deterministic A2UI views. Done when a representation-only change rebuilds
+   without touching MCP, a domain change flags a broken view, and a host overlay injects one
+   custom component.
+2. **`toprope-shell` (ADR-0017)**: A2UI renderer + CopilotKit, with UI-level harness checks
+   (A2UI message level).
+3. **Greenfield backend over HTTP**, served by `toprope-server`, and the **embedded** shape
+   (core imported by a host app).
+4. **Brownfield adapter (ADR-0011)**: GitHub issues/labels in a sandbox repository, with an
+   outbox, read-back and `UNKNOWN`; adapter-level harness checks (never cached).
+5. **Read-only query tools** over the event store (ADR-0012), which M4 relies on.
+6. **Migration plans (ADR-0018)**, plus the deploy gate conditions.
+   Then **regenerate the self domain's authoring UI** from the M1 declaration, so M2 uses a
+   fully generated authoring tool.
+7. **Timers (virtual clock in the harness), function ports with contract tests, external
+   events and multi-party approvals (ADR-0015)**, as far as the M2 domain needs them.
+
+Done when the toy domain runs as usable software through the shell and the greenfield API,
+gates one GitHub effect, survives a state rename with stranded objects through a tested
+migration, and its harness passes on every surface.
 
 ## M2: Dogfood domain (① ② replicated, ③, 3–4 weeks)
 
@@ -123,7 +143,8 @@ Questions:
 
 **③ works as built (H-Factory).** The researcher actually uses the generated software for
 the experiment lifecycle (greenfield), together with one brownfield effect through the
-GitHub adapter, for at least two weeks. Only harness-passing builds are used. Every defect
+GitHub adapter, for at least two weeks. Live changes during this period go through the
+in-flight check and migration plans (ADR-0018). Only harness-passing builds are used. Every defect
 is logged with its class:
 - state-permission: an action allowed or denied differently from the declaration
 - UX, performance, external API
@@ -156,6 +177,8 @@ rests on ① (cost).
   decisions.
 - Proposal engine: from logs and accumulated work decisions, propose model diffs with
   evidence. Humans decide in the generated UI. Accepted diffs regenerate the surfaces.
+- The first `Runtime` adapter (Aegra) enters here for the unattended proposal engine
+  (ADR-0017).
 - Apply this to both domains, including the self domain, so the authoring tool improves
   itself. No self-approval, and the gold set and verdict checks stay outside the loop.
 
