@@ -72,6 +72,7 @@ def ws(tmp_path) -> Workspace:
     inst = tmp_path / "experiments" / "m1" / "instruments"
     inst.mkdir(parents=True)
     (inst / "gold.md").write_text("# Gold\nheld-out answer\n")
+    (tmp_path / "experiments" / "m1" / "interview-guide.md").write_text("# Guide\nprobed areas\n")
     return Workspace(tmp_path)
 
 
@@ -87,7 +88,8 @@ def test_readers_chunk_with_stable_refs_and_redact(ws):
 
 
 def test_held_out_instruments_are_never_read(ws):
-    assert not any("instruments" in c.ref for c in ws.chunks("all"))
+    assert not any("experiments/" in c.ref for c in ws.chunks("all"))
+    assert ws.search_sources("probed areas") == []
     assert ws.search_sources("held-out") == []
 
 

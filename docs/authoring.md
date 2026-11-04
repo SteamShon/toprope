@@ -32,7 +32,8 @@ uv run toprope-author check                      # validate + model-level harnes
   phone numbers and resident registration numbers. Matches become `[REDACTED:<kind>]`.
 - **Local-only** sources are listed with their chunk count, but their content is never
   served, so it never reaches a hosted model.
-- **Never read:** `experiments/*/instruments/**`, where the held-out gold lives, plus `.git`,
+- **Never read:** `experiments/**` (the held-out gold, its key, and the guides that show
+  what the gold probes), plus `.git`,
   `.venv`, `node_modules`, symlinks, files outside the workspace, and binary or large files.
 - **Usage log.** Every chunk served is recorded there, so the drafter records which sources
   it used.
