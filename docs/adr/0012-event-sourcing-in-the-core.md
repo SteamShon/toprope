@@ -1,5 +1,9 @@
 # ADR-0012: Event sourcing is owned by the core; agents query it; Aegra consumes it
 
+> Note (ADR-0017, ADR-0019): until M4, the consumers are the user's own agents through the
+> authoring and query MCP. A runtime such as Aegra joins only for unattended workflows from
+> M4. The query tools are built in M0b, not M0a.
+
 - Link: ③ works as built, ⑤ evolves (and the log replay of ①) · Status: accepted · 2026-11-04 · decided by: SteamShon
 
 ## Context

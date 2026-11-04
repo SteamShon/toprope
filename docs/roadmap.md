@@ -5,16 +5,22 @@ several links, but a milestone ends with a verdict. Budget is ~10h+/week. Dates 
 
 | Milestone | Link | Question | Target |
 |---|---|---|---|
-| M0a | none (enabler) | Thin slice: declaration + semantics, model interpreter, Execution, event store, `toprope-server` MCP and authoring MCP, harness (model, Execution, MCP), change check, incremental analysis | 3–4 weeks |
+| M0a | none (enabler) | Thin slice: declaration + semantics, model interpreter, Execution, event store, `toprope-server` MCP and authoring MCP, source readers, harness (model, Execution, MCP), change check incl. log replay and in-flight check, incremental analysis | 4–5 weeks |
 | M1 | ① ② (self) | Model Toprope's own authoring workflow by iterating. Do compile-time checks catch what natural-language skills and structured specs without a compiler cannot? | 3–4 weeks |
-| M0b | none (enabler) | Surfaces and effects: representation compiler, `toprope-shell` (A2UI + CopilotKit), UI-level harness, GitHub brownfield adapter, embedded shape, log replay, in-flight check and migration, timers and functions | 3–4 weeks |
+| M0b | none (enabler) | Surfaces and effects: representation compiler, `toprope-shell` (A2UI + CopilotKit), UI-level harness, GitHub brownfield adapter, embedded shape, migration plans, query tools, timers and functions; regenerate the self domain's UI | 3–4 weeks |
 | M2 | ① ② ③ (dogfood) | Does the same hold on another domain, and does the harness-passing software work in real use? | 3–4 weeks |
 | M3 | ④ | Do people and agents act on the same meaning through the capsule? | 3 weeks |
 | M4 | ⑤ | Do logs, proposals and decisions make domains better through use? (Runtime adapter, Aegra first, enters here) | 3 weeks |
 | M5 | ⑥ (partial) | Do typed handoffs between domains preserve intent? Write-up, go public | 3 weeks |
 
 **Order rationale (ADR-0019):** M1 needs only the thin slice, so M1 runs before the
-surfaces and effects are built. That brings the first verdict to about 6–7 weeks.
+surfaces and effects are built. That brings the first verdict to about 8–9 weeks, down from
+about 14. This is a target at about 10 h/week, not a commitment.
+
+**Overrun rule:** if M0a runs past 6 weeks, cut it to what M1 strictly needs (semantics,
+model interpreter, Execution, event store, MCP, authoring MCP, model and Execution-level
+harness, structural/semantic/scenario/log-replay/in-flight checks) and move the rest to M0b.
+Do not extend M0a.
 
 **Milestone spec PRs (ADR-0019):** before a milestone starts, a PR freezes its
 requirements, done criteria and verdict rules. Gold sets, probe suites and seeded change
@@ -25,7 +31,7 @@ the claim status in the README is updated.
 
 ---
 
-## M0a: Thin slice (no claim, 3–4 weeks)
+## M0a: Thin slice (no claim, 4–5 weeks)
 
 The hand-built kernel that M1 needs, and nothing more. Kernel code is kept small and listed,
 so it is clear what was hand-built and what was generated.
@@ -53,13 +59,18 @@ so it is clear what was hand-built and what was generated.
 8. **Harness v0 (ADR-0010)**: small world, cell tests, invariant checks, gate-tier
    exploration, flows, replay parity, concurrency tests. It runs at the model, Execution and
    MCP levels, with parity and coverage reports.
-9. **Change check v0 (ADR-0009)**: structural, semantic conflict, scenario regression, NL
-   conflict warnings, preview (a server on copied state). Log replay waits for M0b.
+9. **Change check v0 (ADR-0009, ADR-0018)**: structural, semantic conflict, scenario
+   regression, **log replay**, **in-flight check** (stranded objects are listed; migration
+   plans come in M0b), NL conflict warnings, and a preview (a server on copied state).
+   M1's seeded changes include ones that break past logs and strand objects, so these
+   checks must exist before M1.
 10. **Incremental (ADR-0013)**: hashes, the dependency graph, the impact report,
     affected-only reruns, a result cache with the toolchain hash, and a background full run.
 11. **World map (ADR-0020)**: `world-map.json` plus the `world_map` and `how_to_reach` MCP
     tools, derived from the declaration and harness results.
-12. **Authoring MCP (ADR-0014, ADR-0017)**: tools for drafting, interview questions (defaults,
+12. **Source readers**: repository (code, schema), markdown records, session transcripts,
+    interview log, with redaction and local-only sources (ADR-0014). M1 Phase A needs them.
+13. **Authoring MCP (ADR-0014, ADR-0017)**: tools for drafting, interview questions (defaults,
     grouped cells, priorities), answers and confirmations, so the user's own agent runs the
     interview. The authoring UI is CLI/YAML until self-compile produces one. This limit is
     accepted for M1, where the researcher is the only author.
@@ -88,7 +99,8 @@ See [`experiments/M1-self-compile.md`](experiments/M1-self-compile.md).
 M1 runs on the M0a thin slice only.
 
 Exit: verdicts on H-Iterate and H-Fidelity for the self domain, and a generated authoring
-tool v1.
+tool v1. In M1 the tool is the generated authoring MCP, driven by the user's agent, plus
+CLI/YAML. Its UI is generated from the same declaration after M0b.
 
 Kill/pivot: if the NL arm with LLM review catches about as much as the compiler, the
 compiler's value narrows to speed and previews, and this is recorded. If the self domain
@@ -107,8 +119,10 @@ narrow what is generated before M2.
    (core imported by a host app).
 4. **Brownfield adapter (ADR-0011)**: GitHub issues/labels in a sandbox repository, with an
    outbox, read-back and `UNKNOWN`; adapter-level harness checks (never cached).
-5. **Log replay** in the change check (ADR-0009).
-6. **In-flight check and migration plans (ADR-0018)**, plus the deploy gate conditions.
+5. **Read-only query tools** over the event store (ADR-0012), which M4 relies on.
+6. **Migration plans (ADR-0018)**, plus the deploy gate conditions.
+   Then **regenerate the self domain's authoring UI** from the M1 declaration, so M2 uses a
+   fully generated authoring tool.
 7. **World-map skill-tree view** in the shell, and the map diff in impact reports
    (ADR-0020).
 8. **Timers (virtual clock in the harness), function ports with contract tests, external
