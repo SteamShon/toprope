@@ -19,9 +19,19 @@ Effects        greenfield: generated backend (domain API over Toprope's event st
                brownfield: existing servers, APIs, DBs behind EffectAdapters (read-back, UNKNOWN)
 ```
 
-**Hosting is open** (ADR-0011): (a) a gateway or sidecar in front of brownfield servers,
-(b) embedded in the generated greenfield backend, or (c) a hosted service (a non-goal for
-now). One Execution core serves (a) and (b). M0 builds both shapes on the toy domain.
+## Deployment shapes (ADR-0017)
+
+```
+toprope-core     Python library: declaration, compilers, Execution, harness, ports
+  ├─ toprope-server   core + MCP (agents) + HTTP (greenfield API) + query tools   ← first
+  ├─ embedded         a host app imports core and runs Execution in-process        ← second
+  ├─ toprope-shell    generic web app: A2UI renderer + CopilotKit; hosts replace or override it
+  └─ Runtime adapter  optional, only for autonomous agent workflows: Aegra / LangGraph / Temporal
+```
+
+Minimum deployment: `toprope-server` + PostgreSQL (SQLite for tests). Drafting and
+interviewing run in the user's own agent through the generated authoring MCP. A `Runtime`
+adapter joins only for unattended workflows (M4). Semantics: [`semantics.md`](semantics.md).
 
 ## Bounded contexts
 
@@ -45,17 +55,20 @@ are generated, and only the kernel stays hand-built.
 | Port | Responsibility | First adapter | Later candidates |
 |---|---|---|---|
 | `SourceReader` | read code/schema, records, transcripts, interview logs | repo + markdown + transcript readers | Slack, Notion, DB introspection |
-| `Drafter` | sources → proposed elements with source links | Aegra workflow calling an LLM (Claude API) (ADR-0007) | other models or runtimes |
-| `Interviewer` | targeted questions on unknown or conflicting elements, `undecided` matrix cells and candidate invariants, asked in plain domain language | Aegra workflow; each question is a HITL interrupt answered in the generated UI (ADR-0007) | other runtimes |
+| `Drafter` | sources → proposed elements with source links | the user's agent (e.g. Claude Code) through the authoring MCP (ADR-0017) | Aegra workflow calling an LLM |
+| `Interviewer` | targeted questions on unknown or conflicting elements, `undecided` matrix cells and candidate invariants, asked in plain domain language: defaults first, grouped cells, prioritized, with a stop rule (ADR-0014) | the user's agent through the authoring MCP (ADR-0017) | Aegra workflow with HITL interrupts |
 | `DomainStore` | versioned domain models | YAML in repo | git-backed registry |
 | `EventStore` | append events (matrix, preconditions and invariants enforced at append); read streams; projections for current state (ADR-0012) | PostgreSQL in its own schema (may share Aegra's server) or SQLite for tests | EventStoreDB, Kafka-backed |
-| `AgentSurface` | expose reads and actions to agents | generated MCP server mounted on Aegra custom routes | OpenAPI, LangGraph tools |
+| `AgentSurface` | expose reads and actions to agents | generated MCP served by `toprope-server` (ADR-0017) | in-process (embedded), OpenAPI, LangGraph tools |
 | `HumanSurface` | expose objects and actions to people | compiled A2UI views rendered in React + CopilotKit; host-injected components via the renderer catalog; LLM generative UI for ad-hoc views, limited to the catalog and allowed actions (ADR-0008) | other generative-UI stacks, OpenDots |
 | `RepresentationStore` | versioned base representations and host overlays | YAML files | host-managed registry |
-| `Runtime` | host long-lived agent workflows (drafter, interviewer, proposal engine) | Aegra (ADR-0007) | LangGraph Platform, Temporal |
+| `Runtime` | host unattended agent workflows (proposal engine from M4) | none until M4; then Aegra (ADR-0017) | LangGraph Platform, Temporal |
+| `Scheduler` | fire declared timers as system commands; virtual clock in the harness (ADR-0015) | in-process | Temporal |
+| `Identity` | resolve actors (person, agent, system), `on_behalf_of` and grants (ADR-0016) | OIDC/JWT from the host | — |
+| `FunctionPort` | typed, pure business computations outside generated code, checked by contract tests (ADR-0015) | Python callables | remote functions |
 | `EffectAdapter` | real-world effects, with read-back and `UNKNOWN` | greenfield: the generated backend's store; brownfield: GitHub issues/labels in a sandbox repo (ADR-0011) | flags, ad APIs, internal services |
 | `EventQuery` | read-only, declaration-typed queries for agents: timelines, decision history, denials per cell, `undecided` hits, exceptions, effect outcomes; exposed as generated MCP tools | in-process over `EventStore` | analytics warehouse |
-| `ProposalEngine` | logs → candidate diffs | Aegra cron workflow calling an LLM | Harness²-style probe loops |
+| `ProposalEngine` | logs → candidate diffs | Aegra cron workflow calling an LLM (from M4) | Harness²-style probe loops |
 | `ScenarioRunner` | run the domain's flows against the model (reference interpreter) | in-process | — |
 | `WorldBuilder` | grow the expert's fixtures into a small world: an instance per reachable state, every role, boundary values; report unreachable states | in-process | — |
 | `HarnessGenerator` | compile the matrix, invariants, world and flows into per-surface tests (Execution, MCP client, A2UI view assertions, adapters); parity and coverage reports (ADR-0010) | pytest-based generated suite | browser end-to-end for host components |
@@ -123,12 +136,12 @@ action call ─► Execution: matrix + preconditions + invariants ─► append 
 The core owns the event store. Aegra's threads and checkpoints are a separate stream of
 agent-execution records, linked to domain events by `thread_id` and `run_id`.
 
-## Stack (ADR-0007)
+## Stack (ADR-0007, ADR-0017)
 
-- Domain core: pure Python (`uv`), with no Aegra or LangGraph imports.
-- Server: Aegra (FastAPI + LangGraph + PostgreSQL + Redis) hosting the agent workflows and the
-  generated MCP/domain API as custom routes.
-- Frontend: TypeScript, React + CopilotKit over AG-UI.
+- Domain core: pure Python (`uv`), with no runtime imports.
+- `toprope-server`: Python (MCP + HTTP), PostgreSQL event store.
+- `toprope-shell`: TypeScript, React + CopilotKit rendering A2UI (with a fallback view spec).
+- Optional `Runtime` adapter from M4: Aegra first.
 
 ## Guarantee boundary
 

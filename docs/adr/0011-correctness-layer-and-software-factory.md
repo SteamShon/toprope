@@ -51,7 +51,7 @@ P0 → ① iterate safely → ② model is right → ③ works as built → ④ 
   handling. GitHub (issues and labels) is the candidate: it is real, free and easy to
   observe. The harness runs adapter-level checks against it (a sandbox repository).
 
-### 4. Hosting topology: open
+### 4. Hosting topology: open (decided later by ADR-0017)
 How the correctness layer is deployed is not decided. Candidates:
 - (a) a **gateway / sidecar** in front of brownfield effect servers: agents → Toprope MCP →
   adapter → server

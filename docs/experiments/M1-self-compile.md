@@ -57,6 +57,9 @@ the sanity check for P0 (was the first draft already right?).
   (SKILL.md plus examples) that contains the same rules. Each change is applied as a text
   edit. Pre-deploy check: an LLM is asked to review the edit against the whole skill for
   conflicts and breakage. This is the strongest fair baseline.
+- **Structured-spec arm (ADR-0019).** The same change is applied to the same YAML
+  declaration, but with **no compiler**. Pre-deploy check: the same LLM review as the NL arm.
+  This separates the effect of having a structured spec from the effect of the compiler.
 - **Toprope arm.** The same change is applied to the declaration. Pre-deploy check: the
   compiler's change checks plus a preview build.
 
@@ -125,6 +128,7 @@ counts as **found after deploy**. One that never shows up counts as **silent**.
 | **Held-out accuracy** (primary) | after Phase A, and after Phase B | ② |
 | Accuracy-over-iterations | Phase A curve; accuracy of the first draft | ② and the P0 sanity check |
 | Unsupported rules | rules with no source and no confirmation | ② |
+| Interview efficiency (ADR-0014) | questions asked; cells decided per question; share of cells decided by confirmed defaults | ① ② |
 | Matrix completeness | share of (state, action) cells decided rather than `undecided`; cells decided through the interview vs. drafted from sources | ② |
 | Harness findings | invariant violations and parity failures found before deploy, and by which part (cell tests, exploration, flows) | ① |
 | Generated vs hand-built | share of the authoring tool that is generated; hand edits to generated code | self-compile |
@@ -140,6 +144,9 @@ counts as **found after deploy**. One that never shows up counts as **silent**.
 - **Weakens ①**: the NL arm with LLM review comes within 15 points of Toprope's recall, or
   Toprope's precision < 50%, or most seeded breakages are found only after deploy in both
   arms.
+- **Compiler contribution** (reported alongside ①): Toprope recall minus structured-spec
+  recall. If it is within 10 points, the gain comes from writing the domain down in a
+  structured form, not from the compiler, and this is recorded as a narrowed claim.
 - **Inconclusive ①**: any outcome not covered above. For example, a recall gap of 15–30
   points, or precision of 50–70%. It is reported as inconclusive with the numbers, and is
   not read as support. M2 repeats the comparison.

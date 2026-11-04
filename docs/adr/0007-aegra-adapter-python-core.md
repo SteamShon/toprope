@@ -2,6 +2,8 @@
 
 - Link: ① ⑤ (authoring agents, proposal loop) · Status: accepted · 2026-11-04 · decided by: SteamShon
 - Supersedes: ADR-0006
+- Note: the hosting part (Aegra hosts the generated MCP; Aegra in the M0 spike) is superseded
+  by ADR-0017. The pure-Python core and the TypeScript frontend still stand.
 
 ## Context
 The researcher wanted to build on Aegra (https://github.com/aegra/aegra), a self-hosted,

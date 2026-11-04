@@ -170,7 +170,7 @@ without a real organization, and that limit is stated wherever ⑥ is discussed.
 ## 6. Non-goals
 
 - A full ontology platform, a hosted multi-tenant service, or a marketplace. (How the
-  correctness layer is *deployed* for one team is an open question, ADR-0011.)
+  correctness layer is deployed is decided in ADR-0017: core library, `toprope-server` first.)
 - Choosing a durable runtime or host before a milestone needs one.
 - Learning response models from outcomes. The decision log is a future dataset for that.
 - Monetization as a success criterion.

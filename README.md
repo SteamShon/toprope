@@ -215,20 +215,25 @@ changes only in a PR that reports a preregistered experiment verdict.
 
 | Milestone | Link | What happens |
 |---|---|---|
-| M0a / M0b | none | The kernel: compiler, event store, harness, incremental impact analysis; then UI, a brownfield adapter (GitHub) and two hosting shapes |
-| M1 | ① ② | **Self-compile**: model Toprope's own authoring workflow; a natural-language skill vs. the declaration on a frozen change sequence with seeded conflicts |
+| M0a | none | Thin slice: semantics, model interpreter, Execution, event store, `toprope-server` MCP, authoring MCP, harness, change check, incremental analysis |
+| M1 | ① ② | **Self-compile**: model Toprope's own authoring workflow; a natural-language skill vs. a structured spec without a compiler vs. Toprope, on a frozen change sequence with seeded conflicts |
+| M0b | none | Surfaces and effects: representation compiler and shell, brownfield adapter (GitHub), embedded shape, log replay, migrations, timers and functions |
 | M2 | ① ② ③ | **Dogfood**: an experiment-lifecycle domain built with the self-compiled tool and used for real |
 | M3 | ④ | Do agents make fewer meaning errors through the generated surfaces? |
-| M4 | ⑤ | Proposals from the event history; humans decide |
+| M4 | ⑤ | Proposals from the event history; humans decide (an optional runtime adapter, Aegra first, joins here) |
 | M5 | ⑥ (partial) | Typed handoffs between domains; write-up; public release |
 
 Details, exit criteria and kill criteria: [`docs/roadmap.md`](docs/roadmap.md).
 
 ## Stack
 
-- **Domain core**: Python (`uv`). It never imports the runtime.
-- **Runtime for agent workflows** (drafter, interviewer, proposal engine): [Aegra](https://github.com/aegra/aegra), behind a port.
-- **UI**: A2UI views compiled from the representation layer, rendered with React + CopilotKit.
+- **Domain core**: a Python library (`uv`). It never imports a runtime.
+- **`toprope-server`**: the first deployment shape. It serves MCP for agents, HTTP for the
+  greenfield API, and the query tools. It can also be imported as a library.
+- **Drafting and interviewing**: done by your own agent (e.g. Claude Code) through the
+  generated authoring MCP.
+- **Optional runtime** for unattended workflows (from M4): [Aegra](https://github.com/aegra/aegra), behind a port.
+- **UI** (`toprope-shell`): A2UI views compiled from the representation layer, rendered with React + CopilotKit.
 - **Event store**: PostgreSQL in its own schema.
 - **Harness exploration**: Hypothesis stateful testing.
 
