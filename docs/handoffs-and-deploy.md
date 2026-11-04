@@ -26,12 +26,27 @@ authoring.dispatch()                                                      # retr
 - **Sending.** The sender's action appends a `HandoffRequested` event (kind `outbox`)
   atomically, and the dispatcher sends it after the append. A failure never blocks or rolls
   back the sender's action.
-- **The receiver's command.** It runs as `system` (`handoff:<name>`) on behalf of the
+- **The receiver's command.** It runs as `system` (`handoff:<sender>.<name>`, ADR-0026) on behalf of the
   origin person. Its idempotency key and `causation` are the handoff id
   `<name>:<sender stream>@<version>`.
 - **Resolution.** The outcome is recorded in the sender's stream `handoff:<id>` as
   `HandoffDelivered`, `HandoffDenied` or `HandoffFailed`. Transient outcomes and
   unreachable receivers stay pending, and `dispatch()` retries them.
+
+## Composition (ADR-0026)
+A `*.composition.yaml` declares the members (declaration and published interface major) and
+the wiring. Its format is in [`domain-schema.md`](domain-schema.md#handoffs).
+
+```bash
+uv run toprope-harness --composition self.composition.yaml     # members, wiring and contracts, then each member's harness
+uv run toprope-worldmap --composition self.composition.yaml --out world-map.json
+```
+
+In code:
+- `toprope.compose.assemble(composition, stores, identity)` returns one Execution per
+  member, wired in process. Each receiver accepts only its wired handoffs.
+- `how_to_reach_across(map, ...)` answers path questions across domains. A handoff step is
+  taken by `system`.
 
 ## Local deploy
 ```bash

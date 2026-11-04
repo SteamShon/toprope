@@ -63,7 +63,7 @@ Evaluation stops at the first failure, and each failure has its own outcome:
     version `v`. On a version conflict, retry from step 3 up to N times, then
     `rejected: conflict`.
 12. **External effects and handoffs** run **after** the append, from an outbox. A handoff is a
-    command into another domain, as `system` (`handoff:<name>`) on behalf of the
+    command into another domain, as `system` (`handoff:<sender domain>.<name>`, ADR-0026) on behalf of the
     originating person, with idempotency key `<handoff>:<sender event id>`. A denial there is
     recorded here as `HandoffDenied` (ADR-0023). Their outcome
     is recorded as `EffectSucceeded`, `EffectFailed`, `EffectUnknown` or `EffectConfirmed`

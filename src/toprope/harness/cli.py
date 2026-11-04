@@ -6,6 +6,8 @@
 A domain with handoffs is checked against each receiver's published interface first; an
 unknown receiver is an error, so every handoff's contract is checked before the harness runs.
 
+  toprope-harness --composition self.composition.yaml   (members, wiring, then each member)
+
 Exit status 1 if there is any finding (a failing cell test, an invariant violation, a parity,
 replay or race failure, a failing flow, or an exploration counterexample).
 """
@@ -23,7 +25,9 @@ from .run import DEFAULT_LEVELS, run_harness
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(prog="toprope-harness", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--domain", required=True)
+    ap.add_argument("--domain", help="one declaration (or use --composition)")
+    ap.add_argument("--composition", help="a *.composition.yaml: check members and wiring (ADR-0026), "
+                                          "then run the harness on every member")
     ap.add_argument("--levels", default=",".join(DEFAULT_LEVELS))
     ap.add_argument("--examples", type=int, default=200, help="exploration examples (0 disables)")
     ap.add_argument("--depth", type=int, default=5, help="exploration depth")
@@ -33,6 +37,11 @@ def main(argv: list[str] | None = None) -> None:
                          "(default 1): checks this domain's handoffs against it (ADR-0024)")
     args = ap.parse_args(argv)
 
+    if bool(args.domain) == bool(args.composition):
+        ap.error("give exactly one of --domain or --composition")
+    if args.composition:
+        _composition(args)
+        return
     d = load_domain(args.domain)
     errors = [i for i in validate_domain(d) if i.severity == "error"]
     if errors:
@@ -64,6 +73,32 @@ def main(argv: list[str] | None = None) -> None:
         with open(args.json, "w") as f:
             json.dump(report.to_json(), f, indent=2, default=str)
     raise SystemExit(0 if report.ok else 1)
+
+
+
+def _composition(args) -> None:
+    from ..compose import check_composition, load_composition
+    try:
+        c = load_composition(args.composition)
+    except ValueError as e:
+        print(f"error {e}", file=sys.stderr)
+        raise SystemExit(1) from None
+    issues = check_composition(c)
+    if issues:
+        for i in issues:
+            print(f"error {i.code} at {i.where}: {i.message}", file=sys.stderr)
+        raise SystemExit(1)
+    levels = tuple(x.strip() for x in args.levels.split(",") if x.strip())
+    ok, reports = True, {}
+    for name, d in sorted(c.domains.items()):
+        r = run_harness(d, levels=levels, explore_examples=args.examples, explore_depth=args.depth)
+        print(f"== {name}\n{r.summary()}")
+        ok &= r.ok
+        reports[name] = r.to_json()
+    if args.json:
+        with open(args.json, "w") as f:
+            json.dump(reports, f, indent=2, default=str)
+    raise SystemExit(0 if ok else 1)
 
 
 if __name__ == "__main__":

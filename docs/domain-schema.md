@@ -17,6 +17,7 @@ readable schemas: [`schema/domain.v1.schema.json`](../schema/domain.v1.schema.js
 | `world` (fixtures, actors), `scenarios` (`do`, `read` steps) | core, scenarios | implemented (M0a) |
 | `purpose` (problem, success metric, announcement) | [Purpose](#purpose) | M0a (metadata only) |
 | `handoffs` | [Handoffs](#handoffs) | implemented (M0a, ADR-0024) |
+| composition files (`*.composition.yaml`: members and wiring) | [Handoffs](#handoffs) | implemented (M0a, ADR-0026) |
 | `approvals` on actions | [Approvals](#approvals) | defined; M0b |
 | `invariants` with `scope: cross` + `reservations` | [Reservations](#cross-aggregate-invariants-and-reservations) | defined; M0b |
 | `timers`, scenario `advance` steps | [Timers](#timers) | defined; M0b |
@@ -285,7 +286,7 @@ How a handoff runs (docs/semantics.md step 12):
 - It is sent from an **outbox after the sender's action is appended**. It never blocks or
   rolls back the sender's action.
 - The command in the receiving domain names its `target` (an expression, as with `params`).
-  Its actor is the `system` actor `handoff:<name>`, acting on behalf of the person who
+  Its actor is the `system` actor `handoff:<sender domain>.<name>` (ADR-0026), acting on behalf of the person who
   caused the sender's action (that person's principal, if an agent acted). Its idempotency
   key is `<handoff name>:<sender event id>`, so retries never deliver twice.
 - The receiving action must allow `system` in its actor rule. It is then evaluated like any
@@ -295,6 +296,29 @@ How a handoff runs (docs/semantics.md step 12):
   `HandoffDenied` or `HandoffFailed`). A denial becomes a
   `HandoffDenied` event in the sender's domain, which the sender's own rules and proposals
   can react to.
+
+A system of domains is declared in a **composition file** (ADR-0026). Domains compose and
+never inherit: they connect only through published interfaces.
+
+```yaml
+# self.composition.yaml
+composition: toprope-self
+version: 1
+members:                       # key = the member's declared `domain` name
+  domain-authoring: {declaration: authoring.domain.yaml, interface: 1}   # published major
+  domain-delivery:  {declaration: delivery.domain.yaml,  interface: 1}
+wiring:
+  - {from: domain-authoring.deliver_approved_version, to: domain-delivery.request_delivery}
+```
+
+Compiling a composition checks:
+- every member
+- that every handoff is wired exactly as it declares
+- each wire's contract against the receiver's published major
+
+At runtime, a receiver accepts only the handoffs wired to each action. Any other handoff is
+`denied: actor`. The composed world map joins the members at the wires, so path questions
+cross domains.
 
 ## Approvals
 

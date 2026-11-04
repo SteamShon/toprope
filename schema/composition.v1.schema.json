@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://toprope.dev/schema/composition.v1.schema.json",
+  "type": "object",
+  "properties": {
+    "composition": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "members": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "declaration": {
+            "type": "string"
+          },
+          "interface": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "declaration"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "wiring": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_-]*\\..+$"
+          },
+          "to": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_-]*\\..+$"
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "composition",
+    "version",
+    "members"
+  ],
+  "additionalProperties": false
+}

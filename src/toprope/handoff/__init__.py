@@ -35,7 +35,8 @@ class HandoffTransport(ABC):
     @abstractmethod
     def deliver(self, domain: str, handoff: str, action: str, target: str, params: dict[str, Any],
                 handoff_id: str, origin: dict[str, Any] | None) -> Outcome:
-        """Issue the command in the receiving domain as `system` (`handoff:<name>`)."""
+        """Issue the command in the receiving domain as `system` (`handoff:<sender>.<name>`);
+        `handoff` is the qualified `<sender domain>.<handoff name>`."""
 
 
 class LocalTransport(HandoffTransport):
@@ -91,8 +92,8 @@ class Outbox:
                 report.append(self._resolve(p, "HandoffFailed", {"code": "mapping-error", "reason": pl["error"]}))
                 continue
             try:
-                o = transport.deliver(pl["to"]["domain"], pl["handoff"], pl["to"]["action"], pl["target"],
-                                      pl["params"], p.id, pl.get("origin"))
+                o = transport.deliver(pl["to"]["domain"], f"{self.ex.d.domain}.{pl['handoff']}", pl["to"]["action"],
+                                      pl["target"], pl["params"], p.id, pl.get("origin"))
             except Exception as e:   # the receiver is unreachable: stays pending, retried later
                 report.append({"id": p.id, "result": "pending", "reason": f"{type(e).__name__}: {e}"})
                 continue

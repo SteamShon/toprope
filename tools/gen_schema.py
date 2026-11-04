@@ -1,4 +1,4 @@
-"""Generate schema/domain.v1.schema.json and schema/representation.v1.schema.json.
+"""Generate schema/domain.v1.schema.json, representation.v1.schema.json and composition.v1.schema.json.
 
 The source of truth for the language is docs/domain-schema.md (ADR-0023). This file encodes
 it for machines. Run: uv run python tools/gen_schema.py
@@ -166,8 +166,21 @@ representation = {
     ],
 }
 
+composition = {   # ADR-0026: a system of domains, joined only through published interfaces
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://toprope.dev/schema/composition.v1.schema.json",
+    **obj({"composition": ID, "version": {"type": "integer", "minimum": 1},
+           "members": {"type": "object", "minProperties": 1, "propertyNames": ID, "additionalProperties": obj(
+               {"declaration": {"type": "string"}, "interface": {"type": "integer", "minimum": 1}}, ["declaration"])},
+           "wiring": {"type": "array", "items": obj(
+               {"from": {"type": "string", "pattern": r"^[A-Za-z_][A-Za-z0-9_-]*\..+$"},
+                "to": {"type": "string", "pattern": r"^[A-Za-z_][A-Za-z0-9_-]*\..+$"}}, ["from", "to"])}},
+          ["composition", "version", "members"]),
+}
+
 out = Path(__file__).resolve().parents[1] / "schema"
 out.mkdir(exist_ok=True)
 (out / "domain.v1.schema.json").write_text(json.dumps(domain, indent=2) + "\n")
 (out / "representation.v1.schema.json").write_text(json.dumps(representation, indent=2) + "\n")
-print("wrote", out / "domain.v1.schema.json", out / "representation.v1.schema.json")
+(out / "composition.v1.schema.json").write_text(json.dumps(composition, indent=2) + "\n")
+print("wrote", out / "domain.v1.schema.json", out / "representation.v1.schema.json", out / "composition.v1.schema.json")

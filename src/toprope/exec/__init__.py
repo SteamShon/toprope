@@ -20,13 +20,18 @@ from ..store import EventStore
 
 class Execution:
     def __init__(self, domain: Domain, store: EventStore, identity: Identity,
-                 clock: Callable[[], datetime] | None = None, transport: Any = None):
-        """`transport` (a HandoffTransport) sends this domain's handoffs after each append."""
+                 clock: Callable[[], datetime] | None = None, transport: Any = None,
+                 accepts: dict[str, set[str]] | None = None):
+        """`transport` (a HandoffTransport) sends this domain's handoffs after each append.
+        `accepts` (from a composition, ADR-0026) maps each receiving action to the handoffs
+        wired to it (`<sender domain>.<handoff>`); any other handoff is refused. None: a domain
+        served alone accepts any handoff its actor rules allow."""
         self.d = domain
         self.store = store
         self.identity = identity
         self.clock = clock or (lambda: datetime.now(timezone.utc))
         self.transport = transport
+        self.accepts = accepts
         self._model = ReferenceModel(domain, store, clock=self.clock, seed_world=False)
 
     # -- commands ----------------------------------------------------------------------------
@@ -70,9 +75,10 @@ class Execution:
 
     def receive_handoff(self, handoff: str, action: str, target: str, params: dict[str, Any],
                         handoff_id: str, origin: dict[str, Any] | None) -> Outcome:
-        """A command from another domain's handoff (step 12): actor `system` (`handoff:<name>`),
-        on behalf of the originating person, keyed by the handoff id. In-process transports
-        call this; it never goes through credentials, so no caller can impersonate it."""
+        """A command from another domain's handoff (step 12). `handoff` is
+        `<sender domain>.<handoff name>`; the actor is `system` with id `handoff:<that>`
+        (ADR-0026), on behalf of the originating person, keyed by the handoff id. In-process
+        transports call this; it never goes through credentials, so no caller can impersonate it."""
         spec = self.d.actions.get(action)
         if spec is None:
             return Outcome("rejected", "unknown-action", f"No action {action}.")
@@ -80,6 +86,13 @@ class Execution:
         if bad:
             return Outcome("rejected", "invalid-command", bad)
         actor = Actor(f"handoff:{handoff}", "system", ("system",))
+        if self.accepts is not None and handoff not in self.accepts.get(action, set()):
+            reason = f"{handoff} is not wired to {action} in this composition."
+            self.store.append_attempt(Event(
+                "DeniedAttempt", target, spec.object_type, kind="attempt", at=self.clock(), actor=actor.ref(),
+                domain_version=self.d.version, causation=handoff_id,
+                payload={"action": action, "code": "actor", "reason": reason, "params": dict(params or {})}))
+            return Outcome("denied", "actor", reason)
         principal = Actor(origin["id"], "person") if origin else None
         cmd = Command(actor, action, target, dict(params or {}), handoff_id, self.clock(),
                       on_behalf_of=principal, causation=handoff_id)

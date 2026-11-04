@@ -32,7 +32,8 @@ and one change to the check language that the schema's own example already assum
 
    Resolutions use their own stream so they never bump the sender object's version and never
    cause conflicts with the sender's own commands. The receiver acts as `system`
-   (`handoff:<name>`) on behalf of the origin person (an agent's principal). If no person
+   (`handoff:<name>`; amended by ADR-0026 to `handoff:<sender domain>.<name>`) on behalf of the
+   origin person (an agent's principal). If no person
    originated the sender's action (a system actor acting for no one), the handoff carries
    no `on_behalf_of`. The handoff actor can only come from a transport, never from
    credentials (Identity refuses it).
