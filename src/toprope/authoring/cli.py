@@ -2,7 +2,10 @@
 
   toprope-author init [DIR]                 write a starter toprope.workspace.yaml
   toprope-author serve [--workspace DIR]    the authoring MCP over stdio (for your agent)
-  toprope-author questions [--workspace DIR]
+  toprope-author questions [--workspace DIR] [--stage NAME]
+  toprope-author progress [--workspace DIR]
+  toprope-author fetch [SOURCE_ID] [--workspace DIR]   fetch link sources into snapshots
+  toprope-author skip STAGE --reason TEXT             an optional stage has nothing
   toprope-author confirm PATH... [--workspace DIR] [--yes]   only you confirm
   toprope-author check [--workspace DIR]
 """
@@ -28,6 +31,7 @@ sources:
   - {id: docs, kind: records, path: docs}
   # - {id: sessions, kind: transcripts, path: notes/sessions, local_only: true}
   - {id: interview, kind: interview-log, path: interview/log.jsonl}
+  # - {id: wiki, kind: records, url: "https://example.com/process"}   # a link: run `toprope-author fetch`
 # redact:                        # extra patterns, on top of secrets and personal data
 #   - {name: internal-host, pattern: "[a-z0-9-]+\\\\.corp\\\\.example"}
 # exclude: ["private/**"]        # never read (held-out instruments are always excluded)
@@ -40,9 +44,16 @@ def main(argv: list[str] | None = None) -> None:
     sub = ap.add_subparsers(dest="cmd", required=True)
     init = sub.add_parser("init")
     init.add_argument("dir", nargs="?", default=".")
-    for name in ("serve", "questions", "check"):
+    for name in ("serve", "questions", "check", "progress", "fetch", "skip"):
         p = sub.add_parser(name)
         p.add_argument("--workspace", default=".")
+        if name == "questions":
+            p.add_argument("--stage")
+        if name == "fetch":
+            p.add_argument("source", nargs="?")
+        if name == "skip":
+            p.add_argument("stage")
+            p.add_argument("--reason", required=True)
     c = sub.add_parser("confirm")
     c.add_argument("paths", nargs="+")
     c.add_argument("--workspace", default=".")
@@ -62,7 +73,16 @@ def main(argv: list[str] | None = None) -> None:
             from .mcp import build_authoring_server
             build_authoring_server(ws).run("stdio")
         elif args.cmd == "questions":
-            print(json.dumps(ws.questions(), indent=2, ensure_ascii=False))
+            print(json.dumps(ws.questions(stage=args.stage), indent=2, ensure_ascii=False))
+        elif args.cmd == "progress":
+            p = ws.progress()
+            for st in p["stages"]:
+                counts = ", ".join(f"{k} {v}" for k, v in st.items() if k not in ("stage", "title", "status"))
+                print(f"{st['status']:>8}  {st['title']:<20} {counts}")
+        elif args.cmd == "fetch":
+            print(json.dumps(ws.fetch(args.source), indent=2))
+        elif args.cmd == "skip":
+            print(json.dumps(ws.skip_stage(args.stage, args.reason), indent=2, ensure_ascii=False))
         elif args.cmd == "check":
             out = ws.check()
             print(json.dumps(out, indent=2, ensure_ascii=False))

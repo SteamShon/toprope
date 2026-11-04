@@ -27,7 +27,7 @@ import yaml
 from pydantic import ValidationError
 
 from ..decl import Domain, load_yaml, validate_domain
-from ..sources import DEFAULT_EXCLUDE, ELEMENT_KIND, Chunk, SourceSpec, read
+from ..sources import DEFAULT_EXCLUDE, ELEMENT_KIND, SNAPSHOTS, Chunk, FetchError, SourceSpec, fetch, read
 
 CONFIG = "toprope.workspace.yaml"
 LIST_BY_ID = {"invariants", "preconditions", "scenarios"}
@@ -141,8 +141,11 @@ class Workspace:
         self.extra = [(r["name"], re.compile(r["pattern"])) for r in cfg.get("redact", [])]
         self.sources: dict[str, SourceSpec] = {}
         for s in cfg.get("sources", []):
-            spec = SourceSpec(s["id"], s["kind"], s["path"], tuple(s.get("globs", [])),
-                              bool(s.get("local_only", False)), tuple(s.get("exclude", [])))
+            if bool(s.get("url")) == bool(s.get("path")):
+                raise AuthoringError(f"source {s.get('id')!r}: give either a path or a url")
+            path = s.get("path") or f"{SNAPSHOTS}/{s['id']}"
+            spec = SourceSpec(s["id"], s.get("kind", "records"), path, tuple(s.get("globs", [])),
+                              bool(s.get("local_only", False)), tuple(s.get("exclude", [])), s.get("url"))
             self.sources[spec.id] = spec
         self._chunks: dict[str, list[Chunk]] = {}
 
@@ -156,8 +159,32 @@ class Workspace:
         return self._chunks[source_id]
 
     def list_sources(self) -> list[dict[str, Any]]:
-        return [{"id": s.id, "kind": s.kind, "path": s.path, "local_only": s.local_only,
-                 "chunks": len(self.chunks(s.id))} for s in self.sources.values()]
+        out = []
+        for s in self.sources.values():
+            row = {"id": s.id, "kind": s.kind, "path": s.path, "local_only": s.local_only,
+                   "chunks": len(self.chunks(s.id))}
+            if s.url:
+                meta = self.root / s.path / "snapshot.json"
+                row.update(url=s.url, fetched=json.loads(meta.read_text()) if meta.exists() else None)
+            out.append(row)
+        return out
+
+    def fetch(self, source_id: str | None = None) -> list[dict[str, Any]]:
+        """Fetch link sources into their snapshots (all, or one). Re-fetching replaces the
+        snapshot; refs into it may change, so fetch before drafting from it."""
+        if source_id and source_id not in self.sources:
+            raise AuthoringError(f"no source {source_id!r}")
+        targets = [self.sources[source_id]] if source_id else [s for s in self.sources.values() if s.url]
+        out = []
+        for spec in targets:
+            if not spec.url:
+                raise AuthoringError(f"source {spec.id!r} is a path, not a link")
+            try:
+                out.append({"id": spec.id, **fetch(spec, self.root)})
+            except FetchError as e:
+                raise AuthoringError(str(e)) from None
+            self._chunks.pop(spec.id, None)
+        return out
 
     def read_source(self, source_id: str, offset: int = 0, limit: int = 20) -> dict[str, Any]:
         spec = self.sources.get(source_id)
@@ -247,8 +274,7 @@ class Workspace:
         elements citing the answer. Confirmation is a separate, human-only step."""
         if not answer.strip():
             raise AuthoringError("an answer quotes the owner's words")
-        q = next((x for x in self.questions(limit=1000)["questions"] if x["id"] == question_id), None)
-        text = question or (q["text"] if q else None)
+        text = question or self._all_questions().get(question_id)
         if text is None:
             raise AuthoringError(f"unknown question {question_id!r}: pass its text")
         doc = self.draft()
@@ -303,27 +329,84 @@ class Workspace:
                     out[e.payload["action"]] = out.get(e.payload["action"], 0) + 1
         return out
 
-    def questions(self, limit: int = 10, attempts: dict[str, int] | None = None) -> dict[str, Any]:
+    def _plan(self, attempts: dict[str, int] | None = None):
+        from .stages import Plan
         doc = self.draft()
         try:
             d = Domain.model_validate(doc)
-        except ValidationError as e:
-            return {"questions": [], "stop": {"stop": False, "why": f"the draft does not parse: {e.errors()[0]['msg']}"}}
-        attempts = attempts if attempts is not None else self.attempts_by_action()
+            issues = validate_domain(d)
+        except ValidationError:
+            d, issues = None, []
+        return Plan(self, doc, d, issues, attempts if attempts is not None else self.attempts_by_action())
+
+    def questions(self, limit: int = 10, attempts: dict[str, int] | None = None,
+                  stage: str | None = None) -> dict[str, Any]:
+        """The bundle of questions for the current stage (or `stage`), with progress (ADR-0025).
+        Answer the whole bundle at once with `answer(bundle_id, ...)`."""
+        from .stages import BY_NAME
+        plan = self._plan(attempts)
+        if plan.d is None:   # _plan found the draft does not parse; say why
+            try:
+                Domain.model_validate(plan.doc)
+            except ValidationError as e:
+                why = f"the draft does not parse: {e.errors()[0]['msg']}"
+            return {"stage": None, "questions": [], "progress": [], "stop": {"stop": False, "why": why}}
+        if stage is not None and stage not in BY_NAME:
+            raise AuthoringError(f"unknown stage {stage!r}: one of {list(BY_NAME)}")
+        st = BY_NAME[stage] if stage else plan.current()
+        if st is None:
+            return {"stage": None, "goal": "Every stage is done.", "questions": [], "total": 0,
+                    "progress": plan.progress(), "stop": self._stop(plan.d, plan.attempts)}
+        qs = plan.bundle(st)
+        return {"stage": st.name, "title": st.title, "goal": st.goal, "optional": st.optional,
+                "bundle_id": self._bundle_id(st.name, qs),
+                "questions": [x.as_dict() for x in qs[:limit]], "total": len(qs),
+                "progress": plan.progress(), "stop": self._stop(plan.d, plan.attempts)}
+
+    @staticmethod
+    def _bundle_id(stage: str, qs) -> str:
+        return f"bundle:{stage}:" + hashlib.sha1("|".join(q.id for q in qs).encode()).hexdigest()[:8]
+
+    def _all_questions(self) -> dict[str, str]:
+        """Every question of every stage, and each stage's bundle, by id → text."""
+        from .stages import STAGES
+        plan = self._plan()
+        out: dict[str, str] = {}
+        if plan.d is None:
+            return out
+        for st in STAGES:
+            qs = plan.bundle(st)
+            for q in qs:
+                out[q.id] = q.text
+            out[self._bundle_id(st.name, qs)] = f"[{st.title}] " + " / ".join(q.text for q in qs)
+        return out
+
+    def progress(self) -> dict[str, Any]:
+        plan = self._plan()
+        cur = plan.current() if plan.d is not None else None
+        return {"current": cur.name if cur else None, "stages": plan.progress(),
+                "proposed": len(self._proposed(plan.doc))}
+
+    def skip_stage(self, stage: str, reason: str) -> dict[str, Any]:
+        """The owner says an optional stage has nothing (e.g. no invariants, no handoffs).
+        Recorded in their words in the interview log."""
+        from .stages import BY_NAME
+        st = BY_NAME.get(stage)
+        if st is None or not st.optional:
+            raise AuthoringError(f"only optional stages can be skipped: "
+                                 f"{[s for s, x in BY_NAME.items() if x.optional]}")
+        if not reason.strip():
+            raise AuthoringError("a skip quotes the owner's reason")
+        self._append(self.log_path, {"at": _now(), "kind": "skip", "stage": stage, "reason": reason})
+        return self.progress()
+
+    def _cell_questions(self, d: Domain, attempts: dict[str, int]) -> list[Question]:
+        """ADR-0014 within the transitions stage: defaults first, then grouped rows, by priority."""
         qs: list[Question] = []
 
         def q(kind: str, subject: str, text: str, decides: list[str], priority: float) -> None:
             qid = hashlib.sha1(f"{kind}:{subject}".encode()).hexdigest()[:10]
             qs.append(Question(qid, kind, text, decides, priority))
-
-        if d.purpose is None:
-            q("purpose", d.domain, "Before anything else: what problem does this domain solve, what one "
-              "metric shows it is solved, and how would you announce it in two sentences?", ["purpose"], 1e9)
-
-        for i in validate_domain(d):
-            if i.severity == "error":
-                q("conflict", f"{i.code}@{i.where}", f"The draft has a conflict at {i.where}: {i.message}. "
-                  "Which is right?", [i.where], 1e6)
 
         for obj, tr in d.transitions.items():
             acts = {n: a for n, a in d.actions.items() if a.target == obj and a.creates is None}
@@ -345,14 +428,7 @@ class Workspace:
                   "If so, who, and what does it become?",
                   [f"transitions.{obj}.matrix.{state}.{n}" for n in undecided],
                   max(self._priority([state], acts[n], attempts.get(n, 0)) for n in undecided) + len(undecided))
-
-        proposed = self._proposed(doc)
-        if proposed:
-            q("confirm", ",".join(sorted(proposed))[:200], f"{len(proposed)} drafted elements are not confirmed "
-              "yet. Review them and confirm the ones that are right.", sorted(proposed), len(proposed))
-
-        qs.sort(key=lambda x: (-x.priority, x.id))
-        return {"questions": [x.as_dict() for x in qs[:limit]], "total": len(qs), "stop": self._stop(d, attempts)}
+        return qs
 
     @staticmethod
     def _priority(cells: list[str], a, attempts: int) -> float:

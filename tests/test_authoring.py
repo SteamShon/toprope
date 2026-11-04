@@ -163,13 +163,15 @@ def test_matrix_cells_take_provenance_except_bare_n_a_and_undecided(ws):
 
 
 # -- interview -------------------------------------------------------------------------------
-def test_questions_open_with_purpose_then_defaults_and_grouped_rows(ws):
+def test_questions_come_in_stage_bundles_starting_with_purpose(ws):
     _seed_example(ws)
-    qs = ws.questions(limit=50)["questions"]
-    assert qs[0]["kind"] == "purpose"
-    kinds = [q["kind"] for q in qs]
-    assert "row" in kinds
-    row = next(q for q in qs if q["kind"] == "row")
+    b = ws.questions(limit=50)
+    assert b["stage"] == "purpose" and b["bundle_id"].startswith("bundle:purpose:")
+    assert [q["kind"] for q in b["questions"]] == ["purpose"] * 3
+    progress = {p["stage"]: p["status"] for p in b["progress"]}
+    assert progress["sources"] == "done" and progress["cast"] == "done" and progress["purpose"] == "current"
+    rows = ws.questions(limit=50, stage="transitions")["questions"]
+    row = next(q for q in rows if q["kind"] == "row")
     assert row["decides"] == ["transitions.Experiment.matrix.ended.launch_experiment"]
     assert "Once a Experiment is ended" in row["text"]
 
@@ -183,9 +185,9 @@ def test_attempts_raise_priority_and_drive_the_stop_rule(ws):
     raw["actions"]["launch_experiment"]["effects"] = []
     ws.domain_path.parent.mkdir(parents=True, exist_ok=True)
     ws.domain_path.write_text(yaml.safe_dump(raw, sort_keys=False))
-    calm = ws.questions(limit=50, attempts={})
+    calm = ws.questions(limit=50, attempts={}, stage="transitions")
     assert calm["stop"]["stop"] is True                         # nothing attempted, no effects
-    hot = ws.questions(limit=50, attempts={"launch_experiment": 3})
+    hot = ws.questions(limit=50, attempts={"launch_experiment": 3}, stage="transitions")
     assert hot["stop"]["stop"] is False and len(hot["stop"]["open"]) == 2
     assert hot["questions"][0]["kind"] == "default" and hot["questions"][0]["priority"] >= 300
 
@@ -204,7 +206,7 @@ def test_attempts_are_read_from_the_configured_event_store(ws, tmp_path):
 
 def test_answer_records_the_owners_words_and_cites_them(ws):
     _seed_example(ws)
-    row = next(q for q in ws.questions(limit=50)["questions"] if q["kind"] == "row")
+    row = next(q for q in ws.questions(limit=50, stage="transitions")["questions"] if q["kind"] == "row")
     out = ws.answer(row["id"], "No. Once it has ended it never relaunches.",
                     [{"path": "transitions.Experiment.matrix.ended.launch_experiment",
                       "value": {"deny": "An ended experiment never relaunches."}}])
@@ -214,7 +216,7 @@ def test_answer_records_the_owners_words_and_cites_them(ws):
                               "quote": "No. Once it has ended it never relaunches."}
     assert cell["status"] == "proposed"
     assert ws.chunks("interview")[0].ref == "interview:interview/log.jsonl#L1"   # citable afterwards
-    assert not any(q["kind"] == "row" for q in ws.questions(limit=50)["questions"])
+    assert not any(q["kind"] == "row" for q in ws.questions(limit=50, stage="transitions")["questions"])
     with pytest.raises(AuthoringError, match="owner's words"):
         ws.answer(row["id"], "  ", [])
 
