@@ -72,6 +72,58 @@ Toprope already has the parts that make this semantic rather than textual:
   commit determines all three.
 - **A released system** (ADR-0026) is the tuple of its members' commits.
 
+## Revisions after adversarial review (2026-11-04)
+The researcher's decisions above are unchanged. The review found that several accepted
+details could not hold as written. These additions make them hold; items 1, 4 and 6 need the
+researcher's choice and are repeated as open questions below.
+
+1. **Commits must be real objects.** In schema v1 a kernel reply can only update the object
+   that called. `create` effects are rejected (ADR-0021), and a reply must target the caller
+   (ADR-0028). So the generated Authoring tool could not create immutable Commit objects; a
+   "commit" would only overwrite the working copy's properties. *Proposed:* a reply action
+   may `creates:` an object of another type (the new Commit), amending ADR-0028.
+2. **Approve names its commit.** Under optimistic concurrency, a conflicting command is
+   re-evaluated, not refused (`docs/semantics.md` §3). An owner who reviewed commit N could
+   therefore approve N+1 if it landed meanwhile. `approve` takes the commit id it was
+   reviewed on, and approves exactly that commit.
+3. **Which hash carries a confirmation.**
+   - The full element hash includes `status` and `source` (`decl/interface.py` `TEXT_KEYS`),
+     so confirming an element would itself count as a change.
+   - The shape hash drops `description`, `reason` and `deny`, which carry meaning.
+
+   A **review hash** excludes only provenance (`status`, `source`): a confirmation carries
+   over exactly when it is unchanged. The interface also gains the elements it lacks today,
+   so that changes there are seen: roles, a transition's `field` and `initial`, handoffs,
+   scenarios, fixtures and purpose.
+4. **What a commit covers.** A released UI is a (domain, representation) pair (ADR-0008),
+   and handoffs target an interface major. A commit therefore snapshots the declaration
+   **and its representations**, and records the derived interface version. "The commit
+   determines all three versions" holds only then.
+5. **Commit storage.** Commits are kept in a content-addressed, append-only store shared by
+   Authoring and Delivery. The key is the hash of the canonical declaration, excluding
+   `version`; the parent, the sequence number and the approvals are metadata. The sequence
+   number is not inside the hashed content, so identical content keeps its key. Compiling
+   content identical to the parent makes no new commit.
+6. **Delivery's guarantees.**
+   - A per-environment lock with a compare-and-swap on the deployed commit.
+   - No moving an environment to a commit with a lower sequence number, unless the request
+     is an explicit rollback (rollback itself stays in M2).
+   - The floor refuses a commit that has no approval.
+   - Arrival order of requests is not the order of commits (handoffs from different streams
+     have no global order). So "in order" means: the newest approved commit wins, and an
+     older request is refused as superseded.
+   - A wrong approval cannot be revoked, but can be **superseded**: approving a newer commit
+     makes every older pending request superseded.
+7. **The `diff` service returns element keys, and the re-confirm policy stays declared.**
+   - ADR-0027 makes the authoring workflow's rules declaration facts. So the kernel
+     reports which elements changed, and the Authoring declaration decides which of them
+     need re-confirmation.
+   - Kernel results gain a list-of-strings type for this.
+8. **Toolchain changes.** ADR-0027 says a kernel change invalidates harness results. Tags are
+   never removed. Instead, the deploy floor re-checks that the harness passed at the current
+   toolchain, as it does today, so an approved commit may need a fresh harness run before it
+   can be deployed.
+
 ## Open questions (not decided; answered before the parts they affect are implemented)
 1. **What counts as "changed directly".** Which reference changes make an element directly
    changed? For example, an action whose referenced object was renamed. Today's element hash
@@ -81,6 +133,12 @@ Toprope already has the parts that make this semantic rather than textual:
 3. **Branch and merge (an M2 candidate).** Element-level 3-way merge would stop direct
    conflicts, and running the change check on the merge result would stop indirect ones,
    with the merge commit approved as a new candidate. Is this the shape for M2?
+4. **Reply-creates (revision 1).** Should a kernel reply be allowed to create an object of
+   another type, so Commits are real objects? This amends ADR-0028 and, narrowly, ADR-0021.
+5. **What a commit covers (revision 4).** Should representations be inside the commit, or
+   should the domain and its representation be committed separately and paired at release?
+6. **Delivery ordering (revision 6).** Is it "newest approved wins, older requests are
+   superseded", or strict arrival order?
 
 ## Affected ADRs, documents and code
 

@@ -42,12 +42,35 @@ showed three problems:
    - the gold-set writing protocol built for M1 (`experiments/m1/interview-guide.md`,
      sealed validation, fact keys and compositions, the kernel-fact exclusion), carried over
      as M2's starting point
-3. **The self-domain gold set becomes optional.** It is not a verdict input. If kept, it is a
-   small, entirely shown smoke set: a regression check that the self domains still answer
-   basic questions. It is not frozen as a pre-check instrument.
-4. **M1's pre-check instruments become four**: the probe suite, the change requests, the
-   change key, and the verdict rules (with the ② rules removed). Sub-PR 8 (the change check)
-   waits for those four, not for gold.
+3. **The self-domain gold set shrinks to a correctness set** (see revision 3): small, frozen,
+   for the self tools' critical rules and for ⑥, and not a ② verdict input.
+4. **M1's pre-check instruments**: the probe suite, the change requests (re-bound to the
+   commit model), the change key, the verdict rules (with the ② rules removed), and the small
+   correctness set. Sub-PR 8 (the change check) waits for these.
+
+## Revisions after adversarial review (2026-11-04)
+1. **M2's default domain fails this ADR's own premise.** The roadmap's experiment-lifecycle
+   domain has "the researcher as owner". *Proposed:* an expert who is not Toprope's builder
+   is an **entry criterion for ② in M2**. Without one, ② stays untested rather than being
+   reported on weak evidence.
+2. **The builder's agent family still drafts the model in M2.** The contamination protocol
+   built for M1 carries over unchanged: isolated gold writing, sealed validation, excluded
+   sources.
+3. **Something must still check that the self domains are right.** M2 builds its domain
+   with M1's self-compiled tool. If that tool is wrong, a low ② in M2 cannot be told apart
+   from a weak method. ⑥'s "intent survives" measure is also checked by gold questions. The
+   regeneration check (ADR-0028) proves the tool is regenerable, not that it is correct.
+   *Proposed:* M1 keeps a **small frozen correctness set** for the self tools' critical rules
+   and for ⑥. It is not a ② verdict input. It guards the tool M2 depends on, alongside the
+   probe suite and the researcher's switch-over sign-off.
+4. **Re-bind the change list.** Change requests drafted before ADR-0029 may target version
+   states that no longer exist. If they become unbindable, they silently shrink ①'s recall
+   denominator. *Proposed:* the change list is reviewed against the commit model before it
+   is frozen, and every exclusion is reported in M1's results.
+5. **Timeline.** The first ② verdict moves from about week 12 to after M0b and M2 (about week
+   20 or later). M2 gains expert recruitment and its first full run of the held-out
+   protocol. M2's estimate is redone in its spec PR. M3 may use M2's gold only after M2's
+   verdict is frozen.
 
 ## Alternatives considered
 - **Keep ② on the self domains, with fewer items.** This was rejected (proposed) because
@@ -68,7 +91,8 @@ showed three problems:
 | `docs/milestones/M0a.md` | Sub-PR 8's gate names the four files |
 
 ## Open questions (for the researcher)
-1. Keep a small self-domain smoke gold set (shown only), or drop gold from M1 entirely?
-2. M2's application domain: the experiment-lifecycle dogfood domain as planned, or another?
+1. The correctness set (revision 3): how small, which rules, and how much of it held out?
+2. M2's application domain and its expert (revision 1): who is the expert who is not
+   Toprope's builder? If there is none, is ② left untested in M2?
 3. The gold items another session has already drafted for the self domains: keep them as
    the smoke set, set them aside for reference, or discard them?
