@@ -10,8 +10,9 @@ compositions: [toprope-self]   # optional (ADR-0026): a fact that spans domains 
                                #   and is graded against the composed model
 # Ask only what a domain declaration expresses (who may act, what is allowed or denied and
 # why, the resulting state, what always holds). Facts the Toprope kernel guarantees for every
-# domain (idempotent handoffs, compile-time contract checks, the deploy floor in code) are not
-# gold: no model can get them wrong, so they measure nothing.
+# domain (idempotent handoffs, compile-time contract checks, change reports, the deploy floor in
+# code) are not gold: no model can get them wrong, so they measure nothing. "Kernel" = the
+# hand-built toolchain (ADR-0027); agent behavior the schema cannot express goes to the probes.
 scenarios:
   - id: G01               # stable id, never reused
     domain: toprope-authoring   # whose compiled model answers it: one of `domains` or `compositions`

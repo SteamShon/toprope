@@ -133,7 +133,9 @@ Templates, the freeze procedure and the `verify` check:
   composition (ADR-0026) for a fact that spans both domains, graded against the composed model. The same fact
   asked of both domains shares a `fact` key: its copies share `held_out`, and it counts once in
   scoring (each copy weighs 1/n; verdict rules `scoring.unit: fact`). Facts that the Toprope
-  kernel guarantees for every domain are not gold, since no model can get them wrong. Examples:
+  kernel guarantees for every domain are not gold, since no model can get them wrong. "Kernel" is
+  the hand-built toolchain, and agent behavior the schema cannot express goes to the probe suite
+  (ADR-0027). Examples:
   - "Can an agent confirm its own drafted precondition?"
   - "What happens to an element no source supports?"
   - "When does a representation-only change rebuild MCP?"
