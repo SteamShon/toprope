@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from dataclasses import replace
 from typing import Any, Literal
 
-from ..semantics.types import Event, Outcome
+from ..types import Event, Outcome
 
 
 class ConcurrencyError(Exception):
@@ -86,4 +86,5 @@ class MemoryEventStore(EventStore):
         self._idem[key] = outcome
 
     def release(self, key) -> None:
-        self._idem.pop(key, None)
+        if self._idem.get(key) == "pending":   # never forget a finished outcome
+            del self._idem[key]
