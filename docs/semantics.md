@@ -1,7 +1,7 @@
 # Declaration and execution semantics
 
 Link: ① ② ③. Status: **frozen for M0a** (docs/milestones/M0a.md). Changes need an ADR.
-Amended by ADR-0021.
+Amended by ADR-0021 and ADR-0023.
 
 This document is the **oracle**. The model interpreter implements it, and
 every generated surface must agree with it (ADR-0010 parity, ADR-0019). Where a surface
@@ -29,7 +29,9 @@ Evaluation stops at the first failure, and each failure has its own outcome:
    not exist (or, for a create action, already exists), actors whose role could not act get
    `denied: actor` and everyone else gets `rejected: not-found` / `rejected: exists`
    (ADR-0021). Link ids that do not resolve to an object of the linked type read as missing.
-4. **Actor rule**: role, relation, the grant and `requires: human` (ADR-0016). This runs
+4. **Actor rule**: role, relation, the grant and `requires: human` (ADR-0016). The reserved
+   actors `system` (timers, handoffs) and `external:<source>` match a rule that names them
+   (ADR-0023). This runs
    before the matrix, so cells that differ per role are resolved for this actor. Failure →
    `denied: actor`.
 5. **Matrix cell** for (state, action, the actor's roles; an agent's principal too). A
@@ -40,7 +42,9 @@ Evaluation stops at the first failure, and each failure has its own outcome:
    - `undecided` → `denied: undecided`
 6. **Non-state preconditions**, in declared order. The first failure →
    `denied: <precondition id>`.
-7. **Approvals** (ADR-0015): if more are needed, record the partial approval → `pending`.
+7. **Approvals** (ADR-0015, ADR-0023): if more are needed, record the partial approval →
+   `pending`. It counts only if the caller passes step 4 and holds `from_role`; `distinct`
+   counts people (an agent counts as its principal); any change to the target resets them.
 8. **Reservations** for cross-aggregate invariants (ADR-0015):
    - The reservation is claimed by a **separate command** on the reservation aggregate,
      issued before this one by the generated saga.
@@ -48,7 +52,8 @@ Evaluation stops at the first failure, and each failure has its own outcome:
      released by the transition that leaves them.
    - If any later step of this command fails, the saga issues a compensating release.
    - Here, step 8 only checks that the claim is held. Failure → `denied: reservation`.
-9. **Effects** are computed on a copy: the state field from the matrix (or `initial` for a
+9. **Effects** are computed on a copy. Functions may be called here and in steps 4–6 and 10;
+   they are pure (ADR-0023). the state field from the matrix (or `initial` for a
    create action, which takes only declared params), then `set` in order. Functions are
    called here and must be pure. `create:` effects are not supported yet
    (`rejected: unsupported-effect`, ADR-0021).
@@ -57,7 +62,10 @@ Evaluation stops at the first failure, and each failure has its own outcome:
 11. **Append**: write the domain event(s) and the decision event, if any, at expected
     version `v`. On a version conflict, retry from step 3 up to N times, then
     `rejected: conflict`.
-12. **External effects** (brownfield) run **after** the append, from an outbox. Their outcome
+12. **External effects and handoffs** run **after** the append, from an outbox. A handoff is a
+    command into another domain, as `system` (`handoff:<name>`) on behalf of the
+    originating person, with idempotency key `<handoff>:<sender event id>`. A denial there is
+    recorded here as `HandoffDenied` (ADR-0023). Their outcome
     is recorded as `EffectSucceeded`, `EffectFailed`, `EffectUnknown` or `EffectConfirmed`
     (read-back).
 

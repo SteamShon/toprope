@@ -179,7 +179,7 @@
               }
             },
             "required": [],
-            "additionalProperties": true
+            "additionalProperties": false
           }
         },
         "forms": {
@@ -435,7 +435,7 @@
               }
             },
             "required": [],
-            "additionalProperties": true
+            "additionalProperties": false
           }
         }
       },

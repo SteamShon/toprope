@@ -42,8 +42,7 @@ cell = {"oneOf": [
 ]}
 actor_rule = {"oneOf": [{"type": "string"}, obj({"role": {"type": "string"}, "where": EXPR}, ["role"])]}
 effect = obj({"set": {"type": "object", "additionalProperties":
-                      {"type": ["string", "number", "boolean", "null"]}},
-              "create": {"type": "string", "description": "not supported yet (ADR-0021)"}})
+                      {"type": ["string", "number", "boolean", "null"]}}})  # `create` is not in v1
 precondition = with_prov({"id": ID, "check": EXPR, "reason": {"type": "string"}}, ["id", "check", "reason"])
 action = with_prov({
     "description": {"type": "string"},
@@ -57,7 +56,8 @@ action = with_prov({
     "applies_in": {"type": "array", "items": {"type": "string"}},
     "requires": {"enum": ["human"]},
     "approvals": obj({"count": {"type": "integer", "minimum": 1}, "from_role": {"type": "string"},
-                      "distinct": {"type": "boolean"}}, ["count", "from_role"]),
+                      "distinct": {"type": "boolean"}, "within": {"$ref": "#/$defs/fixed_duration"}},
+                     ["count", "from_role"]),
 }, ["description", "actor"], oneOf=[{"required": ["target"]}, {"required": ["creates"]}])
 duration = {"oneOf": [
     obj({"days": {"type": "number"}, "hours": {"type": "number"}, "minutes": {"type": "number"}},
@@ -65,7 +65,7 @@ duration = {"oneOf": [
     obj({"field": {"type": "string"}, "unit": {"enum": ["days", "hours", "minutes"]}}, ["field", "unit"]),
 ]}
 step = obj({
-    "actor": {"type": "object"},
+    "actor": {"type": "object", "minProperties": 1},
     "do": {"type": "string"}, "read": {"type": "object"}, "advance": duration["oneOf"][0],
     "target": {"type": "string"}, "params": {"type": "object"}, "expect": {"type": "object"},
 }, oneOf=[{"required": ["do", "actor"]}, {"required": ["read", "actor"]}, {"required": ["advance"]}])
@@ -74,7 +74,8 @@ domain = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://toprope.dev/schema/domain.v1.schema.json",
     "title": "Toprope domain declaration v1 (docs/domain-schema.md, ADR-0023)",
-    "$defs": {"source": source},
+    "$defs": {"source": source, "fixed_duration": obj(
+        {"days": {"type": "number"}, "hours": {"type": "number"}, "minutes": {"type": "number"}}, minProperties=1)},
     **obj({
         "domain": ID, "version": {"type": "integer", "minimum": 1}, "owner": {"type": "string"},
         "purpose": obj({"problem": {"type": "string"},
@@ -97,7 +98,11 @@ domain = {
         "invariants": {"type": "array", "items": with_prov(
             {"id": ID, "on": {"type": "string"}, "check": EXPR, "reason": {"type": "string"},
              "scope": {"enum": ["aggregate", "cross"]}, "enforced_by": {"type": "string"}},
-            ["id", "on", "check", "reason"])},
+            ["id", "on", "check", "reason"],
+            # cross requires enforced_by; enforced_by only with cross (ADR-0023)
+            allOf=[{"if": {"properties": {"scope": {"const": "cross"}}, "required": ["scope"]},
+                    "then": {"required": ["enforced_by"]},
+                    "else": {"not": {"required": ["enforced_by"]}}}])},
         "reservations": {"type": "object", "additionalProperties": obj(
             {"on": {"type": "string"}, "key": EXPR, "while_in": {"type": "array", "items": {"type": "string"}},
              "capacity": {"type": "integer", "minimum": 1}}, ["on", "key", "while_in"])},
@@ -116,7 +121,8 @@ domain = {
             {"when": obj({"action": {"type": "string"}, "outcome": {"enum": ["ok"]}}, ["action"]),
              "to": obj({"domain": {"type": "string"}, "interface": {"type": "string"}, "action": {"type": "string"}},
                        ["domain", "interface", "action"]),
-             "params": {"type": "object", "additionalProperties": EXPR}}, ["when", "to"])},
+             "target": EXPR,
+             "params": {"type": "object", "additionalProperties": EXPR}}, ["when", "to", "target"])},
         "world": obj({"fixtures": {"type": "array", "items": {
             "type": "object", "minProperties": 1, "maxProperties": 1,
             "additionalProperties": obj({"id": {"type": "string"}}, ["id"], extra=True)}},
@@ -134,7 +140,7 @@ views = {"type": "object", "additionalProperties": obj({
     "list": obj({"columns": replace_or({"type": "string"}), "group_by": {"type": "string"}, "sort": {"type": "string"}}),
     "detail": obj({"sections": replace_or(section), "actions": replace_or({"type": "string"})}),
     "board": obj({"by": {"type": "string"}}, ["by"]),
-}, extra=True)}
+})}  # closed set of view kinds: a typo such as `detial` is an error
 representation = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://toprope.dev/schema/representation.v1.schema.json",

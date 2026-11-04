@@ -25,6 +25,23 @@
         "kind"
       ],
       "additionalProperties": false
+    },
+    "fixed_duration": {
+      "type": "object",
+      "properties": {
+        "days": {
+          "type": "number"
+        },
+        "hours": {
+          "type": "number"
+        },
+        "minutes": {
+          "type": "number"
+        }
+      },
+      "required": [],
+      "additionalProperties": false,
+      "minProperties": 1
     }
   },
   "type": "object",
@@ -341,10 +358,6 @@
                       "null"
                     ]
                   }
-                },
-                "create": {
-                  "type": "string",
-                  "description": "not supported yet (ADR-0021)"
                 }
               },
               "required": [],
@@ -380,6 +393,9 @@
               },
               "distinct": {
                 "type": "boolean"
+              },
+              "within": {
+                "$ref": "#/$defs/fixed_duration"
               }
             },
             "required": [
@@ -590,7 +606,33 @@
           "check",
           "reason"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "scope": {
+                  "const": "cross"
+                }
+              },
+              "required": [
+                "scope"
+              ]
+            },
+            "then": {
+              "required": [
+                "enforced_by"
+              ]
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "enforced_by"
+                ]
+              }
+            }
+          }
+        ]
       }
     },
     "reservations": {
@@ -886,6 +928,10 @@
             ],
             "additionalProperties": false
           },
+          "target": {
+            "type": "string",
+            "description": "check-language expression (docs/domain-schema.md)"
+          },
           "params": {
             "type": "object",
             "additionalProperties": {
@@ -896,7 +942,8 @@
         },
         "required": [
           "when",
-          "to"
+          "to",
+          "target"
         ],
         "additionalProperties": false
       }
@@ -955,7 +1002,8 @@
               "type": "object",
               "properties": {
                 "actor": {
-                  "type": "object"
+                  "type": "object",
+                  "minProperties": 1
                 },
                 "do": {
                   "type": "string"

@@ -23,6 +23,7 @@ readable schemas: [`schema/domain.v1.schema.json`](../schema/domain.v1.schema.js
 | `functions` | [Functions](#functions) | defined; M0b |
 | `external` sources and `external:<source>` actors | [External events](#external-events) | defined; M0b |
 | representation files and host overlays | [Representation](#representation-layer-adr-0008) | defined; M0b |
+| `create` effects | — | **not in v1** (rejected, ADR-0021) |
 
 The core is **Object, Link, Action**, plus a **transition matrix** and **invariants** per
 stateful object (ADR-0010). How the domain is shown lives in a separate, separately compiled
@@ -272,11 +273,21 @@ handoffs:
       version: target.number
       environment: "'staging'"
       approver: actor.id
+    target: "target.domain_id + ':' + target.number"   # id of the request in the receiving domain
 ```
 
-A handoff is recorded in both domains' event stores, linked by a handoff id. The receiving
-domain evaluates the request like any other command, with all its own rules. A denial is
-returned to the sender and recorded there.
+How a handoff runs (docs/semantics.md step 12):
+- It is sent from an **outbox after the sender's action is appended**. It never blocks or
+  rolls back the sender's action.
+- The command in the receiving domain names its `target` (an expression, as with `params`).
+  Its actor is the `system` actor `handoff:<name>`, acting on behalf of the person who
+  caused the sender's action (that person's principal, if an agent acted). Its idempotency
+  key is `<handoff name>:<sender event id>`, so retries never deliver twice.
+- The receiving action must allow `system` in its actor rule. It is then evaluated like any
+  other command, with all the receiver's rules.
+- The outcome is recorded in both stores, linked by the handoff id. A denial becomes a
+  `HandoffDenied` event in the sender's domain, which the sender's own rules and proposals
+  can react to.
 
 ## Approvals
 
@@ -292,7 +303,13 @@ actions:
 ```
 
 Each call records an `ApprovalRecorded` event and returns `pending` until the count is
-reached. Then the transition fires as a normal command (docs/semantics.md step 7).
+reached. Then the transition fires as a normal command (docs/semantics.md step 7). Rules:
+- An approval counts only if its caller passes the action's actor rule **and** holds
+  `from_role`.
+- `distinct` counts **people**. An agent's approval counts as its principal's, so one person
+  cannot meet a two-person rule through agents.
+- Approvals are bound to the target's version. Any change to the target resets them, and
+  firing the action resets them too. An optional `within: {hours: 48}` expires them.
 
 ## Cross-aggregate invariants and reservations
 
@@ -317,13 +334,20 @@ reservations:
     capacity: 1
 ```
 
-A `cross` invariant without `enforced_by` is checked after the fact and raises an alarm, and
-the compiler warns that it is not enforced.
+Rules:
+- In v1 a `cross` invariant **must** name `enforced_by`. The check language cannot range
+  over other objects, so an "after the fact" cross check could not be written.
+- `enforced_by` is only valid on `scope: cross`.
+- `capacity` defaults to 1.
+- If an effect changes the `key` of an object that holds a claim, the claim moves to the new
+  key in the same saga. It is denied (`denied: reservation`) if the new key is full.
 
 ## Timers
 
 A timer issues an action as the `system` actor when an object has been in a state for a
-while (ADR-0015). The harness runs on a virtual clock, and scenarios advance it explicitly.
+while (ADR-0015). The fired action must list `system` in its actor rule, or the timer is a
+compile error. Deadlines are timers that fire a "deadline passed" action. The harness runs
+on a virtual clock, and scenarios advance it explicitly.
 
 ```yaml
 timers:
@@ -355,10 +379,18 @@ functions:
 
 Usage in a check: `"count(target.variants) * sample_size(target.baseline, target.mde) <= target.traffic"`.
 
+Functions may be called in actor relations, preconditions, effects and invariants (steps
+4–10), and while computing allowed actions for views. So they must be pure, deterministic
+and fast. They may not read the store, the clock or the network: pass `now()` in as an input
+if needed.
+
 ## External events
 
 An inbound event (a webhook, for instance) is an action whose actor is an `external:<source>`
 system actor (ADR-0015). It goes through the same matrix, preconditions and invariants.
+The action's actor list holds only external actors, and the action must appear in that
+source's `actions`. Mixing external and human actors in one action is a compile error:
+declare two actions instead.
 
 ```yaml
 external:
@@ -375,7 +407,9 @@ actions:
 
 ## Actors and agents (runtime, not declared)
 
-People, agents and system actors come from the `Identity` port (ADR-0016). Agents act
+People, agents and system actors come from the `Identity` port (ADR-0016). Two actor names
+are reserved and are not roles: `system` (timers, handoffs and fixtures) and
+`external:<source>`. Actor rules may name them directly. Agents act
 `on_behalf_of` a person with a **grant** (actions, targets, expiry), which is issued at
 runtime, not in the declaration. The declaration controls agents with `requires: human` and
 with actor rules: an agent must satisfy the rule both for itself and for its principal.

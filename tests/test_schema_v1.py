@@ -80,3 +80,57 @@ def test_kernel_refuses_cross_invariants_and_approvals_and_accepts_purpose():
         Domain.model_validate(merged(BLOCKS[0], approvals))
     purpose = next(b for b in BLOCKS if "purpose" in b)
     assert Domain.model_validate(merged(BLOCKS[0], purpose)).purpose.success_metric.direction == "up"
+
+
+# -- the published schema and the kernel must agree (beyond documented not-yet constructs) -------
+def _kernel_accepts(doc) -> bool:
+    from pydantic import ValidationError
+    from toprope.decl import Domain, validate_domain
+    try:
+        d = Domain.model_validate(doc)
+    except ValidationError:
+        return False
+    return not [i for i in validate_domain(d) if i.severity == "error"]
+
+
+def _probe(mutate):
+    doc = copy.deepcopy(BLOCKS[0])
+    mutate(doc)
+    return doc
+
+
+PROBES = {
+    "empty actor list": lambda d: d["actions"]["approve_experiment"].__setitem__("actor", []),
+    "version 0": lambda d: d.__setitem__("version", 0),
+    "list value in set": lambda d: d["actions"]["approve_experiment"]["effects"][0]["set"].__setitem__("x", [1]),
+    "bad id": lambda d: d.__setitem__("domain", "has space"),
+    "step without actor": lambda d: d.setdefault("scenarios", []).append(
+        {"id": "s", "steps": [{"actor": {}, "do": "approve_experiment", "target": "E-onboarding"}]}),
+    "create effect": lambda d: d["actions"]["approve_experiment"]["effects"].append({"create": "Readout"}),
+    "enforced_by on aggregate": lambda d: d["invariants"][0].__setitem__("enforced_by", "slot"),
+}
+
+
+@pytest.mark.parametrize("name", PROBES)
+def test_schema_and_kernel_agree(name):
+    doc = _probe(PROBES[name])
+    assert bool(errors(DOMAIN, doc)) and not _kernel_accepts(doc), name
+
+
+def test_system_is_a_reserved_actor():
+    doc = _probe(lambda d: d["actions"]["launch_experiment"].__setitem__("actor", ["eng", "system"]))
+    assert not errors(DOMAIN, doc) and _kernel_accepts(doc)
+
+
+def test_external_actors_refused_until_m0b():
+    from pydantic import ValidationError
+    from toprope.decl import Domain
+    doc = _probe(lambda d: d["actions"]["launch_experiment"].__setitem__("actor", ["external:flags"]))
+    with pytest.raises(ValidationError, match="external actors"):
+        Domain.model_validate(doc)
+
+
+def test_representation_view_kinds_are_closed():
+    rep = copy.deepcopy(next(b for b in BLOCKS if "representation" in b))
+    rep["views"]["Experiment"]["detial"] = {}
+    assert errors(REPR, rep)

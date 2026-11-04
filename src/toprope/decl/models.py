@@ -5,7 +5,11 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Literal, Union
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from typing import Annotated
+
+Ident = Annotated[str, StringConstraints(pattern=r"^[A-Za-z_][A-Za-z0-9_-]*$")]
+RESERVED_ACTORS = {"system"}   # `external:<source>` is reserved too (refused until M0b)
 
 
 class Strict(BaseModel):
@@ -78,7 +82,7 @@ class Param(Strict):
 
 
 class Precondition(Provenance):
-    id: str
+    id: Ident
     check: str
     reason: str
 
@@ -89,13 +93,13 @@ class ActorRule(Strict):
 
 
 class Effect(Strict):
-    set: dict[str, Any] | None = None
-    create: str | None = None
+    set: dict[str, Union[str, int, float, bool, None]] | None = None
+    create: str | None = None   # not in v1: rejected at compile time (ADR-0021)
 
 
 class Action(Provenance):
     description: str
-    actor: list[Union[str, ActorRule]]
+    actor: Annotated[list[Union[str, ActorRule]], Field(min_length=1)]
     target: str | None = None
     creates: str | None = None
     params: dict[str, Param] = Field(default_factory=dict)
@@ -113,6 +117,9 @@ class Action(Provenance):
             raise ValueError("an action has exactly one of `target` or `creates`")
         if self.approvals is not None:
             raise not_yet("approvals", "M0b")
+        for r in self.actor:
+            if isinstance(r, str) and r.startswith("external:"):
+                raise not_yet("external actors (`external:<source>`)", "M0b")
         return self
 
     @property
@@ -146,7 +153,7 @@ class Transitions(Strict):
 
 
 class Invariant(Provenance):
-    id: str
+    id: Ident
     on: str
     check: str
     reason: str
@@ -155,6 +162,8 @@ class Invariant(Provenance):
 
     @model_validator(mode="after")
     def _cross_not_yet(self) -> Invariant:
+        if self.enforced_by is not None and self.scope != "cross":
+            raise ValueError("`enforced_by` is only valid on `scope: cross` invariants")
         if self.scope == "cross":   # would otherwise be skipped by the guard: fail closed
             raise not_yet("invariants[].scope: cross", "M0b")
         return self
@@ -186,7 +195,7 @@ class Step(Strict):
 
 
 class Scenario(Strict):
-    id: str
+    id: Ident
     given: dict[str, Any] = Field(default_factory=dict)
     steps: list[Step]
 
@@ -210,8 +219,8 @@ NOT_YET = {"handoffs": "M1 (ADR-0022)", "reservations": "M0b", "timers": "M0b",
 
 
 class Domain(Strict):
-    domain: str
-    version: int
+    domain: Ident
+    version: Annotated[int, Field(ge=1)]
     owner: str | None = None
     purpose: Purpose | None = None
     handoffs: dict[str, Any] | None = None
