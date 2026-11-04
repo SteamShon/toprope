@@ -257,3 +257,9 @@ def test_harness_cli_checks_the_handoff_contract(tmp_path):
     assert no_receiver.returncode == 1 and "unknown-domain" in no_receiver.stderr
     wrong_major = run("--receiver", f"{r}@2")
     assert wrong_major.returncode == 1 and "interface-major" in wrong_major.stderr
+    at_dir = tmp_path / "team@x"
+    at_dir.mkdir()
+    (at_dir / "r.domain.yaml").write_text(r.read_text())
+    assert run("--receiver", f"{at_dir / 'r.domain.yaml'}@1").returncode == 0
+    bad = run("--receiver", f"{r}@v1")
+    assert bad.returncode == 1 and "Traceback" not in bad.stderr

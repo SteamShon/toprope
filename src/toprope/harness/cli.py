@@ -43,9 +43,15 @@ def main(argv: list[str] | None = None) -> None:
         from ..decl import check_handoffs
         published = {}
         for spec in args.receiver:
-            path, _, major = spec.partition("@")
-            r = load_domain(path)
-            published[r.domain] = (r, int(major or 1))
+            path, at, major = spec.rpartition("@")
+            if not at or not major.isdigit():
+                path, major = spec, "1"     # no "@MAJOR" suffix: the default major
+            try:
+                r = load_domain(path)
+            except (OSError, ValueError) as e:
+                print(f"error receiver {spec}: {e}", file=sys.stderr)
+                raise SystemExit(1) from None
+            published[r.domain] = (r, int(major))
         contract = check_handoffs(d, published)
         if contract:
             for i in contract:
