@@ -433,7 +433,9 @@ works. The catalog is the kernel itself (ADR-0027):
 | `fetch_source` | `source` | `sha256` |
 | `commit` | `declaration` | `id`, `seq`, `content`, `created`, `parent`, `interface`, `to_review`, `last_approved` (ADR-0029) |
 | `diff` | `domain`, `from`, `to` | `changed`, `added`, `removed`, `to_review` |
-| `approve_commit` | `domain`, `commit`, `approver` | `approved` (immutable tag) |
+| `checkout` | `domain`, `commit`, `declaration` | `content` (loads a commit into a working copy, ADR-0032) |
+| `change_check` | `domain`, `commit` | `passed`, `errors`, `warnings`, `failing`, `summary` (recorded on the commit, ADR-0009) |
+| `approve_commit` | `domain`, `commit`, `approver` | `approved`, `main` (merges into `main` and tags it, ADR-0033) |
 | `preview` | `domain`, `commit` | `build`, `harness_ok` |
 | `deploy` | `domain`, `commit`, `approver` | `deployed` (under the fixed floor, ADR-0022, ADR-0029) |
 

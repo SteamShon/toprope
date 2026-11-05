@@ -518,6 +518,42 @@ class Workspace:
         return {"commit": c.id, "seq": c.seq, "branch": branch, "created": created, "interface": c.interface,
                 "since": base_id, **review}
 
+    def change_check(self, commit_id: str | None = None, branch: str = "work", since: str | None = None,
+              env: str | Path | None = None, examples: int = 50) -> dict[str, Any]:
+        """Run the change check on a commit (default: the branch head) and record it on the
+        commit (ADR-0009, ADR-0032). `since` is the base (default: the merge base with `main`);
+        `env` a deploy environment, whose event store feeds log replay and the in-flight check.
+        The report is also written to `.toprope/checks/<commit>.json`."""
+        from ..check import check_commit
+        from ..commits import CommitError
+        d = self.draft().get("domain")
+        if not isinstance(d, str) or not d:
+            raise AuthoringError("the draft names no `domain`, so there is no commit log to check")
+        try:
+            if commit_id is None:
+                refs = self.commits.refs(d)
+                if not refs:
+                    raise AuthoringError("nothing to check: commit first")
+                if branch not in refs:
+                    raise AuthoringError(f"no branch {branch!r}; branches: {sorted(refs)}")
+                commit_id = refs[branch]
+            base = since if since is not None else "merge-base"
+            if env is not None:
+                from ..deploy import LocalEnvironment
+                if not Path(env).is_dir():
+                    raise AuthoringError(f"no deploy environment at {env}")
+                with LocalEnvironment(env).events(d) as store:
+                    report = check_commit(self.commits, d, commit_id, base, events=store, examples=examples)
+            else:
+                report = check_commit(self.commits, d, commit_id, base, examples=examples)
+        except CommitError as e:
+            raise AuthoringError(str(e)) from None
+        out = {"commit": commit_id, **report.to_json()}
+        path = self.root / ".toprope" / "checks" / f"{commit_id}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(out, indent=2, ensure_ascii=False, default=str))
+        return out
+
     def checkout(self, commit_id: str, force: bool = False) -> dict[str, Any]:
         """Load a commit into the working copy (ADR-0032); committing it is a revert or a restart.
         Refused when the working copy has changes no commit holds, unless `force`."""

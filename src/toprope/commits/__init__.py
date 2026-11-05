@@ -6,6 +6,8 @@ Layout under `<root>/<domain>/`:
   log.jsonl                           one line per commit: id, seq, content, parents, at, interface
   refs.jsonl                          one line per ref move: branch, commit, at (ADR-0033)
   approvals.jsonl                     one line per approval: commit, approver, at (never removed)
+  checks.jsonl                        one line per check run on a commit (ADR-0032): commit, check,
+                                      ok, summary, base, at (append-only, like approvals)
 
 - **Content-addressed.** `content` is the hash of the canonical declaration without
   `version`, plus its representations. A commit's id is `<seq>-<content>`. Reading a commit
@@ -465,6 +467,40 @@ class CommitStore:
             raise CommitError(f"main with {commit_id} does not validate: "
                               + "; ".join(f"{i.code} at {i.where}" for i in errors[:3]))
         return d
+
+    # -- check records (ADR-0032) -----------------------------------------------------------
+    def record_check(self, domain: str, commit_id: str, check: str, ok: bool | None, summary: str,
+                     base: str | None = None) -> dict[str, Any]:
+        """Append the result of one check run on a commit (see `record_checks`)."""
+        return self.record_checks(domain, commit_id, [(check, ok, summary)], base)[0]
+
+    def record_checks(self, domain: str, commit_id: str, rows: list[tuple[str, bool | None, str]],
+                      base: str | None = None) -> list[dict[str, Any]]:
+        """Append the results of one run of checks on a commit, in one write under the lock, with
+        one run id. `ok` None means the check did not run in this run. Never rewritten: a later
+        run appends newer records, and the newest record of each check is its status."""
+        with self._lock(domain) as dirp:
+            self.get(domain, commit_id)
+            at = _now()
+            run = hashlib.sha256(f"{commit_id}|{at}|{os.getpid()}|{id(rows)}".encode()).hexdigest()[:12]
+            entries = [{"commit": commit_id, "check": name, "ok": ok if ok is None else bool(ok),
+                        "summary": summary, "base": base, "at": at, "run": run} for name, ok, summary in rows]
+            with open(dirp / "checks.jsonl", "a") as f:
+                f.write("".join(json.dumps(e, sort_keys=True) + "\n" for e in entries))
+                f.flush()
+                os.fsync(f.fileno())
+            return entries
+
+    def checks(self, domain: str, commit_id: str | None = None) -> list[dict[str, Any]]:
+        rows = self._lines(self._dir(domain) / "checks.jsonl")
+        return [r for r in rows if commit_id is None or r["commit"] == commit_id]
+
+    def check_status(self, domain: str, commit_id: str) -> dict[str, dict[str, Any]]:
+        """The newest record of each check on a commit (`ok` None: it did not run that time)."""
+        out: dict[str, dict[str, Any]] = {}
+        for r in self.checks(domain, commit_id):
+            out[r["check"]] = r
+        return out
 
     # -- history and checkout (ADR-0032) --------------------------------------------------------
     def element_log(self, domain: str, key: str, at: str | None = None) -> list[dict[str, Any]]:

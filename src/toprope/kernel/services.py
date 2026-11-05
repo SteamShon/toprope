@@ -163,6 +163,16 @@ class LocalKernel(KernelServices):
         self.commits.approve(domain, commit, approver)   # conflicts fail the call, as any error does
         return {"approved": True, "main": self.commits.main(domain).id}
 
+    def _change_check(self, domain, commit):
+        from ..check import check_commit
+        if self.environment is not None:
+            with self.environment.events(domain) as store:
+                r = check_commit(self.commits, domain, commit, events=store, examples=self.examples)
+        else:
+            r = check_commit(self.commits, domain, commit, examples=self.examples)
+        return {"passed": r.ok, "errors": r.errors, "warnings": r.warnings,
+                "failing": [n for n, c in r.checks.items() if not c.ok], "summary": r.summary()}
+
     def _checkout(self, domain, commit, declaration):
         c = self.commits.checkout(domain, commit, self._path(declaration))
         return {"content": c.content}

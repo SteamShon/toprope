@@ -48,7 +48,7 @@ src/toprope/
 | 5 | `feat/m0a-mcp-server` | `toprope-server` MCP adapter generated from the declaration, query/world-map tools | 4 |
 | 6 | `feat/m0a-harness` | small world, cell tests, invariant checks, gate-tier exploration, flows, replay parity, concurrency tests, parity + coverage | 5 |
 | 7 | `feat/m0a-worldmap` | `world-map.json` (declaration + harness results), `world_map` / `how_to_reach` MCP tools | 5, 6 |
-| 8 | `feat/m0a-change-check` | diff, structural/semantic/scenario/log-replay/in-flight/NL checks, preview | 6 + **the probe suite and verdict rules frozen by the researcher** (ADR-0034) |
+| 8 | `feat/m0a-change-check` | diff, structural/semantic/scenario/log-replay/in-flight/NL checks, preview; check records on commits (ADR-0032) | 6 + **the probe suite and verdict rules frozen by the researcher** (ADR-0034) |
 | 9 | `feat/m0a-incremental` | dependency graph, hashes, impact report, result cache, background full run | 8 |
 | 10 | `feat/m0a-sources-authoring` | source readers (redaction, local-only), authoring MCP (ADR-0014) | 5 |
 | 11 | `feat/m0a-kernel-effects` | **added by ADR-0028**: kernel services as declared effects (`call`/`with`/`reply`), compile-time checks, kernel-service port with real and recording-fake adapters, `external:kernel`, `toprope-server --composition`, regeneration check | 5, 6, handoffs (ADR-0024), composition (ADR-0026) |

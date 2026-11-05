@@ -381,6 +381,8 @@
                         "fetch_source",
                         "commit",
                         "diff",
+                        "checkout",
+                        "change_check",
                         "approve_commit",
                         "preview",
                         "deploy"
