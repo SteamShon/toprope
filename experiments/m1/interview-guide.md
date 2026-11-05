@@ -122,3 +122,9 @@ yourself.
    suite and the verdict rules can be frozen first. Change-check work (M0a sub-PR 8) starts
    once those two are frozen; run `freeze` again for the change requests and key before the
    pilot runs (ADR-0034).
+5. **Changing a frozen file later.** Edit it (keep `status: frozen`), then record the change
+   with its reason; the old version stays in `FROZEN.json`, and results report which
+   version each run used:
+   ```bash
+   uv run --with pyyaml python experiments/tools/instruments.py amend experiments/m1/instruments verdict-rules --reason "why"
+   ```

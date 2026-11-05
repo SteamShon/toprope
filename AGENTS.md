@@ -98,6 +98,11 @@ umbrella is up to date with `develop`.
   The researcher selects, reviews and freezes them in their own commit, before the pilot
   runs. Everything that feeds a link verdict (M2 and later instruments, any gold set) stays
   human-only.
+- **Freezing and amending.** The researcher freezes an instrument, or tells an agent to, and
+  the commit records that instruction. A frozen file may change later only through
+  `instruments.py amend --reason`, which keeps the old hash and the reason in `FROZEN.json`;
+  results report which version each run used. An agent amends only at the researcher's
+  explicit instruction.
 - **Format changes on request.** When the researcher asks, an agent may change the
   **format** of these instruments: the templates' fields and comments, the validator, and
   the guides. Such a change writes no content, never touches a filled or frozen instrument

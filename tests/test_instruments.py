@@ -116,3 +116,29 @@ def test_the_checks_wait_only_for_the_probes_and_verdict_rules(tmp_path, capsys)
     assert sorted(json.loads((d / "FROZEN.json").read_text())["files"]) == [
         "change-key.yaml", "change-requests.yaml", "probe-suite.yaml", "verdict-rules.yaml"]
     assert [e for e in instruments.verify(d, run=True) if "binding" not in e] == []
+
+
+def test_a_frozen_file_can_be_amended_on_the_record(tmp_path, capsys):
+    """A frozen instrument may change later: the old hash is kept in its history with the reason."""
+    import json
+    d = filled(tmp_path)
+    (d / "gold-scenarios.yaml").unlink()
+    for f in ("change-requests", "change-key"):
+        (d / f"{f}.yaml").unlink()
+    for f in ("probe-suite", "verdict-rules"):
+        p = d / f"{f}.yaml"
+        p.write_text(p.read_text().replace("status: draft", "status: frozen"))
+    assert instruments.freeze(d) == []
+    first = json.loads((d / "FROZEN.json").read_text())["files"]["verdict-rules.yaml"]["sha256"]
+    p = d / "verdict-rules.yaml"
+    p.write_text(p.read_text().replace("preview_seconds: 60", "preview_seconds: 45"))
+    assert instruments.verify(d) == ["verdict-rules.yaml changed after freezing"]
+    assert instruments.amend(d, "verdict-rules", "") == ["amend needs --reason: why the frozen file changes"]
+    assert instruments.amend(d, "change-key", "x") == ["change-key.yaml is not frozen; use freeze"]
+    assert instruments.amend(d, "verdict-rules", "the preview target was too tight") == []
+    meta = json.loads((d / "FROZEN.json").read_text())["files"]["verdict-rules.yaml"]
+    assert meta["history"][0]["sha256"] == first and meta["history"][0]["reason"] == "the preview target was too tight"
+    assert instruments.verify(d) == []
+    assert instruments.amend(d, "verdict-rules", "again") == ["verdict-rules.yaml is unchanged; nothing to amend"]
+    p.write_text(p.read_text().replace("status: frozen", "status: draft"))
+    assert any("keep status: frozen" in e for e in instruments.amend(d, "verdict-rules", "draft again"))

@@ -6,7 +6,7 @@
 # overlap with the domain scenarios or the gold scenarios, and it does not reference the change key.
 instrument: probe-suite
 experiment: M1
-status: draft
+status: frozen
 probes:
   - id: P01
     task: "Finish the confirmation (or approval) of these drafted elements."

@@ -5,6 +5,7 @@ Usage (from the repo root):
   uv run --with pyyaml python experiments/tools/instruments.py freeze   experiments/m1/instruments
   uv run --with pyyaml python experiments/tools/instruments.py freeze-binding experiments/m1/instruments
   uv run --with pyyaml python experiments/tools/instruments.py verify   experiments/m1/instruments [--run]
+  uv run --with pyyaml python experiments/tools/instruments.py amend    experiments/m1/instruments FILE --reason TEXT
 
 validate        checks the filled files (not *.template.yaml) for format and cross-file consistency.
 freeze          researcher only: freezes into FROZEN.json the probe suite and verdict rules
@@ -15,6 +16,11 @@ freeze-binding  stage 2, researcher only, after Phase A and before any arm runs:
                 binding.yaml. Requires the four instruments frozen.
 --sealed        with validate: print nothing derived from change-key.yaml beyond errors
                 (use it whenever an agent runs the validator for you).
+amend FILE --reason TEXT
+                researcher only (or an agent at the researcher's explicit instruction): records a
+                new version of a frozen file. The file must still validate and be `frozen`; the
+                previous hash moves to the file's history with the reason, so every run can
+                report which version it used. Nothing is ever erased from the manifest.
 verify          fails if a frozen file changed. It also fails unless the probe suite and verdict
                 rules are frozen (the gate for building the checks), and with --run (used by
                 the harness before every arm run) unless the change requests, the key and
@@ -237,6 +243,37 @@ def freeze(d: Path) -> list[str]:
     return _freeze(d, BEFORE_CHECKS + later)
 
 
+def amend(d: Path, name: str, reason: str) -> list[str]:
+    """A frozen file may change, on the record: its new hash replaces the old one, and the old
+    one joins the file's history with when and why. `verify` then accepts the new version."""
+    if not reason.strip():
+        return ["amend needs --reason: why the frozen file changes"]
+    manifest, merrs = read_manifest(d)
+    if merrs:
+        return merrs
+    f = FILES.get(name, name)
+    meta = manifest["files"].get(f)
+    if meta is None:
+        return [f"{f} is not frozen; use freeze"]
+    key = next((k for k, v in FILES.items() if v == f), None)
+    errs = validate(d, include_binding=key == "binding")
+    doc = load(d, key) if key else None
+    if doc is None or doc.get("status") != "frozen":
+        errs.append(f"{f}: keep status: frozen in the amended file")
+    if errs:
+        return errs
+    new = sha(d / f)
+    if new == meta["sha256"]:
+        return [f"{f} is unchanged; nothing to amend"]
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    history = meta.get("history", []) + [{"sha256": meta["sha256"], "frozen_at": meta["frozen_at"],
+                                          "replaced_at": now, "reason": reason.strip()}]
+    manifest["files"][f] = {"sha256": new, "frozen_at": now, "history": history}
+    (d / "FROZEN.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    print(f"amended: {f} (version {len(history) + 1}) → {d / 'FROZEN.json'}")
+    return []
+
+
 def freeze_binding(d: Path) -> list[str]:
     manifest, merrs = read_manifest(d)
     if merrs:
@@ -269,6 +306,10 @@ if __name__ == "__main__":
     cmd, d = sys.argv[1], Path(sys.argv[2])
     if cmd == "verify":
         errs = verify(d, run="--run" in sys.argv[3:])
+    elif cmd == "amend":
+        rest = sys.argv[3:]
+        reason = rest[rest.index("--reason") + 1] if "--reason" in rest and rest.index("--reason") + 1 < len(rest) else ""
+        errs = amend(d, rest[0] if rest and rest[0] != "--reason" else "", reason)
     else:
         errs = {"validate": validate, "freeze": freeze, "freeze-binding": freeze_binding}[cmd](d)
     for e in errs:
