@@ -119,23 +119,43 @@ links:
     required: true
     source:
       kind: interview
-      ref: interview:interview/authoring/log.jsonl#L3
+      ref: interview:interview/authoring/log.jsonl#L4
       quote: 7번, 8번 둘 다 추천대로 해도 될 것 같아.
     status: proposed
-  source:
-    from: Element
-    to: Source
-    cardinality: many-to-one
   element:
     from: DecisionRequest
     to: Element
     cardinality: many-to-one
+    source:
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L4
+      quote: 7번, 8번 둘 다 추천대로 해도 될 것 같아.
+    status: proposed
   parents:
     from: Commit
     to: Commit
     cardinality: many-to-many
+    source:
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L4
+      quote: 7번, 8번 둘 다 추천대로 해도 될 것 같아.
+    status: proposed
   commit:
     from: CheckRecord
     to: Commit
     cardinality: many-to-one
     required: true
+    source:
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L4
+      quote: 7번, 8번 둘 다 추천대로 해도 될 것 같아.
+    status: proposed
+  origin:
+    from: Element
+    to: Source
+    cardinality: many-to-one
+    source:
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L4
+      quote: 7번, 8번 둘 다 추천대로 해도 될 것 같아.
+    status: proposed

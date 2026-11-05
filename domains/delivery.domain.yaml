@@ -85,18 +85,38 @@ links:
     to: DeliveryRequest
     cardinality: many-to-one
     required: true
+    source:
+      kind: interview
+      ref: interview:interview/delivery/log.jsonl#L3
+      quote: 7번, 8번 둘 다 추천대로 해도 될 것 같아.
+    status: proposed
   build:
     from: Deployment
     to: Build
     cardinality: many-to-one
     required: true
+    source:
+      kind: interview
+      ref: interview:interview/delivery/log.jsonl#L3
+      quote: 7번, 8번 둘 다 추천대로 해도 될 것 같아.
+    status: proposed
   environment:
     from: Deployment
     to: Environment
     cardinality: many-to-one
     required: true
+    source:
+      kind: interview
+      ref: interview:interview/delivery/log.jsonl#L3
+      quote: 7번, 8번 둘 다 추천대로 해도 될 것 같아.
+    status: proposed
   deployment:
     from: Verification
     to: Deployment
     cardinality: many-to-one
     required: true
+    source:
+      kind: interview
+      ref: interview:interview/delivery/log.jsonl#L3
+      quote: 7번, 8번 둘 다 추천대로 해도 될 것 같아.
+    status: proposed
