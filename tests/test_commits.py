@@ -306,3 +306,15 @@ def test_the_regeneration_check_passes_with_creating_replies(tmp_path):
     (e2e,) = effects_end_to_end(p)
     assert e2e["ok"], e2e
     assert e2e["effects"][0]["resolution"] == "EffectSucceeded" and e2e["effects"][0]["reply"] == "ok"
+
+
+def test_an_unreadable_representation_stops_the_commit_and_an_explicit_empty_list_means_none(tmp_path):
+    st = CommitStore(tmp_path / "commits")
+    wc = write(tmp_path / "shop.domain.yaml", schema_doc_domain())
+    (tmp_path / "ui.representation.yaml").write_text(yaml.safe_dump(
+        {"representation": "ui", "version": 1, "targets": {"domain": "example", "interface": "1.x"}, "views": {}}))
+    alone, _ = st.commit(wc, representations=[])
+    assert not (st.root / "example" / "objects" / alone.content / "representations").exists()
+    (tmp_path / "broken.representation.yaml").write_text("views: [unclosed\n")
+    with pytest.raises(CommitError, match="broken.representation.yaml"):
+        st.commit(wc)
