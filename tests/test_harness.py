@@ -221,3 +221,19 @@ def test_every_example_is_explored_not_one_per_stage():
     raw["world"]["fixtures"] = others + [short] + fx                  # the short one comes first
     w = grow_world(Domain.model_validate(raw))
     assert "approved" not in w.unreachable.get("Experiment", [])
+
+
+def test_races_pair_cases_on_the_same_example():
+    """Two examples in one stage, and two actions that pick different ones (one needs a guardrail):
+    a race and both serial orders must start from the same example."""
+    raw = schema_doc_domain()
+    fx = next(f for f in raw["world"]["fixtures"] if "Experiment" in f and f["Experiment"].get("status") == "draft")
+    other = copy.deepcopy(fx)
+    other["Experiment"]["id"], other["Experiment"]["guardrails"] = "E-noguard", []
+    raw["world"]["fixtures"].insert(0, other)                          # same stage, picked first by `rename`
+    raw["actions"]["rename"] = {"description": "Rename.", "actor": ["approver"], "target": "Experiment",
+                                "params": {"name": {"type": "string"}}, "effects": [{"set": {"target.name": "params.name"}}]}
+    for state, row in raw["transitions"]["Experiment"]["matrix"].items():
+        row["rename"] = state if state == "draft" else "n/a"
+    r = run_harness(Domain.model_validate(raw), levels=("model", "execution"), explore_examples=0)
+    assert [f for f in r.findings if f.kind == "race"] == []

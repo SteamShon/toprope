@@ -145,10 +145,12 @@ class Harness:
     def races(self, cases: list[Case], limit: int = 12) -> int:
         """Two actors on the same object at once (Execution on a durable store): the outcomes
         must be those of one of the two serial orders, and the invariants must hold."""
-        by_state: dict[tuple[str, str | None], list[Case]] = {}
+        # Pair only cases on the same example: the race and both serial orders must start from
+        # the same object (a stage can hold several examples with different facts).
+        by_state: dict[tuple[str, str | None, str], list[Case]] = {}
         for c in cases:
             if c.kind == "cell" and not c.gap and c.expect["status"] == "ok":
-                by_state.setdefault((c.obj, c.state), []).append(c)
+                by_state.setdefault((c.obj, c.state, c.instance.data["id"]), []).append(c)
         pairs = [(a, b) for xs in by_state.values() for i, a in enumerate(xs) for b in xs[i:]
                  if (a.action, a.role) != (b.action, b.role) or a is b]
         tmp = tempfile.TemporaryDirectory()
