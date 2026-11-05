@@ -43,6 +43,21 @@ and a change can be tried without touching what is approved.
      that is an ancestor of the deployed one is a downgrade.
    - Sequence numbers stay unique per domain, for reference only.
 
+## Why there is no pull-request object
+Everything a pull request holds already exists, derived from the branch and `main`:
+- the diff: merge base to branch head
+- the checks: check records on the branch head
+- the discussion: questions on elements (ADR-0032)
+- the review request: a decision request
+- the approval: the merge into `main` and its tag
+
+A stored PR object would add a second source of truth. Its state (open, merged, closed,
+which head was reviewed) can drift from the refs, and every move of a ref would have to keep
+it in sync. ADR-0029's review hash already pins which content was reviewed. The derived
+review view costs nothing to add later as a stored record, if probes show it is needed: for
+example, a description of intent that spans several commits, or a review aimed at a target
+other than `main`.
+
 ## Consequences
 - **The commit store** gains branch refs (append-only ref moves, under the domain lock), a
   merge base, an element-level 3-way merge with a conflict list, and `merge`/`branch`
@@ -56,4 +71,18 @@ and a change can be tried without touching what is approved.
 - Is `main` protected as above, so that approval means merge into `main`? Or may commits be
   approved on any branch?
 - Does Delivery deploy only from `main`, or also from a branch for preview environments
-  (more than one environment comes later)?
+  (more than one environment comes later)? Side effects of allowing it:
+  - **The floor.** A branch commit is not approved, so a preview deploy deploys an
+    unapproved commit. Probe P05 then holds only if "deploy" means production environments.
+  - **State.** A preview needs its own event store. A shared store would hold events written
+    under a schema `main` never had.
+  - **Handoffs and kernel calls.** A preview domain would send real handoffs to real receivers
+    and call real kernel services. It must be wired to recording receivers and a
+    RecordingKernel instead.
+  - **Data.** Copying production data into a preview carries redaction and local-only rules
+    with it.
+  - **Lifecycle.** Preview environments pile up and need cleanup.
+
+  The existing `preview` (build, harness, world map, no deploy) already gives most of the
+  review value without these. *Recommendation:* deploy only from `main` in M1. Revisit
+  isolated preview environments together with multiple environments.
