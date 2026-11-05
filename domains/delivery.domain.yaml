@@ -235,3 +235,16 @@ transitions:
         record_deployment: n/a
         verify:
           deny: Already verified.
+invariants:
+- id: deployed-builds-passed-their-harness
+  'on': DeliveryRequest
+  check: target.deployed != true or target.harness_ok == true
+  reason: Nothing reaches the environment unless its harness passed.
+- id: verified-requests-were-deployed
+  'on': DeliveryRequest
+  check: target.stage != 'verified' or target.deployed == true
+  reason: Only a deployment that happened is verified.
+- id: finished-deploys-record-the-outcome
+  'on': DeliveryRequest
+  check: target.stage not in ['done', 'verified'] or exists(target.deployed)
+  reason: A finished deploy records whether it happened.

@@ -92,6 +92,9 @@ objects:
         enum:
         - open
         - decided
+      choice:
+        type: string
+        optional: true
     source:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
@@ -345,10 +348,12 @@ actions:
         type: string
     requires: human
     records_decision: true
+    effects:
+    - set:
+        target.choice: params.choice
     source:
-      kind: interview
-      ref: interview:interview/authoring/log.jsonl#L5
-      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+      kind: record
+      ref: records:docs/adr/0032-domain-knowledge-as-git-and-github.md#L38-L63
     status: proposed
   commit_draft:
     description: Snapshot the working copy as an immutable commit.
@@ -514,3 +519,20 @@ transitions:
         record_check: recorded
         approve_commit: recorded
         record_approval: recorded
+invariants:
+- id: approved-commits-passed-their-checks
+  'on': Commit
+  check: target.approved != true or target.checks_passed == true
+  reason: An approved commit passed its change check.
+- id: decided-requests-record-the-choice
+  'on': DecisionRequest
+  check: target.stage != 'decided' or exists(target.choice)
+  reason: A decided request records what was chosen.
+- id: fetched-sources-have-a-snapshot
+  'on': Source
+  check: target.stage != 'fetched' or exists(target.sha256)
+  reason: A fetched source has the hash of its snapshot.
+- id: elements-cite-a-source
+  'on': Element
+  check: exists(target.origin)
+  reason: Every element cites where it came from.

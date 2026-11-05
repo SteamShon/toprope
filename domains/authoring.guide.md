@@ -19,7 +19,7 @@ A domain owner's workflow lives in people's heads; turning it into a declared do
 - **Commit**: An immutable snapshot of the working copy on a branch. Stages: `recorded` (starts `recorded`).
   - facts: `seq` (integer), `content` (string), `branch` (string), `author` (string, optional), `message` (string, optional), `interface` (string), `domain_id` (string), `checks_passed` (boolean, optional), `failing` (string, optional), `approved` (boolean, optional), `main` (string, optional)
 - **DecisionRequest**: A decision only a person may take, proposed with grounds and a recommendation and sent to that person's outbox. Stages: `open`, `decided` (starts `open`).
-  - facts: `subject` (string), `grounds` (string), `recommendation` (string)
+  - facts: `subject` (string), `grounds` (string), `recommendation` (string), `choice` (string, optional)
 - **Draft**: The working copy of a domain's declaration on a branch: what a commit snapshots. Stages: `open` (starts `open`).
   - facts: `domain_id` (string), `declaration` (string), `branch` (string)
 - **Element**: One part of the draft declaration (an object, action, cell, invariant...), proposed by an agent or confirmed by a person. Stages: `proposed`, `unknown`, `confirmed` (starts `proposed`).
@@ -53,7 +53,7 @@ A domain owner's workflow lives in people's heads; turning it into a declared do
 | `confirm_element` 🔒 | owner | **Element** | — | the stage (per the matrix) | — | `ElementConfirmElement` |
 | `mark_unknown` | owner, expert | **Element** | — | the stage (per the matrix) | — | `ElementMarkUnknown` |
 | `request_decision` | owner | creates **DecisionRequest**; params `element` (a Element), `subject` (string), `grounds` (string), `recommendation` (string) | — | — | — | `DecisionRequestCreated` |
-| `decide` 🔒 📝 | owner | **DecisionRequest**; params `choice` (string) | — | the stage (per the matrix) | — | `DecisionRequestDecide` |
+| `decide` 🔒 📝 | owner | **DecisionRequest**; params `choice` (string) | — | the stage (per the matrix); `target.choice` ← `params.choice` | — | `DecisionRequestDecide` |
 | `commit_draft` | owner | **Draft** | — | the stage (per the matrix) | kernel `commit` → `record_commit` | `DraftCommitDraft` |
 | `record_commit` | the kernel | creates **Commit**; params `seq` (integer), `content` (string), `interface` (string) | — | — | — | `CommitCreated` |
 | `check_commit` | owner | **Commit** | — | the stage (per the matrix) | kernel `change_check` → `record_check` | `CommitCheckCommit` |
@@ -98,6 +98,13 @@ For each stage: may the action happen, and where does it lead? A missing cell is
 | --- | --- | --- |
 | `added` | → `added` | → `fetched` |
 | `fetched` | denied: A link is fetched once into a snapshot; add a new source to read it again. | n/a |
+
+## Always true (invariants)
+
+- **approved-commits-passed-their-checks** on Commit: An approved commit passed its change check.
+- **decided-requests-record-the-choice** on DecisionRequest: A decided request records what was chosen.
+- **fetched-sources-have-a-snapshot** on Source: A fetched source has the hash of its snapshot.
+- **elements-cite-a-source** on Element: Every element cites where it came from.
 
 ## What is generated
 

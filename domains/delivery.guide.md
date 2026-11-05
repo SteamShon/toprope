@@ -47,6 +47,12 @@ For each stage: may the action happen, and where does it lead? A missing cell is
 | `done` | → `previewing` | n/a | → `deploying` | n/a | → `verified` |
 | `verified` | n/a | n/a | n/a | n/a | denied: Already verified. |
 
+## Always true (invariants)
+
+- **deployed-builds-passed-their-harness** on DeliveryRequest: Nothing reaches the environment unless its harness passed.
+- **verified-requests-were-deployed** on DeliveryRequest: Only a deployment that happened is verified.
+- **finished-deploys-record-the-outcome** on DeliveryRequest: A finished deploy records whether it happened.
+
 ## What is generated
 
 - **MCP server** `toprope:delivery`: one tool per action (6), plus `get_object`, `history`, `attempts`, `allowed_actions`, `describe_domain`, `world_map` and `how_to_reach`. Kernel replies (`record_build`, `record_deployment`) are tools too, but only the kernel may take them.
