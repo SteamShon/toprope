@@ -131,10 +131,24 @@ class Outbox:
         from ..kernel import CATALOG
         pl = p.event.payload
         svc = CATALOG[pl["service"]]
-        result = svc.failure(f"mapping-error: {pl['error']}") if pl.get("error") else services.call(pl["service"], pl["inputs"])
+        result = (svc.failure(f"mapping-error: {pl['error']}") if pl.get("error")
+                  else services.call(pl["service"], pl["inputs"], caller=p.event.actor))
         reply = self.ex.d.actions[pl["reply"]]
-        o = self.ex.receive_kernel_reply(p.id, pl["reply"], p.event.stream,
-                                         {k: result[k] for k in reply.params if k in result})
+        params = {k: result[k] for k in reply.params if k in result}
+        if reply.creates is not None:
+            # A creating reply (ADR-0029) makes the object the service named; nothing to make on
+            # failure, and an object that already exists (the same commit again) is not an error.
+            if not result["ok"] or not result.get("id"):
+                return self._resolve(p, "EffectFailed", {"service": pl["service"], "result": result,
+                                                        "reply": pl["reply"], "status": "skipped",
+                                                        "code": None, "reason": result.get("error")})
+            if self.ex.lookup(result["id"]) is not None:
+                return self._resolve(p, "EffectSucceeded", {"service": pl["service"], "result": result,
+                                                           "reply": pl["reply"], "status": "ok",
+                                                           "code": "unchanged", "reason": None})
+            o = self.ex.receive_kernel_reply(p.id, pl["reply"], result["id"], params)
+        else:
+            o = self.ex.receive_kernel_reply(p.id, pl["reply"], p.event.stream, params)
         if o.status == "rejected" and o.code in TRANSIENT:
             return {"id": p.id, "result": "pending", "reason": o.reason}
         detail = {"service": pl["service"], "result": result, "reply": pl["reply"],

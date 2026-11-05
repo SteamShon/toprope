@@ -18,9 +18,11 @@ An environment is a directory:
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import os
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -56,8 +58,10 @@ def _now() -> str:
 
 
 def _write_atomic(path: Path, text: str) -> None:
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(text)
+    import tempfile
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")   # unique per writer
+    with os.fdopen(fd, "w") as f:
+        f.write(text)
     os.replace(tmp, path)
 
 
@@ -108,8 +112,61 @@ class LocalEnvironment:
         p = self.root / "builds" / build_id / "build.json"
         return Build(**json.loads(p.read_text())) if p.exists() else None
 
+    @contextmanager
+    def _lock(self):
+        """One deploy at a time per environment (ADR-0029): the ref moves under a lock."""
+        with open(self.root / ".lock", "w") as f:
+            fcntl.flock(f, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(f, fcntl.LOCK_UN)
+
+    # -- commits (ADR-0029) -------------------------------------------------------------------
+    def preview_commit(self, commits: Any, domain: str, commit_id: str, levels: tuple[str, ...] = ("model", "execution"),
+                       examples: int = 100) -> Build:
+        """Build a commit from the commit store; `commit.json` in the build links it to the commit."""
+        c = commits.get(domain, commit_id)
+        src = self.root / "builds" / ".incoming" / f"{c.content}.domain.yaml"
+        src.parent.mkdir(parents=True, exist_ok=True)
+        commits.export(domain, commit_id, src)
+        b = self.preview(src, levels=levels, examples=examples)
+        meta = {**asdict(b), "commit": c.id, "seq": c.seq, "commit_domain": domain}
+        (self.root / "builds" / b.id / "commit.json").write_text(json.dumps(meta, indent=2))
+        return b
+
+    def deploy_commit(self, commits: Any, domain: str, commit_id: str, approver: Actor) -> dict[str, Any]:
+        """Point this environment at a commit. Besides the build floor, the commit must be
+        approved, must not be superseded by a newer approved commit, and must be newer than the
+        deployed one: no downgrades without an explicit rollback (M2)."""
+        c = commits.get(domain, commit_id)
+        with self._lock():
+            build_id = next((p.parent.name for p in (self.root / "builds").glob("*/commit.json")
+                             if json.loads(p.read_text())["commit"] == c.id), None)
+            try:
+                if not commits.is_approved(domain, c.id):
+                    raise DeployRefused("unapproved", f"commit {c.id} has no approval")
+                latest = commits.latest_approved(domain)
+                if latest is not None and latest.seq > c.seq:
+                    raise DeployRefused("superseded", f"commit {c.id} is superseded by approved {latest.id}")
+                cur = self.current()
+                if cur and cur.get("commit_domain") == domain and cur.get("seq", 0) >= c.seq:
+                    raise DeployRefused("downgrade", f"{cur.get('commit')} is deployed; {c.id} is not newer "
+                                                     "(rollback comes in M2)")
+                if build_id is None:
+                    raise DeployRefused("no-build", f"commit {c.id} has not been previewed")
+            except DeployRefused as e:
+                self._log({"at": _now(), "commit": c.id, "result": "refused", "rule": e.rule,
+                           "reason": e.reason, "approver": approver.ref()})
+                raise
+            return self._deploy_locked(build_id, approver, {"commit": c.id, "seq": c.seq, "commit_domain": domain})
+
     # -- deploy (the fixed floor) ------------------------------------------------------------
     def deploy(self, build_id: str, approver: Actor) -> dict[str, Any]:
+        with self._lock():
+            return self._deploy_locked(build_id, approver, {})
+
+    def _deploy_locked(self, build_id: str, approver: Actor, extra: dict[str, Any]) -> dict[str, Any]:
         try:
             build = self._floor(build_id, approver)
         except DeployRefused as e:
@@ -118,7 +175,7 @@ class LocalEnvironment:
             raise
         current = {"build": build.id, "domain": build.domain, "version": build.version,
                    "declaration": str(self.root / "builds" / build.id / "domain.yaml"),
-                   "deployed_at": _now(), "approver": approver.ref()}
+                   "deployed_at": _now(), "approver": approver.ref(), **extra}
         _write_atomic(self.root / "current.json", json.dumps(current, indent=2))
         self._log({"at": current["deployed_at"], "build": build.id, "result": "deployed", "approver": approver.ref()})
         return current

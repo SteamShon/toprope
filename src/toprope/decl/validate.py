@@ -307,7 +307,12 @@ def _check_call(d: Domain, name: str, a, k: int, e) -> list[Issue]:
     r = d.actions.get(e.reply)
     if r is None:
         return out + [Issue("unknown-reply", f"{where}.reply", f"no action '{e.reply}'")]
-    if r.object_type != a.object_type or r.target is None:
+    if r.creates is not None:
+        # A reply may create an object (ADR-0029: a Commit) when the service returns its `id`.
+        if "id" not in svc.fields():
+            out.append(Issue("reply-target", f"{where}.reply",
+                             f"{e.reply} creates an object, but {e.call} returns no `id` for it"))
+    elif r.object_type != a.object_type:
         out.append(Issue("reply-target", f"{where}.reply",
                          f"{e.reply} must target {a.object_type}, the object that called {e.call}"))
     if KERNEL not in {x.role if isinstance(x, ActorRule) else x for x in r.actor}:
@@ -317,7 +322,13 @@ def _check_call(d: Domain, name: str, a, k: int, e) -> list[Issue]:
         if p not in fields:
             out.append(Issue("reply-param", f"actions.{e.reply}.params.{p}",
                              f"{e.call} returns no '{p}' (it returns {sorted(fields)})"))
-        elif spec.many or spec.ref or spec.enum or spec.type != fields[p]:
+        elif not _reply_type_ok(spec, fields[p]):
             out.append(Issue("reply-param-type", f"actions.{e.reply}.params.{p}",
                              f"{e.call} returns '{p}' as a {fields[p]}"))
     return out
+
+
+def _reply_type_ok(spec, field: str) -> bool:
+    if field == "strings":
+        return spec.many and spec.type == "string" and not (spec.ref or spec.enum)
+    return not (spec.many or spec.ref or spec.enum) and spec.type == field
