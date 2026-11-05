@@ -21,6 +21,10 @@ class Caller:
 
     def __post_init__(self) -> None:
         a = self.actor
+        p = self.on_behalf_of
+        if p is not None and (p.id == "system" or p.id.startswith(("external:", "handoff:"))
+                              or any(r == "system" or r.startswith("external:") for r in p.roles)):
+            raise ValueError("a principal is a person, never a reserved actor (system, external:*, handoff:*)")
         for who in (a, self.on_behalf_of):
             if who is not None and (not isinstance(who.id, str) or not who.id
                                     or not all(isinstance(r, str) for r in who.roles)):

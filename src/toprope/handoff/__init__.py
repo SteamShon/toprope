@@ -66,6 +66,11 @@ class Pending:
         return (RESOLUTION_PREFIX if self.kind == "handoff" else EFFECT_PREFIX) + self.id
 
 
+def pending_of(e: Event) -> Pending:
+    return (Pending(handoff_id(e), e, "handoff") if e.type == "HandoffRequested"
+            else Pending(effect_id(e), e, "effect"))
+
+
 def handoff_id(e: Event) -> str:
     return f"{e.payload['handoff']}:{e.stream}@{e.version}"
 
@@ -100,6 +105,20 @@ class Outbox:
     def resolution(self, oid: str, kind: str = "handoff") -> Event | None:
         evs = self.ex.store.read(Pending(oid, None, kind).stream)   # type: ignore[arg-type]
         return evs[0] if evs else None
+
+    def process(self, p: Pending, transport: HandoffTransport | None, services: Any) -> tuple[dict[str, Any] | None, list[Event]]:
+        """Send one entry if its channel is configured and it is still unresolved. Returns its
+        report entry (None if not sent) and the events a kernel reply produced in this domain,
+        whose own outbox entries come next."""
+        if self.ex.store.version(p.stream) != 0:
+            return None, []
+        if p.kind == "handoff":
+            return (self._handoff(p, transport), []) if transport is not None else (None, [])
+        if services is None:
+            return None, []
+        self._follow: list[Event] = []
+        rep = self._effect(p, services)
+        return rep, self._follow
 
     def dispatch(self, transport: HandoffTransport | None = None, services: Any = None) -> list[dict[str, Any]]:
         """Send every pending entry once: handoffs through `transport`, kernel calls through
@@ -149,6 +168,7 @@ class Outbox:
             o = self.ex.receive_kernel_reply(p.id, pl["reply"], result["id"], params)
         else:
             o = self.ex.receive_kernel_reply(p.id, pl["reply"], p.event.stream, params)
+        self._follow = list(o.events)
         if o.status == "rejected" and o.code in TRANSIENT:
             return {"id": p.id, "result": "pending", "reason": o.reason}
         detail = {"service": pl["service"], "result": result, "reply": pl["reply"],

@@ -83,6 +83,9 @@ def _pascal(name: str) -> str:
     return "".join(p[:1].upper() + p[1:] for p in name.split("_"))
 
 
+RESERVED_ID_PREFIXES = ("handoff:", "effect:")   # the outbox's resolution streams (ADR-0024, ADR-0028)
+
+
 def _of_type(v: Any, t: str) -> bool:
     if t == "boolean":
         return isinstance(v, bool)
@@ -191,6 +194,8 @@ class Interpreter:
         obj = action.object_type
         creating = action.creates is not None
         bad = self.invalid_params(action, cmd.params)                       # ADR-0021: input check
+        if cmd.target is not None and cmd.target.startswith(RESERVED_ID_PREFIXES):
+            bad = f"Object ids may not start with {' or '.join(RESERVED_ID_PREFIXES)} (outbox records)."
         if cmd.target is None or bad:
             why = "A target id is required." if cmd.target is None else bad
             return Decision(Outcome("rejected", "invalid-command", why), (), ())

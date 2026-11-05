@@ -115,6 +115,13 @@ def _set(doc: dict, segs: list[str], value: Any) -> None:
         cur[last] = value
 
 
+def _no_provenance_path(segs: list[str]) -> None:
+    """`source` and `status` are set by the tool, never written directly: otherwise an agent
+    could write `actions.X.status: confirmed` (only a person confirms)."""
+    if segs[0] != "glossary" and segs[-1] in ("status", "source") and len(segs) > 1 and segs[-2] != "properties":
+        raise AuthoringError(f"{'.'.join(segs)}: provenance is set by the tool; propose the element itself")
+
+
 def _demote(v: Any) -> Any:
     """Agents never write `confirmed`, at any depth (nested preconditions, by_role denies)."""
     if isinstance(v, dict):
@@ -262,6 +269,7 @@ class Workspace:
 
     def propose(self, path: str, value: Any, source_ref: str, quote: str | None = None) -> dict[str, Any]:
         segs = element_path(path)
+        _no_provenance_path(segs)
         src = self.source_of(source_ref, quote)
         doc = self.draft()
         _set(doc, segs, self._with_provenance(segs, value, src))
@@ -282,6 +290,7 @@ class Workspace:
         ref = f"{self._log_source_id()}:{self.log_path.relative_to(self.root).as_posix()}#L{n}"
         for dec in decisions:
             segs = element_path(dec["path"])
+            _no_provenance_path(segs)
             src = {"kind": "interview", "ref": ref, "quote": answer}
             _set(doc, segs, self._with_provenance(segs, dec.get("value"), src))
         issues = self._write(doc) if decisions else []

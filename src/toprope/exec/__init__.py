@@ -64,10 +64,27 @@ class Execution:
         if ((self.transport is not None or self.services is not None) and not self._dispatching
                 and any(e.kind == "outbox" for e in out.events)):
             try:
-                self.dispatch()
-            except Exception:    # pending entries are retried by the next dispatch
+                self._dispatch_events(list(out.events))
+            except Exception:    # pending entries are retried by the next dispatch()
                 pass
         return out
+
+    def _dispatch_events(self, events: list[Event], limit: int = 100) -> list[dict[str, Any]]:
+        """Send the outbox entries these events created, then those their kernel replies
+        create, without scanning the store (`dispatch()` does that, for retries)."""
+        from ..handoff import Outbox, pending_of
+        box, report = Outbox(self), []
+        queue = [pending_of(e) for e in events if e.kind == "outbox"]
+        self._dispatching = True
+        try:
+            while queue and len(report) < limit:
+                rep, follow = box.process(queue.pop(0), self.transport, self.services)
+                if rep is not None:
+                    report.append(rep)
+                queue += [pending_of(e) for e in follow if e.kind == "outbox"]
+        finally:
+            self._dispatching = False
+        return report
 
     def dispatch(self, rounds: int = 20) -> list[dict[str, Any]]:
         """Send every pending outbox entry: handoffs through the transport, kernel calls through

@@ -122,7 +122,7 @@ def evaluate(node: Node, env: Env) -> Any:
                 raise EvalError(f"cannot apply {op} to {type(a).__name__} and {type(b).__name__}")
             return a + b if op == "+" else a - b
         case Compare(op, left, right):
-            a, b = evaluate(left, env), evaluate(right, env)
+            a, b = _times(evaluate(left, env), evaluate(right, env))
             if op == "==":
                 return a == b
             if op == "!=":
@@ -141,6 +141,23 @@ def evaluate(node: Node, env: Env) -> Any:
             except TypeError as e:
                 raise EvalError(f"cannot compare {type(a).__name__} {op} {type(b).__name__}") from e
     raise EvalError(f"unknown node {node!r}")
+
+
+def _times(a: Any, b: Any) -> tuple[Any, Any]:
+    """Effects store datetimes as ISO strings, and `now()` is a datetime: when one side is a
+    datetime, an ISO string on the other side is read as one. Anything else fails closed."""
+    from datetime import datetime, timezone
+    def parse(s: str) -> datetime:
+        try:
+            t = datetime.fromisoformat(s)
+        except ValueError:
+            raise EvalError(f"cannot compare a time with {s!r}") from None
+        return t if t.tzinfo else t.replace(tzinfo=timezone.utc)
+    if isinstance(a, datetime) and isinstance(b, str):
+        return a, parse(b)
+    if isinstance(b, datetime) and isinstance(a, str):
+        return parse(a), b
+    return a, b
 
 
 def _truth(v: Any) -> bool:
