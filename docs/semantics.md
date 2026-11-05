@@ -17,6 +17,8 @@ A command is `(actor, on_behalf_of?, grant?, action, target?, params, idempotenc
 ## 2. Evaluation order
 Evaluation stops at the first failure, and each failure has its own outcome:
 
+For what objects, links, actions and the matrix are, see [`domain-model.md`](domain-model.md).
+
 0. **Command validation** (ADR-0021): a target id is given, and params match the declaration
    (no unknown params, required ones present, type/enum/`many`/`ref` shape). Otherwise
    `rejected: invalid-command`.

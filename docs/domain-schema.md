@@ -28,7 +28,8 @@ readable schemas: [`schema/domain.v1.schema.json`](../schema/domain.v1.schema.js
 | `create` effects | — | **not in v1** (rejected, ADR-0021) |
 
 The core is **Object, Link, Action**, plus a **transition matrix** and **invariants** per
-stateful object (ADR-0010). How the domain is shown lives in a separate, separately compiled
+stateful object (ADR-0010). What these are, and what each one drives, is explained in
+[`domain-model.md`](domain-model.md): read it before this reference. How the domain is shown lives in a separate, separately compiled
 **representation** layer (ADR-0008). Concepts not listed here (policy, execution contract,
 flow orchestration) are added only by an ADR naming the need.
 
