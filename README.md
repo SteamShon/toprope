@@ -120,7 +120,7 @@ checks the affected set for:
 
 The edit gets a **preview** to try before deploying. Only affected artifacts and tests are
 rebuilt, and everything else comes from a hash-keyed cache. The draft targets are an
-impact report in 2 s, an affected harness in 30 s, and a preview in 60 s.
+impact report in 2 s, an affected harness in 30 s, and a preview in 30 s.
 
 ### 5. Record everything, learn from it
 Domain events are the system of record. Decisions (with inputs and rationale), **denied

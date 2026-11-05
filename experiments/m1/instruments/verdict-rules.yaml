@@ -1,0 +1,41 @@
+# M1 verdict rules. Drafted by the assistant; every value decided by the researcher in review
+# (2026-11-05): the draft kept except iteration time (5 → 1 min), the preview target
+# (60 → 30 s, so the latency targets fit the iteration time) and the handoff rule when no
+# handoff-breaking change is seeded. The researcher freezes them in their own commit.
+instrument: verdict-rules
+experiment: M1
+status: draft
+iterate:                         # link ①
+  supports:
+    toprope_recall_min: 0.80
+    toprope_precision_min: 0.70
+    nl_recall_gap_min: 0.30      # Toprope − NL arm
+    structured_recall_gap_min: 0.10  # Toprope − structured-spec arm (compiler contribution)
+    median_iteration_minutes_max: 1    # edit → validated preview, wall time
+    hand_edits_to_generated_max: 0
+  weakens:
+    nl_within: 0.15              # NL arm within this of Toprope recall
+    toprope_precision_below: 0.50
+    most_found_after_deploy: true
+  narrowed_if_structured_gap_below: 0.10   # takes precedence over "supports"
+  else: inconclusive
+# ② and the P0 sanity check are judged in M2, not here (ADR-0030).
+self_compile:                    # a feasibility result, not a link verdict (ADR-0030)
+  holds_only_if:
+    hand_edits_to_generated_max: 0
+    regeneration_check_passes: true      # ADR-0028
+    probes_pass: true                    # ADR-0031: no gold set; the probes and the sign-off guard the tool
+    switch_over_signed_off: true         # ADR-0022
+handoff:                         # link ⑥ (partial)
+  supports:
+    handoff_breaking_changes_caught_before_deploy_min: 1.0   # of those seeded, if any
+    handoff_intent_probes_pass: true     # P07: a handed-off request arrives intact
+  if_none_seeded:                # no handoff-breaking change in the key: catching them is untested
+    holds_if:
+      handoff_intent_probes_pass: true
+    report: "the handoff holds across the change sequence; catching handoff-breaking changes was not tested"
+  else: inconclusive
+latency_targets:                 # ADR-0013 drafts, confirmed here
+  impact_report_seconds: 2
+  affected_harness_seconds: 30
+  preview_seconds: 30            # 2 + 30 + 30 s fits the 1-minute median iteration

@@ -169,8 +169,9 @@ Templates, the freeze procedure and the `verify` check:
   - Toprope pre-deploy recall ≥ 80% with precision ≥ 70%
   - the NL arm's recall at least 30 points lower
   - the structured-spec arm's recall at least 10 points lower (the compiler's contribution)
-  - median iteration time ≤ 5 minutes to a validated preview, with no hand edits to
-    generated surfaces.
+  - median iteration time ≤ 1 minute to a validated preview, with no hand edits to
+    generated surfaces. The latency targets fit it: impact report ≤ 2 s, affected harness
+    ≤ 30 s, preview ≤ 30 s.
 - **Weakens ①**: the NL arm with LLM review comes within 15 points of Toprope's recall, or
   Toprope's precision < 50%, or most seeded breakages are found only after deploy in both
   arms.
@@ -181,6 +182,11 @@ Templates, the freeze procedure and the `verify` check:
 - **Inconclusive ①**: any outcome not covered above. For example, a recall gap of 15–30
   points, or precision of 50–70%. It is reported as inconclusive with the numbers, and is
   not read as support. M2 repeats the comparison.
+- **Supports ⑥ (partial)**: every seeded handoff-breaking change is caught before deploy,
+  and the probe that checks a handed-off request arrives intact (P07) passes. If the key
+  seeds no handoff-breaking change, the result is "the handoff holds across the change
+  sequence" when P07 passes, reported with "catching handoff-breaking changes was not
+  tested". Otherwise inconclusive.
 - **② is not judged in M1** (ADR-0030). Its verdict rules, held-out accuracy and the P0
   sanity check move to M2, on an application domain whose expert is not Toprope's builder.
 - **Self-compile claim** (a feasibility result) holds only if all of these hold:
