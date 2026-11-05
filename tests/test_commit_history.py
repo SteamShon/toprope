@@ -116,3 +116,89 @@ def test_the_checkout_service_and_the_cli(tmp_path):
         == "Start traffic."
     out = k.call("checkout", {"domain": "example", "commit": c2, "declaration": "../outside.yaml"})
     assert not out["ok"] and "outside" in out["error"]
+
+
+# -- review findings -----------------------------------------------------------------------------
+def test_an_element_log_at_an_unknown_commit_is_an_error(tmp_path):
+    st = CommitStore(tmp_path / "commits")
+    st.commit(write(tmp_path / "d.domain.yaml", schema_doc_domain()))
+    with pytest.raises(CommitError, match="no commit"):
+        st.element_log("example", "action:launch_experiment", at="main")
+
+
+def test_checkout_never_drops_an_uncommitted_ui_next_to_a_missing_declaration(tmp_path):
+    st = CommitStore(tmp_path / "commits")
+    wc = write(tmp_path / "d.domain.yaml", schema_doc_domain())
+    c1, _ = st.commit(wc)
+    wc.unlink()
+    ui = tmp_path / "ui.representation.yaml"
+    ui.write_text(yaml.safe_dump({"representation": "ui", "version": 1,
+                                  "targets": {"domain": "example", "interface": "1.x"}, "views": {}}))
+    with pytest.raises(CommitError, match="changes no commit holds"):
+        st.checkout("example", c1.id, wc)
+    assert ui.exists()
+
+
+def test_a_forced_checkout_recovers_an_unreadable_working_copy(tmp_path):
+    from toprope.authoring import AuthoringError, Workspace
+    (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump({"domain": "d.domain.yaml", "sources": []}))
+    write(tmp_path / "d.domain.yaml", schema_doc_domain())
+    ws = Workspace(tmp_path)
+    c1 = ws.commit()["commit"]
+    (tmp_path / "bad.representation.yaml").write_text("a: [unclosed")
+    with pytest.raises(AuthoringError, match="cannot read"):
+        ws.checkout(c1)
+    (tmp_path / "bad.representation.yaml").unlink()
+    (tmp_path / "d.domain.yaml").write_text("domain: [unclosed")
+    with pytest.raises(AuthoringError, match="cannot read the working copy"):
+        ws.checkout(c1)
+    (tmp_path / "bad.representation.yaml").write_text("a: [unclosed")
+    assert ws.checkout(c1, force=True)["commit"] == c1
+    assert yaml.safe_load((tmp_path / "d.domain.yaml").read_text())["domain"] == "example"
+
+
+def test_checkout_keeps_the_drafts_version(tmp_path):
+    st = CommitStore(tmp_path / "commits")
+    raw = schema_doc_domain()
+    raw["version"] = 7
+    wc = write(tmp_path / "d.domain.yaml", raw)
+    c1, _ = st.commit(wc)
+    raw["glossary"]["x"] = "X."
+    st.commit(write(wc, raw))
+    st.checkout("example", c1.id, wc)
+    assert yaml.safe_load(wc.read_text())["version"] == 7
+
+
+def test_a_caller_without_an_id_authors_nothing(tmp_path):
+    write(tmp_path / "d.domain.yaml", schema_doc_domain())
+    k = LocalKernel(tmp_path)
+    out = k.call("commit", {"declaration": "d.domain.yaml"}, caller={"id": None, "kind": "agent"})
+    assert k.commits.get("example", out["id"]).author == ""
+    assert k.caller is None                                           # per call: nothing left behind
+
+
+def test_a_merge_resolution_is_not_credited_with_mains_changes(tmp_path):
+    from toprope.authoring import Workspace
+    (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump({"domain": "d.domain.yaml", "sources": []}))
+    raw = schema_doc_domain()
+    write(tmp_path / "d.domain.yaml", raw)
+    ws = Workspace(tmp_path)
+    ws.approve_commit(ws.commit(author="ana")["commit"], via="cli", who="ana")
+    other = copy.deepcopy(raw)
+    other["actions"]["launch_experiment"]["description"] = "Turn it on."
+    (tmp_path / "o").mkdir()
+    co = ws.commits.commit(write(tmp_path / "o" / "o.domain.yaml", other), branch="eli", author="eli")[0]
+    ws.approve_commit(co.id, via="cli", who="eli")
+    raw["actions"]["launch_experiment"]["description"] = "Start traffic."
+    write(tmp_path / "d.domain.yaml", raw)
+    ws.commit(author="ana")
+    ws.merge_main()
+    resolved = ws.draft()
+    resolved["actions"]["launch_experiment"]["description"] = "Turn it on."   # take main's wording
+    resolved["glossary"]["mine"] = "M."
+    write(tmp_path / "d.domain.yaml", resolved)
+    r = ws.commit(merge=co.id, author="ana")["commit"]
+    ws.approve_commit(r, via="cli", who="ana")
+    log = ws.element_log("action:launch_experiment")
+    assert [(e["author"], e["change"]) for e in log] == [("ana", "added"), ("eli", "changed"), ("ana", "changed")]
+    assert r not in [e["commit"] for e in log]                        # ana's own edit is her branch commit

@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
 
@@ -23,8 +24,14 @@ def complete(svc: Service, result: dict[str, Any]) -> dict[str, Any]:
     return full
 
 
+_CALLER: ContextVar[dict[str, Any] | None] = ContextVar("kernel_caller", default=None)
+
+
 class KernelServices(ABC):
-    caller: dict[str, Any] | None = None
+    @property
+    def caller(self) -> dict[str, Any] | None:
+        """Who made the current call (per call, safe across threads): a commit's author."""
+        return _CALLER.get()
 
     def call(self, service: str, inputs: dict[str, Any], caller: dict[str, Any] | None = None) -> dict[str, Any]:
         """`caller` is the actor whose action made the call (`{id, kind}`), from the outbox
@@ -39,11 +46,13 @@ class KernelServices(ABC):
         if "approver" in svc.inputs:
             if not caller or caller.get("kind") != "person" or caller.get("id") != inputs["approver"]:
                 return svc.failure(f"{service} records a person's decision: the calling person must be the approver")
-        self.caller = caller                # who made the call: a commit records it as its author
+        token = _CALLER.set(caller)
         try:
             return complete(svc, self.run(service, {k: inputs[k] for k in svc.inputs}))
         except Exception as e:   # a failure still replies: the declaration decides what it means
             return svc.failure(f"{type(e).__name__}: {e}")
+        finally:
+            _CALLER.reset(token)
 
     @abstractmethod
     def run(self, service: str, inputs: dict[str, Any]) -> dict[str, Any]: ...
@@ -136,7 +145,7 @@ class LocalKernel(KernelServices):
 
     # -- commits (ADR-0029) -----------------------------------------------------------------
     def _commit(self, declaration):
-        c, created = self.commits.commit(self._path(declaration), author=(self.caller or {}).get("id", ""))
+        c, created = self.commits.commit(self._path(declaration), author=str((self.caller or {}).get("id") or ""))
         main = self.commits.main(c.domain)          # reviewed from the merge base with main (ADR-0033)
         base = self.commits.merge_base(c.domain, c.id, main.id) if main else None
         review = self.commits.diff(c.domain, base, c.id)["to_review"] if created else []

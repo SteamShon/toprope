@@ -522,7 +522,13 @@ class Workspace:
         """Load a commit into the working copy (ADR-0032); committing it is a revert or a restart.
         Refused when the working copy has changes no commit holds, unless `force`."""
         from ..commits import CommitError
-        d = self.draft().get("domain")
+        try:
+            d = self.draft().get("domain")
+        except Exception as e:                       # noqa: BLE001 - an unreadable draft
+            if not force:
+                raise AuthoringError(f"cannot read the working copy: {e}") from None
+            d = next((x.name for x in sorted(self.commits.root.glob("*")) if x.is_dir()
+                      and any(c.id == commit_id for c in self.commits.log(x.name))), None)
         if not isinstance(d, str) or not d:
             raise AuthoringError("the draft names no `domain`, so there is no commit log to check out from")
         try:
@@ -548,7 +554,6 @@ class Workspace:
         conflict the branch's value is kept; at an element conflict the element holds both
         sides' changes, field by field, for the person to judge. Then `commit(merge=<main>)` records both parents.
         Refuses when the working copy has changes not yet committed to the branch."""
-        from ..commits import content_id
         d = self.draft().get("domain")
         if not isinstance(d, str) or not d:
             raise AuthoringError("the draft names no `domain`, so there is no commit log to merge in")
@@ -558,24 +563,14 @@ class Workspace:
             raise AuthoringError(f"nothing to merge: {'main' if main is None else branch} has no commits")
         if self.commits.is_ancestor(d, main.id, head.id):
             return {"merge": main.id, "branch": branch, "up_to_date": True, "conflicts": []}
-        folder = self.domain_path.parent
         try:
-            present = self.commits.representations_for(d, folder)
-            reps = {p.name: load_yaml(p.read_text()) for p in present}
-            if content_id(self.draft(), reps) != head.content:
+            current, present = self.commits.working_copy(d, self.domain_path)
+            if current != head.content:
                 raise AuthoringError(f"the working copy has changes not committed to {branch}: commit them first")
             m = self.commits.merge3(d, head.id, main.id)
+            self.commits.write_working_copy(d, m.merged, self.domain_path, self.draft().get("version", 1), present)
         except CommitError as e:
             raise AuthoringError(str(e)) from None
-        body = m.merged["domain"]                                   # stored without `version`: keep the draft's
-        out = {"domain": body.get("domain"), "version": self.draft().get("version", 1),
-               **{k: v for k, v in body.items() if k != "domain"}}
-        self.domain_path.write_text(yaml.safe_dump(out, sort_keys=False, allow_unicode=True))
-        for name, rbody in m.merged["representations"].items():
-            (folder / name).write_text(yaml.safe_dump(rbody, sort_keys=False))
-        for p in present:                                           # a UI the merge removed is removed
-            if p.name not in m.merged["representations"]:
-                p.unlink()
         return {"merge": main.id, "branch": branch, "up_to_date": False,
                 "conflicts": [{"path": c.path, "base": c.base, "ours": c.ours, "theirs": c.theirs} for c in m.conflicts]}
 

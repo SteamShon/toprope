@@ -36,11 +36,13 @@ uv run toprope-author checkout 1-ab12…               # load a commit; committi
   that added, changed or removed the element, or changed its provenance (a confirmation,
   or a new source). Each entry has the author, the message, and the `source` and `status`
   the element cites. It reads from what `main` points to (else the `work` head), or
-  `--at <commit>`. A merge commit is compared with its first parent.
+  `--at <commit>`. A merge commit is listed only when the element differs from every
+  parent, so a change that came in from `main` is credited where it was made.
 - **Checkout.** `checkout <commit>` (or the kernel's `checkout` service) loads a commit's
-  declaration and representations into the working copy. Committing it makes a new commit,
-  so a revert is a commit. It is refused when the working copy holds content no commit
-  has, unless `--force`.
+  declaration and representations into the working copy, keeping the draft's `version`.
+  Committing it makes a new commit, so a revert is a commit. It is refused when the working
+  copy holds content no commit has, unless `--force`, which also recovers a working copy
+  that no longer parses. Files are written under temporary names and then renamed.
 
 ## Branches (ADR-0033)
 - **A branch is a named ref to a commit.** A commit goes onto a branch (`work` by default).

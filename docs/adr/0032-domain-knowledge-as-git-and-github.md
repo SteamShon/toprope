@@ -20,10 +20,10 @@ not need the researcher.
 | working tree | the working copy, one per domain in M1 | exists |
 | staging area (`git add -p`) | none: a commit snapshots the whole working copy | **closed: not needed** (the semantic diff already shows what changed) |
 | commit, message, parents | immutable commit, message, parents as a list | exists |
-| commit author | who compiled the commit | **closed: added** (recorded on the commit) |
+| commit author | who compiled the commit | **closed: add** (recorded on the commit) |
 | diff | the semantic diff by element (review hash) | exists |
-| `git log -- path`, `git blame` | an element's history: the commits that changed it, with the source and answer it cites | **closed: added**: an element log (`log`) |
-| `git checkout <commit>` / `git revert` | load a commit's content into the working copy, then commit (a revert is a new commit) | **closed: added**: a `checkout` kernel service and CLI command |
+| `git log -- path`, `git blame` | an element's history: the commits that changed it, with the source and answer it cites | **closed: add** an element log |
+| `git checkout <commit>` / `git revert` | load a commit's content into the working copy, then commit (a revert is a new commit) | **closed: add** a `checkout` kernel service and CLI command |
 | branch, merge | branches from the start (ADR-0033) | decided |
 | tag, release | approval tag; an environment ref to the deployed commit | exists |
 | pull request | no separate object: the review is the range from the last approved commit to the head, with its change report | **closed** (see 1) |
@@ -56,7 +56,7 @@ not need the researcher.
 5. **One approver in M1.** The domain owner approves. Per-element ownership and required
    reviewers, the CODEOWNERS analogue, wait until a domain has more than one owner (M2 or
    later).
-6. **Small additions to the commit store** (implemented; see `docs/commits.md`):
+6. **Small additions to the commit store**, implemented next:
    - the commit's author
    - an element log
    - `checkout`
