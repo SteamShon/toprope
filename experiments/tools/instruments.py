@@ -7,14 +7,15 @@ Usage (from the repo root):
   uv run --with pyyaml python experiments/tools/instruments.py verify   experiments/m1/instruments [--run]
 
 validate        checks the filled files (not *.template.yaml) for format and cross-file consistency.
-freeze          stage 1, researcher only, in M0a before the checks are built: freezes the five
-                pre-check instruments (status must be `frozen`) into FROZEN.json. The binding is
+freeze          stage 1, researcher only, in M0a before the checks are built: freezes the four
+                pre-check instruments, and a gold file if there is one (status must be `frozen`),
+                into FROZEN.json. The binding is
                 ignored at this stage.
 freeze-binding  stage 2, researcher only, after Phase A and before any arm runs: freezes
                 binding.yaml. Requires stage 1.
 --sealed        with validate: print nothing derived from change-key.yaml beyond errors
                 (use it whenever an agent runs the validator for you).
-verify          fails if a frozen file changed. It also fails unless all five stage-1 files are
+verify          fails if a frozen file changed. It also fails unless all four stage-1 files are
                 frozen, and with --run (used by the harness before every arm run) unless the
                 binding is frozen too.
 """
@@ -37,7 +38,11 @@ FILES = {
     "verdict-rules": "verdict-rules.yaml",
 }
 SEALED = "--sealed" in sys.argv   # validate without printing anything derived from the sealed key
-BEFORE_CHECKS = ["gold-scenarios", "probe-suite", "change-requests", "change-key", "verdict-rules"]
+# Stage 1 (ADR-0031): the four pre-check instruments of M1's ① experiment. A gold file is
+# optional in M1 (the self domains are confirmed by interview and sign-off); if present, it is
+# validated and frozen with them.
+BEFORE_CHECKS = ["probe-suite", "change-requests", "change-key", "verdict-rules"]
+OPTIONAL_STAGE1 = ["gold-scenarios"]
 ANSWER_KINDS = {"yes_no", "outcome", "state", "actors", "free_text"}
 PROBLEMS = {"none", "conflict", "breakage"}
 TYPES = {"conflicts-with-rule", "breaks-reference", "breaks-scenario", "breaks-past-behavior",
@@ -223,7 +228,7 @@ def _freeze(d: Path, keys: list[str]) -> list[str]:
 
 
 def freeze(d: Path) -> list[str]:
-    return _freeze(d, BEFORE_CHECKS)
+    return _freeze(d, BEFORE_CHECKS + [k for k in OPTIONAL_STAGE1 if (d / FILES[k]).exists()])
 
 
 def freeze_binding(d: Path) -> list[str]:

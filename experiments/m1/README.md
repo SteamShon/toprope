@@ -15,7 +15,7 @@ plan) is in [`interview-guide.md`](interview-guide.md). It holds no content.
 
 | File (copy from `*.template.yaml`) | Shown to | Written | Frozen |
 |---|---|---|---|
-| `gold-scenarios.yaml`: the **correctness set** (ADR-0030), about 10–15 items in all, across both self domains and their composition; `held_out` optional; shared `fact` keys across domains | graded from the compiled models' read surface | M0a, before change checks are built | M0a |
+| `gold-scenarios.yaml`: **optional, not used in M1** (ADR-0031). The self domains are confirmed by interview and sign-off. The template and validator are kept for M2's application domain | — | — | only if present |
 | `probe-suite.yaml` | no arm before deploy; run after each deploy | M0a | M0a |
 | `change-requests.yaml` (about 20, written as **intents**, against the commit model of ADR-0029) | all arms | M0a | M0a |
 | `change-key.yaml` (seeded problems) | **sealed**: no arm, agent or reviewer during the experiment | M0a | M0a |

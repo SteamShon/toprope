@@ -36,3 +36,4 @@ A record is superseded rather than deleted when a decision changes. History befo
 | [0028](0028-self-domains-generated-end-to-end.md) | ① ② ③ | Self domains are generated end to end: kernel services called as declared effects, results back through `external:kernel`, a regeneration check; adds one M0a sub-PR |
 | [0029](0029-authoring-and-delivery-as-semantic-git.md) | ① ② ⑥ | Authoring as an immutable commit log with approval tags and a semantic diff (re-confirm only direct changes); Delivery points an environment at one commit |
 | [0030](0030-fidelity-is-measured-on-an-application-domain.md) | ① ② | ② is judged in M2 on an application domain; M1 judges ① and self-compile; self-domain gold becomes an optional smoke set |
+| [0031](0031-self-domains-confirmed-by-interview.md) | ① ⑥ | The self domains are confirmed by interview, regeneration check, probes and sign-off; no correctness set; M1 freezes four ① instruments |
