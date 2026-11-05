@@ -1,4 +1,4 @@
-# M1 seeded-problem key: TEMPLATE (format only). Researcher-written; agents must not fill or edit.
+# M1 seeded-problem key: TEMPLATE (format only). Researcher-written content; agents never fill it (format changes only on the researcher's request, AGENTS.md).
 # SEALED: never given to any arm, any agent run, or any reviewer during the experiment.
 # One entry per change request seq. Mix target: ~6 conflicts, ~4 breakages, ~10 clean.
 instrument: change-key

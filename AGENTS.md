@@ -87,10 +87,16 @@ umbrella is up to date with `develop`.
   The links and hypotheses themselves change only through an accepted ADR.
 - **Decisions go into ADRs** (`docs/adr/`). Supersede an ADR when it changes; do not delete it.
 - **Gold sets are human-only.** Gold scenarios, post-deploy probe suites, and seeded change
-  lists (with their answer keys and bindings) are written by the researcher. Agents must not create or edit them. Verdict rules
-  and thresholds may be *drafted* by an agent when the researcher asks. They are marked
-  `draft` until the researcher reviews and freezes them in their own commit, before the
-  experiment's checks are built.
+  lists (with their answer keys and bindings) are written by the researcher. Agents must not
+  create or edit their **content**: questions, answers, probes, intents, key entries,
+  bindings. Verdict rules and thresholds may be *drafted* by an agent when the researcher
+  asks. They are marked `draft` until the researcher reviews and freezes them in their own
+  commit, before the experiment's checks are built.
+- **Format changes on request.** When the researcher asks, an agent may change the
+  **format** of these instruments: the templates' fields and comments, the validator, and
+  the guides. Such a change writes no content, never touches a filled or frozen instrument
+  file, and never reads a sealed one (a change key, or held-out items). The PR says it was
+  requested.
 - **Language.** Docs are in English. Working notes in `notes/ko/` may be in Korean.
 
 ## Rules for coding agents
