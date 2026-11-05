@@ -1,0 +1,100 @@
+[
+ {
+  "version": "v0.9",
+  "createSurface": {
+   "surfaceId": "Experiment.detail:E1",
+   "catalogId": "toprope://catalog/spike-v1"
+  }
+ },
+ {
+  "version": "v0.9",
+  "updateComponents": {
+   "surfaceId": "Experiment.detail:E1",
+   "components": [
+    {
+     "id": "sec0_name",
+     "component": "Text",
+     "text": {
+      "path": "/display/name"
+     }
+    },
+    {
+     "id": "sec0_guardrails",
+     "component": "Text",
+     "text": {
+      "path": "/display/guardrails"
+     }
+    },
+    {
+     "id": "sec0_title",
+     "component": "Text",
+     "text": "Design",
+     "variant": "h4"
+    },
+    {
+     "id": "sec0_col",
+     "component": "Column",
+     "children": [
+      "sec0_title",
+      "sec0_name",
+      "sec0_guardrails"
+     ]
+    },
+    {
+     "id": "sec0",
+     "component": "Card",
+     "child": "sec0_col"
+    },
+    {
+     "id": "sec1",
+     "component": "AcmeStatusBadge",
+     "status": {
+      "path": "/obj/status"
+     }
+    },
+    {
+     "id": "actions",
+     "component": "Row",
+     "children": []
+    },
+    {
+     "id": "heading",
+     "component": "Text",
+     "text": "Experiment E1",
+     "variant": "h2"
+    },
+    {
+     "id": "root",
+     "component": "Column",
+     "children": [
+      "heading",
+      "sec0",
+      "sec1",
+      "actions"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "version": "v0.9",
+  "updateDataModel": {
+   "surfaceId": "Experiment.detail:E1",
+   "path": "/",
+   "value": {
+    "obj": {
+     "id": "E1",
+     "name": "New onboarding",
+     "status": "draft",
+     "guardrails": 1
+    },
+    "display": {
+     "id": "id: E1",
+     "name": "name: New onboarding",
+     "status": "status: draft",
+     "guardrails": "guardrails: 1"
+    }
+   }
+  }
+ }
+]

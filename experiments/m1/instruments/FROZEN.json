@@ -1,0 +1,12 @@
+{
+  "files": {
+    "probe-suite.yaml": {
+      "sha256": "9314d46915f57d0e7960ab566bdf08178848490358e86750263a1cae42c8330f",
+      "frozen_at": "2026-11-05T07:57:10+00:00"
+    },
+    "verdict-rules.yaml": {
+      "sha256": "54cada1c7a1ea62e7e6683ce8b27c6ee53cdb94bd1b864d3cc461a0b605f96b5",
+      "frozen_at": "2026-11-05T07:57:10+00:00"
+    }
+  }
+}

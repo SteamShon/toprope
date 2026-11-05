@@ -1,6 +1,6 @@
 # ADR-0006: Defer runtime and host choices
 
-- Link: none · Status: accepted · 2026-11-04 · decided by: SteamShon
+- Link: none · Status: **superseded by [ADR-0007](0007-aegra-adapter-python-core.md)** · 2026-11-04 · decided by: SteamShon
 
 ## Decision
 No durable runtime (Temporal, LangGraph) or host (OpenDots) is adopted while actions are

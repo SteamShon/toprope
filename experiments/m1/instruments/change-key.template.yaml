@@ -1,0 +1,14 @@
+# M1 seeded-problem key: TEMPLATE (format only). Researcher-written content; agents never fill it (format changes only on the researcher's request, AGENTS.md).
+# SEALED: never given to any arm, any agent run, or any reviewer during the experiment.
+# One entry per change request seq. Mix target: ~6 conflicts, ~4 breakages, ~10 clean.
+instrument: change-key
+experiment: M1
+status: draft
+entries:
+  - seq: 1
+    problem: none          # none | conflict | breakage
+    type: ""               # if not none: conflicts-with-rule | breaks-reference | breaks-scenario |
+                           #   breaks-past-behavior | strands-objects | other:<text>
+    against: ""            # the earlier rule/behavior it conflicts with or breaks, in domain language
+    designed_for_checks: unknown   # yes | no | unknown — was this type anticipated by the check design?
+                                   # (risk mitigation: include types the checks were not designed for)

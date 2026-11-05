@@ -1,6 +1,6 @@
 # ADR-0002: First domain is Toprope itself (self-compile), then dogfood domains
 
-- Link: ① ② · Status: accepted · 2026-11-04 · decided by: SteamShon
+- Link: ① ② · Status: accepted (amended by ADR-0022: two self domains, Authoring and Delivery) · 2026-11-04 · decided by: SteamShon
 
 ## Decision
 M1 models Toprope's own domain-authoring workflow and generates the authoring tool from
@@ -12,6 +12,8 @@ Authoring is itself a hidden workflow, and the researcher can judge it best. Suc
 every later milestone a generated rather than hand-built authoring tool.
 
 ## Consequences
+- (ADR-0030) The self-compile milestone (M1) gives no ② verdict; ② is judged on the dogfood
+  or another application domain whose expert is not Toprope's builder.
 The self domain is biased toward success, because its designer is the researcher, so only
 M2 counts as evidence outside it. Circularity and self-approval are guarded by a gold set
 and verdict checks kept outside the loop (docs/experiments/M1-self-compile.md).
