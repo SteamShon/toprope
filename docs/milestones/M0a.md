@@ -53,8 +53,8 @@ src/toprope/
 | 10 | `feat/m0a-sources-authoring` | source readers (redaction, local-only), authoring MCP (ADR-0014) | 5 |
 | 11 | `feat/m0a-kernel-effects` | **added by ADR-0028**: kernel services as declared effects (`call`/`with`/`reply`), compile-time checks, kernel-service port with real and recording-fake adapters, `external:kernel`, `toprope-server --composition`, regeneration check | 5, 6, handoffs (ADR-0024), composition (ADR-0026) |
 
-Sub-PR 8 does not start until `experiments/m1/instruments/FROZEN.json` exists with the five
-stage-1 files (`instruments.py verify` passes without `--run`).
+Sub-PR 8 does not start until `experiments/m1/instruments/FROZEN.json` exists with the four
+stage-1 files (ADR-0031: probes, change requests, change key, verdict rules) (`instruments.py verify` passes without `--run`).
 
 ## Done criteria (from the roadmap; all on the toy domain)
 - (ADR-0028) a domain whose actions call kernel services runs end to end from its declaration

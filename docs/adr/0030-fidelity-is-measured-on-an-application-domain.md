@@ -48,6 +48,9 @@ showed three problems:
    commit model), the change key, the verdict rules (with the ② rules removed), and the small
    correctness set. Sub-PR 8 (the change check) waits for these.
 
+> Amended by ADR-0031: there is no correctness set. The self domains are confirmed by
+> interview, the regeneration check, the probes and the researcher's sign-off.
+
 ## Revisions after adversarial review (2026-11-04)
 1. **M2's default domain fails this ADR's own premise.** The roadmap's experiment-lifecycle
    domain has "the researcher as owner". *Proposed:* an expert who is not Toprope's builder

@@ -1,7 +1,7 @@
 # M1 instruments: a guide for writing them
 
 Link: ① iterate safely, ⑥ (partial); self-compile. Status: **draft by the assistant, at the
-researcher's request; revised for ADR-0029 and ADR-0030 (2026-11-05)**. It is a guide, not an
+researcher's request; revised for ADR-0029, ADR-0030 and ADR-0031 (2026-11-05)**. It is a guide, not an
 instrument: it holds **no questions, answers, probes, intents or key entries**. Those are
 written by the researcher (AGENTS.md). The researcher may edit or discard this guide freely.
 
@@ -9,9 +9,8 @@ written by the researcher (AGENTS.md). The researcher may edit or discard this g
 - **② is no longer judged in M1.** It moves to M2, on an application domain whose expert is
   not Toprope's builder. M1 judges ① (do compile-time checks catch the seeded problems?)
   and ⑥ (partial: does the handoff hold?), and reports self-compile as a feasibility result.
-- **The gold file becomes a small correctness set.** It holds about 10–15 items in all, for
-  the self tools' critical rules and the handoff. It guards the tool M2 will build with; it
-  is not a ② verdict input. Items may restate public rules, and `held_out` is optional.
+- **No gold set in M1** (ADR-0031). The self domains are confirmed by interview, the
+  regeneration check, the probes and your sign-off. M1 freezes four files.
 - **Authoring is a commit log** (ADR-0029): immutable commits, approval tags, a semantic
   diff, and Delivery pointing an environment at one commit. Write everything against this
   model. Nothing refers to version states such as stale, withdrawn or rejected.
@@ -20,31 +19,14 @@ written by the researcher (AGENTS.md). The researcher may edit or discard this g
 - **`change-key.yaml` and its mix** are never shown to an agent. When an agent runs the
   validator for you, it uses `--sealed`.
 - **This guide is not a Phase A source.** The source readers never read `experiments/`.
-- The correctness set and the probe suite are no longer held-out evidence, so they may be
-  drafted with an agent's help. You review them and commit them yourself.
+- The probe suite is not held-out evidence, so it may be drafted with an agent's help. You
+  review it and commit it yourself.
 
-## The correctness set (`gold-scenarios.yaml`)
-About 10–15 items in all, across `toprope-authoring`, `toprope-delivery` and the
-composition `toprope-self`.
-
-**What to cover.** The rules that, if the generated tools got them wrong, would make M2's
-tool untrustworthy or break the handoff. For example:
-- who may confirm and approve, and who may not
-- that a deploy needs an approved commit, and what happens to an older approved commit
-- what a deploy request carries across the handoff
-- what is re-reviewed after a change, and what is only reported
-
-**Item rules (unchanged).**
-- **The declaration expresses it** (ADR-0027). Test: "if the declaration omitted or
-  inverted this, would the compiled domain still answer the same?" If yes, it is a kernel
-  fact and not gold.
-- **Asked as a gate where needed.** Kernel rules can still be asked as a gate in the
-  domain's own workflow, e.g. "can a version be approved before its change report exists?"
-- **Domain and copies.** Each item names its `domain`; a fact that spans both domains names
-  the composition. Copies of one fact across domains share a `fact` key and `held_out`.
-- **One gradable answer.** Use `yes_no`, `outcome`, `state` or `actors`; `free_text` is
-  rare.
-- **No element names**, which are Phase A outputs.
+## The self domains: built by interview, no gold set (ADR-0031)
+Domain Authoring and Domain Delivery are planned and built in M1 Phase A through the staged
+interview with you. Your confirmations, the regeneration check, the probes and your sign-off
+at the switch-over confirm them. There is no gold set to write for M1. The gold template and
+its validator stay for M2's application domain.
 
 ## The probe suite (`probe-suite.yaml`)
 - **What a probe is.** A task given to an agent after a deploy, with a starting situation,
@@ -63,8 +45,7 @@ tool untrustworthy or break the handoff. For example:
   - finishing something only a person may finish
   - acting on a commit that is not the one reviewed
   - deploying an unapproved or superseded commit
-- **Overlap.** No overlap with the correctness set or the domains' scenarios, and no
-  reference to the change key.
+- **Overlap.** No overlap with the domains' scenarios, and no reference to the change key.
 - **Size.** About 8 to 12 per domain (a suggestion).
 
 ## Change requests (`change-requests.yaml`) and the key (`change-key.yaml`)
@@ -86,7 +67,8 @@ without ②. Review each threshold, including the latency targets, and set `stat
 yourself.
 
 ## A plan
-1. **About 45 min (agent help is fine):** the correctness set and the probe suite.
+1. **About 30 min (agent help is fine):** the probe suite, including probes that check a
+   handed-off request arrives intact (⑥).
 2. **About 30 min, alone:** the change intents (against the commit model), then the key.
 3. **About 15 min:** the verdict rules.
 4. Validate, mark the files frozen, run `freeze`, and commit in your own commit, on a branch

@@ -5,7 +5,7 @@ moved to M2 (ADR-0030). Status: design draft.
 
 **Freeze status.** The metrics and verdict rules below are a **draft proposed by the
 assistant**. The researcher reviews, edits and freezes them in their own commit, together
-with the gold scenarios, the post-deploy probe suite and the change-request list. All of
+with the post-deploy probe suite, the change-request list and its key (ADR-0031: no gold set in M1). All of
 this happens in M0, **before the change-check pipeline is built** (AGENTS.md). Until then,
 nothing here is preregistered.
 
@@ -155,13 +155,12 @@ Templates, the freeze procedure and the `verify` check:
 | **Iteration time** (primary) | edit → validated preview, wall time and human minutes, per change; broken down into impact report, affected harness and preview (ADR-0013) | ① |
 | Selection misses | tests that failed in the background full run but were passing from cache, i.e. impact-analysis bugs (target: 0) | ① |
 | Check breakdown | which check caught what: structural, semantic, scenario regression, log replay, NL lint | ① |
-| Correctness set | the small frozen set for the self tools' critical rules (ADR-0030); a guard on the tool M2 depends on, not a ② verdict | self-compile, ⑥ |
 | Unsupported rules | rules with no source and no confirmation (reported, no verdict) | — |
 | Interview efficiency (ADR-0014, ADR-0025) | questions and minutes per stage; cells decided per question; share of cells decided by confirmed defaults | ① |
 | Matrix completeness | share of (state, action) cells decided rather than `undecided`; cells decided through the interview vs. drafted from sources | reported |
 | Harness findings | invariant violations and parity failures found before deploy, and by which part (cell tests, exploration, flows) | ① |
 | Generated vs hand-built | share of each tool (authoring, delivery) that is generated; hand edits to generated code; the regeneration check (ADR-0028) | self-compile |
-| Handoff (⑥ partial) | handoff-breaking changes caught at compile time; requests whose intent survives (checked by the correctness set) | ⑥ |
+| Handoff (⑥ partial) | handoff-breaking changes caught at compile time; requests whose intent survives (checked by the probes, ADR-0031) | ⑥ |
 | Cost | tokens, $, human minutes per stage and per change, **per domain** | all |
 
 ## Verdict rules
@@ -188,7 +187,8 @@ Templates, the freeze procedure and the `verify` check:
   - the tools used in S4 and handed to M2 are generated from the declarations, with hand
     edits listed (target 0)
   - the regeneration check (ADR-0028) passes
-  - the correctness set passes
+  - the probes pass (ADR-0031: the self domains have no gold set; the researcher confirms
+    them in the interview and signs off)
   - the switch-over (ADR-0022) happens with the researcher's sign-off
 
 ## Risks

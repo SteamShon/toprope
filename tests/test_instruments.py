@@ -76,3 +76,18 @@ def test_an_all_shown_correctness_set_draws_no_held_out_warning(tmp_path, capsys
     items = [{"id": f"A{i}", "domain": "toprope-authoring", "held_out": False} for i in range(4)]
     errs, out = run(filled(tmp_path, items), capsys)
     assert errs == [] and "held out" not in out
+
+
+def test_stage_one_needs_no_gold_file(tmp_path, capsys):
+    """ADR-0031: M1 freezes the four ① instruments; a gold file is optional."""
+    d = filled(tmp_path)
+    (d / "gold-scenarios.yaml").unlink()
+    assert instruments.validate(d) == []
+    for f in ("probe-suite", "change-requests", "change-key", "verdict-rules"):
+        p = d / f"{f}.yaml"
+        p.write_text(p.read_text().replace("status: draft", "status: frozen"))
+    assert instruments.freeze(d) == []
+    import json
+    assert sorted(json.loads((d / "FROZEN.json").read_text())["files"]) == [
+        "change-key.yaml", "change-requests.yaml", "probe-suite.yaml", "verdict-rules.yaml"]
+    assert instruments.verify(d) == []

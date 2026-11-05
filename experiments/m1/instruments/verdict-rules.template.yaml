@@ -19,19 +19,16 @@ iterate:                         # link ①
   narrowed_if_structured_gap_below: 0.10   # takes precedence over "supports"
   else: inconclusive
 # ② and the P0 sanity check are judged in M2, not here (ADR-0030).
-scoring:                         # how the correctness set is counted (draft)
-  unit: fact                     # items sharing a `fact` key count once: each copy weighs 1/n,
-                                 #   graded against its own domain's (or the composition's) compiled model
 self_compile:                    # a feasibility result, not a link verdict (ADR-0030)
   holds_only_if:
     hand_edits_to_generated_max: 0
     regeneration_check_passes: true      # ADR-0028
-    correctness_set_min: 1.0             # every item right: it guards the tool M2 builds with
+    probes_pass: true                    # ADR-0031: no gold set; the probes and the sign-off guard the tool
     switch_over_signed_off: true         # ADR-0022
 handoff:                         # link ⑥ (partial)
   supports:
     handoff_breaking_changes_caught_before_deploy_min: 1.0   # of those seeded, if any
-    correctness_set_handoff_items_min: 1.0
+    handoff_intent_probes_pass: true     # the probes that check a handed-off request arrives intact
   else: inconclusive
 latency_targets:                 # ADR-0013 drafts, confirmed here
   impact_report_seconds: 2

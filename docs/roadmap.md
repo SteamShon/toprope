@@ -94,8 +94,9 @@ See [`experiments/M1-self-compile.md`](experiments/M1-self-compile.md).
 
 - **Phase A**: model Toprope's own **Domain Authoring** and **Domain Delivery** workflows
   (ADR-0022) by iterating through system → records → interview → use, then generate both
-  tools from them, joined by a typed handoff. Recorded: human time, edits, and a small frozen
-  correctness set for the self tools' critical rules and ⑥ (ADR-0030; not a ② verdict).
+  tools from them, joined by a typed handoff. They are planned through the staged interview
+  with the researcher and confirmed by the researcher's sign-off, the regeneration check and
+  the probes, with no gold set (ADR-0031). Recorded: human time and edits.
 - **Phase B**: apply a frozen sequence of about 20 change requests with seeded conflicts and
   breakages to three arms: a natural-language skill (with LLM conflict review), a
   structured spec (the same YAML, with LLM review and no compiler), and the Toprope
