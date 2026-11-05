@@ -344,6 +344,7 @@ Details, exit criteria and kill criteria: [`docs/roadmap.md`](docs/roadmap.md).
 - [`docs/charter.md`](docs/charter.md): problem, what Toprope is, the chain, hypotheses, principles
 - [`docs/roadmap.md`](docs/roadmap.md): milestones, each ending with a verdict on a link
 - [`docs/architecture.md`](docs/architecture.md): layers, bounded contexts, ports and adapters, pipelines
+- [`docs/domain-model.md`](docs/domain-model.md): the domain model: objects, links, actions and the transition matrix, and what each drives
 - [`docs/domain-schema.md`](docs/domain-schema.md): the declaration format
 - [`docs/experiments/M1-self-compile.md`](docs/experiments/M1-self-compile.md): the first experiment
 - [`docs/adr/`](docs/adr/): every decision, with provenance and supersession
