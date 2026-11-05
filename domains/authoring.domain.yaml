@@ -9,3 +9,148 @@ purpose:
   announcement: Domain owners now turn the workflow in their heads into a declared,
     checked domain without writing code. Every change shows what it breaks before
     anything is deployed.
+roles:
+- owner
+- expert
+objects:
+  Source:
+    description: 'Where raw material lives: code, records, transcripts or the interview
+      log.'
+    properties:
+      kind:
+        enum:
+        - repository
+        - records
+        - transcripts
+        - interview-log
+      path:
+        type: string
+      local_only:
+        type: boolean
+    source:
+      kind: system
+      ref: system:src/toprope/authoring/__init__.py#L121-L240
+    status: proposed
+  Question:
+    description: A question in a stage's bundle, for the owner to answer.
+    properties:
+      stage:
+        type: string
+      text:
+        type: string
+    source:
+      kind: system
+      ref: system:src/toprope/authoring/__init__.py#L241-L360
+    status: proposed
+  Answer:
+    description: The owner's answer, in their words; its decisions become proposed
+      elements.
+    properties:
+      words:
+        type: string
+    source:
+      kind: system
+      ref: system:src/toprope/authoring/__init__.py#L241-L360
+    status: proposed
+  Element:
+    description: One part of the draft declaration (an object, action, cell, invariant...),
+      proposed by an agent or confirmed by a person.
+    properties:
+      path:
+        type: string
+    source:
+      kind: system
+      ref: system:src/toprope/authoring/__init__.py#L241-L360
+    status: proposed
+  DecisionRequest:
+    description: A decision only a person may take, proposed with grounds and a recommendation
+      and sent to that person's outbox.
+    properties:
+      subject:
+        type: string
+      grounds:
+        type: string
+      recommendation:
+        type: string
+    source:
+      kind: record
+      ref: records:docs/adr/0032-domain-knowledge-as-git-and-github.md#L38-L63
+    status: proposed
+  Commit:
+    description: An immutable snapshot of the working copy on a branch.
+    properties:
+      seq:
+        type: integer
+      content:
+        type: string
+      branch:
+        type: string
+      author:
+        type: string
+        optional: true
+      message:
+        type: string
+        optional: true
+      interface:
+        type: string
+    source:
+      kind: system
+      ref: system:src/toprope/commits/__init__.py#L1-L120
+    status: proposed
+  CheckRecord:
+    description: The result of one check run on a commit (change check, harness).
+    properties:
+      check:
+        type: string
+      ok:
+        type: boolean
+        optional: true
+      summary:
+        type: string
+    source:
+      kind: system
+      ref: system:src/toprope/commits/__init__.py#L361-L480
+    status: proposed
+links:
+  answers:
+    from: Answer
+    to: Question
+    cardinality: many-to-one
+    required: true
+    source:
+      kind: system
+      ref: system:src/toprope/authoring/__init__.py#L241-L360
+    status: proposed
+  cites:
+    from: Element
+    to: Source
+    cardinality: many-to-one
+    source:
+      kind: system
+      ref: system:src/toprope/authoring/__init__.py#L241-L360
+    status: proposed
+  about:
+    from: DecisionRequest
+    to: Element
+    cardinality: many-to-one
+    source:
+      kind: record
+      ref: records:docs/adr/0032-domain-knowledge-as-git-and-github.md#L38-L63
+    status: proposed
+  parents:
+    from: Commit
+    to: Commit
+    cardinality: many-to-many
+    source:
+      kind: system
+      ref: system:src/toprope/commits/__init__.py#L1-L120
+    status: proposed
+  checks:
+    from: CheckRecord
+    to: Commit
+    cardinality: many-to-one
+    required: true
+    source:
+      kind: system
+      ref: system:src/toprope/commits/__init__.py#L361-L480
+    status: proposed

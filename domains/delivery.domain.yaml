@@ -9,3 +9,110 @@ purpose:
     direction: up
   announcement: Approved domain versions now reach the environment as working software
     in one step. Nothing that fails its checks or lacks a person's approval gets there.
+roles:
+- approver
+objects:
+  DeliveryRequest:
+    description: A request to deliver an approved commit of a domain, handed off by
+      Authoring.
+    properties:
+      domain_id:
+        type: string
+      commit:
+        type: string
+      interface:
+        type: string
+      environment:
+        type: string
+      approver:
+        type: string
+    source:
+      kind: record
+      ref: records:docs/experiments/M1-self-domains-scope.md#L33-L56
+    status: proposed
+  Build:
+    description: The artifacts built from one commit, with its harness result (a preview).
+    properties:
+      commit:
+        type: string
+      harness_ok:
+        type: boolean
+      toolchain:
+        type: string
+    source:
+      kind: system
+      ref: system:src/toprope/deploy/__init__.py#L1-L120
+    status: proposed
+  Environment:
+    description: Where a domain runs; it points at one deployed commit.
+    properties:
+      name:
+        type: string
+      current_commit:
+        type: string
+        optional: true
+    source:
+      kind: system
+      ref: system:src/toprope/deploy/__init__.py#L1-L120
+    status: proposed
+  Deployment:
+    description: One attempt to move an environment to a commit, under the fixed floor.
+    properties:
+      commit:
+        type: string
+      approver:
+        type: string
+      refusal:
+        type: string
+        optional: true
+    source:
+      kind: system
+      ref: system:src/toprope/deploy/__init__.py#L121-L240
+    status: proposed
+  Verification:
+    description: Post-deploy checks of a deployment (the harness and the probes).
+    properties:
+      probes_pass:
+        type: boolean
+        optional: true
+    source:
+      kind: record
+      ref: records:docs/experiments/M1-self-domains-scope.md#L33-L56
+    status: proposed
+links:
+  built_for:
+    from: Build
+    to: DeliveryRequest
+    cardinality: many-to-one
+    required: true
+    source:
+      kind: system
+      ref: system:src/toprope/deploy/__init__.py#L1-L120
+    status: proposed
+  deploys:
+    from: Deployment
+    to: Build
+    cardinality: many-to-one
+    required: true
+    source:
+      kind: system
+      ref: system:src/toprope/deploy/__init__.py#L121-L240
+    status: proposed
+  deployed_to:
+    from: Deployment
+    to: Environment
+    cardinality: many-to-one
+    required: true
+    source:
+      kind: system
+      ref: system:src/toprope/deploy/__init__.py#L121-L240
+    status: proposed
+  verifies:
+    from: Verification
+    to: Deployment
+    cardinality: many-to-one
+    required: true
+    source:
+      kind: record
+      ref: records:docs/experiments/M1-self-domains-scope.md#L33-L56
+    status: proposed
