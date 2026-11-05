@@ -588,7 +588,7 @@ class CommitStore:
             draft = load_yaml(path.read_text()) if path.exists() else None
             if isinstance(draft, dict) and isinstance(draft.get("version"), int):
                 version = draft["version"]
-        except Exception:                            # noqa: BLE001 - only under force: overwritten
+        except Exception:  # noqa: BLE001, S110 - only under force: the draft is overwritten
             pass
         self.write_working_copy(domain, self._body(domain, c.id), path, version, present)
         return c
