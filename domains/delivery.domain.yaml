@@ -26,22 +26,25 @@ objects:
         type: string
       approver:
         type: string
-    source:
-      kind: record
-      ref: records:docs/experiments/M1-self-domains-scope.md#L33-L56
-    status: proposed
-  Build:
-    description: The artifacts built from one commit, with its harness result (a preview).
-    properties:
-      commit:
+      build:
         type: string
+        optional: true
       harness_ok:
         type: boolean
-      toolchain:
+        optional: true
+      deployed:
+        type: boolean
+        optional: true
+      refusal:
         type: string
+        optional: true
+      verified:
+        type: boolean
+        optional: true
     source:
-      kind: system
-      ref: system:src/toprope/deploy/__init__.py#L1-L120
+      kind: interview
+      ref: interview:interview/delivery/log.jsonl#L4
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: proposed
   Environment:
     description: Where a domain runs; it points at one deployed commit.
@@ -52,71 +55,120 @@ objects:
         type: string
         optional: true
     source:
-      kind: system
-      ref: system:src/toprope/deploy/__init__.py#L1-L120
+      kind: interview
+      ref: interview:interview/delivery/log.jsonl#L4
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: proposed
-  Deployment:
-    description: One attempt to move an environment to a commit, under the fixed floor.
-    properties:
+links: {}
+actions:
+  request_delivery:
+    description: Receive a request to deliver an approved commit, handed off by Authoring.
+    actor:
+    - system
+    creates: DeliveryRequest
+    params:
+      domain_id:
+        type: string
       commit:
+        type: string
+      interface:
+        type: string
+      environment:
         type: string
       approver:
         type: string
-      refusal:
+    source:
+      kind: interview
+      ref: interview:interview/delivery/log.jsonl#L4
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+    status: proposed
+  preview:
+    description: Build the commit and run its harness, before anything is deployed.
+    actor:
+    - approver
+    target: DeliveryRequest
+    effects:
+    - call: preview
+      with:
+        domain: target.domain_id
+        commit: target.commit
+      reply: record_build
+    source:
+      kind: interview
+      ref: interview:interview/delivery/log.jsonl#L4
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+    status: proposed
+  record_build:
+    description: Record the build and its harness result.
+    actor:
+    - external:kernel
+    target: DeliveryRequest
+    params:
+      build:
         type: string
-        optional: true
-    source:
-      kind: system
-      ref: system:src/toprope/deploy/__init__.py#L121-L240
-    status: proposed
-  Verification:
-    description: Post-deploy checks of a deployment (the harness and the probes).
-    properties:
-      probes_pass:
+      harness_ok:
         type: boolean
-        optional: true
-    source:
-      kind: record
-      ref: records:docs/experiments/M1-self-domains-scope.md#L33-L56
-    status: proposed
-links:
-  request:
-    from: Build
-    to: DeliveryRequest
-    cardinality: many-to-one
-    required: true
+    effects:
+    - set:
+        target.build: params.build
+        target.harness_ok: params.harness_ok
     source:
       kind: interview
-      ref: interview:interview/delivery/log.jsonl#L3
-      quote: 7번, 8번 둘 다 추천대로 해도 될 것 같아.
+      ref: interview:interview/delivery/log.jsonl#L4
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: proposed
-  build:
-    from: Deployment
-    to: Build
-    cardinality: many-to-one
-    required: true
+  deploy:
+    description: Deploy the commit, under the fixed floor. Only a person deploys.
+    actor:
+    - approver
+    target: DeliveryRequest
+    requires: human
+    records_decision: true
+    effects:
+    - call: deploy
+      with:
+        domain: target.domain_id
+        commit: target.commit
+        approver: actor.id
+      reply: record_deployment
     source:
       kind: interview
-      ref: interview:interview/delivery/log.jsonl#L3
-      quote: 7번, 8번 둘 다 추천대로 해도 될 것 같아.
+      ref: interview:interview/delivery/log.jsonl#L4
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: proposed
-  environment:
-    from: Deployment
-    to: Environment
-    cardinality: many-to-one
-    required: true
+  record_deployment:
+    description: Record whether the deploy happened, or which floor rule refused it.
+    actor:
+    - external:kernel
+    target: DeliveryRequest
+    params:
+      deployed:
+        type: boolean
+      error:
+        type: string
+    effects:
+    - set:
+        target.deployed: params.deployed
+        target.refusal: params.error
     source:
       kind: interview
-      ref: interview:interview/delivery/log.jsonl#L3
-      quote: 7번, 8번 둘 다 추천대로 해도 될 것 같아.
+      ref: interview:interview/delivery/log.jsonl#L4
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: proposed
-  deployment:
-    from: Verification
-    to: Deployment
-    cardinality: many-to-one
-    required: true
+  verify:
+    description: Confirm the deployed domain works in use (the probes).
+    actor:
+    - approver
+    target: DeliveryRequest
+    requires: human
+    params:
+      verified:
+        type: boolean
+    effects:
+    - set:
+        target.verified: params.verified
     source:
       kind: interview
-      ref: interview:interview/delivery/log.jsonl#L3
-      quote: 7번, 8번 둘 다 추천대로 해도 될 것 같아.
+      ref: interview:interview/delivery/log.jsonl#L4
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: proposed

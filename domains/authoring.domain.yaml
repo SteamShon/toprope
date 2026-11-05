@@ -27,9 +27,13 @@ objects:
         type: string
       local_only:
         type: boolean
+      sha256:
+        type: string
+        optional: true
     source:
-      kind: system
-      ref: system:src/toprope/authoring/__init__.py#L121-L240
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L5
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: proposed
   Question:
     description: A question in a stage's bundle, for the owner to answer.
@@ -39,8 +43,9 @@ objects:
       text:
         type: string
     source:
-      kind: system
-      ref: system:src/toprope/authoring/__init__.py#L241-L360
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L5
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: proposed
   Answer:
     description: The owner's answer, in their words; its decisions become proposed
@@ -49,8 +54,9 @@ objects:
       words:
         type: string
     source:
-      kind: system
-      ref: system:src/toprope/authoring/__init__.py#L241-L360
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L5
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: proposed
   Element:
     description: One part of the draft declaration (an object, action, cell, invariant...),
@@ -59,8 +65,9 @@ objects:
       path:
         type: string
     source:
-      kind: system
-      ref: system:src/toprope/authoring/__init__.py#L241-L360
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L5
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: proposed
   DecisionRequest:
     description: A decision only a person may take, proposed with grounds and a recommendation
@@ -73,8 +80,9 @@ objects:
       recommendation:
         type: string
     source:
-      kind: record
-      ref: records:docs/adr/0032-domain-knowledge-as-git-and-github.md#L38-L63
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L5
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: proposed
   Commit:
     description: An immutable snapshot of the working copy on a branch.
@@ -93,23 +101,39 @@ objects:
         optional: true
       interface:
         type: string
-    source:
-      kind: system
-      ref: system:src/toprope/commits/__init__.py#L1-L120
-    status: proposed
-  CheckRecord:
-    description: The result of one check run on a commit (change check, harness).
-    properties:
-      check:
+      domain_id:
         type: string
-      ok:
+      checks_passed:
         type: boolean
         optional: true
-      summary:
+      failing:
+        type: string
+        optional: true
+      approved:
+        type: boolean
+        optional: true
+      main:
+        type: string
+        optional: true
+    source:
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L5
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+    status: proposed
+  Draft:
+    description: 'The working copy of a domain''s declaration on a branch: what a
+      commit snapshots.'
+    properties:
+      domain_id:
+        type: string
+      declaration:
+        type: string
+      branch:
         type: string
     source:
-      kind: system
-      ref: system:src/toprope/commits/__init__.py#L361-L480
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L5
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: proposed
 links:
   question:
@@ -119,8 +143,8 @@ links:
     required: true
     source:
       kind: interview
-      ref: interview:interview/authoring/log.jsonl#L4
-      quote: 7번, 8번 둘 다 추천대로 해도 될 것 같아.
+      ref: interview:interview/authoring/log.jsonl#L5
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: proposed
   element:
     from: DecisionRequest
@@ -128,8 +152,8 @@ links:
     cardinality: many-to-one
     source:
       kind: interview
-      ref: interview:interview/authoring/log.jsonl#L4
-      quote: 7번, 8번 둘 다 추천대로 해도 될 것 같아.
+      ref: interview:interview/authoring/log.jsonl#L5
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: proposed
   parents:
     from: Commit
@@ -137,18 +161,8 @@ links:
     cardinality: many-to-many
     source:
       kind: interview
-      ref: interview:interview/authoring/log.jsonl#L4
-      quote: 7번, 8번 둘 다 추천대로 해도 될 것 같아.
-    status: proposed
-  commit:
-    from: CheckRecord
-    to: Commit
-    cardinality: many-to-one
-    required: true
-    source:
-      kind: interview
-      ref: interview:interview/authoring/log.jsonl#L4
-      quote: 7번, 8번 둘 다 추천대로 해도 될 것 같아.
+      ref: interview:interview/authoring/log.jsonl#L5
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: proposed
   origin:
     from: Element
@@ -156,6 +170,269 @@ links:
     cardinality: many-to-one
     source:
       kind: interview
-      ref: interview:interview/authoring/log.jsonl#L4
-      quote: 7번, 8번 둘 다 추천대로 해도 될 것 같아.
+      ref: interview:interview/authoring/log.jsonl#L5
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+    status: proposed
+actions:
+  add_source:
+    description: 'Add a source of raw material: code, records, transcripts or the
+      interview log.'
+    actor:
+    - owner
+    creates: Source
+    params:
+      kind:
+        enum:
+        - repository
+        - records
+        - transcripts
+        - interview-log
+      path:
+        type: string
+      local_only:
+        type: boolean
+        optional: true
+    source:
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L5
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+    status: proposed
+  fetch_source:
+    description: Fetch a link source into a snapshot, once.
+    actor:
+    - owner
+    target: Source
+    effects:
+    - call: fetch_source
+      with:
+        source: target.id
+      reply: record_fetch
+    source:
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L5
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+    status: proposed
+  record_fetch:
+    description: Record the fetched snapshot's hash.
+    actor:
+    - external:kernel
+    target: Source
+    params:
+      sha256:
+        type: string
+    effects:
+    - set:
+        target.sha256: params.sha256
+    source:
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L5
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+    status: proposed
+  ask_question:
+    description: Ask a question of the current stage's bundle.
+    actor:
+    - owner
+    creates: Question
+    params:
+      stage:
+        type: string
+      text:
+        type: string
+    source:
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L5
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+    status: proposed
+  answer_question:
+    description: Answer a question, in the person's own words.
+    actor:
+    - owner
+    - expert
+    creates: Answer
+    params:
+      question:
+        ref: Question
+      words:
+        type: string
+    source:
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L5
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+    status: proposed
+  propose_element:
+    description: Propose a draft element that cites where it came from.
+    actor:
+    - owner
+    creates: Element
+    params:
+      path:
+        type: string
+      origin:
+        ref: Source
+    source:
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L5
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+    status: proposed
+  confirm_element:
+    description: Confirm a drafted element. Only a person confirms.
+    actor:
+    - owner
+    target: Element
+    requires: human
+    source:
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L5
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+    status: proposed
+  mark_unknown:
+    description: Mark an element as not known yet, instead of guessing.
+    actor:
+    - owner
+    - expert
+    target: Element
+    source:
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L5
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+    status: proposed
+  request_decision:
+    description: Ask the owner for a decision only a person may take, with grounds
+      and a recommendation.
+    actor:
+    - owner
+    creates: DecisionRequest
+    params:
+      element:
+        ref: Element
+      subject:
+        type: string
+      grounds:
+        type: string
+      recommendation:
+        type: string
+    source:
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L5
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+    status: proposed
+  decide:
+    description: Decide a requested decision.
+    actor:
+    - owner
+    target: DecisionRequest
+    params:
+      choice:
+        type: string
+    requires: human
+    records_decision: true
+    source:
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L5
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+    status: proposed
+  commit_draft:
+    description: Snapshot the working copy as an immutable commit.
+    actor:
+    - owner
+    target: Draft
+    effects:
+    - call: commit
+      with:
+        declaration: target.declaration
+      reply: record_commit
+    source:
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L5
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+    status: proposed
+  record_commit:
+    description: Record the commit the kernel made.
+    actor:
+    - external:kernel
+    creates: Commit
+    params:
+      seq:
+        type: integer
+      content:
+        type: string
+      interface:
+        type: string
+    source:
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L5
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+    status: proposed
+  check_commit:
+    description: Run the change check on a commit.
+    actor:
+    - owner
+    target: Commit
+    effects:
+    - call: change_check
+      with:
+        domain: target.domain_id
+        commit: target.id
+      reply: record_check
+    source:
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L5
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+    status: proposed
+  record_check:
+    description: Record the change check's result on the commit.
+    actor:
+    - external:kernel
+    target: Commit
+    params:
+      passed:
+        type: boolean
+      summary:
+        type: string
+    effects:
+    - set:
+        target.checks_passed: params.passed
+        target.failing: params.summary
+    source:
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L5
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+    status: proposed
+  approve_commit:
+    description: 'Approve a commit: merge it into main and tag it. Only a person approves.'
+    actor:
+    - owner
+    target: Commit
+    requires: human
+    records_decision: true
+    effects:
+    - call: approve_commit
+      with:
+        domain: target.domain_id
+        commit: target.id
+        approver: actor.id
+      reply: record_approval
+    source:
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L5
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+    status: proposed
+  record_approval:
+    description: Record the approval and what main points to.
+    actor:
+    - external:kernel
+    target: Commit
+    params:
+      approved:
+        type: boolean
+      main:
+        type: string
+    effects:
+    - set:
+        target.approved: params.approved
+        target.main: params.main
+    source:
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L5
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: proposed
