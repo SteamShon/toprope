@@ -66,7 +66,7 @@ stage-1 files (ADR-0031: probes, change requests, change key, verdict rules) (`i
 - a seeded invariant-breaking transition is found by exploration as a minimal flow
 - a race on one cell yields only outcomes the semantics allow
 - a single-cell change meets the draft latency targets (impact report ≤ 2 s, affected
-  harness ≤ 30 s, preview ≤ 60 s)
+  harness ≤ 30 s, preview ≤ 30 s; set by the M1 verdict rules)
 - the full run finds no selection miss.
 
 Scope change (ADR-0028, decided by the researcher): sub-PR 11 was added after this spec froze, so

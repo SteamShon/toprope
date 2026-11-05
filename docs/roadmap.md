@@ -85,7 +85,7 @@ Done when, on the toy domain:
 - a seeded invariant-breaking transition is found by exploration as a minimal flow
 - a race on one cell yields only outcomes the semantics allow
 - a single-cell change meets the draft latency targets (impact report ≤ 2 s, affected
-  harness ≤ 30 s, preview ≤ 60 s)
+  harness ≤ 30 s, preview ≤ 30 s; set by the M1 verdict rules)
 - the full run finds no selection miss.
 
 ## M1: Self-compile and safe iteration (①, ⑥ partial, 4–5 weeks; ② moved to M2 by ADR-0030)
