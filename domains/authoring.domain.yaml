@@ -30,6 +30,10 @@ objects:
       sha256:
         type: string
         optional: true
+      stage:
+        enum:
+        - added
+        - fetched
     source:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
@@ -64,6 +68,11 @@ objects:
     properties:
       path:
         type: string
+      review:
+        enum:
+        - proposed
+        - confirmed
+        - unknown
     source:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
@@ -79,6 +88,10 @@ objects:
         type: string
       recommendation:
         type: string
+      stage:
+        enum:
+        - open
+        - decided
     source:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
@@ -115,6 +128,9 @@ objects:
       main:
         type: string
         optional: true
+      stage:
+        enum:
+        - recorded
     source:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
@@ -130,6 +146,9 @@ objects:
         type: string
       branch:
         type: string
+      stage:
+        enum:
+        - open
     source:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
@@ -417,6 +436,13 @@ actions:
       ref: interview:interview/authoring/log.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: proposed
+    preconditions:
+    - id: checks-pass
+      check: target.checks_passed == true
+      reason: Run the change check, and approve only a commit that passes it.
+    - id: not-approved
+      check: target.approved != true
+      reason: Already approved; approve a newer commit.
   record_approval:
     description: Record the approval and what main points to.
     actor:
@@ -436,3 +462,55 @@ actions:
       ref: interview:interview/authoring/log.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: proposed
+transitions:
+  Source:
+    field: stage
+    initial: added
+    matrix:
+      added:
+        fetch_source: added
+        record_fetch: fetched
+      fetched:
+        fetch_source:
+          deny: A link is fetched once into a snapshot; add a new source to read it
+            again.
+        record_fetch: n/a
+  Element:
+    field: review
+    initial: proposed
+    matrix:
+      proposed:
+        confirm_element: confirmed
+        mark_unknown: unknown
+      unknown:
+        confirm_element: confirmed
+        mark_unknown: n/a
+      confirmed:
+        confirm_element: n/a
+        mark_unknown:
+          deny: A confirmed element changes by a new proposal and a new commit, not
+            by marking it unknown.
+  DecisionRequest:
+    field: stage
+    initial: open
+    matrix:
+      open:
+        decide: decided
+      decided:
+        decide:
+          deny: Already decided; a new decision needs a new request.
+  Draft:
+    field: stage
+    initial: open
+    matrix:
+      open:
+        commit_draft: open
+  Commit:
+    field: stage
+    initial: recorded
+    matrix:
+      recorded:
+        check_commit: recorded
+        record_check: recorded
+        approve_commit: recorded
+        record_approval: recorded

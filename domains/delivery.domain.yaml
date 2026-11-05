@@ -41,6 +41,14 @@ objects:
       verified:
         type: boolean
         optional: true
+      stage:
+        enum:
+        - requested
+        - previewing
+        - previewed
+        - deploying
+        - done
+        - verified
     source:
       kind: interview
       ref: interview:interview/delivery/log.jsonl#L4
@@ -136,6 +144,10 @@ actions:
       ref: interview:interview/delivery/log.jsonl#L4
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: proposed
+    preconditions:
+    - id: harness-passed
+      check: target.harness_ok == true
+      reason: Deploy only a build whose harness passed.
   record_deployment:
     description: Record whether the deploy happened, or which floor rule refused it.
     actor:
@@ -172,3 +184,54 @@ actions:
       ref: interview:interview/delivery/log.jsonl#L4
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: proposed
+    preconditions:
+    - id: deployed
+      check: target.deployed == true
+      reason: Only a deployment that happened can be verified.
+transitions:
+  DeliveryRequest:
+    field: stage
+    initial: requested
+    matrix:
+      requested:
+        preview: previewing
+        record_build: n/a
+        deploy:
+          deny: Preview it first.
+        record_deployment: n/a
+        verify: n/a
+      previewing:
+        preview:
+          deny: A preview is running.
+        record_build: previewed
+        deploy:
+          deny: The preview has not finished.
+        record_deployment: n/a
+        verify: n/a
+      previewed:
+        preview: previewing
+        record_build: n/a
+        deploy: deploying
+        record_deployment: n/a
+        verify: n/a
+      deploying:
+        preview:
+          deny: A deploy is running.
+        record_build: n/a
+        deploy:
+          deny: A deploy is running.
+        record_deployment: done
+        verify: n/a
+      done:
+        preview: previewing
+        record_build: n/a
+        deploy: deploying
+        record_deployment: n/a
+        verify: verified
+      verified:
+        preview: n/a
+        record_build: n/a
+        deploy: n/a
+        record_deployment: n/a
+        verify:
+          deny: Already verified.
