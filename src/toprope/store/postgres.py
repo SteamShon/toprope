@@ -11,13 +11,7 @@ from psycopg import sql
 
 from ..types import Event, Outcome
 from . import ConcurrencyError, EventStore
-from .codec import (
-    event_from_json,
-    event_to_json,
-    key_to_text,
-    outcome_from_json,
-    outcome_to_json,
-)
+from .codec import event_from_json, event_to_json, key_to_text, outcome_from_json, outcome_to_json
 
 
 def _ddl(schema: str) -> sql.Composed:

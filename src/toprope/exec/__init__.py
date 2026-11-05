@@ -14,8 +14,8 @@ from typing import Any
 from ..decl.models import Domain
 from ..identity import Caller, Identity
 from ..semantics.model import ReferenceModel
-from ..store import EventStore
 from ..types import Actor, Command, Event, Outcome
+from ..store import EventStore
 
 
 class Execution:
