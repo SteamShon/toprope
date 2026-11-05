@@ -318,9 +318,9 @@ changes only in a PR that reports a preregistered experiment verdict.
 | Milestone | Link | What happens |
 |---|---|---|
 | M0a | none | Thin slice: semantics, model interpreter, Execution, event store, `toprope-server` MCP, authoring MCP, source readers, world map (JSON + MCP tools), harness, change check (incl. log replay and in-flight check), incremental analysis |
-| M1 | ① ⑥ (partial) | **Self-compile**: model Toprope's own Authoring and Delivery workflows, generated end to end (ADR-0028); ② moves to M2 (ADR-0030); a natural-language skill vs. a structured spec without a compiler vs. Toprope, on a frozen change sequence with seeded conflicts |
+| M1 | self-compile; ① ⑥ pilot | **Self-compile**: model Toprope's own Authoring and Delivery workflows, generated end to end (ADR-0028). A pilot of ① and ⑥: a natural-language skill vs. a structured spec without a compiler vs. Toprope, on a frozen change sequence with seeded conflicts. No link verdict: ② and ① are judged in M2 (ADR-0030, ADR-0034) |
 | M0b | none | Surfaces and effects: representation compiler and shell, brownfield adapter (GitHub), embedded shape, migration plans, query tools, timers and functions |
-| M2 | ① ② ③ | **Dogfood**: an application domain built with the self-compiled tool and used for real; ② needs an expert who is not Toprope's builder |
+| M2 | ① ② ③ | **Dogfood**: an application domain built with the self-compiled tool and used for real; the first ① and ② verdicts, which need an expert who is not Toprope's builder |
 | M3 | ④ | Do agents make fewer meaning errors through the generated surfaces? |
 | M4 | ⑤ | Proposals from the event history; humans decide (an optional runtime adapter, Aegra first, joins here) |
 | M5 | ⑥ (partial) | Typed handoffs between domains; write-up; public release |

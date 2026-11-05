@@ -1,7 +1,7 @@
 # ADR-0034: M1 pilots ① on the self domains; the ① verdict moves to M2
 
-- Link: ① iterate safely, ⑥ org productivity · Status: **proposed** · 2026-11-05 · decided by:
-  the researcher chose this direction ("Y"); the text is the assistant's draft for review
+- Link: ① iterate safely, ⑥ org productivity · Status: accepted · 2026-11-05 · decided by:
+  SteamShon (direction "Y" and the open questions; drafted by the assistant)
 - Amends: ADR-0030 (what M1 gives verdicts on), ADR-0031 (M1's instruments), AGENTS.md (the
   human-only rule), `docs/experiments/M1-self-compile.md`, the roadmap and README milestone
   table, `docs/milestones/M0a.md` (sub-PR 8's gate)
@@ -22,7 +22,7 @@ link verdict.
   Toprope's builder (ADR-0030, revision 1). That expert's own change requests are
   independent of the checks, without any protocol.
 
-## Decision (proposed)
+## Decision
 1. **M1 gives no link verdict.** It reports:
    - **Self-compile** (a feasibility result, unchanged): generated end to end, the
      regeneration check passes, zero hand edits to generated code, the switch-over is
@@ -76,17 +76,14 @@ link verdict.
 | `experiments/tools/instruments.py` | `verify` for sub-PR 8 requires the probe suite and verdict rules only; the change list and key are required before the pilot run (`--run`) |
 
 ## Alternatives considered
-- **Keep ① in M1 with the protocol (X).** Rejected (proposed): the independence problem
+- **Keep ① in M1 with the protocol (X).** Rejected: the independence problem
   does not shrink with more protocol, the same argument ADR-0030 made for ②.
 - **Exempt the self domains but keep the ① verdict in M1.** Rejected: agent-drafted
   seeded problems scored against agent-built checks would make the verdict circular.
 
-## Open questions (for the researcher)
-1. **⑥ in M1.** Should "the handoff holds" (P07 passing across the change sequence) stay a
-   small verdict in M1, since it does not depend on seeded problems? Or is it a pilot like
-   the rest? The draft above makes it a pilot.
-2. **M2's seeded problems.** In M2 the expert writes the change requests. Who decides
-   which of them carry seeded problems, and who writes the key? The expert alone, or the
-   researcher seeding into the expert's requests? To be settled in M2's spec PR.
-3. **The pilot's arms.** Run all three arms in M1 (comparable numbers, more cost), or only
-   Toprope (cheaper; M2 runs the comparison)? The draft keeps all three.
+## Resolved (researcher, 2026-11-05)
+1. **⑥ in M1 is a pilot**, like ①. "The handoff holds" (P07) is reported, not judged.
+2. **M2's seeded problems** (who seeds them into the expert's requests, and who writes the
+   key) are decided in M2's spec PR.
+3. **The pilot runs all three arms** (natural-language skill, structured spec, Toprope), so
+   its numbers are comparable and size M2's run.

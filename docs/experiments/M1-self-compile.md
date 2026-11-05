@@ -1,13 +1,13 @@
 # M1: Self-compile, and safe iteration vs. natural-language skills
 
-Link: ① iterate safely, ⑥ (partial, the handoff); self-compile feasibility. ② model is right
-moved to M2 (ADR-0030). Status: design draft.
+Link: self-compile feasibility; ① iterate safely and ⑥ (the handoff) as a **pilot**. M1 gives
+no link verdict: ② (ADR-0030) and ① (ADR-0034) are judged in M2. Status: design draft.
 
-**Freeze status.** The metrics and verdict rules below are a **draft proposed by the
-assistant**. The researcher reviews, edits and freezes them in their own commit, together
-with the post-deploy probe suite, the change-request list and its key (ADR-0031: no gold set in M1). All of
-this happens in M0, **before the change-check pipeline is built** (AGENTS.md). Until then,
-nothing here is preregistered.
+**Freeze status.** The researcher freezes the probe suite and the verdict rules before the
+change-check pipeline is built, and the change-request list and its key before the pilot
+runs (ADR-0034). Because these are self-domain instruments and feed no link verdict, an
+agent may draft them at the researcher's request, including multiple-choice options; the
+researcher selects and freezes them (AGENTS.md). No gold set in M1 (ADR-0031).
 
 ## Why this design
 
@@ -80,7 +80,7 @@ declaration. Whether handoff-breaking changes are part of the seeded mix is the 
 call when freezing the change list. If they are, recall is reported with and without them,
 because only the Toprope arm has a compiled interface to break.
 
-### Change requests (researcher-written, frozen in M0 before the checks are built)
+### Change requests (the researcher's, agent help allowed; frozen before the pilot runs)
 
 About 20 realistic change requests to the self domain, in a fixed order, written as
 **intents** in domain language rather than element names, because the element names are
@@ -165,6 +165,10 @@ Templates, the freeze procedure and the `verify` check:
 
 ## Verdict rules
 
+> ADR-0034: in M1 these are **pilot targets**. The numbers are reported against them to tune
+> the checks and size M2's run; they are not evidence for ① or ⑥, and the claim-status
+> table does not change on them. They are M2's starting point for the ① verdict.
+
 - **Supports ①** (compile-time checking) requires **all** of:
   - Toprope pre-deploy recall ≥ 80% with precision ≥ 70%
   - the NL arm's recall at least 30 points lower
@@ -199,10 +203,10 @@ Templates, the freeze procedure and the `verify` check:
 
 ## Risks
 
-- **Seeding bias.** The researcher writes both the checks and the seeded problems. The
-  change list, the key, the gold set and the probe suite are frozen in M0, before the
-  change-check pipeline is built. Include problem types the checks were not
-  designed for, and report per-type recall.
+- **Seeding bias.** The people who build the checks also choose the seeded problems. This
+  is why M1 is a pilot (ADR-0034) and the ① verdict moves to M2, where the change requests
+  come from an expert who is not the builder. Still include problem types the checks were
+  not designed for, and report per-type recall.
 - **Unequal information.** The NL skill and the structured spec are written from the same
   confirmed model. A second reader checks that every rule appears in all three arms.
 - **Circularity and self-approval.** The gold set, the change key and the verdict checks

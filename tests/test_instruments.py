@@ -91,3 +91,28 @@ def test_stage_one_needs_no_gold_file(tmp_path, capsys):
     assert sorted(json.loads((d / "FROZEN.json").read_text())["files"]) == [
         "change-key.yaml", "change-requests.yaml", "probe-suite.yaml", "verdict-rules.yaml"]
     assert instruments.verify(d) == []
+
+
+def test_the_checks_wait_only_for_the_probes_and_verdict_rules(tmp_path, capsys):
+    """ADR-0034: the probe suite and verdict rules gate the checks; the change requests and key
+    are frozen later, before the pilot runs."""
+    import json
+    d = filled(tmp_path)
+    (d / "gold-scenarios.yaml").unlink()
+    later = {f: (d / f"{f}.yaml").read_text() for f in ("change-requests", "change-key")}
+    for f in later:
+        (d / f"{f}.yaml").unlink()
+    assert instruments.validate(d) == []
+    for f in ("probe-suite", "verdict-rules"):
+        p = d / f"{f}.yaml"
+        p.write_text(p.read_text().replace("status: draft", "status: frozen"))
+    assert instruments.freeze(d) == []
+    assert instruments.verify(d) == []                                   # the checks may be built
+    assert any("change-requests.yaml" in e for e in instruments.verify(d, run=True))
+    (d / "change-requests.yaml").write_text(later["change-requests"].replace("status: draft", "status: frozen"))
+    assert instruments.freeze(d) == ["freeze the change requests and the change key together"]
+    (d / "change-key.yaml").write_text(later["change-key"].replace("status: draft", "status: frozen"))
+    assert instruments.freeze(d) == []                                   # the pilot's two, later
+    assert sorted(json.loads((d / "FROZEN.json").read_text())["files"]) == [
+        "change-key.yaml", "change-requests.yaml", "probe-suite.yaml", "verdict-rules.yaml"]
+    assert [e for e in instruments.verify(d, run=True) if "binding" not in e] == []

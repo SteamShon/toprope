@@ -48,14 +48,15 @@ src/toprope/
 | 5 | `feat/m0a-mcp-server` | `toprope-server` MCP adapter generated from the declaration, query/world-map tools | 4 |
 | 6 | `feat/m0a-harness` | small world, cell tests, invariant checks, gate-tier exploration, flows, replay parity, concurrency tests, parity + coverage | 5 |
 | 7 | `feat/m0a-worldmap` | `world-map.json` (declaration + harness results), `world_map` / `how_to_reach` MCP tools | 5, 6 |
-| 8 | `feat/m0a-change-check` | diff, structural/semantic/scenario/log-replay/in-flight/NL checks, preview | 6 + **M1 instruments frozen by the researcher** |
+| 8 | `feat/m0a-change-check` | diff, structural/semantic/scenario/log-replay/in-flight/NL checks, preview | 6 + **the probe suite and verdict rules frozen by the researcher** (ADR-0034) |
 | 9 | `feat/m0a-incremental` | dependency graph, hashes, impact report, result cache, background full run | 8 |
 | 10 | `feat/m0a-sources-authoring` | source readers (redaction, local-only), authoring MCP (ADR-0014) | 5 |
 | 11 | `feat/m0a-kernel-effects` | **added by ADR-0028**: kernel services as declared effects (`call`/`with`/`reply`), compile-time checks, kernel-service port with real and recording-fake adapters, `external:kernel`, `toprope-server --composition`, regeneration check | 5, 6, handoffs (ADR-0024), composition (ADR-0026) |
 | 12 | `feat/commit-branches` | **added by ADR-0033**: branch refs, protected `main` (approve = merge into `main`), merge base, semantic 3-way merge with conflicts by path and a validated merge result, `merge`/`branches` CLI, deploy floor by ancestry on `main` | ADR-0029 commits |
 
-Sub-PR 8 does not start until `experiments/m1/instruments/FROZEN.json` exists with the four
-stage-1 files (ADR-0031: probes, change requests, change key, verdict rules) (`instruments.py verify` passes without `--run`).
+Sub-PR 8 does not start until `experiments/m1/instruments/FROZEN.json` exists with the probe
+suite and the verdict rules (ADR-0034; `instruments.py verify` passes without `--run`). The
+change requests and the change key are frozen before the pilot runs (`verify --run`).
 
 ## Done criteria (from the roadmap; all on the toy domain)
 - (ADR-0028) a domain whose actions call kernel services runs end to end from its declaration
