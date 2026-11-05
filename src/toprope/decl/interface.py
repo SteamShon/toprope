@@ -124,26 +124,31 @@ def review_hash(content: Any) -> str:
     return hashlib.sha256(_canon(_strip_provenance(data)).encode()).hexdigest()[:16]
 
 
-def review_elements(d: Domain) -> dict[str, str]:
-    """Every reviewable element of a declaration, key → review hash. The interface's elements,
+def review_contents(d: Domain) -> dict[str, Any]:
+    """Every reviewable element of a declaration, key → what it says. The interface's elements,
     plus what an owner confirms but other layers do not compile against: roles, each object's
     stage field and initial stage, handoffs, scenarios, fixtures and purpose."""
     dump = lambda m: m.model_dump(mode="json", by_alias=True, exclude_none=True)  # noqa: E731
-    out = {k: review_hash(e.content) for k, e in interface(d).items()}
+    out: dict[str, Any] = {k: e.content for k, e in interface(d).items()}
     for r in d.roles:
-        out[f"role:{r}"] = review_hash({"role": r})
+        out[f"role:{r}"] = {"role": r}
     for obj, tr in d.transitions.items():
-        out[f"stages:{obj}"] = review_hash({"field": tr.field, "initial": tr.initial})
+        out[f"stages:{obj}"] = {"field": tr.field, "initial": tr.initial}
     for name, h in d.handoffs.items():
-        out[f"handoff:{name}"] = review_hash(dump(h))
+        out[f"handoff:{name}"] = dump(h)
     for sc in d.scenarios:
-        out[f"scenario:{sc.id}"] = review_hash(dump(sc))
+        out[f"scenario:{sc.id}"] = dump(sc)
     for fx in d.world.fixtures:
         ((obj, data),) = fx.items()
-        out[f"fixture:{obj}.{data.get('id')}"] = review_hash(data)
+        out[f"fixture:{obj}.{data.get('id')}"] = data
     if d.purpose is not None:
-        out["purpose"] = review_hash(dump(d.purpose))
+        out["purpose"] = dump(d.purpose)
     return out
+
+
+def review_elements(d: Domain) -> dict[str, str]:
+    """Every reviewable element of a declaration (see `review_contents`), key → review hash."""
+    return {k: review_hash(c) for k, c in review_contents(d).items()}
 
 
 @dataclass(frozen=True)

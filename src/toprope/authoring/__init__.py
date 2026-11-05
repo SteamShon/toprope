@@ -498,20 +498,65 @@ class Workspace:
         from ..commits import CommitStore
         return CommitStore(self.root / ".toprope" / "commits")
 
-    def commit(self, message: str = "") -> dict[str, Any]:
-        """Compile the working copy into an immutable commit. Returns what to re-confirm: the
-        elements that changed directly since the last approved commit (or since the start)."""
+    def commit(self, message: str = "", branch: str = "work", merge: str | None = None) -> dict[str, Any]:
+        """Compile the working copy into an immutable commit on a branch (ADR-0033). Returns what
+        to re-confirm: the elements that changed directly since the branch's merge base with
+        `main` (`since`; None before the first approval). `merge` names the commit whose
+        conflicts this working copy resolves."""
+        from ..commits import CommitError
         try:
-            c, created = self.commits.commit(self.domain_path, message=message)
+            c, created = self.commits.commit(self.domain_path, message=message, branch=branch, merge=merge)
         except ValidationError as e:
             raise AuthoringError(f"the draft does not parse: {e.errors()[0]['msg']}") from None
-        base = self.commits.latest_approved(c.domain)
-        review = self.commits.diff(c.domain, base.id if base else None, c.id)
-        return {"commit": c.id, "seq": c.seq, "created": created, "interface": c.interface,
-                "since": base.id if base else None, **review}
+        except CommitError as e:
+            raise AuthoringError(str(e)) from None
+        main = self.commits.main(c.domain)          # ADR-0033: a branch is reviewed from its merge base
+        base_id = self.commits.merge_base(c.domain, c.id, main.id) if main else None
+        review = self.commits.diff(c.domain, base_id, c.id)
+        return {"commit": c.id, "seq": c.seq, "branch": branch, "created": created, "interface": c.interface,
+                "since": base_id, **review}
+
+    def merge_main(self, branch: str = "work") -> dict[str, Any]:
+        """Bring `main` into a branch's working copy (ADR-0033). Writes the semantic 3-way merge
+        into the working copy and lists the conflicts for the person to resolve: at a path
+        conflict the branch's value is kept; at an element conflict the element holds both
+        sides' changes, field by field, for the person to judge. Then `commit(merge=<main>)` records both parents.
+        Refuses when the working copy has changes not yet committed to the branch."""
+        from ..commits import content_id
+        d = self.draft().get("domain")
+        if not isinstance(d, str) or not d:
+            raise AuthoringError("the draft names no `domain`, so there is no commit log to merge in")
+        from ..commits import CommitError
+        main, head = self.commits.main(d), self.commits.head(d, branch)
+        if main is None or head is None:
+            raise AuthoringError(f"nothing to merge: {'main' if main is None else branch} has no commits")
+        if self.commits.is_ancestor(d, main.id, head.id):
+            return {"merge": main.id, "branch": branch, "up_to_date": True, "conflicts": []}
+        folder = self.domain_path.parent
+        try:
+            present = self.commits.representations_for(d, folder)
+            reps = {p.name: load_yaml(p.read_text()) for p in present}
+            if content_id(self.draft(), reps) != head.content:
+                raise AuthoringError(f"the working copy has changes not committed to {branch}: commit them first")
+            m = self.commits.merge3(d, head.id, main.id)
+        except CommitError as e:
+            raise AuthoringError(str(e)) from None
+        body = m.merged["domain"]                                   # stored without `version`: keep the draft's
+        out = {"domain": body.get("domain"), "version": self.draft().get("version", 1),
+               **{k: v for k, v in body.items() if k != "domain"}}
+        self.domain_path.write_text(yaml.safe_dump(out, sort_keys=False, allow_unicode=True))
+        for name, rbody in m.merged["representations"].items():
+            (folder / name).write_text(yaml.safe_dump(rbody, sort_keys=False))
+        for p in present:                                           # a UI the merge removed is removed
+            if p.name not in m.merged["representations"]:
+                p.unlink()
+        return {"merge": main.id, "branch": branch, "up_to_date": False,
+                "conflicts": [{"path": c.path, "base": c.base, "ours": c.ours, "theirs": c.theirs} for c in m.conflicts]}
 
     def approve_commit(self, commit_id: str, via: str, who: str) -> dict[str, Any]:
-        """Tag a commit as approved. Only a person, through a human channel (as `confirm`)."""
+        """Approve a commit: merge it into `main` and tag the result (ADR-0033). Only a person,
+        through a human channel (as `confirm`). Conflicts are an error that lists them; bring
+        `main` into the branch with `merge_main`, resolve, commit, and approve again."""
         if via not in ("cli", "elicitation"):
             raise AuthoringError("only a person approves, through the CLI or an MCP elicitation")
         d = self.draft().get("domain")
@@ -519,11 +564,13 @@ class Workspace:
             raise AuthoringError("the draft names no `domain`, so there is no commit log to approve in")
         from ..commits import CommitError
         try:
-            new = self.commits.approve(d, commit_id, who)
+            target = self.commits.approve(d, commit_id, who)
         except CommitError as e:
             raise AuthoringError(str(e)) from None
-        self._append(self.log_path, {"at": _now(), "kind": "approve", "commit": commit_id, "via": via, "who": who})
-        return {"commit": commit_id, "approved": True, "new": new}
+        main = self.commits.main(d)
+        self._append(self.log_path, {"at": _now(), "kind": "approve", "commit": commit_id, "main": main.id if main else None,
+                                     "via": via, "who": who})
+        return {"commit": commit_id, "approved": True, "new": target is not None, "main": main.id if main else None}
 
     # -- logs ------------------------------------------------------------------------------
     def _append(self, path: Path, entry: dict[str, Any]) -> None:
