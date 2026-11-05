@@ -65,4 +65,4 @@ For each stage: may the action happen, and where does it lead? A missing cell is
 - **MCP server** `toprope:delivery`: one tool per action (6), plus `get_object`, `history`, `attempts`, `allowed_actions`, `describe_domain`, `world_map` and `how_to_reach`. Kernel replies (`record_build`, `record_deployment`) are tools too, but only the kernel may take them.
 - **Events**: one per action (`DeliveryRequestCreated`, `DeliveryRequestDeploy`, `DeliveryRequestPreview`, `DeliveryRequestRecordBuild`, `DeliveryRequestRecordDeployment`, `DeliveryRequestVerify`); the current state is the events replayed in order.
 - **World map** (`world-map.json`): every object, link, stage and (stage, action) edge.
-- **Harness**: fails; decided cells covered per level: model 50/60, execution 50/60, mcp 50/60; 2 finding(s).
+- **Harness**: fails; decided cells covered per level: model 60/60, execution 60/60, mcp 60/60; 2 finding(s).

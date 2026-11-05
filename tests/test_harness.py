@@ -1,3 +1,4 @@
+import copy
 import json
 import subprocess
 import time
@@ -204,3 +205,19 @@ def test_parity_flags_results_present_only_at_another_level(monkeypatch):
     monkeypatch.setattr(h, "run_cases", extra)
     r = h.run(explore_examples=0, races=False)
     assert any(f.kind == "parity" and f.case == "cell:Experiment.ghost#events" for f in r.findings)
+
+
+def test_every_example_is_explored_not_one_per_stage():
+    """Two examples in one stage can unlock different moves; the second must not be skipped."""
+    from toprope.harness.world import grow_world
+    raw = schema_doc_domain()
+    raw["transitions"]["Experiment"]["matrix"]["draft"]["launch_experiment"] = {"deny": "Approve first."}
+    raw["actions"]["approve_experiment"]["preconditions"] = [
+        {"id": "long-enough", "check": "target.planned_days >= 7", "reason": "Plan at least a week."}]
+    fx = [f for f in raw["world"]["fixtures"] if "Experiment" in f]
+    short = copy.deepcopy(fx[0])
+    short["Experiment"]["id"], short["Experiment"]["planned_days"] = "E-short", 1
+    others = [f for f in raw["world"]["fixtures"] if "Experiment" not in f]
+    raw["world"]["fixtures"] = others + [short] + fx                  # the short one comes first
+    w = grow_world(Domain.model_validate(raw))
+    assert "approved" not in w.unreachable.get("Experiment", [])
