@@ -1,4 +1,4 @@
-# M1 gold scenarios: TEMPLATE (format only). Researcher-written; agents must not fill or edit (AGENTS.md).
+# M1 gold scenarios: TEMPLATE (format only). Researcher-written content; agents never fill it (format changes only on the researcher's request, AGENTS.md).
 # Copy to gold-scenarios.yaml, fill, then freeze (see ../README.md).
 # Link: ② model is right (held-out accuracy), P0 sanity check (first-draft accuracy).
 instrument: gold-scenarios
