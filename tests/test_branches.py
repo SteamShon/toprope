@@ -80,9 +80,10 @@ def test_a_direct_conflict_is_listed_by_path_and_main_does_not_move(st, tmp_path
     st.approve("example", ca.id, "ana")
     with pytest.raises(MergeConflict) as e:
         st.approve("example", cb.id, "ana")
-    (c,) = e.value.conflicts
+    c, el = e.value.conflicts                                         # the field, and its element
     assert c.path == "domain.actions.launch_experiment.description"
     assert (c.ours, c.theirs) == ("Start traffic.", "Turn it on.")
+    assert el.path == "element:action:launch_experiment"
     assert st.main("example") == ca
 
 
@@ -130,7 +131,8 @@ def test_conflicts_are_resolved_in_the_working_copy_then_approved(tmp_path):
     del raw["glossary"]["dirty"]
     write(tmp_path / "d.domain.yaml", raw)
     out = ws.merge_main()
-    assert out["merge"] == co.id and [c["path"] for c in out["conflicts"]] == ["domain.actions.launch_experiment.description"]
+    assert out["merge"] == co.id and [c["path"] for c in out["conflicts"]] == [
+        "domain.actions.launch_experiment.description", "element:action:launch_experiment"]
     resolved = ws.draft()
     assert resolved["glossary"]["o"] == "O."                         # main's other change came in
     resolved["actions"]["launch_experiment"]["description"] = "Start traffic now."
@@ -179,3 +181,131 @@ def test_cli_branches_merge_and_approve(tmp_path):
     assert json.loads(run("approve", c1["commit"], "--as", "ana", "--yes").stdout)["main"] == c1["commit"]
     assert json.loads(run("branches").stdout) == {"feat": c1["commit"], "main": c1["commit"]}
     assert json.loads(run("merge", "--branch", "feat").stdout)["up_to_date"] is True
+
+
+# -- review findings -----------------------------------------------------------------------------
+def workspace(tmp_path, raw):
+    from toprope.authoring import Workspace
+    (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump({"domain": "d.domain.yaml", "sources": []}))
+    write(tmp_path / "d.domain.yaml", raw)
+    return Workspace(tmp_path)
+
+
+def land_on_main(ws, tmp_path, raw, name="other"):
+    """Someone else's change, approved into main from its own branch and folder."""
+    (tmp_path / name).mkdir(exist_ok=True)
+    c = ws.commits.commit(write(tmp_path / name / "o.domain.yaml", raw), branch=name, representations=[])[0]
+    ws.approve_commit(c.id, via="cli", who="ana")
+    return c
+
+
+def test_a_resolved_merge_is_checked_before_main_takes_it(tmp_path):
+    """The `merge`, `commit --merge`, approve route fast-forwards, and is validated all the same."""
+    from toprope.authoring import AuthoringError
+    raw = schema_doc_domain()
+    ws = workspace(tmp_path, raw)
+    ws.approve_commit(ws.commit()["commit"], via="cli", who="ana")
+    other = copy.deepcopy(raw)
+    del other["objects"]["Experiment"]["properties"]["started_at"]
+    other["actions"]["launch_experiment"]["effects"] = []
+    other["invariants"] = [i for i in other["invariants"] if i["id"] != "running-has-start"]
+    co = land_on_main(ws, tmp_path, other)
+    raw["invariants"].append({"id": "ended-has-start", "on": "Experiment",
+                              "check": "target.status != 'ended' or exists(target.started_at)", "reason": "r"})
+    write(tmp_path / "d.domain.yaml", raw)
+    ws.commit()
+    assert ws.merge_main()["conflicts"] == []
+    r = ws.commit(merge=co.id)
+    with pytest.raises(AuthoringError, match="does not validate"):
+        ws.approve_commit(r["commit"], via="cli", who="ana")
+    assert ws.commits.main("example").id == co.id
+
+
+def test_branches_made_before_any_approval_share_the_first_commit(st, tmp_path):
+    raw = schema_doc_domain()
+    raw["glossary"]["x"] = "X."
+    c1 = on(st, tmp_path, raw, "work")
+    feat = copy.deepcopy(raw)
+    del feat["glossary"]["x"]                                        # a deletion on one side
+    c2 = on(st, tmp_path, feat, "feat")
+    assert c2.parents == [c1.id] and st.merge_base("example", c1.id, c2.id) == c1.id
+    st.approve("example", c1.id, "ana")
+    m = st.approve("example", c2.id, "ana")                           # fast-forward: c1 is c2's parent
+    assert m == c2 and "x" not in st.declaration("example", st.main("example").id)["glossary"]
+
+
+def test_a_store_from_before_branches_keeps_its_history(st, tmp_path):
+    raw = schema_doc_domain()
+    c1 = on(st, tmp_path, raw, "work")
+    st.approve("example", c1.id, "ana")
+    raw["glossary"]["x"] = "X."
+    c2 = on(st, tmp_path, raw, "work")
+    (st.root / "example" / "refs.jsonl").unlink()                     # as written before ADR-0033
+    assert st.refs("example") == {"work": c2.id, "main": c1.id} and st.latest_approved("example") == c1
+    raw["glossary"]["y"] = "Y."
+    c3 = on(st, tmp_path, raw, "work")
+    assert c3.parents == [c2.id]
+    assert st.refs("example") == {"work": c3.id, "main": c1.id}       # the derived refs were kept
+
+
+def test_an_element_changed_on_both_sides_conflicts_even_in_different_fields(st, tmp_path):
+    raw, _ = started(st, tmp_path)
+    a, b = copy.deepcopy(raw), copy.deepcopy(raw)
+    a["actions"]["launch_experiment"]["description"] = "Start traffic."
+    b["actions"]["launch_experiment"]["actor"] = ["eng", "pm"]
+    ca, cb = on(st, tmp_path, a, "feat-a"), on(st, tmp_path, b, "feat-b")
+    st.approve("example", ca.id, "ana")
+    with pytest.raises(MergeConflict) as e:
+        st.approve("example", cb.id, "ana")
+    assert [c.path for c in e.value.conflicts] == ["element:action:launch_experiment"]
+    a2, b2 = copy.deepcopy(a), copy.deepcopy(raw)                      # added on both sides, differently
+    a2["glossary"]["close"] = "End it."
+    b2["glossary"]["close"] = "Stop it."
+    assert "element:term:close" in [c.path for c in st.merge3(
+        "example", on(st, tmp_path, a2, "feat-a").id, on(st, tmp_path, b2, "feat-c").id).conflicts]
+
+
+def test_a_branch_is_reviewed_from_its_merge_base_not_from_main(tmp_path):
+    raw = schema_doc_domain()
+    ws = workspace(tmp_path, raw)
+    c0 = ws.commit()["commit"]
+    ws.approve_commit(c0, via="cli", who="ana")
+    other = copy.deepcopy(raw)
+    other["glossary"]["o"] = "O."
+    land_on_main(ws, tmp_path, other)
+    raw["actions"]["launch_experiment"]["description"] = "Start traffic."
+    write(tmp_path / "d.domain.yaml", raw)
+    out = ws.commit()
+    assert out["since"] == c0 and out["to_review"] == ["action:launch_experiment"] and out["removed"] == []
+
+
+def test_merging_main_removes_a_ui_that_main_removed(tmp_path):
+    raw = schema_doc_domain()
+    ui = tmp_path / "ui.representation.yaml"
+    ui.write_text(yaml.safe_dump({"representation": "ui", "version": 1,
+                                  "targets": {"domain": "example", "interface": "1.x"}, "views": {}}))
+    ws = workspace(tmp_path, raw)
+    ws.approve_commit(ws.commit()["commit"], via="cli", who="ana")
+    other = copy.deepcopy(raw)
+    other["glossary"]["o"] = "O."
+    land_on_main(ws, tmp_path, other)                                 # its folder has no UI: removed
+    raw["glossary"]["mine"] = "M."
+    write(tmp_path / "d.domain.yaml", raw)
+    ws.commit()
+    assert ws.merge_main()["conflicts"] == [] and not ui.exists()
+
+
+def test_merge_reports_an_unreadable_ui_as_an_authoring_error(tmp_path):
+    from toprope.authoring import AuthoringError
+    raw = schema_doc_domain()
+    ws = workspace(tmp_path, raw)
+    ws.approve_commit(ws.commit()["commit"], via="cli", who="ana")
+    other = copy.deepcopy(raw)
+    other["glossary"]["o"] = "O."
+    land_on_main(ws, tmp_path, other)
+    raw["glossary"]["mine"] = "M."
+    write(tmp_path / "d.domain.yaml", raw)
+    ws.commit()
+    (tmp_path / "bad.representation.yaml").write_text("a: [unclosed")
+    with pytest.raises(AuthoringError, match="cannot read"):
+        ws.merge_main()

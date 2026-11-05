@@ -29,26 +29,32 @@ uv run toprope-author branches                       # every branch and its comm
 
 ## Branches (ADR-0033)
 - **A branch is a named ref to a commit.** A commit goes onto a branch (`work` by default).
-  A new branch starts from `main`. Ref moves are appended to `refs.jsonl` under the domain
-  lock.
+  A new branch starts from `main`. Before the first approval, it starts from the domain's
+  first commit, so every branch shares a base. Ref moves are appended to `refs.jsonl` under
+  the domain lock. A store written before branches gets its refs derived once: `work` is the
+  last commit, and `main` the newest approved one.
 - **`main` is protected.** Only `approve` moves it, so approving means merging into `main`.
   If `main` has not moved since the branch left it, `main` fast-forwards to the commit.
   Otherwise a merge commit with two parents (main, the commit) is made. The tag goes on what
   `main` then points to. A commit `main` already contains cannot be approved: approve a
   newer one.
-- **The merge is semantic**, from the nearest common ancestor, per declaration path:
-  - A path changed on one side takes that side.
-  - A path changed differently on both sides is a **conflict**, listed by path with its
-    base, ours and theirs.
-  - Elements with ids (scenarios, invariants) merge by id; lists of names (roles) merge as
-    sets.
-  - The merge result must validate. This catches indirect conflicts, where each side is
-    valid alone but not together. The full change check (M0a sub-PR 8) will run there too.
+- **The merge is semantic**, from the nearest common ancestor:
+  - **By element.** An element (by review hash) changed differently on both sides is a
+    **conflict** (`element:<key>`), even when the two sides changed different fields of it.
+    This includes an element added on both sides with different content.
+  - **By path**, inside the declaration. A path changed on one side takes that side. A path
+    changed differently on both sides is a conflict too, listed with its base, ours and
+    theirs. Elements with ids (scenarios, invariants) merge by id; lists of names (roles)
+    merge as sets.
+  - **What `main` takes must validate**, on a fast-forward as well as on a merge commit. This
+    catches indirect conflicts, where each side is valid alone but not together. The full
+    change check (M0a sub-PR 8) will run there too.
 - **Resolving conflicts.** `merge` writes the 3-way merge into the working copy, keeping the
   branch's value at each conflict, and lists the conflicts. Resolve them, then `commit
   --merge <main>` records both parents. Approving that commit is a fast-forward.
 - **No pull-request object.** A branch's review is derived: the diff from the merge base,
-  its change report and its check records.
+  its change report and its check records. `commit` reports `to_review` since the merge base
+  with `main`, so changes that others landed on `main` are not yours to re-confirm.
 
 ## What is reviewed again
 The **review hash** of an element covers everything it says, references and wording

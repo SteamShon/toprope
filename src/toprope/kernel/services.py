@@ -146,9 +146,10 @@ class LocalKernel(KernelServices):
         return getattr(self, f"_{service}")(**inputs)
 
     def _approve_commit(self, domain, commit, approver):
-        self.commits.approve(domain, commit, approver)
+        self.commits.approve(domain, commit, approver)   # conflicts fail the call, as any error does
         main = self.commits.main(domain)
-        return {"approved": True, "main": main.id if main else ""}
+        return {"approved": self.commits.is_approved(domain, main.id) and self.commits.is_ancestor(domain, commit, main.id),
+                "main": main.id}
 
     def _preview(self, domain, commit):
         if self.environment is None:

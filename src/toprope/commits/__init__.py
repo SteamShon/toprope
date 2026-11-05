@@ -45,10 +45,12 @@ from ..decl import (
     diff_interface,
     interface,
     load_yaml,
+    review_contents,
     review_diff,
     review_elements,
     validate_domain,
 )
+from ..decl.interface import review_hash
 
 MAIN = "main"
 DEFAULT_BRANCH = "work"
@@ -154,6 +156,21 @@ def _bump(version: str, kind: str) -> str:
     return version
 
 
+def _element_conflicts(base: dict[str, Any], ours: dict[str, Any], theirs: dict[str, Any]) -> list[Conflict]:
+    """ADR-0033: an element (by review hash) changed differently on both sides is a conflict,
+    even when the two sides changed different fields of it. Added on both sides with
+    different content counts too: there is no base to merge against."""
+    def contents(raw: dict[str, Any]) -> dict[str, Any]:
+        return review_contents(Domain.model_validate({"version": 1, **raw})) if raw else {}
+    b, o, t = contents(base), contents(ours), contents(theirs)
+    h = lambda m, k: review_hash(m[k]) if k in m else None  # noqa: E731
+    out = []
+    for k in sorted(set(o) | set(t)):
+        if h(o, k) != h(b, k) and h(t, k) != h(b, k) and h(o, k) != h(t, k):
+            out.append(Conflict(f"element:{k}", b.get(k), o.get(k), t.get(k)))
+    return out
+
+
 class CommitStore:
     def __init__(self, root: str | Path):
         self.root = Path(root).resolve()
@@ -193,9 +210,25 @@ class CommitStore:
 
     def refs(self, domain: str) -> dict[str, str]:
         """Every branch → the commit it points to. `main` is absent until the first approval."""
+        path = self._dir(domain) / "refs.jsonl"
+        if not path.exists():
+            return self._legacy_refs(domain)
         out: dict[str, str] = {}
-        for r in self._lines(self._dir(domain) / "refs.jsonl"):
+        for r in self._lines(path):
             out[r["branch"]] = r["commit"]
+        return out
+
+    def _legacy_refs(self, domain: str) -> dict[str, str]:
+        """A store written before branches (ADR-0029: one line of commits) has no refs file. Its
+        refs are derived: `work` is the last commit, `main` the newest approved one."""
+        log = self.log(domain)
+        if not log:
+            return {}
+        approved = {a["commit"] for a in self.approvals(domain)}
+        out = {DEFAULT_BRANCH: log[-1].id}
+        main = max((c for c in log if c.id in approved), key=lambda c: c.seq, default=None)
+        if main is not None:
+            out[MAIN] = main.id
         return out
 
     def head(self, domain: str, branch: str = DEFAULT_BRANCH) -> Commit | None:
@@ -205,26 +238,36 @@ class CommitStore:
     def main(self, domain: str) -> Commit | None:
         return self.head(domain, MAIN)
 
-    def ancestors(self, domain: str, commit_id: str) -> set[str]:
-        """The commit and everything it descends from."""
-        by_id = {c.id: c for c in self.log(domain)}
+    @staticmethod
+    def _reach(parents: dict[str, list[str]], commit_id: str) -> set[str]:
         seen, todo = set(), [commit_id]
         while todo:
             c = todo.pop()
-            if c not in seen and c in by_id:
+            if c not in seen and c in parents:
                 seen.add(c)
-                todo.extend(by_id[c].parents)
+                todo.extend(parents[c])
         return seen
+
+    def ancestors(self, domain: str, commit_id: str) -> set[str]:
+        """The commit and everything it descends from."""
+        return self._reach({c.id: c.parents for c in self.log(domain)}, commit_id)
 
     def is_ancestor(self, domain: str, a: str, b: str) -> bool:
         """True if `a` is `b` or an ancestor of `b`."""
         return a in self.ancestors(domain, b)
 
     def merge_base(self, domain: str, a: str, b: str) -> str | None:
-        """The nearest common ancestor: a common ancestor no other common ancestor descends from."""
-        common = self.ancestors(domain, a) & self.ancestors(domain, b)
-        best = [c for c in common if not any(c != o and c in self.ancestors(domain, o) for o in common)]
-        return max(best, key=lambda c: self.get(domain, c).seq) if best else None
+        """The nearest common ancestor: a common ancestor no other common ancestor descends from.
+        The log is read once."""
+        log = self.log(domain)
+        parents = {c.id: c.parents for c in log}
+        common = self._reach(parents, a) & self._reach(parents, b)
+        covered: set[str] = set()                          # strict ancestors of a common ancestor
+        for c in common:
+            for p in parents[c]:
+                covered |= self._reach(parents, p)
+        seq = {c.id: c.seq for c in log}
+        return max(common - covered, key=seq.__getitem__, default=None)
 
     def get(self, domain: str, commit_id: str) -> Commit:
         c = next((c for c in self.log(domain) if c.id == commit_id), None)
@@ -269,8 +312,10 @@ class CommitStore:
     def merge3(self, domain: str, ours: str, theirs: str) -> Merge:
         """The semantic 3-way merge of `theirs` into `ours`, from their merge base."""
         base = self.merge_base(domain, ours, theirs)
+        bodies = [self._body(domain, x) for x in (base, ours, theirs)]
         conflicts: list[Conflict] = []
-        merged = _merge3(self._body(domain, base), self._body(domain, ours), self._body(domain, theirs), "", conflicts)
+        merged = _merge3(*bodies, "", conflicts)
+        conflicts += _element_conflicts(*(b["domain"] for b in bodies))
         return Merge(base, merged, conflicts)
 
     # -- writing ----------------------------------------------------------------------------------
@@ -286,24 +331,27 @@ class CommitStore:
         if representations is None:   # a released UI is the pair (ADR-0008): take this domain's own
             representations = self.representations_for(d.domain, Path(declaration).parent)
         reps = {Path(r).name: load_yaml(Path(r).read_text()) for r in representations}
+        cid = content_id(raw, reps)
         with self._lock(d.domain) as dirp:
-            head = self.head(d.domain, branch) or self.main(d.domain)
+            log = self.log(d.domain)
+            # A new branch starts from `main`; before the first approval, from the domain's first
+            # commit, so every branch shares a base (ADR-0033: main exists from the first commit).
+            head = self.head(d.domain, branch) or self.main(d.domain) or (log[0] if log else None)
             if merge is not None:
                 self.get(d.domain, merge)
                 if head is not None and self.is_ancestor(d.domain, merge, head.id):
                     merge = None                       # already merged: an ordinary commit
-            if head is not None and merge is None and head.content == content_id(raw, reps):
+            if head is not None and merge is None and head.content == cid:
                 if self.refs(d.domain).get(branch) != head.id:
                     self._move(dirp, branch, head.id)
                 return head, False
             parents = ([head.id] if head else []) + ([merge] if merge else [])
-            return self._write(dirp, d.domain, raw, reps, parents, message, branch), True
+            return self._write(dirp, d, raw, reps, cid, parents, message, branch), True
 
-    def _write(self, dirp: Path, domain: str, raw: dict[str, Any], reps: dict[str, Any], parents: list[str],
-               message: str, branch: str) -> Commit:
+    def _write(self, dirp: Path, d: Domain, raw: dict[str, Any], reps: dict[str, Any], cid: str,
+               parents: list[str], message: str, branch: str) -> Commit:
         """Store a commit and move `branch` to it. Called under the domain lock."""
-        d = Domain.model_validate({"version": 1, **raw})          # a stored body has no `version`
-        cid = content_id(raw, reps)
+        domain = d.domain
         seq = max((c.seq for c in self.log(domain)), default=0) + 1
         iface = "1.0.0"
         if parents:
@@ -321,11 +369,22 @@ class CommitStore:
                     (tmp / "representations" / name).write_text(yaml.safe_dump(rbody, sort_keys=False))
             (dirp / "objects").mkdir(exist_ok=True)
             os.replace(tmp, obj)
+        self._keep_legacy_refs(dirp)
         self._append(dirp / "log.jsonl", asdict(c))
         self._move(dirp, branch, c.id)
         return c
 
+    def _keep_legacy_refs(self, dirp: Path) -> None:
+        """A store from before branches: write its derived refs before anything else changes."""
+        refs = dirp / "refs.jsonl"
+        if not refs.exists():
+            derived = self._legacy_refs(dirp.name)
+            refs.touch()
+            for b, c in derived.items():
+                self._append(refs, {"branch": b, "commit": c, "at": _now(), "derived": True})
+
     def _move(self, dirp: Path, branch: str, commit_id: str) -> None:
+        self._keep_legacy_refs(dirp)
         self._append(dirp / "refs.jsonl", {"branch": branch, "commit": commit_id, "at": _now()})
 
     @staticmethod
@@ -356,26 +415,34 @@ class CommitStore:
                 raise CommitError(f"{c.id} is already in main at {main.id}, which supersedes it; "
                                   "approve a newer commit")
             if main is None or self.is_ancestor(domain, main.id, c.id):
-                target = c                                         # fast-forward
+                body = self._body(domain, c.id)               # fast-forward: main takes this commit
+                self._check(c.id, body["domain"])               # (a resolved merge comes this way too)
+                target = c
                 self._move(dirp, MAIN, c.id)
             else:
                 m = self.merge3(domain, main.id, c.id)
                 if m.conflicts:
                     raise MergeConflict(m.conflicts)
-                raw = m.merged["domain"]
-                try:
-                    errors = [i for i in validate_domain(Domain.model_validate({"version": 1, **raw}))
-                              if i.severity == "error"]
-                except ValidationError as e:
-                    raise CommitError(f"the merge of {c.id} into main does not parse: {e}") from None
-                if errors:
-                    raise CommitError(f"the merge of {c.id} into main does not validate: "
-                                      + "; ".join(f"{i.code} at {i.where}" for i in errors[:3]))
-                target = self._write(dirp, domain, raw, m.merged["representations"], [main.id, c.id],
-                                     f"merge {c.id} into main", MAIN)
+                d = self._check(c.id, m.merged["domain"])
+                reps = m.merged["representations"]
+                target = self._write(dirp, d, m.merged["domain"], reps, content_id(m.merged["domain"], reps),
+                                     [main.id, c.id], f"merge {c.id} into main", MAIN)
             self._append(dirp / "approvals.jsonl", {"commit": target.id, "approver": approver, "at": _now(),
                                                     **({"merged": c.id} if target.id != c.id else {})})
             return target
+
+    @staticmethod
+    def _check(commit_id: str, raw: dict[str, Any]) -> Domain:
+        """What `main` takes must validate: each side may be valid alone and not together."""
+        try:
+            d = Domain.model_validate({"version": 1, **raw})
+        except ValidationError as e:
+            raise CommitError(f"main with {commit_id} does not parse: {e}") from None
+        errors = [i for i in validate_domain(d) if i.severity == "error"]
+        if errors:
+            raise CommitError(f"main with {commit_id} does not validate: "
+                              + "; ".join(f"{i.code} at {i.where}" for i in errors[:3]))
+        return d
 
     # -- the semantic diff ------------------------------------------------------------------------
     def diff(self, domain: str, a: str | None, b: str) -> dict[str, Any]:

@@ -509,10 +509,11 @@ class Workspace:
             raise AuthoringError(f"the draft does not parse: {e.errors()[0]['msg']}") from None
         except CommitError as e:
             raise AuthoringError(str(e)) from None
-        base = self.commits.latest_approved(c.domain)
-        review = self.commits.diff(c.domain, base.id if base else None, c.id)
+        main = self.commits.main(c.domain)          # ADR-0033: a branch is reviewed from its merge base
+        base_id = self.commits.merge_base(c.domain, c.id, main.id) if main else None
+        review = self.commits.diff(c.domain, base_id, c.id)
         return {"commit": c.id, "seq": c.seq, "branch": branch, "created": created, "interface": c.interface,
-                "since": base.id if base else None, **review}
+                "since": base_id, **review}
 
     def merge_main(self, branch: str = "work") -> dict[str, Any]:
         """Bring `main` into a branch's working copy (ADR-0033). Writes the semantic 3-way merge
@@ -523,22 +524,30 @@ class Workspace:
         d = self.draft().get("domain")
         if not isinstance(d, str) or not d:
             raise AuthoringError("the draft names no `domain`, so there is no commit log to merge in")
+        from ..commits import CommitError
         main, head = self.commits.main(d), self.commits.head(d, branch)
         if main is None or head is None:
             raise AuthoringError(f"nothing to merge: {'main' if main is None else branch} has no commits")
         if self.commits.is_ancestor(d, main.id, head.id):
             return {"merge": main.id, "branch": branch, "up_to_date": True, "conflicts": []}
-        reps = {p.name: load_yaml(p.read_text())
-                for p in self.commits.representations_for(d, self.domain_path.parent)}
-        if content_id(self.draft(), reps) != head.content:
-            raise AuthoringError(f"the working copy has changes not committed to {branch}: commit them first")
-        m = self.commits.merge3(d, head.id, main.id)
+        folder = self.domain_path.parent
+        try:
+            present = self.commits.representations_for(d, folder)
+            reps = {p.name: load_yaml(p.read_text()) for p in present}
+            if content_id(self.draft(), reps) != head.content:
+                raise AuthoringError(f"the working copy has changes not committed to {branch}: commit them first")
+            m = self.commits.merge3(d, head.id, main.id)
+        except CommitError as e:
+            raise AuthoringError(str(e)) from None
         body = m.merged["domain"]                                   # stored without `version`: keep the draft's
         out = {"domain": body.get("domain"), "version": self.draft().get("version", 1),
                **{k: v for k, v in body.items() if k != "domain"}}
         self.domain_path.write_text(yaml.safe_dump(out, sort_keys=False, allow_unicode=True))
-        for name, body in m.merged["representations"].items():
-            (self.domain_path.parent / name).write_text(yaml.safe_dump(body, sort_keys=False))
+        for name, rbody in m.merged["representations"].items():
+            (folder / name).write_text(yaml.safe_dump(rbody, sort_keys=False))
+        for p in present:                                           # a UI the merge removed is removed
+            if p.name not in m.merged["representations"]:
+                p.unlink()
         return {"merge": main.id, "branch": branch, "up_to_date": False,
                 "conflicts": [{"path": c.path, "base": c.base, "ours": c.ours, "theirs": c.theirs} for c in m.conflicts]}
 
