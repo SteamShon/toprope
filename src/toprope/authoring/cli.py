@@ -13,9 +13,9 @@
   toprope-author merge [--branch B]                   bring main into the working copy; lists conflicts
   toprope-author branches                             every branch and the commit it points to
   toprope-author log ELEMENT [--at COMMIT]            an element's history (ADR-0032), e.g. action:launch
-  toprope-author change-check [COMMIT] [--since C] [--env DIR] [--examples N]
-                                                      the change check (ADR-0009), recorded on the
-                                                      commit; exits 1 when it fails
+  toprope-author change-check [COMMIT] [--since C] [--env DIR] [--examples N] [--no-cache] [--full]
+                                                      the change check (ADR-0009), incremental (ADR-0013),
+                                                      recorded on the commit; exits 1 when it fails
   toprope-author checkout COMMIT [--force]            load a commit into the working copy (a revert,
                                                       once committed)
   toprope-author approve COMMIT --as NAME [--yes]     merge a commit into main and tag it (only you)
@@ -84,6 +84,8 @@ def main(argv: list[str] | None = None) -> None:
     ck.add_argument("--since", default=None, help="the base commit (default: the merge base with main)")
     ck.add_argument("--env", default=None, help="a deploy environment, for log replay and in-flight objects")
     ck.add_argument("--examples", type=int, default=50)
+    ck.add_argument("--no-cache", action="store_true", help="run every test; reuse no result")
+    ck.add_argument("--full", action="store_true", help="also run uncached and list selection misses")
     ck.add_argument("--workspace", default=".")
     co = sub.add_parser("checkout")
     co.add_argument("commit")
@@ -140,9 +142,10 @@ def main(argv: list[str] | None = None) -> None:
         elif args.cmd == "log":
             print(json.dumps(ws.element_log(args.element, args.at), indent=2, ensure_ascii=False))
         elif args.cmd == "change-check":
-            out = ws.change_check(args.commit, branch=args.branch, since=args.since, env=args.env, examples=args.examples)
+            out = ws.change_check(args.commit, branch=args.branch, since=args.since, env=args.env,
+                                  examples=args.examples, cache=not args.no_cache, full=args.full)
             print(json.dumps(out, indent=2, ensure_ascii=False, default=str))
-            if not out["ok"]:
+            if not out["ok"] or out.get("selection_misses"):
                 raise SystemExit(1)
         elif args.cmd == "checkout":
             print(json.dumps(ws.checkout(args.commit, force=args.force), indent=2))

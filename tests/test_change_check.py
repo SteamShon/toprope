@@ -43,7 +43,7 @@ def test_an_unchanged_declaration_passes_every_check_that_runs(base):
     r = change_check(dom(base), dom(copy.deepcopy(base)), events=history(base), examples=10)
     assert r.ok and r.diff["to_review"] == [] and r.diff["interface_bump"] == "none"
     assert [n for n, c in r.checks.items() if not c.ran] == ["nl"]
-    assert r.checks["log_replay"].note == "2 past action(s) replayed; 0 would be blocked"
+    assert r.checks["log_replay"].note == "0 of 2 past action(s) re-decided; 0 would be blocked"   # nothing affected
     assert problems(r, "log_replay") == []                         # recorded timestamps are not differences
 
 
@@ -93,7 +93,7 @@ def test_log_replay_reports_past_actions_the_change_would_block(base):
     r = change_check(dom(raw), dom(base), events=st, examples=10)
     (p,) = r.checks["log_replay"].problems
     assert p.severity == "error" and p.where.startswith("E-onboarding@") and "eli" in p.message
-    assert r.checks["log_replay"].note == "2 past action(s) replayed; 1 would be blocked"
+    assert r.checks["log_replay"].note == "1 of 2 past action(s) re-decided; 1 would be blocked"  # launch only
     raw2 = copy.deepcopy(base)                                           # a precondition the past fails
     raw2["actions"]["approve_experiment"]["preconditions"].append(
         {"id": "long-enough", "check": "target.planned_days >= 30", "reason": "Run at least a month."})
