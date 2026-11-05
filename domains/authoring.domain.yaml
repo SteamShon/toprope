@@ -1,0 +1,11 @@
+domain: authoring
+version: 1
+purpose:
+  problem: A domain owner's workflow lives in people's heads; turning it into a declared
+    domain, and changing it safely, takes code.
+  success_metric:
+    name: human minutes from an owner's intent to a confirmed, compiled domain version
+    direction: down
+  announcement: Domain owners now turn the workflow in their heads into a declared,
+    checked domain without writing code. Every change shows what it breaks before
+    anything is deployed.

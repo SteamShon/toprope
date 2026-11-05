@@ -1,0 +1,11 @@
+domain: delivery
+version: 1
+purpose:
+  problem: An approved domain version must become working software in an environment,
+    and nothing unverified may reach it.
+  success_metric:
+    name: share of approved versions that reach verified-in-use without a manual fix
+      or rollback
+    direction: up
+  announcement: Approved domain versions now reach the environment as working software
+    in one step. Nothing that fails its checks or lacks a person's approval gets there.
