@@ -61,6 +61,38 @@ its validator stay for M2's application domain.
   **not** designed for. Whether to seed handoff-breaking changes is your decision; keep it
   to yourself.
 
+### A menu of change types (requested by the researcher, 2026-11-05)
+To write the intents mostly by choosing, pick a type from this menu, then write in one line
+what that type means in the self domains, as the owner would say it, with a rationale. The
+menu is generic: it names no element and no seeded problem. Tick types until there are
+about 20 intents; a type may be used more than once.
+
+| # | Type | Example in a bakery-order domain (not ours) |
+|---|---|---|
+| 1 | Add a step between two existing steps | "Put a tasting step before a wedding cake goes to production." |
+| 2 | Split one action into two | "Separate taking a deposit from confirming the order." |
+| 3 | Merge two actions or steps into one | "Packing and labelling can be one step." |
+| 4 | Narrow who may do something | "Only the manager may cancel a paid order." |
+| 5 | Widen who may do something | "Let part-timers mark an order as picked up." |
+| 6 | Add a condition before an action | "No production before the deposit is paid." |
+| 7 | Relax or remove a condition | "Small orders no longer need a deposit." |
+| 8 | Change who approves, or add an approval | "Custom designs need the head baker's sign-off." |
+| 9 | Add a required piece of information | "Every order records an allergy note." |
+| 10 | Remove a piece of information, a step or an option | "We no longer offer same-day delivery." |
+| 11 | Rename or redefine a term | "Call it a 'collection slot', not a 'pickup time'." |
+| 12 | Change a deadline, a timer or an order of events | "Cancellations close 48 hours before pickup, not 24." |
+| 13 | Add a new kind of thing or a new role | "Add catering orders, handled by an events lead." |
+| 14 | Change what one domain hands to the other | "The kitchen also needs the delivery address." |
+| 15 | Change what happens to things already in progress | "Orders already in production keep the old price." |
+
+- **Write in the owner's words.** The menu's type names are for you; the intent does not
+  use them, and names no element.
+- **Go outside the menu at least twice.** The assistant wrote this menu, so its types are
+  ones the assistant knows. At least two seeded problems should come from types not on it,
+  so that some are ones the checks were not designed for (`designed_for_checks: no`).
+- **The key stays yours.** Which intents are seeded, and how, goes only into
+  `change-key.yaml`, written alone.
+
 ## Verdict rules (`verdict-rules.yaml`)
 Start from `verdict-rules.template.yaml`, which holds the assistant's draft values, now
 without ②. Review each threshold, including the latency targets, and set `status: frozen`
