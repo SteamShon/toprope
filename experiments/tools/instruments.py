@@ -207,8 +207,19 @@ def read_manifest(d: Path) -> tuple[dict, list[str]]:
         return {"files": {}}, [f"FROZEN.json is malformed: {e}"]
 
 
+def _sealed_validate(d: Path, include_binding: bool) -> list[str]:
+    """Validate as `--sealed`: freezing and amending may be run by an agent at the researcher's
+    instruction (AGENTS.md), so they never print anything derived from the change key."""
+    global SEALED
+    was, SEALED = SEALED, True
+    try:
+        return validate(d, include_binding=include_binding)
+    finally:
+        SEALED = was
+
+
 def _freeze(d: Path, keys: list[str]) -> list[str]:
-    errs = validate(d, include_binding="binding" in keys)
+    errs = _sealed_validate(d, include_binding="binding" in keys)
     for k in keys:
         doc = load(d, k)
         if doc is None:
@@ -256,7 +267,7 @@ def amend(d: Path, name: str, reason: str) -> list[str]:
     if meta is None:
         return [f"{f} is not frozen; use freeze"]
     key = next((k for k, v in FILES.items() if v == f), None)
-    errs = validate(d, include_binding=key == "binding")
+    errs = _sealed_validate(d, include_binding=key == "binding")
     doc = load(d, key) if key else None
     if doc is None or doc.get("status") != "frozen":
         errs.append(f"{f}: keep status: frozen in the amended file")
@@ -293,6 +304,7 @@ def verify(d: Path, run: bool = False) -> list[str]:
         return merrs
     files = manifest["files"]
     required = [FILES[k] for k in BEFORE_CHECKS] + ([FILES[k] for k in BEFORE_RUN] + [FILES["binding"]] if run else [])
+    required += [FILES[k] for k in OPTIONAL_STAGE1 if (d / FILES[k]).exists()]   # a gold file, once it exists
     errs = [f"{f} is not frozen" for f in required if f not in files]
     for f, meta in files.items():
         if not (d / f).exists():

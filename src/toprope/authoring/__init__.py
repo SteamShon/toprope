@@ -27,7 +27,16 @@ import yaml
 from pydantic import ValidationError
 
 from ..decl import Domain, load_yaml, validate_domain
-from ..sources import DEFAULT_EXCLUDE, ELEMENT_KIND, SNAPSHOTS, Chunk, FetchError, SourceSpec, fetch, read
+from ..sources import (
+    DEFAULT_EXCLUDE,
+    ELEMENT_KIND,
+    SNAPSHOTS,
+    Chunk,
+    FetchError,
+    SourceSpec,
+    fetch,
+    read,
+)
 
 CONFIG = "toprope.workspace.yaml"
 LIST_BY_ID = {"invariants", "preconditions", "scenarios"}

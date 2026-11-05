@@ -96,8 +96,7 @@ class Outbox:
             for e in store.read(stream):
                 if e.kind != "outbox":
                     continue
-                p = (Pending(handoff_id(e), e, "handoff") if e.type == "HandoffRequested"
-                     else Pending(effect_id(e), e, "effect"))
+                p = pending_of(e)
                 if (kind is None or p.kind == kind) and store.version(p.stream) == 0:
                     out.append(p)
         return out

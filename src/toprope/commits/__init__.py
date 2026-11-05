@@ -432,8 +432,8 @@ class CommitStore:
         CommitError for a commit `main` already contains (approve a newer one instead)."""
         with self._lock(domain) as dirp:
             c = self.get(domain, commit_id)
-            if self.is_approved(domain, c.id):
-                return None
+            if self.is_approved(domain, c.id) or any(a.get("merged") == c.id for a in self.approvals(domain)):
+                return None                                  # approved already, directly or by a merge
             main = self.main(domain)
             if main is not None and self.is_ancestor(domain, c.id, main.id):
                 raise CommitError(f"{c.id} is already in main at {main.id}, which supersedes it; "

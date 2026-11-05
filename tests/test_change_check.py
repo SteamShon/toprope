@@ -179,8 +179,8 @@ def test_the_change_check_service_and_the_cli(tmp_path, base):
     assert bad.returncode == 1 and "semantic" in json.loads(bad.stdout)["summary"]
     env = LocalEnvironment(tmp_path / "env")
     k = LocalKernel(tmp_path, environment=env, harness_examples=10)
-    out = k.call("change_check", {"domain": "example", "commit": c1})   # nothing approved: a first version
-    assert out["ok"] and out["passed"] is False and out["failing"] == ["scenarios"]
+    out = k.call("change_check", {"domain": "example", "commit": c1})   # nothing approved: against its parent
+    assert out["ok"] and out["passed"] is False and out["failing"] == ["semantic", "scenarios"]
     assert k.commits.check_status("example", c1)["change-check"]["ok"] is False
     env.preview_commit(k.commits, "example", c0, examples=5)              # the preview's harness is a record too
     assert k.commits.check_status("example", c0)["preview-harness"]["ok"] is True

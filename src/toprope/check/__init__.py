@@ -140,17 +140,23 @@ def change_check(new: Domain, old: Domain | None = None, *, events: EventStore |
     structurally_ok = checks["structural"].ok
     # A base with errors is no baseline: nothing is reported as newly lost against it.
     baseline = old if old is not None and not any(i.severity == "error" for i in old_issues) else None
-    impact = impact_of(new, baseline, examples) if structurally_ok else None
-    misses = None
+    misses = impact = None
     if full and cache is None:
         raise ValueError("a full run compares with the result cache: it needs one")
     if structurally_ok:
-        checks["semantic"], checks["scenarios"], checks["harness"], stats, tested = \
-            _model_checks(new, old, baseline, examples, cache)
+        from ..harness.run import Harness
+        ids = {sc.id for sc in new.scenarios}
+        carried = [sc for sc in (old.scenarios if old else []) if sc.id not in ids]
+        tested = new.model_copy(update={"scenarios": list(new.scenarios) + carried})
+        h = Harness(tested, levels=("model",))                 # one small world for the whole check
+        cases = h.planner.cases()
+        impact = impact_of(new, baseline, examples, cases)
+        checks["semantic"], checks["scenarios"], checks["harness"], stats = \
+            _model_checks(tested, carried, baseline, examples, cache, h)
         timings["harness"] = stats["seconds"]
         if full:
             from ..incremental import selection_misses
-            misses = selection_misses(tested, examples=examples, cache=cache)
+            misses = selection_misses(tested, examples=examples, cache=cache, cases=cases)
     else:
         for name in ("semantic", "scenarios", "harness"):
             checks[name] = CheckResult(name, ran=False, note="the declaration has structural errors")
@@ -179,12 +185,13 @@ def check_commit(commits: Any, domain: str, commit_id: str, base: str | None = "
     (ADR-0032): one record per check, `ok: null` for one that did not run, plus `change-check`
     for the whole, appended together with one run id. The base is
     the commit's merge base with `main` by default (ADR-0033: a branch is reviewed from there),
-    or its first parent when the commit is already in `main`; None checks it as a first version."""
+    or its first parent when the commit is already in `main` or nothing is approved yet; a
+    commit without parents is checked as a first version."""
     c = commits.get(domain, commit_id)
     if base == "merge-base":
         main = commits.main(domain)
         base = commits.merge_base(domain, c.id, main.id) if main else None
-        if base == c.id:
+        if base == c.id or main is None:       # in main already, or nothing approved yet: its parent
             base = c.parents[0] if c.parents else None
     old = commits.domain(domain, base) if base else None
     report = change_check(commits.domain(domain, c.id), old, events=events, nl=nl, examples=examples,
@@ -236,18 +243,16 @@ def _allows(cell: Any) -> bool:
     return isinstance(cell, str) and cell not in ("n/a", "undecided")
 
 
-def _model_checks(new: Domain, old: Domain | None, baseline: Domain | None, examples: int,
-                  cache: Any = None) -> tuple[CheckResult, CheckResult, CheckResult, dict[str, Any], Domain]:
+def _model_checks(tested: Domain, carried: list[Any], baseline: Domain | None, examples: int,
+                  cache: Any, h: Any) -> tuple[CheckResult, CheckResult, CheckResult, dict[str, Any]]:
     """One model-level harness pass on the new declaration, with the base's scenarios carried
     along and unchanged tests taken from the cache (ADR-0013): the semantic check (the small
     world's unreachable states, undecided cells), scenario regression (the flows) and the rest
     of the harness findings."""
     from ..harness.world import grow_world
     from ..incremental import run_tests
-    ids = {sc.id for sc in new.scenarios}
-    carried = [sc for sc in (old.scenarios if old else []) if sc.id not in ids]
-    tested = new.model_copy(update={"scenarios": list(new.scenarios) + carried})
-    run = run_tests(tested, examples=examples, cache=cache)
+    new = tested
+    run = run_tests(tested, examples=examples, cache=cache, harness=h)
 
     semantic = CheckResult("semantic")
     unreach_old = grow_world(baseline).unreachable if baseline is not None else {}
@@ -276,11 +281,11 @@ def _model_checks(new: Domain, old: Domain | None, baseline: Domain | None, exam
             scenarios.add("error", f"scenario:{f.case}", f"{origin} fails: {f.detail.get('why')}")
         else:
             harness.add("error", f"{f.kind}:{f.case}", _short(f.detail))
-    total = len(new.scenarios) + len(carried)
+    total = len(tested.scenarios)
     scenarios.note = f"{total - len(failed)}/{total} scenarios pass"
     harness.note = (f"{run.stats['tests']} tests: {run.stats['run']} run, {run.stats['cached']} from cache, "
                     f"{run.stats['seconds']} s")
-    return semantic, scenarios, harness, run.stats, tested
+    return semantic, scenarios, harness, run.stats
 
 
 def _short(detail: dict[str, Any]) -> str:
@@ -390,8 +395,9 @@ def _command(ev: Event, new: Domain, old: Domain | None,
     kind = ref.get("kind", "person")
     if roles_of is not None:
         roles = tuple(roles_of(ref, action))
-    elif kind == "system":
-        roles = ("system",)
+    elif kind == "system":            # the kernel replies as `external:kernel`; handoffs as `system`
+        rid = str(ref.get("id") or "")
+        roles = (rid,) if rid.startswith("external:") else ("system",)
     else:                     # it succeeded then, so the actor held a role the old version allowed
         src = old if old is not None and action in old.actions else new
         a = src.actions.get(action)
