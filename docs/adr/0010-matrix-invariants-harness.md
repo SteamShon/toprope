@@ -2,6 +2,9 @@
 
 - Link: ① iterate safely, ② model is right, ③ works as built, ④ shared language · Status: accepted · 2026-11-04 · decided by: SteamShon
 
+> Amended by ADR-0035: the harness also generates objects from the declaration's types, so
+> every cell and the invariants are tested with or without examples (the mechanical layer).
+
 ## Context
 - The researcher's preferred way to keep a domain correct, from DDD and agent-based coding,
   is to manage a **transition matrix** (state × action → outcome) and **invariants** (what
