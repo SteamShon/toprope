@@ -12,7 +12,7 @@ An approved domain version must become working software in an environment, and n
 
 ## People and things
 
-**Roles:** `approver`. Agents act only on a person's behalf, with a grant.
+**Roles:** `approver` (ana). Agents act only on a person's behalf, with a grant.
 
 - **DeliveryRequest**: A request to deliver an approved commit of a domain, handed off by Authoring. Stages: `requested`, `previewing`, `previewed`, `deploying`, `done`, `verified` (starts `requested`).
   - facts: `domain_id` (string), `commit` (string), `interface` (string), `environment` (string), `approver` (string), `build` (string, optional), `harness_ok` (boolean, optional), `deployed` (boolean, optional), `refusal` (string, optional), `verified` (boolean, optional)
@@ -53,9 +53,16 @@ For each stage: may the action happen, and where does it lead? A missing cell is
 - **verified-requests-were-deployed** on DeliveryRequest: Only a deployment that happened is verified.
 - **finished-deploys-record-the-outcome** on DeliveryRequest: A finished deploy records whether it happened.
 
+## Examples and scenarios
+
+- 5 example object(s): Environment `ENV-local`, DeliveryRequest `R1`, DeliveryRequest `R2`, DeliveryRequest `R3`, DeliveryRequest `R4`
+- scenario `deliver-preview-deploy-verify`: 6 step(s)
+- scenario `a-failed-harness-is-never-deployed`: 1 step(s)
+- scenario `a-refused-deploy-is-not-verified-and-can-be-retried`: 2 step(s)
+
 ## What is generated
 
 - **MCP server** `toprope:delivery`: one tool per action (6), plus `get_object`, `history`, `attempts`, `allowed_actions`, `describe_domain`, `world_map` and `how_to_reach`. Kernel replies (`record_build`, `record_deployment`) are tools too, but only the kernel may take them.
 - **Events**: one per action (`DeliveryRequestCreated`, `DeliveryRequestDeploy`, `DeliveryRequestPreview`, `DeliveryRequestRecordBuild`, `DeliveryRequestRecordDeployment`, `DeliveryRequestVerify`); the current state is the events replayed in order.
 - **World map** (`world-map.json`): every object, link, stage and (stage, action) edge.
-- **Harness**: generated from the matrix, invariants, examples and scenarios (run it to see coverage).
+- **Harness**: fails; decided cells covered per level: model 50/60, execution 50/60, mcp 50/60; 2 finding(s).

@@ -536,3 +536,171 @@ invariants:
   'on': Element
   check: exists(target.origin)
   reason: Every element cites where it came from.
+world:
+  actors:
+    owner:
+    - ana
+    expert:
+    - eli
+  fixtures:
+  - Source:
+      id: S-code
+      kind: repository
+      path: src/toprope
+      stage: added
+  - Source:
+      id: S-docs
+      kind: records
+      path: docs
+      stage: fetched
+      sha256: 5f1c
+  - Question:
+      id: Q1
+      stage: purpose
+      text: What problem does this domain solve, and for whom?
+  - Answer:
+      id: A1
+      question: Q1
+      words: Owners turn workflows into domains without code.
+  - Element:
+      id: E1
+      path: purpose
+      origin: S-docs
+      review: proposed
+  - Element:
+      id: E2
+      path: objects.Commit
+      origin: S-code
+      review: confirmed
+  - Element:
+      id: E3
+      path: actions.mark_unknown
+      origin: S-docs
+      review: unknown
+  - DecisionRequest:
+      id: DR1
+      element: E1
+      subject: Which success metric?
+      grounds: The scope document names two.
+      recommendation: Human minutes to a confirmed version.
+      stage: open
+  - Draft:
+      id: D1
+      domain_id: authoring
+      declaration: domains/authoring.domain.yaml
+      branch: work
+      stage: open
+  - Commit:
+      id: C1
+      seq: 1
+      content: a1b2
+      branch: work
+      interface: 1.0.0
+      domain_id: authoring
+      stage: recorded
+      checks_passed: true
+      approved: true
+      main: C1
+  - Commit:
+      id: C2
+      seq: 2
+      content: c3d4
+      branch: work
+      interface: 1.1.0
+      domain_id: authoring
+      stage: recorded
+      checks_passed: false
+scenarios:
+- id: approve-only-after-a-passing-check
+  given:
+    from_world: C2
+  steps:
+  - actor:
+      role: owner
+    do: approve_commit
+    target: C2
+    expect:
+      denied_by: checks-pass
+  - actor:
+      external: kernel
+    do: record_check
+    target: C2
+    params:
+      passed: true
+      summary: passes
+    expect:
+      state:
+        C2.checks_passed: true
+  - actor:
+      role: owner
+    do: approve_commit
+    target: C2
+    expect:
+      state:
+        C2.stage: recorded
+  - actor:
+      external: kernel
+    do: record_approval
+    target: C2
+    params:
+      approved: true
+      main: C2
+    expect:
+      state:
+        C2.approved: true
+  - actor:
+      role: owner
+    do: approve_commit
+    target: C2
+    expect:
+      denied_by: not-approved
+- id: a-confirmed-element-is-not-unknown-again
+  given:
+    from_world: E1
+  steps:
+  - actor:
+      role: owner
+    do: confirm_element
+    target: E1
+    expect:
+      state:
+        E1.review: confirmed
+  - actor:
+      role: expert
+    do: mark_unknown
+    target: E1
+    expect:
+      denied_by: matrix
+      reason_shown: true
+- id: a-decision-is-taken-once
+  given:
+    from_world: DR1
+  steps:
+  - actor:
+      role: owner
+    do: decide
+    target: DR1
+    params:
+      choice: A
+    expect:
+      state:
+        DR1.stage: decided
+        DR1.choice: A
+  - actor:
+      role: owner
+    do: decide
+    target: DR1
+    params:
+      choice: B
+    expect:
+      denied_by: matrix
+- id: a-link-is-fetched-once
+  given:
+    from_world: S-docs
+  steps:
+  - actor:
+      role: owner
+    do: fetch_source
+    target: S-docs
+    expect:
+      denied_by: matrix

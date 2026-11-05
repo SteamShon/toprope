@@ -12,7 +12,7 @@ A domain owner's workflow lives in people's heads; turning it into a declared do
 
 ## People and things
 
-**Roles:** `owner`, `expert`. Agents act only on a person's behalf, with a grant.
+**Roles:** `owner` (ana), `expert` (eli). Agents act only on a person's behalf, with a grant.
 
 - **Answer**: The owner's answer, in their words; its decisions become proposed elements.
   - facts: `words` (string)
@@ -106,9 +106,17 @@ For each stage: may the action happen, and where does it lead? A missing cell is
 - **fetched-sources-have-a-snapshot** on Source: A fetched source has the hash of its snapshot.
 - **elements-cite-a-source** on Element: Every element cites where it came from.
 
+## Examples and scenarios
+
+- 11 example object(s): Source `S-code`, Source `S-docs`, Question `Q1`, Answer `A1`, Element `E1`, Element `E2`, Element `E3`, DecisionRequest `DR1`, Draft `D1`, Commit `C1`, Commit `C2`
+- scenario `approve-only-after-a-passing-check`: 5 step(s)
+- scenario `a-confirmed-element-is-not-unknown-again`: 2 step(s)
+- scenario `a-decision-is-taken-once`: 2 step(s)
+- scenario `a-link-is-fetched-once`: 1 step(s)
+
 ## What is generated
 
 - **MCP server** `toprope:authoring`: one tool per action (16), plus `get_object`, `history`, `attempts`, `allowed_actions`, `describe_domain`, `world_map` and `how_to_reach`. Kernel replies (`record_fetch`, `record_commit`, `record_check`, `record_approval`) are tools too, but only the kernel may take them.
 - **Events**: one per action (`AnswerCreated`, `CommitApproveCommit`, `CommitCheckCommit`, `CommitCreated`, `CommitRecordApproval`, `CommitRecordCheck`, `DecisionRequestCreated`, `DecisionRequestDecide`, `DraftCommitDraft`, `ElementConfirmElement`, `ElementCreated`, `ElementMarkUnknown`, `QuestionCreated`, `SourceCreated`, `SourceFetchSource`, `SourceRecordFetch`); the current state is the events replayed in order.
 - **World map** (`world-map.json`): every object, link, stage and (stage, action) edge.
-- **Harness**: generated from the matrix, invariants, examples and scenarios (run it to see coverage).
+- **Harness**: passes; decided cells covered per level: model 51/51, execution 51/51, mcp 51/51; 0 finding(s).
