@@ -38,7 +38,6 @@ from ..decl import (
     review_diff,
     review_elements,
 )
-from ..decl.interface import _strip_text
 
 Key = str
 
@@ -100,10 +99,18 @@ def action_deps(d: Domain, action: str, keys: set[str]) -> set[str]:
     return out
 
 
+TEXT_ONLY = ("term:", "purpose")          # glossary and purpose: read by people, never by a test
+
+
 def shape(d: Domain) -> str:
-    """The whole declaration without its text (descriptions, reasons, glossary terms, purpose):
-    what flows and exploration depend on."""
-    return _h({k: _strip_text(v) for k, v in review_contents(d).items() if not k.startswith(("term:", "purpose"))})
+    """The whole declaration without its text: what flows and exploration depend on. Interface
+    elements count by their shape (descriptions and reasons dropped, ADR-0008); the review-only
+    elements (roles, stage fields, handoffs, scenarios, fixtures) count whole, user data
+    included; glossary terms and purpose not at all. The world's actor names count too."""
+    iface = interface(d)
+    parts = {k: (iface[k].shape_hash if k in iface else _h(v))
+             for k, v in review_contents(d).items() if not k.startswith(TEXT_ONLY)}
+    return _h({"elements": parts, "actors": d.world.actors})
 
 
 @dataclass
@@ -129,14 +136,17 @@ def tests_of(d: Domain, planner_cases: list[Any] | None = None, examples: int = 
     out = []
     per_action: dict[str, set[str]] = {}
     for c in planner_cases:
-        deps = per_action.setdefault(c.action, action_deps(d, c.action, keys))
+        if c.action not in per_action:
+            per_action[c.action] = action_deps(d, c.action, keys)
+        deps = per_action[c.action]
         if c.kind == "cell":       # a cell test reads its own cell; the others reach it through `instance`
             own = f"cell:{c.obj}.{c.state}.{c.action}"
             deps = {k for k in deps if not k.startswith("cell:") or k == own}
         case = {"kind": c.kind, "obj": c.obj, "state": c.state, "action": c.action, "role": c.role,
                 "params": c.params, "expect": c.expect, "gap": c.gap,
                 "instance": c.instance.data if c.instance is not None else None}
-        key = _h({"tc": tc, "test": c.id, "case": case, "deps": {k: body[k] for k in sorted(deps)}})
+        key = _h({"tc": tc, "test": c.id, "case": case, "actors": d.world.actors,
+                  "deps": {k: body[k] for k in sorted(deps)}})
         out.append(Test(c.id, "case", c.action, deps, key))
     whole = shape(d)
     for sc in d.scenarios:
@@ -146,27 +156,40 @@ def tests_of(d: Domain, planner_cases: list[Any] | None = None, examples: int = 
 
 
 # -- the impact report ------------------------------------------------------------------------------
-def impact(new: Domain, old: Domain | None, examples: int = 50) -> dict[str, Any]:
-    """Before anything runs: the changed elements and the tests and past actions they affect."""
+def impact(new: Domain, old: Domain | None, examples: int = 50, cases: list[Any] | None = None) -> dict[str, Any]:
+    """Before anything runs: the changed elements and the tests and past actions they affect.
+    Dependencies are taken over both versions' elements, so a removal affects what read it."""
     t0 = time.perf_counter()
     r = review_diff(review_elements(old) if old else {}, review_elements(new))
     changed = set(r.changed) | set(r.added) | set(r.removed)
     text_only = set(diff_interface(interface(old), interface(new)).text_only) & set(r.changed) if old else set()
-    tests = tests_of(new, examples=examples)
-    shape_changed = bool(changed - text_only) or old is None
-    affected = [t for t in tests
-                if (t.kind == "case" and t.deps & changed) or (t.kind != "case" and shape_changed)]
-    actions = sorted({t.action for t in affected if t.action} | {k.split(":", 1)[1] for k in changed
-                                                                 if k.startswith("action:")})
+    text_only |= {k for k in changed if k.startswith(TEXT_ONLY)}
+    keys = set(review_contents(new)) | (set(review_contents(old)) if old else set())
+    shape_changed = old is None or shape(old) != shape(new)
+    tests = tests_of(new, cases, examples)
+    deps = {a: action_deps(new, a, keys) for a in new.actions}
+    if old is not None:                              # an action the new version removed
+        deps.update({a: action_deps(old, a, keys) for a in old.actions if a not in new.actions})
+
+    def touched(t: Test) -> bool:
+        if t.kind != "case":
+            return shape_changed
+        d = deps.get(t.action, set())
+        if t.id.startswith("cell:"):
+            obj, state, action = t.id.split(":", 1)[1].split(".")[:3]
+            d = {k for k in d if not k.startswith("cell:") or k == f"cell:{obj}.{state}.{action}"}
+        return bool(d & changed)
+    affected = [t for t in tests if touched(t)]
+    actions = sorted(a for a, ds in deps.items() if ds & (changed - text_only))
     kinds: dict[str, int] = {}
     for k in changed:
         kinds[k.split(":", 1)[0]] = kinds.get(k.split(":", 1)[0], 0) + 1
-    by_kind = {"cell": 0, "precondition": 0, "create": 0}
+    by_kind: dict[str, int] = {}
     for t in affected:
         if t.kind == "case":
             by_kind[t.id.split(":", 1)[0]] = by_kind.get(t.id.split(":", 1)[0], 0) + 1
+    parts = [f"{n} {kind} test(s)" for kind, n in sorted(by_kind.items())]
     flows = [t.id for t in affected if t.kind == "flow"]
-    parts = [f"{n} {kind} test(s)" for kind, n in by_kind.items() if n]
     if flows:
         parts.append(f"{len(flows)} flow(s)")
     if any(t.kind == "explore" for t in affected):
@@ -194,9 +217,13 @@ class ResultCache:
     def get(self, key: Key) -> list[dict[str, Any]] | None:
         p = self._path(key)
         try:
-            return json.loads(p.read_text())["findings"] if p.exists() else None
-        except (json.JSONDecodeError, KeyError, OSError):
+            entry = json.loads(p.read_text()) if p.exists() else None
+        except (json.JSONDecodeError, OSError, UnicodeDecodeError):
             return None                                   # a damaged entry is a miss, never a pass
+        findings = entry.get("findings") if isinstance(entry, dict) else None
+        ok = isinstance(findings, list) and all(isinstance(f, dict) and {"kind", "level", "case"} <= set(f)
+                                                 for f in findings)
+        return findings if ok else None
 
     def put(self, key: Key, test: str, findings: list[dict[str, Any]]) -> None:
         p = self._path(key)
@@ -219,7 +246,7 @@ class Run:
 
 def run_tests(d: Domain, *, examples: int = 50, cache: ResultCache | None = None) -> Run:
     """Run the model-level harness, reusing cached results for unchanged tests."""
-    from ..harness.cases import raw_cell
+    from ..harness.cases import undecided_cells
     from ..harness.explore import explore
     from ..harness.run import Finding, Harness
     t0 = time.perf_counter()
@@ -228,6 +255,7 @@ def run_tests(d: Domain, *, examples: int = 50, cache: ResultCache | None = None
     tests = {t.id: t for t in tests_of(d, cases, examples)}
     results: dict[str, list[dict[str, Any]]] = {}
     cached = 0
+    from_cache: set[str] = set()
 
     def hit(tid: str) -> bool:
         nonlocal cached
@@ -235,6 +263,7 @@ def run_tests(d: Domain, *, examples: int = 50, cache: ResultCache | None = None
         if got is None:
             return False
         results[tid] = got
+        from_cache.add(tid)
         cached += 1
         return True
 
@@ -245,23 +274,26 @@ def run_tests(d: Domain, *, examples: int = 50, cache: ResultCache | None = None
         new = h.findings[before:]
         for c in todo:
             results[c.id] = [asdict(f) for f in new if f.case == c.id]
-    for sc in d.scenarios:
-        tid = f"flow:{sc.id}"
-        if not hit(tid):
-            sub = Harness(d.model_copy(update={"scenarios": [sc]}), levels=("model",))
-            sub.world, sub.planner = h.world, h.planner
-            sub.flows("model")
-            results[tid] = [asdict(f) for f in sub.findings]
+    missing = [sc for sc in d.scenarios if not hit(f"flow:{sc.id}")]
+    if missing:                                     # one pass over the scenarios not in the cache
+        before, full = len(h.findings), h.d
+        h.d = d.model_copy(update={"scenarios": missing})
+        try:
+            h.flows("model")
+        finally:
+            h.d = full
+        new = h.findings[before:]
+        for sc in missing:
+            results[f"flow:{sc.id}"] = [asdict(f) for f in new if f.case.split("#")[0] == sc.id]
     if examples and not hit("explore"):
         minimal = explore(h, examples=examples)
         results["explore"] = [asdict(Finding("exploration", "model", "explore", minimal))] if minimal else []
+    ran = [tid for tid in results if tid not in from_cache]
     if cache is not None:
-        for tid, fs in results.items():
-            cache.put(tests[tid].key, tid, fs)
+        for tid in ran:
+            cache.put(tests[tid].key, tid, results[tid])
     findings = [Finding(**f) for tid in results for f in results[tid]]
-    undecided = sorted({f"{obj}.{st}.{a}" for obj, tr in d.transitions.items() for st in tr.matrix
-                        for a, act in d.actions.items() if act.target == obj and act.creates is None
-                        for role in h.world.actors if raw_cell(d, obj, st, a, role) == "undecided"})
+    undecided = undecided_cells(d, h.world)
     stats = {"tests": len(results), "run": len(results) - cached, "cached": cached,
              "seconds": round(time.perf_counter() - t0, 3)}
     return Run(findings, h.world, undecided, stats, results)

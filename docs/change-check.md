@@ -46,8 +46,11 @@ is deployed. It exits 1 when a check reports an error. The report is printed, wr
 - **Dependencies are static and conservative.** A case test depends on everything about its
   action (the action, params, preconditions; a cell test only its own cell), on every object
   reachable from the action's object through links, on roles, handoffs and fixtures, and on
-  the case as the small world built it. Flows and exploration depend on the whole
-  declaration without its text, so a description or glossary change reruns nothing.
+  the case as the small world built it, and on the world's actor names. Dependencies are
+  taken over both versions, so removing an element affects what read it. Flows and
+  exploration depend on the whole declaration's shape: interface elements without their
+  text, the other elements whole (fixture and scenario data included), never the glossary
+  or purpose. A description or glossary change reruns nothing.
 - **Results are cached** in `.toprope/cache`, keyed by the hash of a test's inputs and the
   toolchain (the kernel's source). Unchanged tests are not re-run; a damaged entry is a miss.
   `--no-cache` runs everything.
@@ -55,7 +58,8 @@ is deployed. It exits 1 when a check reports an error. The report is printed, wr
   state.
 - **Soundness.** `--full` also runs everything uncached and lists **selection misses**: tests
   that fail uncached but passed from the cache, i.e. bugs in this analysis (target 0; the
-  command exits 1 if there are any). Run it in the background and before release PRs.
+  command exits 1 if there are any). It compares with the cache, so it cannot run with
+  `--no-cache`. Run it in the background and before release PRs.
 - Not yet: the background exploration tier and build taint (ADR-0013 §3).
 
 ## The base

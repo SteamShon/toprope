@@ -44,6 +44,14 @@ def raw_cell(d: Domain, obj: str, state: str, action: str, role: str) -> Any:
     return c.to if isinstance(c, Target) else c
 
 
+def undecided_cells(d: Domain, world: Any) -> list[str]:
+    """Every cell (object.state.action) that is undecided for some role, a missing cell or row
+    included: the interpreter treats those as undecided (docs/semantics.md step 5)."""
+    return sorted({f"{obj}.{st}.{a}" for obj, tr in d.transitions.items() for st in tr.matrix
+                   for a, act in d.actions.items() if act.target == obj and act.creates is None
+                   for role in world.actors if raw_cell(d, obj, st, a, role) == "undecided"})
+
+
 def cell_expectation(c: Any, state: str) -> dict[str, Any]:
     if c == "n/a":
         return {"status": "denied", "code": "not-applicable", "reason": f"Not applicable when {state}."}

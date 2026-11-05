@@ -542,6 +542,8 @@ class Workspace:
                 commit_id = refs[branch]
             base = since if since is not None else "merge-base"
             from ..incremental import ResultCache
+            if full and not cache:
+                raise AuthoringError("--full compares with the result cache; it cannot run with --no-cache")
             rc = ResultCache(self.root / ".toprope" / "cache") if cache else None
             if env is not None:
                 from ..deploy import LocalEnvironment
@@ -549,15 +551,12 @@ class Workspace:
                     raise AuthoringError(f"no deploy environment at {env}")
                 with LocalEnvironment(env).events(d) as store:
                     report = check_commit(self.commits, d, commit_id, base, events=store, examples=examples,
-                                          cache=rc)
+                                          cache=rc, full=full)
             else:
-                report = check_commit(self.commits, d, commit_id, base, examples=examples, cache=rc)
+                report = check_commit(self.commits, d, commit_id, base, examples=examples, cache=rc, full=full)
         except CommitError as e:
             raise AuthoringError(str(e)) from None
         out = {"commit": commit_id, **report.to_json()}
-        if full and rc is not None:
-            from ..incremental import selection_misses
-            out["selection_misses"] = selection_misses(self.commits.domain(d, commit_id), examples=examples, cache=rc)
         path = self.root / ".toprope" / "checks" / f"{commit_id}.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(out, indent=2, ensure_ascii=False, default=str))

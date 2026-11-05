@@ -98,10 +98,15 @@ def test_log_replay_re_decides_only_affected_actions():
     from test_change_check import history
     base = schema_doc_domain()
     raw = copy.deepcopy(base)
-    raw["actions"]["approve_experiment"]["description"] = "Sign off."
+    raw["actions"]["approve_experiment"]["preconditions"].append(
+        {"id": "planned", "check": "target.planned_days >= 1", "reason": "Plan the run."})
     r = change_check(dom(raw), dom(base), events=history(base), examples=10)
     assert r.checks["log_replay"].note == "1 of 2 past action(s) re-decided; 0 would be blocked"
     assert r.impact["actions"] == ["approve_experiment"] and r.timings["impact"] <= 2
+    text = copy.deepcopy(base)                                         # wording cannot block anything
+    text["actions"]["approve_experiment"]["description"] = "Sign off."
+    t = change_check(dom(text), dom(base), events=history(base), examples=10)
+    assert t.checks["log_replay"].note == "0 of 2 past action(s) re-decided; 0 would be blocked"
 
 
 def test_the_cli_reuses_results_and_checks_soundness(tmp_path):
@@ -129,3 +134,74 @@ def test_a_single_cell_change_meets_the_latency_targets(tmp_path, examples):
     run_tests(old, examples=examples, cache=cache)
     r = change_check(new, old, examples=examples, cache=cache)
     assert r.timings["impact"] <= 2 and r.timings["harness"] <= 30
+
+
+
+# -- review findings -----------------------------------------------------------------------------
+def test_a_removed_cell_still_replays_the_actions_that_read_it():
+    from test_change_check import history
+    base = schema_doc_domain()
+    raw = copy.deepcopy(base)
+    del raw["transitions"]["Experiment"]["matrix"]["approved"]["launch_experiment"]    # now undecided
+    r = change_check(dom(raw), dom(base), events=history(base), examples=10)
+    assert "launch_experiment" in r.impact["actions"]
+    assert any(p.severity == "error" for p in r.checks["log_replay"].problems)
+
+
+def test_state_in_fixtures_and_scenarios_is_part_of_the_shape(tmp_path):
+    cache = ResultCache(tmp_path / "cache")
+    base = schema_doc_domain()
+    run_tests(dom(base), examples=10, cache=cache)
+    raw = copy.deepcopy(base)
+    sc = next(s for s in raw["scenarios"] if s["id"] == "no-approve-running")
+    sc["given"]["Experiment"]["status"] = "draft"
+    again = run_tests(dom(raw), examples=10, cache=cache)
+    assert again.stats["run"] > 0 and selection_misses(dom(raw), examples=10, cache=cache) == []
+
+
+def test_the_world_actors_are_part_of_every_key(tmp_path):
+    cache = ResultCache(tmp_path / "cache")
+    base = schema_doc_domain()
+    run_tests(dom(base), examples=10, cache=cache)
+    raw = copy.deepcopy(base)
+    role = next(iter(raw["world"]["actors"]))
+    raw["world"]["actors"][role] = ["someone-else"]
+    assert run_tests(dom(raw), examples=10, cache=cache).stats["cached"] == 0
+
+
+def test_actions_without_a_matrix_are_replayed_when_their_rules_change():
+    base = schema_doc_domain()
+    raw = copy.deepcopy(base)
+    raw["actions"]["edit_hypothesis"] = {"description": "Edit.", "actor": ["pm"], "target": "Hypothesis",
+                                         "params": {"statement": {"type": "string"}}}
+    added = copy.deepcopy(raw)
+    added["actions"]["edit_hypothesis"]["preconditions"] = [
+        {"id": "worded", "check": "exists(target.statement)", "reason": "Keep a statement."}]
+    assert "edit_hypothesis" in impact(dom(added), dom(raw), examples=10)["actions"]
+
+
+def test_a_malformed_cache_entry_is_a_miss(tmp_path):
+    cache = ResultCache(tmp_path / "cache")
+    d = dom(schema_doc_domain())
+    run_tests(d, examples=10, cache=cache)
+    t = inc.tests_of(d, examples=10)[0]
+    for bad in ("[]", '"x"', '{"findings": {}}', '{"findings": [1]}'):
+        cache._path(t.key).write_text(bad)
+        assert cache.get(t.key) is None
+
+
+def test_full_needs_the_cache_and_uses_the_checked_scenarios(tmp_path):
+    base = schema_doc_domain()
+    raw = copy.deepcopy(base)
+    raw["scenarios"] = raw["scenarios"][1:]                            # one scenario is carried
+    with pytest.raises(ValueError, match="needs one"):
+        change_check(dom(raw), dom(base), examples=10, full=True)
+    r = change_check(dom(raw), dom(base), examples=10, cache=ResultCache(tmp_path / "c"), full=True)
+    assert r.selection_misses == []
+
+
+def test_a_structural_error_with_full_reports_instead_of_crashing(tmp_path):
+    raw = schema_doc_domain()
+    raw["transitions"]["Experiment"]["matrix"]["draft"]["frobnicate"] = "approved"
+    r = change_check(dom(raw), None, examples=10, cache=ResultCache(tmp_path / "c"), full=True)
+    assert not r.ok and r.selection_misses is None

@@ -84,6 +84,11 @@ class ChangeReport:
     checks: dict[str, CheckResult]
     impact: dict[str, Any] | None = None       # the impact report (ADR-0013), computed first
     timings: dict[str, Any] = field(default_factory=dict)
+    selection_misses: list[str] | None = None   # with a full run: tests the cache wrongly passed
+
+    @property
+    def sound(self) -> bool:
+        return not self.selection_misses
 
     @property
     def ok(self) -> bool:
@@ -105,6 +110,7 @@ class ChangeReport:
     def to_json(self) -> dict[str, Any]:
         return {"domain": self.domain, "ok": self.ok, "errors": self.errors, "warnings": self.warnings,
                 "summary": self.summary(), "diff": self.diff, "impact": self.impact, "timings": self.timings,
+                **({"selection_misses": self.selection_misses} if self.selection_misses is not None else {}),
                 "checks": {n: {"ok": c.ok, "ran": c.ran, "summary": c.summary(), "note": c.note,
                                "problems": [asdict(p) for p in c.problems]} for n, c in self.checks.items()}}
 
@@ -118,27 +124,33 @@ class NLChecker(Protocol):
 
 # -- the pipeline -------------------------------------------------------------------------------
 def change_check(new: Domain, old: Domain | None = None, *, events: EventStore | None = None,
-                 nl: NLChecker | None = None, examples: int = 50, cache: Any = None,
+                 nl: NLChecker | None = None, examples: int = 50, cache: Any = None, full: bool = False,
                  roles_of: Callable[[dict[str, Any], str], tuple[str, ...]] | None = None) -> ChangeReport:
     """Run every check of `new` against `old` (None: the first version). `events` is the
     deployed environment's event store, for log replay and the in-flight check. `roles_of`
     resolves a past actor's roles (the Identity port); without it, an actor is assumed to have
     had every role the current version allowed for that action. `cache` (a ResultCache)
-    reuses the results of tests whose inputs did not change (ADR-0013)."""
+    reuses the results of tests whose inputs did not change (ADR-0013); `full` then also runs
+    every test uncached and lists the selection misses (tests the cache wrongly passed)."""
     from ..incremental import impact as impact_of
     checks: dict[str, CheckResult] = {}
     timings: dict[str, float] = {}
     old_issues = validate_domain(old) if old else []
     checks["structural"] = _structural(new, old, old_issues)
     structurally_ok = checks["structural"].ok
-    impact = impact_of(new, old if old is not None and not any(i.severity == "error" for i in old_issues) else None,
-                       examples) if structurally_ok else None
     # A base with errors is no baseline: nothing is reported as newly lost against it.
     baseline = old if old is not None and not any(i.severity == "error" for i in old_issues) else None
+    impact = impact_of(new, baseline, examples) if structurally_ok else None
+    misses = None
+    if full and cache is None:
+        raise ValueError("a full run compares with the result cache: it needs one")
     if structurally_ok:
-        checks["semantic"], checks["scenarios"], checks["harness"], stats = \
+        checks["semantic"], checks["scenarios"], checks["harness"], stats, tested = \
             _model_checks(new, old, baseline, examples, cache)
         timings["harness"] = stats["seconds"]
+        if full:
+            from ..incremental import selection_misses
+            misses = selection_misses(tested, examples=examples, cache=cache)
     else:
         for name in ("semantic", "scenarios", "harness"):
             checks[name] = CheckResult(name, ran=False, note="the declaration has structural errors")
@@ -155,12 +167,13 @@ def change_check(new: Domain, old: Domain | None = None, *, events: EventStore |
     report = ChangeReport(new.domain, diff, {n: checks[n] for n in CHECKS})
     report.impact = impact
     report.timings = {**timings, "impact": impact["seconds"] if impact else None}
+    report.selection_misses = misses
     return report
 
 
 def check_commit(commits: Any, domain: str, commit_id: str, base: str | None = "merge-base", *,
                  events: EventStore | None = None, nl: NLChecker | None = None, examples: int = 50,
-                 cache: Any = None,
+                 cache: Any = None, full: bool = False,
                  roles_of: Callable[[dict[str, Any], str], tuple[str, ...]] | None = None) -> ChangeReport:
     """Run the change check on a commit of a commit store, and record the result on the commit
     (ADR-0032): one record per check, `ok: null` for one that did not run, plus `change-check`
@@ -175,7 +188,7 @@ def check_commit(commits: Any, domain: str, commit_id: str, base: str | None = "
             base = c.parents[0] if c.parents else None
     old = commits.domain(domain, base) if base else None
     report = change_check(commits.domain(domain, c.id), old, events=events, nl=nl, examples=examples,
-                          cache=cache, roles_of=roles_of)
+                          cache=cache, full=full, roles_of=roles_of)
     report.diff["from"], report.diff["to"] = base, c.id
     rows = [(name, res.ok if res.ran else None, res.summary()) for name, res in report.checks.items()]
     rows.append(("change-check", report.ok, report.summary()))
@@ -224,7 +237,7 @@ def _allows(cell: Any) -> bool:
 
 
 def _model_checks(new: Domain, old: Domain | None, baseline: Domain | None, examples: int,
-                  cache: Any = None) -> tuple[CheckResult, CheckResult, CheckResult, dict[str, Any]]:
+                  cache: Any = None) -> tuple[CheckResult, CheckResult, CheckResult, dict[str, Any], Domain]:
     """One model-level harness pass on the new declaration, with the base's scenarios carried
     along and unchanged tests taken from the cache (ADR-0013): the semantic check (the small
     world's unreachable states, undecided cells), scenario regression (the flows) and the rest
@@ -233,8 +246,8 @@ def _model_checks(new: Domain, old: Domain | None, baseline: Domain | None, exam
     from ..incremental import run_tests
     ids = {sc.id for sc in new.scenarios}
     carried = [sc for sc in (old.scenarios if old else []) if sc.id not in ids]
-    run = run_tests(new.model_copy(update={"scenarios": list(new.scenarios) + carried}),
-                    examples=examples, cache=cache)
+    tested = new.model_copy(update={"scenarios": list(new.scenarios) + carried})
+    run = run_tests(tested, examples=examples, cache=cache)
 
     semantic = CheckResult("semantic")
     unreach_old = grow_world(baseline).unreachable if baseline is not None else {}
@@ -267,7 +280,7 @@ def _model_checks(new: Domain, old: Domain | None, baseline: Domain | None, exam
     scenarios.note = f"{total - len(failed)}/{total} scenarios pass"
     harness.note = (f"{run.stats['tests']} tests: {run.stats['run']} run, {run.stats['cached']} from cache, "
                     f"{run.stats['seconds']} s")
-    return semantic, scenarios, harness, run.stats
+    return semantic, scenarios, harness, run.stats, tested
 
 
 def _short(detail: dict[str, Any]) -> str:
