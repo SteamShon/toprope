@@ -44,7 +44,8 @@ element (object, field, link, action, matrix cell, invariant, glossary term, vie
 - Rebuild only affected artifacts. Unchanged artifacts are reused by hash.
 - Each test result is cached under the hashes of all its inputs:
   - the declaration elements, artifacts, fixtures and seed it depends on
-  - the **toolchain hash**: the hand-built kernel (Execution, compiler, harness runtime) and
+  - the **toolchain hash**: the hand-built kernel (Execution, compiler, harness runtime; defined
+    in ADR-0027) and
     the dependency lockfile
   - for representation tests, the host component packages and versions.
 

@@ -1,13 +1,25 @@
 # M1 gold scenarios: TEMPLATE (format only). Researcher-written content; agents never fill it (format changes only on the researcher's request, AGENTS.md).
 # Copy to gold-scenarios.yaml, fill, then freeze (see ../README.md).
-# Link: ② model is right (held-out accuracy), P0 sanity check (first-draft accuracy).
+# Link: self-compile and ⑥ (partial). Since ADR-0030 this is a small CORRECTNESS SET (about 10–15
+# items in all) for the self tools' critical rules and the handoff; ② is judged in M2.
 instrument: gold-scenarios
 experiment: M1
 status: draft            # draft → frozen (set by the researcher, then `experiments/tools/instruments.py freeze`, in their own commit)
-domain: toprope-authoring # the self domain
+domains: [toprope-authoring, toprope-delivery]   # the self domains
+compositions: [toprope-self]   # optional (ADR-0026): a fact that spans domains (e.g. what the receiver
+                               #   gets when the sender approves) names the composition as its `domain`
+                               #   and is graded against the composed model
+# Ask only what a domain declaration expresses (who may act, what is allowed or denied and
+# why, the resulting state, what always holds). Facts the Toprope kernel guarantees for every
+# domain (idempotent handoffs, compile-time contract checks, change reports, the deploy floor in
+# code) are not gold: no model can get them wrong, so they measure nothing. "Kernel" = the
+# hand-built toolchain (ADR-0027); agent behavior the schema cannot express goes to the probes.
 scenarios:
   - id: G01               # stable id, never reused
-    held_out: true        # true: never shown to any iteration (about half)
+    domain: toprope-authoring   # whose compiled model answers it: one of `domains` or `compositions`
+    fact: ""              # optional: the same fact asked of another domain shares this key;
+                          #   such copies must share held_out, and the fact counts once in scoring
+    held_out: false       # optional since ADR-0030: true keeps an item from every iteration
     question: "<a question about the authoring workflow, in domain language>"
     answer:
       kind: yes_no        # yes_no | outcome | state | actors | free_text

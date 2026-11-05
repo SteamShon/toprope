@@ -1,6 +1,6 @@
 # M1 instruments
 
-Link: ① iterate safely, ② model is right. Experiment design:
+Link: ① iterate safely, ⑥ (partial); self-compile. ② moved to M2 (ADR-0030). Experiment design:
 [`docs/experiments/M1-self-compile.md`](../../docs/experiments/M1-self-compile.md).
 
 The templates in `instruments/` define the **format only**. The content is written by the
@@ -15,9 +15,9 @@ plan) is in [`interview-guide.md`](interview-guide.md). It holds no content.
 
 | File (copy from `*.template.yaml`) | Shown to | Written | Frozen |
 |---|---|---|---|
-| `gold-scenarios.yaml` (about 30; half `held_out`) | no arm, ever (held out); answers are graded from the model's read surface | M0a, before change checks are built | M0a |
+| `gold-scenarios.yaml`: **optional, not used in M1** (ADR-0031). The self domains are confirmed by interview and sign-off. The template and validator are kept for M2's application domain | — | — | only if present |
 | `probe-suite.yaml` | no arm before deploy; run after each deploy | M0a | M0a |
-| `change-requests.yaml` (about 20, written as **intents**) | all arms | M0a | M0a |
+| `change-requests.yaml` (about 20, written as **intents**, against the commit model of ADR-0029) | all arms | M0a | M0a |
 | `change-key.yaml` (seeded problems) | **sealed**: no arm, agent or reviewer during the experiment | M0a | M0a |
 | `verdict-rules.yaml` (start from the draft template) | everyone | M0a | M0a |
 | `binding.yaml` (intent → element names) | the harness | after Phase A, before any arm runs | then |

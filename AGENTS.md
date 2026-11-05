@@ -92,6 +92,17 @@ umbrella is up to date with `develop`.
   bindings. Verdict rules and thresholds may be *drafted* by an agent when the researcher
   asks. They are marked `draft` until the researcher reviews and freezes them in their own
   commit, before the experiment's checks are built.
+- **Exception: the self domains' M1 instruments** (ADR-0034). M1 gives no link verdict, so
+  its probe suite, change requests, change key and verdict rules may be drafted by an agent
+  when the researcher asks, including multiple-choice options the researcher selects from.
+  The researcher selects, reviews and freezes them in their own commit, before the pilot
+  runs. Everything that feeds a link verdict (M2 and later instruments, any gold set) stays
+  human-only.
+- **Freezing and amending.** The researcher freezes an instrument, or tells an agent to, and
+  the commit records that instruction. A frozen file may change later only through
+  `instruments.py amend --reason`, which keeps the old hash and the reason in `FROZEN.json`;
+  results report which version each run used. An agent amends only at the researcher's
+  explicit instruction.
 - **Format changes on request.** When the researcher asks, an agent may change the
   **format** of these instruments: the templates' fields and comments, the validator, and
   the guides. Such a change writes no content, never touches a filled or frozen instrument
@@ -115,6 +126,13 @@ umbrella is up to date with `develop`.
   and call it coverage. Never skip, delete, `xfail`, comment out or weaken a test, or loosen
   an assertion, to get green: fix the code, or stop and explain. This applies equally to
   generated harnesses and to the M1 instruments.
+
+## Development
+
+- `uv sync`, then `uv run pytest`.
+- PostgreSQL tests run when `TOPROPE_PG_DSN` is set (e.g. `host=127.0.0.1 port=5432
+  user=postgres dbname=postgres`); each test uses its own throwaway schema. Without it, the
+  same contract tests run on the memory and SQLite stores only.
 
 ## Repository settings (maintainer)
 

@@ -120,7 +120,7 @@ checks the affected set for:
 
 The edit gets a **preview** to try before deploying. Only affected artifacts and tests are
 rebuilt, and everything else comes from a hash-keyed cache. The draft targets are an
-impact report in 2 s, an affected harness in 30 s, and a preview in 60 s.
+impact report in 2 s, an affected harness in 30 s, and a preview in 30 s.
 
 ### 5. Record everything, learn from it
 Domain events are the system of record. Decisions (with inputs and rationale), **denied
@@ -304,11 +304,11 @@ P0 premise          nobody can define a domain correctly in one go; it is found 
 | Link | Hypothesis | Verdict in | Status |
 |---|---|---|---|
 | ① iterate safely | H-Iterate | M1 (self), M2 (dogfood) | untested |
-| ② model is right | H-Fidelity | M1 (self), M2 (dogfood) | untested |
+| ② model is right | H-Fidelity | M2 (an application domain whose expert is not Toprope's builder; ADR-0030) | untested |
 | ③ works as built | H-Factory | M2 (dogfood use) | untested |
 | ④ shared language | H-Shared | M3 | untested |
 | ⑤ evolves | H-Evolve | M4 | untested |
-| ⑥ org productivity | H-Handoff (partial) | M5 | untested |
+| ⑥ org productivity | H-Handoff (partial) | M1 (self handoff, partial), M5 | untested |
 
 Status values: `untested` · `supported` · `weakened` · `refuted`. The `Status` column
 changes only in a PR that reports a preregistered experiment verdict.
@@ -318,9 +318,9 @@ changes only in a PR that reports a preregistered experiment verdict.
 | Milestone | Link | What happens |
 |---|---|---|
 | M0a | none | Thin slice: semantics, model interpreter, Execution, event store, `toprope-server` MCP, authoring MCP, source readers, world map (JSON + MCP tools), harness, change check (incl. log replay and in-flight check), incremental analysis |
-| M1 | ① ② | **Self-compile**: model Toprope's own authoring workflow; a natural-language skill vs. a structured spec without a compiler vs. Toprope, on a frozen change sequence with seeded conflicts |
+| M1 | self-compile; ① ⑥ pilot | **Self-compile**: model Toprope's own Authoring and Delivery workflows, generated end to end (ADR-0028). A pilot of ① and ⑥: a natural-language skill vs. a structured spec without a compiler vs. Toprope, on a frozen change sequence with seeded conflicts. No link verdict: ② and ① are judged in M2 (ADR-0030, ADR-0034) |
 | M0b | none | Surfaces and effects: representation compiler and shell, brownfield adapter (GitHub), embedded shape, migration plans, query tools, timers and functions |
-| M2 | ① ② ③ | **Dogfood**: an experiment-lifecycle domain built with the self-compiled tool and used for real |
+| M2 | ① ② ③ | **Dogfood**: an application domain built with the self-compiled tool and used for real; the first ① and ② verdicts, which need an expert who is not Toprope's builder |
 | M3 | ④ | Do agents make fewer meaning errors through the generated surfaces? |
 | M4 | ⑤ | Proposals from the event history; humans decide (an optional runtime adapter, Aegra first, joins here) |
 | M5 | ⑥ (partial) | Typed handoffs between domains; write-up; public release |

@@ -1,12 +1,13 @@
 # M1: Self-compile, and safe iteration vs. natural-language skills
 
-Link: ① iterate safely, ② model is right, ⑥ (partial, the handoff). Status: design draft.
+Link: self-compile feasibility; ① iterate safely and ⑥ (the handoff) as a **pilot**. M1 gives
+no link verdict: ② (ADR-0030) and ① (ADR-0034) are judged in M2. Status: design draft.
 
-**Freeze status.** The metrics and verdict rules below are a **draft proposed by the
-assistant**. The researcher reviews, edits and freezes them in their own commit, together
-with the gold scenarios, the post-deploy probe suite and the change-request list. All of
-this happens in M0, **before the change-check pipeline is built** (AGENTS.md). Until then,
-nothing here is preregistered.
+**Freeze status.** The researcher freezes the probe suite and the verdict rules before the
+change-check pipeline is built, and the change-request list and its key before the pilot
+runs (ADR-0034). Because these are self-domain instruments and feed no link verdict, an
+agent may draft them at the researcher's request, including multiple-choice options; the
+researcher selects and freezes them (AGENTS.md). No gold set in M1 (ADR-0031).
 
 ## Why this design
 
@@ -79,7 +80,7 @@ declaration. Whether handoff-breaking changes are part of the seeded mix is the 
 call when freezing the change list. If they are, recall is reported with and without them,
 because only the Toprope arm has a compiled interface to break.
 
-### Change requests (researcher-written, frozen in M0 before the checks are built)
+### Change requests (the researcher's, agent help allowed; frozen before the pilot runs)
 
 About 20 realistic change requests to the self domain, in a fixed order, written as
 **intents** in domain language rather than element names, because the element names are
@@ -128,7 +129,14 @@ counts as **found after deploy**. One that never shows up counts as **silent**.
 Templates, the freeze procedure and the `verify` check:
 [`experiments/m1/`](../../experiments/m1/README.md).
 
-- About 30 scenario questions per self domain (Authoring, Delivery, and the handoff between them), half held out. Examples:
+- About 30 scenario questions per self domain (Authoring, Delivery, and the handoff between them), half held out
+  in each domain. Each item names the domain whose compiled model answers it, or the
+  composition (ADR-0026) for a fact that spans both domains, graded against the composed model. The same fact
+  asked of both domains shares a `fact` key: its copies share `held_out`, and it counts once in
+  scoring (each copy weighs 1/n; verdict rules `scoring.unit: fact`). Facts that the Toprope
+  kernel guarantees for every domain are not gold, since no model can get them wrong. "Kernel" is
+  the hand-built toolchain, and agent behavior the schema cannot express goes to the probe suite
+  (ADR-0027). Examples:
   - "Can an agent confirm its own drafted precondition?"
   - "What happens to an element no source supports?"
   - "When does a representation-only change rebuild MCP?"
@@ -147,24 +155,27 @@ Templates, the freeze procedure and the `verify` check:
 | **Iteration time** (primary) | edit → validated preview, wall time and human minutes, per change; broken down into impact report, affected harness and preview (ADR-0013) | ① |
 | Selection misses | tests that failed in the background full run but were passing from cache, i.e. impact-analysis bugs (target: 0) | ① |
 | Check breakdown | which check caught what: structural, semantic, scenario regression, log replay, NL lint | ① |
-| **Held-out accuracy** (primary) | after Phase A, and after Phase B | ② |
-| Accuracy-over-iterations | Phase A curve; accuracy of the first draft | ② and the P0 sanity check |
-| Unsupported rules | rules with no source and no confirmation | ② |
-| Interview efficiency (ADR-0014) | questions asked; cells decided per question; share of cells decided by confirmed defaults | ① ② |
-| Matrix completeness | share of (state, action) cells decided rather than `undecided`; cells decided through the interview vs. drafted from sources | ② |
+| Unsupported rules | rules with no source and no confirmation (reported, no verdict) | — |
+| Interview efficiency (ADR-0014, ADR-0025) | questions and minutes per stage; cells decided per question; share of cells decided by confirmed defaults | ① |
+| Matrix completeness | share of (state, action) cells decided rather than `undecided`; cells decided through the interview vs. drafted from sources | reported |
 | Harness findings | invariant violations and parity failures found before deploy, and by which part (cell tests, exploration, flows) | ① |
-| Generated vs hand-built | share of each tool (authoring, delivery) that is generated; hand edits to generated code | self-compile |
-| Handoff (⑥ partial) | handoff-breaking changes caught at compile time; requests whose intent survives (checked by gold questions) | ⑥ |
+| Generated vs hand-built | share of each tool (authoring, delivery) that is generated; hand edits to generated code; the regeneration check (ADR-0028) | self-compile |
+| Handoff (⑥ partial) | handoff-breaking changes caught at compile time; requests whose intent survives (checked by the probes, ADR-0031) | ⑥ |
 | Cost | tokens, $, human minutes per stage and per change, **per domain** | all |
 
 ## Verdict rules
+
+> ADR-0034: in M1 these are **pilot targets**. The numbers are reported against them to tune
+> the checks and size M2's run; they are not evidence for ① or ⑥, and the claim-status
+> table does not change on them. They are M2's starting point for the ① verdict.
 
 - **Supports ①** (compile-time checking) requires **all** of:
   - Toprope pre-deploy recall ≥ 80% with precision ≥ 70%
   - the NL arm's recall at least 30 points lower
   - the structured-spec arm's recall at least 10 points lower (the compiler's contribution)
-  - median iteration time ≤ 5 minutes to a validated preview, with no hand edits to
-    generated surfaces.
+  - median iteration time ≤ 1 minute to a validated preview, with no hand edits to
+    generated surfaces. The latency targets fit it: impact report ≤ 2 s, affected harness
+    ≤ 30 s, preview ≤ 30 s.
 - **Weakens ①**: the NL arm with LLM review comes within 15 points of Toprope's recall, or
   Toprope's precision < 50%, or most seeded breakages are found only after deploy in both
   arms.
@@ -175,23 +186,27 @@ Templates, the freeze procedure and the `verify` check:
 - **Inconclusive ①**: any outcome not covered above. For example, a recall gap of 15–30
   points, or precision of 50–70%. It is reported as inconclusive with the numbers, and is
   not read as support. M2 repeats the comparison.
-- **Supports ② (self)**: held-out accuracy ≥ 80%, unsupported rules ≤ 10%, total human time
-  ≤ 4 h **per domain** for Phase A, and accuracy rising over iterations (the final accuracy is higher than
-  the first draft's).
-- **Weakens ② (self)**: accuracy plateaus below 70%, or unsupported rules stay above 20%
-  after S3.
-- **Inconclusive ②**: anything in between.
-- **P0 sanity check** (not a verdict): if the first draft already reaches ≥ 80% held-out
-  accuracy, record that P0 did not show up on this domain.
-- **Self-compile claim** holds only if the tool used in S4 and handed to M2 is generated
-  from the model, with hand edits listed.
+- **Supports ⑥ (partial)**: every seeded handoff-breaking change is caught before deploy,
+  and the probe that checks a handed-off request arrives intact (P07) passes. If the key
+  seeds no handoff-breaking change, the result is "the handoff holds across the change
+  sequence" when P07 passes, reported with "catching handoff-breaking changes was not
+  tested". Otherwise inconclusive.
+- **② is not judged in M1** (ADR-0030). Its verdict rules, held-out accuracy and the P0
+  sanity check move to M2, on an application domain whose expert is not Toprope's builder.
+- **Self-compile claim** (a feasibility result) holds only if all of these hold:
+  - the tools used in S4 and handed to M2 are generated from the declarations, with hand
+    edits listed (target 0)
+  - the regeneration check (ADR-0028) passes
+  - the probes pass (ADR-0031: the self domains have no gold set; the researcher confirms
+    them in the interview and signs off)
+  - the switch-over (ADR-0022) happens with the researcher's sign-off
 
 ## Risks
 
-- **Seeding bias.** The researcher writes both the checks and the seeded problems. The
-  change list, the key, the gold set and the probe suite are frozen in M0, before the
-  change-check pipeline is built. Include problem types the checks were not
-  designed for, and report per-type recall.
+- **Seeding bias.** The people who build the checks also choose the seeded problems. This
+  is why M1 is a pilot (ADR-0034) and the ① verdict moves to M2, where the change requests
+  come from an expert who is not the builder. Still include problem types the checks were
+  not designed for, and report per-type recall.
 - **Unequal information.** The NL skill and the structured spec are written from the same
   confirmed model. A second reader checks that every rule appears in all three arms.
 - **Circularity and self-approval.** The gold set, the change key and the verdict checks
