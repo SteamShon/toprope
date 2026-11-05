@@ -1,10 +1,9 @@
 """The domain guide: a readable account of a domain, generated from its declaration."""
-import copy
 import subprocess
 
 import yaml
-
 from test_decl import schema_doc_domain
+
 from toprope.decl import Domain
 from toprope.harness import run_harness
 from toprope.worldmap.guide import build_domain_guide

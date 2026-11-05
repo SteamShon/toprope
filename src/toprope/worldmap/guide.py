@@ -107,8 +107,8 @@ def build_domain_guide(d: Domain, harness: dict[str, Any] | None = None) -> str:
     L += [""]
 
     if d.transitions:
-        L += ["## Transitions", "", "For each stage: may the action happen, and where does it lead? "
-              "A missing cell is undecided; nothing is ever silently allowed.", ""]
+        L += ["## Transitions", "", ("For each stage: may the action happen, and where does it lead? "
+                                     "A missing cell is undecided; nothing is ever silently allowed."), ""]
         for obj, tr in sorted(d.transitions.items()):
             acts = [n for n, a in d.actions.items() if a.target == obj]
             L += [f"### {obj} (`{tr.field}`)", ""]
@@ -137,14 +137,14 @@ def build_domain_guide(d: Domain, harness: dict[str, Any] | None = None) -> str:
         L += ["## Handoffs", ""]
         L += [f"- `{n}`: after `{h.when.action}`, calls {h.to.domain}.`{h.to.action}`" for n, h in d.handoffs.items()] + [""]
 
-    tools = [n for n, a in d.actions.items() if KERNEL not in [r if isinstance(r, str) else r.role for r in a.actor]]
+    replies = [n for n, a in d.actions.items() if KERNEL in [r if isinstance(r, str) else r.role for r in a.actor]]
     L += ["## What is generated", "",
-          f"- **MCP server** `toprope:{d.domain}`: one tool per action ({len(tools)}: "
-          + ", ".join(f"`{t}`" for t in tools) + "), plus `get_object`, `history`, `attempts`, "
-          "`allowed_actions`, `describe_domain`, `world_map` and `how_to_reach`. Kernel replies "
-          "are not tools: only the kernel sends them.",
-          f"- **Events**: one per action ({', '.join(sorted({f'`{_event(d, n, a)}`' for n, a in d.actions.items()}))}); "
-          "the current state is the events replayed in order.",
+          (f"- **MCP server** `toprope:{d.domain}`: one tool per action ({len(d.actions)}), plus `get_object`, "
+           "`history`, `attempts`, `allowed_actions`, `describe_domain`, `world_map` and `how_to_reach`."
+           + (f" Kernel replies ({', '.join(f'`{r}`' for r in replies)}) are tools too, but only the kernel "
+              "may take them." if replies else "")),
+          (f"- **Events**: one per action ({', '.join(sorted({f'`{_event(d, n, a)}`' for n, a in d.actions.items()}))}); "
+           "the current state is the events replayed in order."),
           "- **World map** (`world-map.json`): every object, link, stage and (stage, action) edge."]
     if harness:
         cells = (harness.get("coverage") or {}).get("cells") or {}
