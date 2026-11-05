@@ -385,3 +385,12 @@ scenarios:
     expect:
       state:
         R3.stage: previewing
+glossary:
+  delivery request: A request, handed over from Authoring, to put one approved commit
+    of a domain into an environment.
+  preview: Building a commit and running its harness before anything is deployed;
+    a preview changes no environment.
+  deploy floor: 'Rules the kernel enforces on every deploy that no declaration can
+    weaken: approved, on main, not a downgrade, harness passed, a person deploys,
+    nothing stranded.'
+  verified: A deployment a person has checked in use, after it happened.

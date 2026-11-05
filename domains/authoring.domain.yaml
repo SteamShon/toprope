@@ -739,3 +739,18 @@ handoffs:
       environment: params.environment
       approver: actor.id
     target: target.domain_id + ':' + target.id + ':' + params.environment
+glossary:
+  commit: An immutable snapshot of the working copy. Every change is a new commit;
+    nothing is edited in place.
+  main: The protected branch. A commit reaches main only by being approved, and only
+    commits on main are delivered.
+  approval: A person's decision that merges a commit into main and tags it. It cannot
+    be undone; a newer approved commit supersedes it.
+  element: One part of a declaration (an object, a link, an action, a cell, an invariant),
+    drafted by an agent and confirmed only by a person.
+  draft: 'The working copy of a domain''s declaration on a branch: what the next commit
+    will snapshot.'
+  change check: 'The checks a commit runs before approval: structure, semantics, scenarios,
+    harness, past actions, stranded objects.'
+  unknown: An element marked as not known yet, instead of guessed. It stays visible
+    until someone answers it.
