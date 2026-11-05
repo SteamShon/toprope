@@ -244,13 +244,13 @@ class Run:
     results: dict[str, list[dict[str, Any]]]   # test id → findings (for soundness)
 
 
-def run_tests(d: Domain, *, examples: int = 50, cache: ResultCache | None = None) -> Run:
+def run_tests(d: Domain, *, examples: int = 50, cache: ResultCache | None = None, harness: Any = None) -> Run:
     """Run the model-level harness, reusing cached results for unchanged tests."""
     from ..harness.cases import undecided_cells
     from ..harness.explore import explore
     from ..harness.run import Finding, Harness
     t0 = time.perf_counter()
-    h = Harness(d, levels=("model",))
+    h = harness if harness is not None else Harness(d, levels=("model",))   # one small world per check
     cases = h.planner.cases()
     tests = {t.id: t for t in tests_of(d, cases, examples)}
     results: dict[str, list[dict[str, Any]]] = {}
@@ -299,11 +299,11 @@ def run_tests(d: Domain, *, examples: int = 50, cache: ResultCache | None = None
     return Run(findings, h.world, undecided, stats, results)
 
 
-def selection_misses(d: Domain, *, examples: int = 50, cache: ResultCache) -> list[str]:
+def selection_misses(d: Domain, *, examples: int = 50, cache: ResultCache, cases: list[Any] | None = None) -> list[str]:
     """The background soundness check: tests that fail on an uncached run but pass from the
     cache. Each one is a bug in impact analysis."""
     fresh = run_tests(d, examples=examples, cache=None).results
-    tests = tests_of(d, examples=examples)
+    tests = tests_of(d, cases, examples)
     out = []
     for t in tests:
         was = cache.get(t.key)

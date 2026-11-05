@@ -101,7 +101,8 @@ class _RawArgs(FuncMetadata):
 def build_server(ex: Execution, credentials: Credentials, *, harness: dict[str, Any] | None = None,
                  **server_kwargs: Any) -> MCPServer:
     """`harness` is a harness report (JSON) whose per-edge results the world map shows."""
-    from ...worldmap import build_world_map, how_to_reach as reach
+    from ...worldmap import build_world_map
+    from ...worldmap import how_to_reach as reach
     d = ex.d
     wmap = build_world_map(d, harness)
     for name, a in d.actions.items():

@@ -22,10 +22,10 @@ list on the right (a null list is an error), and type errors raise `EvalError`. 
 treat a check that raises as failed.
 """
 
-from .ast import Call, Compare, ListLit, Literal, Logical, Not, Path, Arith, Neg, Node
-from .parser import ParseError, parse
-from .eval import EvalError, Env, evaluate
+from .ast import Arith, Call, Compare, ListLit, Literal, Logical, Neg, Node, Not, Path
 from .deps import paths_read
+from .eval import Env, EvalError, evaluate
+from .parser import ParseError, parse
 
 __all__ = [
     "Arith", "Call", "Compare", "Env", "EvalError", "ListLit", "Literal", "Logical", "Neg",

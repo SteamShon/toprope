@@ -4,7 +4,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .interface import Element, InterfaceDiff, ReviewDiff, diff_interface, interface, review_contents, review_diff, review_elements
+from .interface import (
+    Element,
+    InterfaceDiff,
+    ReviewDiff,
+    diff_interface,
+    interface,
+    review_contents,
+    review_diff,
+    review_elements,
+)
 from .models import Domain
 from .validate import Issue, check_handoffs, validate_domain
 from .yamlio import load_yaml

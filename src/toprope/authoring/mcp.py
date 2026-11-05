@@ -15,8 +15,8 @@ from typing import Annotated, Any
 
 from mcp.server.elicitation import AcceptedElicitation, ElicitationResult
 from mcp.server.mcpserver import MCPServer
-from mcp.server.mcpserver.resolve import Elicit, Resolve
 from mcp.server.mcpserver.exceptions import ToolError
+from mcp.server.mcpserver.resolve import Elicit, Resolve
 from pydantic import BaseModel, Field
 
 from . import AuthoringError, Workspace

@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Literal, Union
+from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
-from typing import Annotated
 
 Ident = Annotated[str, StringConstraints(pattern=r"^[A-Za-z_][A-Za-z0-9_-]*$")]
 RESERVED_ACTORS = {"system", "external:kernel"}   # other `external:<source>` actors: M0b (ADR-0028)

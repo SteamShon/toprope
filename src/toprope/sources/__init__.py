@@ -80,8 +80,24 @@ def redact(text: str, extra: list[tuple[str, re.Pattern]] | None = None) -> tupl
             counts[kind] = counts.get(kind, 0) + 1
             if kind == "assignment":   # keep the name, drop the value
                 return f"{m.group(1)}{m.group(2)}[REDACTED:secret]"
-            return f"[REDACTED:{kind}]"
+            # Keep the line count, so refs (#L…) into a redacted file stay right.
+            return f"[REDACTED:{kind}]" + "\n" * m.group(0).count("\n")
         text = pat.sub(sub, text)
+    return text, counts
+
+
+MULTILINE = {"private-key"}
+
+
+def redact_multiline(text: str) -> tuple[str, dict[str, int]]:
+    """Redact the patterns that can span lines, on a whole text, keeping its line count."""
+    counts: dict[str, int] = {}
+    for kind, pat in PATTERNS:
+        if kind in MULTILINE:
+            def sub(m: re.Match, kind=kind) -> str:
+                counts[kind] = counts.get(kind, 0) + 1
+                return f"[REDACTED:{kind}]" + "\n" * m.group(0).count("\n")
+            text = pat.sub(sub, text)
     return text, counts
 
 
@@ -164,6 +180,9 @@ def read(spec: SourceSpec, root: Path, extra_redactions=None, exclude: tuple[str
         text = _text(p)
         if text is None:
             continue
+        # Multi-line secrets (private keys) are redacted on the whole file first: a chunk
+        # boundary inside one would otherwise hide it from the pattern.
+        text, whole = redact_multiline(text)
         lines = text.splitlines()
         rel = p.relative_to(root.resolve()).as_posix()
         if spec.kind == "repository":
@@ -174,6 +193,9 @@ def read(spec: SourceSpec, root: Path, extra_redactions=None, exclude: tuple[str
             parts = _by_headings(lines)
         for a, b, body in parts:
             red, counts = redact(body, extra_redactions)
+            for kind, n in whole.items():                 # credit each chunk with its whole-file redactions
+                if (k := body.count(f"[REDACTED:{kind}]")):
+                    counts[kind] = counts.get(kind, 0) + k
             ref = f"{spec.id}:{rel}#L{a}" + (f"-L{b}" if b != a else "")
             out.append(Chunk(ref, spec.id, red, counts))
     return out

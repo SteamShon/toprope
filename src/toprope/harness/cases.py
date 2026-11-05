@@ -14,7 +14,7 @@ from datetime import datetime
 from typing import Any
 
 from ..decl.models import Action, ActorRule, ByRole, Deny, Domain, Target
-from ..expr import paths_read, parse
+from ..expr import parse, paths_read
 from ..semantics.interpreter import Interpreter
 from ..semantics.types import Command
 from .world import Instance, SmallWorld, default_params
@@ -91,8 +91,8 @@ class Planner:
 
     def first_failing(self, a: Action, inst_data: dict[str, Any], role: str) -> str | None:
         """The id of the first precondition that does not hold, or None."""
-        from ..semantics.interpreter import ObjectView
         from ..expr import EvalError, evaluate
+        from ..semantics.interpreter import ObjectView
         view = ObjectView(self.d, a.object_type, inst_data, self.lookup)
         for pre in a.preconditions:
             try:

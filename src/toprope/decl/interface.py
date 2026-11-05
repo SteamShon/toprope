@@ -20,9 +20,14 @@ def _canon(obj: Any) -> str:
     return json.dumps(obj, sort_keys=True, separators=(",", ":"), default=str)
 
 
+# Keys whose values are user data (effect assignments, kernel inputs, fixture and scenario
+# data, expectations): a key named `status` or `source` there is data, never provenance or text.
+DATA_KEYS = {"set", "with", "given", "params", "expect", "data", "state", "changes", "inputs"}
+
+
 def _strip_text(obj: Any) -> Any:
     if isinstance(obj, dict):
-        return {k: _strip_text(v) for k, v in obj.items() if k not in TEXT_KEYS}
+        return {k: (v if k in DATA_KEYS else _strip_text(v)) for k, v in obj.items() if k not in TEXT_KEYS}
     if isinstance(obj, list):
         return [_strip_text(v) for v in obj]
     return obj
@@ -110,7 +115,8 @@ PROVENANCE_KEYS = {"source", "status"}
 
 def _strip_provenance(obj: Any) -> Any:
     if isinstance(obj, dict):
-        return {k: _strip_provenance(v) for k, v in obj.items() if k not in PROVENANCE_KEYS}
+        return {k: (v if k in DATA_KEYS else _strip_provenance(v)) for k, v in obj.items()
+                if k not in PROVENANCE_KEYS}
     if isinstance(obj, list):
         return [_strip_provenance(v) for v in obj]
     return obj
@@ -140,7 +146,7 @@ def review_contents(d: Domain) -> dict[str, Any]:
         out[f"scenario:{sc.id}"] = dump(sc)
     for fx in d.world.fixtures:
         ((obj, data),) = fx.items()
-        out[f"fixture:{obj}.{data.get('id')}"] = data
+        out[f"fixture:{obj}.{data.get('id')}"] = {"data": data}   # data: its `status` is a stage, kept
     if d.purpose is not None:
         out["purpose"] = dump(d.purpose)
     return out
