@@ -6,9 +6,13 @@
   toprope-author progress [--workspace DIR]
   toprope-author fetch [SOURCE_ID] [--workspace DIR]   fetch link sources into snapshots
   toprope-author skip STAGE --reason TEXT             an optional stage has nothing
-  toprope-author commit [-m MESSAGE]                  compile the working copy into a commit (ADR-0029)
+  toprope-author commit [-m MESSAGE] [--branch B] [--merge C]
+                                                      compile the working copy into a commit on a
+                                                      branch (ADR-0029, ADR-0033; default `work`)
   toprope-author diff [FROM] TO                       what changed directly between two commits
-  toprope-author approve COMMIT --as NAME [--yes]     tag a commit as approved (only you)
+  toprope-author merge [--branch B]                   bring main into the working copy; lists conflicts
+  toprope-author branches                             every branch and the commit it points to
+  toprope-author approve COMMIT --as NAME [--yes]     merge a commit into main and tag it (only you)
   toprope-author confirm PATH... [--workspace DIR] [--yes]   only you confirm
   toprope-author check [--workspace DIR]
 """
@@ -61,6 +65,13 @@ def main(argv: list[str] | None = None) -> None:
     cm = sub.add_parser("commit")
     cm.add_argument("--workspace", default=".")
     cm.add_argument("-m", "--message", default="")
+    cm.add_argument("--branch", default="work")
+    cm.add_argument("--merge", default=None, help="the commit whose conflicts this working copy resolves")
+    mg = sub.add_parser("merge")
+    mg.add_argument("--branch", default="work")
+    mg.add_argument("--workspace", default=".")
+    br = sub.add_parser("branches")
+    br.add_argument("--workspace", default=".")
     df = sub.add_parser("diff")
     df.add_argument("commits", nargs="+", help="[FROM] TO")
     df.add_argument("--workspace", default=".")
@@ -103,7 +114,11 @@ def main(argv: list[str] | None = None) -> None:
             print(json.dumps(out, indent=2, ensure_ascii=False))
             raise SystemExit(0 if out.get("parses") and out.get("harness", {}).get("ok", False) else 1)
         elif args.cmd == "commit":
-            print(json.dumps(ws.commit(args.message), indent=2))
+            print(json.dumps(ws.commit(args.message, branch=args.branch, merge=args.merge), indent=2))
+        elif args.cmd == "merge":
+            print(json.dumps(ws.merge_main(args.branch), indent=2, default=str))
+        elif args.cmd == "branches":
+            print(json.dumps(ws.commits.refs(ws.draft()["domain"]), indent=2))
         elif args.cmd == "diff":
             frm, to = (None, args.commits[0]) if len(args.commits) == 1 else args.commits[:2]
             print(json.dumps(ws.commits.diff(ws.draft()["domain"], frm, to), indent=2))

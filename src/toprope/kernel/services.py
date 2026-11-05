@@ -147,7 +147,8 @@ class LocalKernel(KernelServices):
 
     def _approve_commit(self, domain, commit, approver):
         self.commits.approve(domain, commit, approver)
-        return {"approved": True}
+        main = self.commits.main(domain)
+        return {"approved": True, "main": main.id if main else ""}
 
     def _preview(self, domain, commit):
         if self.environment is None:

@@ -8,8 +8,9 @@ An environment is a directory:
   events.db            the deployed domain's event store (serve it with `server_args()`)
 
 **The fixed floor.** `deploy_commit` is the only way to move an environment (ADR-0029). It
-enforces, in code, rules no declaration can weaken (ADR-0022, ADR-0029): the commit is
-approved, not superseded and not a downgrade, and its build passes the build floor:
+enforces, in code, rules no declaration can weaken (ADR-0022, ADR-0029, ADR-0033): the commit
+is approved (so it is on `main`), it is what `main` points to (not superseded), it is not the
+deployed commit or one of its ancestors (not a downgrade), and its build passes the build floor:
 1. the build's declaration is unchanged since preview (its hash), and the toolchain that
    ran the harness is the current one (no taint)
 2. the harness passed for that build
@@ -139,20 +140,21 @@ class LocalEnvironment:
 
     def deploy_commit(self, commits: Any, domain: str, commit_id: str, approver: Actor) -> dict[str, Any]:
         """Point this environment at a commit. Besides the build floor, the commit must be
-        approved, must not be superseded by a newer approved commit, and must be newer than the
-        deployed one: no downgrades without an explicit rollback (M2)."""
+        approved and be what `main` points to, and must not be the deployed commit or one of its
+        ancestors: no downgrades without an explicit rollback (M2). Ancestry, not sequence
+        numbers, decides what is newer (ADR-0033)."""
         c = commits.get(domain, commit_id)
         with self._lock():
             build_id = next((p.parent.name for p in (self.root / "builds").glob("*/commit.json")
                              if json.loads(p.read_text())["commit"] == c.id), None)
             try:
-                if not commits.is_approved(domain, c.id):
-                    raise DeployRefused("unapproved", f"commit {c.id} has no approval")
-                latest = commits.latest_approved(domain)
-                if latest is not None and latest.seq > c.seq:
-                    raise DeployRefused("superseded", f"commit {c.id} is superseded by approved {latest.id}")
+                main = commits.main(domain)
+                if not commits.is_approved(domain, c.id) or main is None or not commits.is_ancestor(domain, c.id, main.id):
+                    raise DeployRefused("unapproved", f"commit {c.id} has no approval on main")
+                if main.id != c.id:
+                    raise DeployRefused("superseded", f"commit {c.id} is superseded by approved {main.id}")
                 cur = self.current()
-                if cur and cur.get("commit_domain") == domain and cur.get("seq", 0) >= c.seq:
+                if cur and cur.get("commit_domain") == domain and commits.is_ancestor(domain, c.id, cur.get("commit", "")):
                     raise DeployRefused("downgrade", f"{cur.get('commit')} is deployed; {c.id} is not newer "
                                                      "(rollback comes in M2)")
                 if build_id is None:

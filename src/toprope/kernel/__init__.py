@@ -57,9 +57,10 @@ CATALOG: dict[str, Service] = {s.name: s for s in (
     Service("diff", "The semantic diff between two commits: what changed directly.",
             {"domain": "string", "from": "string", "to": "string"},
             {"changed": "strings", "added": "strings", "removed": "strings", "to_review": "strings"}),
-    Service("approve_commit", "Tag a commit as approved; immutable. The calling person must be the approver.",
+    Service("approve_commit", "Merge a commit into main and tag what main then points to (ADR-0033); "
+            "immutable. The calling person must be the approver.",
             {"domain": "string", "commit": "string", "approver": "string"},
-            {"approved": "boolean"}),
+            {"approved": "boolean", "main": "string"}),
     Service("preview", "Build a commit for deployment: its harness and world map.",
             {"domain": "string", "commit": "string"},
             {"build": "string", "harness_ok": "boolean"}),

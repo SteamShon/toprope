@@ -58,8 +58,9 @@ uv run toprope-server $(uv run toprope-deploy --env .toprope/envs/local server-a
 
 An environment moves only to a **commit** (ADR-0029); there is no build-only path. `deploy`
 enforces the **fixed floor** (ADR-0022, ADR-0029), which no declaration can weaken:
-- the commit is approved, not superseded by a newer approved commit, and not a downgrade
-  (rollback comes in M2), and the move happens under a per-environment lock
+- the commit is approved and is what `main` points to (not superseded), and is not the deployed
+  commit or one of its ancestors (not a downgrade; rollback comes in M2). ADR-0033. The move
+  happens under a per-environment lock
 - the build is untainted: the same declaration, and the same toolchain that ran the harness
 - the harness passed
 - a person approves

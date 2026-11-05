@@ -96,11 +96,12 @@ def test_approvals_are_immutable_and_the_newest_wins(store):
     c1, _ = st.commit(write(wc, raw))
     raw["glossary"]["x"] = "y"
     c2, _ = st.commit(write(wc, raw))
-    assert st.approve("example", c2.id, "ana") is True
-    assert st.approve("example", c2.id, "ana") is False                     # tagging again is a no-op
-    st.approve("example", c1.id, "ana")                                      # an older approval later
-    assert st.latest_approved("example").id == c2.id
-    assert [a["commit"] for a in st.approvals("example")] == [c2.id, c1.id]
+    assert st.approve("example", c2.id, "ana") == c2                        # a fast-forward of main
+    assert st.approve("example", c2.id, "ana") is None                      # tagging again is a no-op
+    with pytest.raises(CommitError, match="supersedes"):                    # ADR-0033: main already has it
+        st.approve("example", c1.id, "ana")
+    assert st.latest_approved("example").id == c2.id and st.main("example") == c2
+    assert [a["commit"] for a in st.approvals("example")] == [c2.id]
 
 
 def test_concurrent_commits_get_distinct_sequence_numbers(store, tmp_path):

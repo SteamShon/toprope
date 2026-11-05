@@ -498,20 +498,54 @@ class Workspace:
         from ..commits import CommitStore
         return CommitStore(self.root / ".toprope" / "commits")
 
-    def commit(self, message: str = "") -> dict[str, Any]:
-        """Compile the working copy into an immutable commit. Returns what to re-confirm: the
-        elements that changed directly since the last approved commit (or since the start)."""
+    def commit(self, message: str = "", branch: str = "work", merge: str | None = None) -> dict[str, Any]:
+        """Compile the working copy into an immutable commit on a branch (ADR-0033). Returns what
+        to re-confirm: the elements that changed directly since the last approved commit (or
+        since the start). `merge` names the commit whose conflicts this working copy resolves."""
+        from ..commits import CommitError
         try:
-            c, created = self.commits.commit(self.domain_path, message=message)
+            c, created = self.commits.commit(self.domain_path, message=message, branch=branch, merge=merge)
         except ValidationError as e:
             raise AuthoringError(f"the draft does not parse: {e.errors()[0]['msg']}") from None
+        except CommitError as e:
+            raise AuthoringError(str(e)) from None
         base = self.commits.latest_approved(c.domain)
         review = self.commits.diff(c.domain, base.id if base else None, c.id)
-        return {"commit": c.id, "seq": c.seq, "created": created, "interface": c.interface,
+        return {"commit": c.id, "seq": c.seq, "branch": branch, "created": created, "interface": c.interface,
                 "since": base.id if base else None, **review}
 
+    def merge_main(self, branch: str = "work") -> dict[str, Any]:
+        """Bring `main` into a branch's working copy (ADR-0033). Writes the semantic 3-way merge
+        into the working copy, keeping the branch's value at each conflict, and lists the
+        conflicts for the person to resolve. Then `commit(merge=<main>)` records both parents.
+        Refuses when the working copy has changes not yet committed to the branch."""
+        from ..commits import content_id
+        d = self.draft().get("domain")
+        if not isinstance(d, str) or not d:
+            raise AuthoringError("the draft names no `domain`, so there is no commit log to merge in")
+        main, head = self.commits.main(d), self.commits.head(d, branch)
+        if main is None or head is None:
+            raise AuthoringError(f"nothing to merge: {'main' if main is None else branch} has no commits")
+        if self.commits.is_ancestor(d, main.id, head.id):
+            return {"merge": main.id, "branch": branch, "up_to_date": True, "conflicts": []}
+        reps = {p.name: load_yaml(p.read_text())
+                for p in self.commits.representations_for(d, self.domain_path.parent)}
+        if content_id(self.draft(), reps) != head.content:
+            raise AuthoringError(f"the working copy has changes not committed to {branch}: commit them first")
+        m = self.commits.merge3(d, head.id, main.id)
+        body = m.merged["domain"]                                   # stored without `version`: keep the draft's
+        out = {"domain": body.get("domain"), "version": self.draft().get("version", 1),
+               **{k: v for k, v in body.items() if k != "domain"}}
+        self.domain_path.write_text(yaml.safe_dump(out, sort_keys=False, allow_unicode=True))
+        for name, body in m.merged["representations"].items():
+            (self.domain_path.parent / name).write_text(yaml.safe_dump(body, sort_keys=False))
+        return {"merge": main.id, "branch": branch, "up_to_date": False,
+                "conflicts": [{"path": c.path, "base": c.base, "ours": c.ours, "theirs": c.theirs} for c in m.conflicts]}
+
     def approve_commit(self, commit_id: str, via: str, who: str) -> dict[str, Any]:
-        """Tag a commit as approved. Only a person, through a human channel (as `confirm`)."""
+        """Approve a commit: merge it into `main` and tag the result (ADR-0033). Only a person,
+        through a human channel (as `confirm`). Conflicts are an error that lists them; bring
+        `main` into the branch with `merge_main`, resolve, commit, and approve again."""
         if via not in ("cli", "elicitation"):
             raise AuthoringError("only a person approves, through the CLI or an MCP elicitation")
         d = self.draft().get("domain")
@@ -519,11 +553,13 @@ class Workspace:
             raise AuthoringError("the draft names no `domain`, so there is no commit log to approve in")
         from ..commits import CommitError
         try:
-            new = self.commits.approve(d, commit_id, who)
+            target = self.commits.approve(d, commit_id, who)
         except CommitError as e:
             raise AuthoringError(str(e)) from None
-        self._append(self.log_path, {"at": _now(), "kind": "approve", "commit": commit_id, "via": via, "who": who})
-        return {"commit": commit_id, "approved": True, "new": new}
+        main = self.commits.main(d)
+        self._append(self.log_path, {"at": _now(), "kind": "approve", "commit": commit_id, "main": main.id if main else None,
+                                     "via": via, "who": who})
+        return {"commit": commit_id, "approved": True, "new": target is not None, "main": main.id if main else None}
 
     # -- logs ------------------------------------------------------------------------------
     def _append(self, path: Path, entry: dict[str, Any]) -> None:
