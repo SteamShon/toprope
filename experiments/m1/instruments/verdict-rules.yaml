@@ -6,7 +6,7 @@
 # they are M2's starting point. `self_compile` is M1's feasibility result.
 instrument: verdict-rules
 experiment: M1
-status: draft
+status: frozen
 iterate:                         # link ① (pilot target in M1, ADR-0034)
   supports:
     toprope_recall_min: 0.80
