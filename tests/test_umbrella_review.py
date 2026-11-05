@@ -80,6 +80,8 @@ def test_a_principal_cannot_be_a_reserved_actor():
                       Actor("external:kernel", "person", ())):
         with pytest.raises(ValueError, match="principal"):
             Caller(bot, principal, Grant("g", frozenset({"x"})))
+    with pytest.raises(ValueError):                         # a malformed principal is a ValueError too
+        Caller(bot, Actor(None, "person", ()), Grant("g", frozenset({"x"})))
 
 
 # 7. a submit does not scan the whole store -------------------------------------------------------------
