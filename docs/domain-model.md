@@ -106,6 +106,10 @@ declaration: "with this change, 12 past actions would have been blocked" (log re
 | Precondition | boundary tests, the reasons people see | can block past actions: log replay reports them |
 | Invariant | checks after every test step, the runtime guard | can expose transitions the matrix allows but the world forbids |
 
+## For one domain
+For a particular domain, the same picture is generated from its declaration as
+`domain-guide.md`, next to the world map, at every preview ([`world-map.md`](world-map.md)).
+
 ## In the interview
 The staged interview builds a domain in this order (ADR-0025): purpose, then **people and
 things** (roles, objects, links), then **actions**, then **transitions** (the matrix), then

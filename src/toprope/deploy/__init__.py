@@ -108,6 +108,8 @@ class LocalEnvironment:
         (out / "harness.json").write_text(json.dumps(harness, indent=2, default=str))
         (out / "world-map.json").write_text(json.dumps(build_world_map(d, report.to_json() if report else None),
                                                        indent=2, sort_keys=True))
+        from ..worldmap.guide import build_domain_guide
+        (out / "domain-guide.md").write_text(build_domain_guide(d, report.to_json() if report else None))
         (out / "build.json").write_text(json.dumps(asdict(build), indent=2))
         return build
 
