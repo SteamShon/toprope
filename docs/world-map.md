@@ -41,3 +41,13 @@ external events (`fired_by` is empty until M0b), and the map diff in impact repo
 ## Mermaid
 `to_mermaid(map)` gives a flowchart of the structure layer and a state diagram per stateful
 object. Undecided cells appear as notes.
+
+## The domain guide
+Next to `world-map.json`, a preview writes `domain-guide.md`: the same domain told for people,
+in the terms of [`domain-model.md`](domain-model.md). It covers purpose, roles, objects and
+links, an action table (who, on what, what must be true first, what it changes, what it
+starts, its event), the transition matrix per object with its undecided cells, invariants,
+examples and scenarios, handoffs, and what is generated (MCP tools, events, harness
+coverage). It is generated from the declaration and never edited by hand.
+`toprope-worldmap --domain d.domain.yaml --guide domain-guide.md` writes it on its own.
+

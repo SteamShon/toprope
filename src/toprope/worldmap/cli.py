@@ -1,6 +1,6 @@
 """`toprope-worldmap`: compile a declaration's world map (ADR-0020).
 
-  toprope-worldmap --domain d.domain.yaml --out world-map.json [--harness] [--mermaid DIR]
+  toprope-worldmap --domain d.domain.yaml --out world-map.json [--harness] [--mermaid DIR] [--guide FILE]
 
 With --harness, the harness runs first and its per-edge results are part of the map.
 """
@@ -27,6 +27,7 @@ def main(argv: list[str] | None = None) -> None:
                                              "--composition: the member → report map that "
                                              "`toprope-harness --composition --json` writes)")
     ap.add_argument("--mermaid", help="also write structure.mmd and <Object>.states.mmd here")
+    ap.add_argument("--guide", help="also write the domain guide (Markdown) to this path")
     args = ap.parse_args(argv)
 
     if bool(args.domain) == bool(args.composition):
@@ -72,6 +73,9 @@ def main(argv: list[str] | None = None) -> None:
     Path(args.out).write_text(json.dumps(wmap, indent=2, sort_keys=True) + "\n")
     if args.mermaid:
         _write_mermaid(Path(args.mermaid), wmap)
+    if args.guide:
+        from .guide import build_domain_guide
+        Path(args.guide).write_text(build_domain_guide(d, report))
     print(f"wrote {args.out}")
 
 
