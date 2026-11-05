@@ -166,7 +166,7 @@ class LocalKernel(KernelServices):
     def _change_check(self, domain, commit):
         from ..check import check_commit
         if self.environment is not None:
-            with self.environment.events() as store:
+            with self.environment.events(domain) as store:
                 r = check_commit(self.commits, domain, commit, events=store, examples=self.examples)
         else:
             r = check_commit(self.commits, domain, commit, examples=self.examples)

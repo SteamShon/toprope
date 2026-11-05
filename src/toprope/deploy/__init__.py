@@ -212,9 +212,12 @@ class LocalEnvironment:
             return [f"{p.where} ({p.message})" for p in in_flight(d, store).problems]
 
     @contextmanager
-    def events(self):
-        """The deployed domain's event store, or None when nothing was deployed yet."""
-        if not self.store_path.exists():
+    def events(self, domain: str | None = None):
+        """The deployed domain's event store, or None when nothing was deployed yet, or when
+        `domain` is given and another domain is deployed here."""
+        cur = self.current() or {}
+        deployed = cur.get("commit_domain") or cur.get("domain")
+        if not self.store_path.exists() or (domain is not None and deployed not in (None, domain)):
             yield None
             return
         from ..store.sqlite import SQLiteEventStore

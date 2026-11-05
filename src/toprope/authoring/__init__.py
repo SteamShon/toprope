@@ -531,14 +531,18 @@ class Workspace:
             raise AuthoringError("the draft names no `domain`, so there is no commit log to check")
         try:
             if commit_id is None:
-                head = self.commits.head(d, branch) or self.commits.main(d)
-                if head is None:
+                refs = self.commits.refs(d)
+                if not refs:
                     raise AuthoringError("nothing to check: commit first")
-                commit_id = head.id
+                if branch not in refs:
+                    raise AuthoringError(f"no branch {branch!r}; branches: {sorted(refs)}")
+                commit_id = refs[branch]
             base = since if since is not None else "merge-base"
             if env is not None:
                 from ..deploy import LocalEnvironment
-                with LocalEnvironment(env).events() as store:
+                if not Path(env).is_dir():
+                    raise AuthoringError(f"no deploy environment at {env}")
+                with LocalEnvironment(env).events(d) as store:
                     report = check_commit(self.commits, d, commit_id, base, events=store, examples=examples)
             else:
                 report = check_commit(self.commits, d, commit_id, base, examples=examples)

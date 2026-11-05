@@ -123,12 +123,13 @@ def change_check(new: Domain, old: Domain | None = None, *, events: EventStore |
     resolves a past actor's roles (the Identity port); without it, an actor is assumed to have
     had every role the current version allowed for that action."""
     checks: dict[str, CheckResult] = {}
-    checks["structural"] = _structural(new, old)
+    old_issues = validate_domain(old) if old else []
+    checks["structural"] = _structural(new, old, old_issues)
     structurally_ok = checks["structural"].ok
+    # A base with errors is no baseline: nothing is reported as newly lost against it.
+    baseline = old if old is not None and not any(i.severity == "error" for i in old_issues) else None
     if structurally_ok:
-        checks["semantic"] = _semantic(new, old)
-        checks["scenarios"] = _scenarios(new, old)
-        checks["harness"] = _harness(new, examples)
+        checks["semantic"], checks["scenarios"], checks["harness"] = _model_checks(new, old, baseline, examples)
     else:
         for name in ("semantic", "scenarios", "harness"):
             checks[name] = CheckResult(name, ran=False, note="the declaration has structural errors")
@@ -139,15 +140,17 @@ def change_check(new: Domain, old: Domain | None = None, *, events: EventStore |
         checks["in_flight"] = in_flight(new, events)
         checks["log_replay"] = log_replay(new, old, events, roles_of) if structurally_ok else \
             CheckResult("log_replay", ran=False, note="the declaration has structural errors")
-    checks["nl"] = _nl(new, old, nl)
-    return ChangeReport(new.domain, _diff(new, old), {n: checks[n] for n in CHECKS})
+    diff = _diff(new, old)
+    checks["nl"] = _nl(new, old, nl, diff["to_review"])
+    return ChangeReport(new.domain, diff, {n: checks[n] for n in CHECKS})
 
 
 def check_commit(commits: Any, domain: str, commit_id: str, base: str | None = "merge-base", *,
                  events: EventStore | None = None, nl: NLChecker | None = None, examples: int = 50,
                  roles_of: Callable[[dict[str, Any], str], tuple[str, ...]] | None = None) -> ChangeReport:
     """Run the change check on a commit of a commit store, and record the result on the commit
-    (ADR-0032): one record per check that ran, plus `change-check` for the whole. The base is
+    (ADR-0032): one record per check, `ok: null` for one that did not run, plus `change-check`
+    for the whole, appended together with one run id. The base is
     the commit's merge base with `main` by default (ADR-0033: a branch is reviewed from there),
     or its first parent when the commit is already in `main`; None checks it as a first version."""
     c = commits.get(domain, commit_id)
@@ -160,10 +163,9 @@ def check_commit(commits: Any, domain: str, commit_id: str, base: str | None = "
     report = change_check(commits.domain(domain, c.id), old, events=events, nl=nl, examples=examples,
                           roles_of=roles_of)
     report.diff["from"], report.diff["to"] = base, c.id
-    for name, res in report.checks.items():
-        if res.ran:
-            commits.record_check(domain, c.id, name, res.ok, res.summary(), base)
-    commits.record_check(domain, c.id, "change-check", report.ok, report.summary(), base)
+    rows = [(name, res.ok if res.ran else None, res.summary()) for name, res in report.checks.items()]
+    rows.append(("change-check", report.ok, report.summary()))
+    commits.record_checks(domain, c.id, rows, base)        # one run, one append: skipped checks too
     return report
 
 
@@ -174,9 +176,9 @@ def _diff(new: Domain, old: Domain | None) -> dict[str, Any]:
             "interface_bump": bump}
 
 
-def _structural(new: Domain, old: Domain | None) -> CheckResult:
+def _structural(new: Domain, old: Domain | None, old_issues: list[Any]) -> CheckResult:
     res = CheckResult("structural")
-    before = {(i.code, i.where) for i in validate_domain(old)} if old else set()
+    before = {(i.code, i.where) for i in old_issues}
     for i in validate_domain(new):
         sev = i.severity if i.severity == "error" or (i.code, i.where) in before else "warning"
         res.add(sev, i.where, f"{i.code}: {i.message}" + ("" if (i.code, i.where) in before or not old else " (new)"))
@@ -207,71 +209,51 @@ def _allows(cell: Any) -> bool:
     return isinstance(cell, str) and cell not in ("n/a", "undecided")
 
 
-def undecided_cells(d: Domain) -> list[str]:
-    out = []
-    for obj, tr in d.transitions.items():
-        for state, row in tr.matrix.items():
-            for action, cell in row.items():
-                by_role = getattr(cell, "by_role", None) or {}
-                if cell == "undecided" or "undecided" in by_role.values():
-                    out.append(f"cell:{obj}.{state}.{action}")
-    return out
-
-
-def _semantic(new: Domain, old: Domain | None) -> CheckResult:
-    from ..harness.world import grow_world
-    res = CheckResult("semantic")
-    unreach_new = grow_world(new).unreachable
-    unreach_old = grow_world(old).unreachable if old and not _has_errors(old) else {}
-    for obj, states in unreach_new.items():
-        for s in states:
-            newly = old is not None and s not in unreach_old.get(obj, []) and obj in old.transitions \
-                and s in old.transitions[obj].matrix
-            res.add("error" if newly else "warning", f"state:{obj}.{s}",
-                    "no longer reachable from the examples" if newly else "not reachable from the examples")
-    dead_old = set(dead_actions(old)) if old else set()
-    for a in dead_actions(new):
-        newly = old is not None and a in old.actions and a not in dead_old
-        res.add("error" if newly else "warning", f"action:{a}",
-                "no matrix cell allows it any more" if newly else "no matrix cell allows it")
-    for c in undecided_cells(new):
-        res.add("info", c, "undecided")
-    return res
-
-
-def _has_errors(d: Domain) -> bool:
-    return any(i.severity == "error" for i in validate_domain(d))
-
-
-def _scenarios(new: Domain, old: Domain | None) -> CheckResult:
-    """Scenario regression: the current version's scenarios and the new ones, on the new model."""
+def _model_checks(new: Domain, old: Domain | None, baseline: Domain | None,
+                  examples: int) -> tuple[CheckResult, CheckResult, CheckResult]:
+    """One harness pass on the new model, with the base's scenarios carried along, gives the
+    semantic check (the small world's unreachable states, undecided cells), scenario regression
+    (the flows) and the rest of the harness findings."""
     from ..harness.run import Harness
-    res = CheckResult("scenarios")
-    scenarios = {sc.id: sc for sc in new.scenarios}
-    carried = [sc for sc in (old.scenarios if old else []) if sc.id not in scenarios]
-    d = new.model_copy(update={"scenarios": list(new.scenarios) + carried})
-    h = Harness(d, levels=("model",))
-    passed = h.flows("model")
-    for f in h.findings:
-        sid = f.case.split("#")[0]
-        origin = "a scenario the new version removed" if sid in {s.id for s in carried} else "scenario"
-        res.add("error", f"scenario:{f.case}", f"{origin} fails: {f.detail.get('why')}")
-    res.note = f"{passed}/{len(d.scenarios)} scenarios pass"
-    return res
+    from ..harness.world import grow_world
+    ids = {sc.id for sc in new.scenarios}
+    carried = [sc for sc in (old.scenarios if old else []) if sc.id not in ids]
+    h = Harness(new.model_copy(update={"scenarios": list(new.scenarios) + carried}), levels=("model",))
+    report = h.run(explore_examples=examples, races=False)
+    cells = (report.coverage or {}).get("cells") or {}
 
+    semantic = CheckResult("semantic")
+    unreach_old = grow_world(baseline).unreachable if baseline is not None else {}
+    for obj, states in h.world.unreachable.items():
+        for st in states:
+            newly = baseline is not None and obj in baseline.transitions \
+                and st in baseline.transitions[obj].matrix and st not in unreach_old.get(obj, [])
+            semantic.add("error" if newly else "warning", f"state:{obj}.{st}",
+                         "no longer reachable from the examples" if newly else "not reachable from the examples")
+    dead_old = set(dead_actions(baseline)) if baseline is not None else set()
+    for a in dead_actions(new):
+        newly = baseline is not None and a in baseline.actions and a not in dead_old
+        semantic.add("error" if newly else "warning", f"action:{a}",
+                     "no matrix cell allows it any more" if newly else "no matrix cell allows it")
+    for c in cells.get("undecided") or []:                 # missing cells count: the harness resolves them
+        semantic.add("info", f"cell:{c}", "undecided")
 
-def _harness(new: Domain, examples: int) -> CheckResult:
-    from ..harness import run_harness
-    res = CheckResult("harness")
-    report = run_harness(new, levels=("model",), explore_examples=examples, races=False)
+    scenarios, harness = CheckResult("scenarios"), CheckResult("harness")
+    carried_ids = {sc.id for sc in carried}
+    failed = set()
     for f in report.findings:
         if f.kind == "flow":
-            continue                                    # reported by the scenario check
-        res.add("error", f"{f.kind}:{f.case}", _short(f.detail))
-    cells = (report.coverage or {}).get("cells") or {}
+            sid = f.case.split("#")[0]
+            failed.add(sid)
+            origin = "a scenario the new version removed" if sid in carried_ids else "scenario"
+            scenarios.add("error", f"scenario:{f.case}", f"{origin} fails: {f.detail.get('why')}")
+        else:
+            harness.add("error", f"{f.kind}:{f.case}", _short(f.detail))
+    total = len(new.scenarios) + len(carried)
+    scenarios.note = f"{total - len(failed)}/{total} scenarios pass"
     covered = (cells.get("covered") or {}).get("model", "?")
-    res.note = f"{covered}/{cells.get('decided', '?')} decided cells covered at the model level"
-    return res
+    harness.note = f"{covered}/{cells.get('decided', '?')} decided cells covered at the model level"
+    return semantic, scenarios, harness
 
 
 def _short(detail: dict[str, Any]) -> str:
@@ -324,7 +306,9 @@ def log_replay(new: Domain, old: Domain | None, events: EventStore,
         return (evs[0].aggregate, project(evs)) if evs else None
 
     history = [ev for _, evs in _domain_streams(events) for ev in evs if ev.kind == "domain"]
-    history.sort(key=lambda e: (e.at or EPOCH, e.stream, e.version or 0))
+    # By time; ties keep each stream's own order (the sort is stable). Across streams with equal
+    # times the true order is unknown: a coarse clock can misorder cross-object lookups.
+    history.sort(key=lambda e: e.at or EPOCH)
     replayed = blocked = 0
     for ev in history:
         action = (ev.payload or {}).get("action")
@@ -381,7 +365,9 @@ def _command(ev: Event, new: Domain, old: Domain | None,
     else:                     # it succeeded then, so the actor held a role the old version allowed
         src = old if old is not None and action in old.actions else new
         a = src.actions.get(action)
-        roles = tuple(r for r in (a.actor if a else []) if isinstance(r, str)) or tuple(src.roles)
+        roles = tuple(dict.fromkeys(r if isinstance(r, str) else getattr(r, "role", None)
+                                    for r in (a.actor if a else []))) or tuple(src.roles)
+        roles = tuple(r for r in roles if r)
     actor = Actor(ref.get("id"), kind, roles)
     principal = grant = None
     if ev.on_behalf_of:
@@ -392,11 +378,10 @@ def _command(ev: Event, new: Domain, old: Domain | None,
                    causation=ev.causation)
 
 
-def _nl(new: Domain, old: Domain | None, nl: NLChecker | None) -> CheckResult:
+def _nl(new: Domain, old: Domain | None, nl: NLChecker | None, changed: list[str]) -> CheckResult:
     if nl is None:
         return CheckResult("nl", ran=False, note="no natural-language checker configured")
     res = CheckResult("nl")
-    changed = _diff(new, old)["to_review"]
     for where, message in nl.conflicts(old, new, changed):
         res.add("warning", where, message)                     # never an error (ADR-0009)
     return res
@@ -413,5 +398,4 @@ __all__ = [
     "dead_actions",
     "in_flight",
     "log_replay",
-    "undecided_cells",
 ]

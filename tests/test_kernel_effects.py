@@ -291,3 +291,22 @@ def test_cli_regen_check(tmp_path):
                         "--levels", "model", "--examples", "5"], capture_output=True, text=True, timeout=180)
     assert r.returncode == 0, r.stdout + r.stderr
     assert json.loads(r.stdout)["same_after_regenerating"] is True
+
+
+def test_the_schema_lists_every_kernel_service():
+    """A declaration may call any service in the catalog; the v1 schema must accept each one."""
+    import json
+    from pathlib import Path
+    schema = json.loads((Path(__file__).resolve().parents[1] / "schema/domain.v1.schema.json").read_text())
+
+    def calls(node):
+        if isinstance(node, dict):
+            if "call" in node and isinstance(node["call"], dict) and "enum" in node["call"]:
+                yield node["call"]["enum"]
+            for v in node.values():
+                yield from calls(v)
+        elif isinstance(node, list):
+            for v in node:
+                yield from calls(v)
+    (enum,) = list(calls(schema))
+    assert set(enum) == set(CATALOG)

@@ -30,8 +30,14 @@ is deployed. It exits 1 when a check reports an error. The report is printed, wr
   nothing was deployed.
 - **Log replay keeps the recorded history.** Each past action is decided against the state
   the recorded events left, so one blocked action does not cascade. A past actor is assumed
-  to have held every role the base version allowed for that action; pass `roles_of` (the
-  Identity port) to resolve real roles.
+  to have held every role the base version allowed for that action, roles named by actor
+  rules included; pass `roles_of` (the Identity port) to resolve real roles. Events are
+  replayed in time order; events on different objects with the same time keep no known
+  order, so a coarse clock can misorder cross-object lookups.
+- **The environment must run this domain.** An environment where another domain is deployed
+  is not replayed, and a mistyped `--env` is an error, never an empty environment.
+- **A base with structural errors is no baseline**: nothing is reported as newly lost
+  against it.
 
 ## The base
 By default the base is the commit's merge base with `main` (ADR-0033: a branch is reviewed
@@ -40,8 +46,9 @@ nothing approved the commit is checked as a first version, so nothing counts as 
 lost. `--since` sets the base explicitly.
 
 ## Records on commits (ADR-0032)
-Each run appends to `checks.jsonl` in the commit store: one record per check that ran, and
-`change-check` for the whole (commit, check, ok, summary, base, at). The newest record of
+Each run appends to `checks.jsonl` in the commit store, in one write: one record per check
+(`ok: null` for a check that did not run that time) and `change-check` for the whole
+(commit, check, ok, summary, base, at, run). The newest record of
 each check is the commit's status (`CommitStore.check_status`). A preview appends
 `preview-harness`. Whether approval requires green checks is the Authoring declaration's
 decision (ADR-0032 recommends yes).

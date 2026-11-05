@@ -153,7 +153,8 @@ def test_a_check_is_recorded_on_the_commit_against_its_merge_base(tmp_path, base
     status = st.check_status("example", c1.id)
     assert status["change-check"]["ok"] is False and status["log_replay"]["ok"] is False
     assert status["structural"]["ok"] is True and status["change-check"]["base"] == c0.id
-    assert "nl" not in status                                            # a check that did not run is not recorded
+    assert status["nl"]["ok"] is None                                     # did not run: recorded as such
+    assert len({r["run"] for r in st.checks("example", c1.id)}) == 1
     assert check_commit(st, "example", c0.id, examples=10).diff["from"] is None   # main's first commit
 
 
@@ -183,3 +184,58 @@ def test_the_change_check_service_and_the_cli(tmp_path, base):
     assert k.commits.check_status("example", c1)["change-check"]["ok"] is False
     env.preview_commit(k.commits, "example", c0, examples=5)              # the preview's harness is a record too
     assert k.commits.check_status("example", c0)["preview-harness"]["ok"] is True
+
+
+# -- review findings -----------------------------------------------------------------------------
+def test_a_base_with_errors_is_no_baseline_for_newly_lost(base):
+    broken = copy.deepcopy(base)
+    broken["transitions"]["Experiment"]["matrix"]["draft"]["approve_experiment"] = "aproved"
+    r = change_check(dom(base), dom(broken), examples=10)
+    assert problems(r, "semantic", "error") == []
+
+
+def test_replay_gives_past_actors_the_roles_of_actor_rules(base):
+    raw = copy.deepcopy(base)
+    raw["actions"]["launch_experiment"]["actor"] = ["approver", {"role": "eng", "where": "true"}]
+    st = history(raw)                                                     # eli launched under the rule
+    new = copy.deepcopy(raw)
+    new["actions"]["launch_experiment"]["actor"] = [{"role": "eng", "where": "true"}]
+    r = change_check(dom(new), dom(raw), events=st, examples=10)
+    assert problems(r, "log_replay") == []
+
+
+def test_undecided_cells_include_missing_ones(base):
+    raw = copy.deepcopy(base)
+    raw["actions"]["pause_experiment"] = {"description": "Pause.", "actor": ["eng"], "target": "Experiment"}
+    raw["transitions"]["Experiment"]["matrix"]["running"]["pause_experiment"] = "ended"
+    r = change_check(dom(raw), dom(base), examples=10)
+    assert ("info", "cell:Experiment.draft.pause_experiment") in problems(r, "semantic", "info")
+
+
+def test_an_environment_of_another_domain_is_not_replayed(tmp_path, base):
+    from toprope.deploy import LocalEnvironment
+    from toprope.kernel.services import LocalKernel
+    from toprope.store.sqlite import SQLiteEventStore
+    env = LocalEnvironment(tmp_path / "env")
+    other = copy.deepcopy(base)
+    other["domain"] = "billing"
+    ReferenceModel(dom(other), SQLiteEventStore(str(env.store_path)))      # billing's objects live here
+    (tmp_path / "env" / "current.json").write_text(json.dumps({"commit_domain": "billing"}))
+    st = CommitStore(tmp_path / ".toprope" / "commits")
+    c, _ = st.commit(write(tmp_path / "d.yaml", base))
+    k = LocalKernel(tmp_path, environment=env, commits=st, harness_examples=10)
+    assert k.call("change_check", {"domain": "example", "commit": c.id})["passed"] is True
+    assert st.check_status("example", c.id)["in_flight"]["ok"] is None
+
+
+def test_a_mistyped_environment_or_branch_is_an_error(tmp_path, base):
+    from toprope.authoring import AuthoringError, Workspace
+    (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump({"domain": "d.domain.yaml", "sources": []}))
+    write(tmp_path / "d.domain.yaml", base)
+    ws = Workspace(tmp_path)
+    ws.commit()
+    with pytest.raises(AuthoringError, match="no deploy environment"):
+        ws.change_check(env=tmp_path / "envs" / "lcoal", examples=5)
+    assert not (tmp_path / "envs").exists()
+    with pytest.raises(AuthoringError, match="no branch"):
+        ws.change_check(branch="wrok", examples=5)
