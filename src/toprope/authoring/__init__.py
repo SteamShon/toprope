@@ -500,8 +500,9 @@ class Workspace:
 
     def commit(self, message: str = "", branch: str = "work", merge: str | None = None) -> dict[str, Any]:
         """Compile the working copy into an immutable commit on a branch (ADR-0033). Returns what
-        to re-confirm: the elements that changed directly since the last approved commit (or
-        since the start). `merge` names the commit whose conflicts this working copy resolves."""
+        to re-confirm: the elements that changed directly since the branch's merge base with
+        `main` (`since`; None before the first approval). `merge` names the commit whose
+        conflicts this working copy resolves."""
         from ..commits import CommitError
         try:
             c, created = self.commits.commit(self.domain_path, message=message, branch=branch, merge=merge)
@@ -517,8 +518,9 @@ class Workspace:
 
     def merge_main(self, branch: str = "work") -> dict[str, Any]:
         """Bring `main` into a branch's working copy (ADR-0033). Writes the semantic 3-way merge
-        into the working copy, keeping the branch's value at each conflict, and lists the
-        conflicts for the person to resolve. Then `commit(merge=<main>)` records both parents.
+        into the working copy and lists the conflicts for the person to resolve: at a path
+        conflict the branch's value is kept; at an element conflict the element holds both
+        sides' changes, field by field, for the person to judge. Then `commit(merge=<main>)` records both parents.
         Refuses when the working copy has changes not yet committed to the branch."""
         from ..commits import content_id
         d = self.draft().get("domain")

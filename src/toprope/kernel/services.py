@@ -134,7 +134,9 @@ class LocalKernel(KernelServices):
     # -- commits (ADR-0029) -----------------------------------------------------------------
     def _commit(self, declaration):
         c, created = self.commits.commit(self._path(declaration))
-        review = self.commits.diff(c.domain, c.parents[0] if c.parents else None, c.id)["to_review"] if created else []
+        main = self.commits.main(c.domain)          # reviewed from the merge base with main (ADR-0033)
+        base = self.commits.merge_base(c.domain, c.id, main.id) if main else None
+        review = self.commits.diff(c.domain, base, c.id)["to_review"] if created else []
         approved = self.commits.latest_approved(c.domain)
         return {"id": c.id, "seq": c.seq, "content": c.content, "created": created,
                 "parent": c.parents[0] if c.parents else "", "interface": c.interface, "to_review": review,
@@ -147,9 +149,7 @@ class LocalKernel(KernelServices):
 
     def _approve_commit(self, domain, commit, approver):
         self.commits.approve(domain, commit, approver)   # conflicts fail the call, as any error does
-        main = self.commits.main(domain)
-        return {"approved": self.commits.is_approved(domain, main.id) and self.commits.is_ancestor(domain, commit, main.id),
-                "main": main.id}
+        return {"approved": True, "main": self.commits.main(domain).id}
 
     def _preview(self, domain, commit):
         if self.environment is None:

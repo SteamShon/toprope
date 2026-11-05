@@ -156,17 +156,29 @@ def _bump(version: str, kind: str) -> str:
     return version
 
 
-def _element_conflicts(base: dict[str, Any], ours: dict[str, Any], theirs: dict[str, Any]) -> list[Conflict]:
+def _element_conflicts(base: dict[str, Any], ours: dict[str, Any], theirs: dict[str, Any],
+                       merged: dict[str, Any]) -> list[Conflict]:
     """ADR-0033: an element (by review hash) changed differently on both sides is a conflict,
     even when the two sides changed different fields of it. Added on both sides with
-    different content counts too: there is no base to merge against."""
+    different content counts too. An element both sides changed from a base is not listed
+    when the merge kept ours whole: then every change theirs made is a path conflict already."""
     def contents(raw: dict[str, Any]) -> dict[str, Any]:
-        return review_contents(Domain.model_validate({"version": 1, **raw})) if raw else {}
+        try:
+            return review_contents(Domain.model_validate({"version": 1, **raw})) if raw else {}
+        except ValidationError as e:
+            raise CommitError(f"a commit in this merge does not parse: {e}") from None
     b, o, t = contents(base), contents(ours), contents(theirs)
-    h = lambda m, k: review_hash(m[k]) if k in m else None  # noqa: E731
+    try:
+        m = review_contents(Domain.model_validate({"version": 1, **merged}))
+    except ValidationError:
+        m = {}                                       # the merge check reports it; list every element
+    h = lambda x, k: review_hash(x[k]) if k in x else None  # noqa: E731
     out = []
     for k in sorted(set(o) | set(t)):
-        if h(o, k) != h(b, k) and h(t, k) != h(b, k) and h(o, k) != h(t, k):
+        if k.startswith("fixture:") and k.endswith(".None"):
+            continue                                 # fixtures without an id are not one element
+        if h(o, k) != h(b, k) and h(t, k) != h(b, k) and h(o, k) != h(t, k) \
+                and not (k in b and h(m, k) == h(o, k)):
             out.append(Conflict(f"element:{k}", b.get(k), o.get(k), t.get(k)))
     return out
 
@@ -265,7 +277,8 @@ class CommitStore:
         covered: set[str] = set()                          # strict ancestors of a common ancestor
         for c in common:
             for p in parents[c]:
-                covered |= self._reach(parents, p)
+                if p not in covered:
+                    covered |= self._reach(parents, p)
         seq = {c.id: c.seq for c in log}
         return max(common - covered, key=seq.__getitem__, default=None)
 
@@ -315,7 +328,7 @@ class CommitStore:
         bodies = [self._body(domain, x) for x in (base, ours, theirs)]
         conflicts: list[Conflict] = []
         merged = _merge3(*bodies, "", conflicts)
-        conflicts += _element_conflicts(*(b["domain"] for b in bodies))
+        conflicts += _element_conflicts(*(b["domain"] for b in bodies), merged["domain"])
         return Merge(base, merged, conflicts)
 
     # -- writing ----------------------------------------------------------------------------------
@@ -377,11 +390,15 @@ class CommitStore:
     def _keep_legacy_refs(self, dirp: Path) -> None:
         """A store from before branches: write its derived refs before anything else changes."""
         refs = dirp / "refs.jsonl"
-        if not refs.exists():
-            derived = self._legacy_refs(dirp.name)
-            refs.touch()
-            for b, c in derived.items():
-                self._append(refs, {"branch": b, "commit": c, "at": _now(), "derived": True})
+        if not refs.exists():                        # written whole, then renamed: never half there
+            lines = [json.dumps({"branch": b, "commit": c, "at": _now(), "derived": True}, sort_keys=True) + "\n"
+                     for b, c in self._legacy_refs(dirp.name).items()]
+            fd, tmp = tempfile.mkstemp(dir=dirp, prefix=".refs-")
+            with os.fdopen(fd, "w") as f:
+                f.writelines(lines)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, refs)
 
     def _move(self, dirp: Path, branch: str, commit_id: str) -> None:
         self._keep_legacy_refs(dirp)

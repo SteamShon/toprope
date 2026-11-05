@@ -49,8 +49,11 @@ uv run toprope-author branches                       # every branch and its comm
   - **What `main` takes must validate**, on a fast-forward as well as on a merge commit. This
     catches indirect conflicts, where each side is valid alone but not together. The full
     change check (M0a sub-PR 8) will run there too.
-- **Resolving conflicts.** `merge` writes the 3-way merge into the working copy, keeping the
-  branch's value at each conflict, and lists the conflicts. Resolve them, then `commit
+- **Resolving conflicts.** `merge` writes the 3-way merge into the working copy and lists the
+  conflicts. At a path conflict the branch's value is kept. At an element conflict the
+  element holds both sides' changes, field by field, for you to judge. An element both
+  sides changed is not listed again when the merge kept your version whole, because its path
+  conflicts already show every change from `main`. Resolve them, then `commit
   --merge <main>` records both parents. Approving that commit is a fast-forward.
 - **No pull-request object.** A branch's review is derived: the diff from the merge base,
   its change report and its check records. `commit` reports `to_review` since the merge base

@@ -80,10 +80,9 @@ def test_a_direct_conflict_is_listed_by_path_and_main_does_not_move(st, tmp_path
     st.approve("example", ca.id, "ana")
     with pytest.raises(MergeConflict) as e:
         st.approve("example", cb.id, "ana")
-    c, el = e.value.conflicts                                         # the field, and its element
+    (c,) = e.value.conflicts                                          # once: the path shows it
     assert c.path == "domain.actions.launch_experiment.description"
     assert (c.ours, c.theirs) == ("Start traffic.", "Turn it on.")
-    assert el.path == "element:action:launch_experiment"
     assert st.main("example") == ca
 
 
@@ -131,8 +130,7 @@ def test_conflicts_are_resolved_in_the_working_copy_then_approved(tmp_path):
     del raw["glossary"]["dirty"]
     write(tmp_path / "d.domain.yaml", raw)
     out = ws.merge_main()
-    assert out["merge"] == co.id and [c["path"] for c in out["conflicts"]] == [
-        "domain.actions.launch_experiment.description", "element:action:launch_experiment"]
+    assert out["merge"] == co.id and [c["path"] for c in out["conflicts"]] == ["domain.actions.launch_experiment.description"]
     resolved = ws.draft()
     assert resolved["glossary"]["o"] == "O."                         # main's other change came in
     resolved["actions"]["launch_experiment"]["description"] = "Start traffic now."
@@ -309,3 +307,29 @@ def test_merge_reports_an_unreadable_ui_as_an_authoring_error(tmp_path):
     (tmp_path / "bad.representation.yaml").write_text("a: [unclosed")
     with pytest.raises(AuthoringError, match="cannot read"):
         ws.merge_main()
+
+
+def test_an_element_added_on_both_sides_conflicts_even_when_one_side_has_less(st, tmp_path):
+    raw, _ = started(st, tmp_path)
+    a, b = copy.deepcopy(raw), copy.deepcopy(raw)
+    a["objects"]["Experiment"]["properties"]["tag"] = {"type": "string", "optional": True}
+    b["objects"]["Experiment"]["properties"]["tag"] = {"type": "string"}
+    m = st.merge3("example", on(st, tmp_path, a, "feat-a").id, on(st, tmp_path, b, "feat-b").id)
+    assert [c.path for c in m.conflicts if c.path.startswith("element:")] == ["element:property:Experiment.tag"]
+    assert not [c for c in m.conflicts if not c.path.startswith("element:")]   # no path conflict at all
+
+
+def test_the_commit_service_reviews_from_the_merge_base_like_the_workspace(tmp_path):
+    from toprope.kernel.services import LocalKernel
+    raw = schema_doc_domain()
+    write(tmp_path / "d.domain.yaml", raw)
+    k = LocalKernel(tmp_path)
+    c0 = k.call("commit", {"declaration": "d.domain.yaml"})["id"]
+    k.commits.approve("example", c0, "ana")
+    raw["glossary"]["a"] = "A."
+    write(tmp_path / "d.domain.yaml", raw)
+    k.call("commit", {"declaration": "d.domain.yaml"})
+    raw["actions"]["launch_experiment"]["description"] = "Start traffic."
+    write(tmp_path / "d.domain.yaml", raw)
+    c2 = k.call("commit", {"declaration": "d.domain.yaml"})
+    assert c2["to_review"] == ["action:launch_experiment", "term:a"]        # the branch, not its last step
