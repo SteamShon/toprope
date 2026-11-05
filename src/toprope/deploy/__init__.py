@@ -7,7 +7,9 @@ An environment is a directory:
   deployments.jsonl    every deploy and refusal, append-only
   events.db            the deployed domain's event store (serve it with `server_args()`)
 
-**The fixed floor.** `deploy` enforces, in code, rules no declaration can weaken (ADR-0022):
+**The fixed floor.** `deploy_commit` is the only way to move an environment (ADR-0029). It
+enforces, in code, rules no declaration can weaken (ADR-0022, ADR-0029): the commit is
+approved, not superseded and not a downgrade, and its build passes the build floor:
 1. the build's declaration is unchanged since preview (its hash), and the toolchain that
    ran the harness is the current one (no taint)
 2. the harness passed for that build
@@ -161,11 +163,7 @@ class LocalEnvironment:
                 raise
             return self._deploy_locked(build_id, approver, {"commit": c.id, "seq": c.seq, "commit_domain": domain})
 
-    # -- deploy (the fixed floor) ------------------------------------------------------------
-    def deploy(self, build_id: str, approver: Actor) -> dict[str, Any]:
-        with self._lock():
-            return self._deploy_locked(build_id, approver, {})
-
+    # -- the build floor (reached only through deploy_commit, ADR-0029) -----------------------
     def _deploy_locked(self, build_id: str, approver: Actor, extra: dict[str, Any]) -> dict[str, Any]:
         try:
             build = self._floor(build_id, approver)

@@ -53,7 +53,7 @@ CATALOG: dict[str, Service] = {s.name: s for s in (
     Service("commit", "Snapshot a working copy as an immutable commit (no new commit if unchanged).",
             {"declaration": "string"},
             {"id": "string", "seq": "integer", "content": "string", "created": "boolean", "parent": "string",
-             "interface": "string", "to_review": "strings"}),
+             "interface": "string", "to_review": "strings", "last_approved": "string"}),
     Service("diff", "The semantic diff between two commits: what changed directly.",
             {"domain": "string", "from": "string", "to": "string"},
             {"changed": "strings", "added": "strings", "removed": "strings", "to_review": "strings"}),

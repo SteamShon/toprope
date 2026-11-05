@@ -149,12 +149,14 @@ class CommitStore:
         return max(cs, key=lambda c: c.seq) if cs else None
 
     # -- writing ----------------------------------------------------------------------------------
-    def commit(self, declaration: str | Path, representations: list[str | Path] = (),
+    def commit(self, declaration: str | Path, representations: list[str | Path] | None = None,
                message: str = "") -> tuple[Commit, bool]:
         """Snapshot a working copy. Returns (commit, created). Identical content to the head
         returns the head, created False."""
         raw = load_yaml(Path(declaration).read_text()) or {}
         d = Domain.model_validate(raw)
+        if representations is None:   # a released UI is the pair (ADR-0008): take this domain's own
+            representations = self.representations_for(d.domain, Path(declaration).parent)
         reps = {Path(r).name: load_yaml(Path(r).read_text()) for r in representations}
         cid = content_id(raw, reps)
         with self._lock(d.domain) as dirp:
@@ -181,6 +183,20 @@ class CommitStore:
                 os.replace(tmp, obj)
             self._append(dirp / "log.jsonl", asdict(c))
             return c, True
+
+    @staticmethod
+    def representations_for(domain: str, folder: Path) -> list[Path]:
+        """The `*.representation.yaml` files next to a declaration that target its domain. A file
+        that cannot be read is an error, never skipped: a release would silently lose its UI."""
+        out = []
+        for p in sorted(folder.glob("*.representation.yaml")):
+            try:
+                body = load_yaml(p.read_text()) or {}
+            except Exception as e:
+                raise CommitError(f"cannot read {p.name}: {e}") from None
+            if isinstance(body, dict) and (body.get("targets") or {}).get("domain") == domain:
+                out.append(p)
+        return out
 
     def approve(self, domain: str, commit_id: str, approver: str) -> bool:
         """Tag a commit as approved. Immutable; approving it again is a no-op (False)."""

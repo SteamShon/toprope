@@ -50,13 +50,16 @@ In code:
 
 ## Local deploy
 ```bash
-uv run toprope-deploy --env .toprope/envs/local preview my.domain.yaml   # build id, harness result
-uv run toprope-deploy --env .toprope/envs/local deploy BUILD --approver ana
+uv run toprope-deploy --env .toprope/envs/local --commits .toprope/commits preview example 2-cd34…
+uv run toprope-deploy --env .toprope/envs/local --commits .toprope/commits deploy example 2-cd34… --approver ana
 uv run toprope-deploy --env .toprope/envs/local status
 uv run toprope-server $(uv run toprope-deploy --env .toprope/envs/local server-args) --identity static:tokens.yaml
 ```
 
-`deploy` enforces the **fixed floor** (ADR-0022), which no declaration can weaken:
+An environment moves only to a **commit** (ADR-0029); there is no build-only path. `deploy`
+enforces the **fixed floor** (ADR-0022, ADR-0029), which no declaration can weaken:
+- the commit is approved, not superseded by a newer approved commit, and not a downgrade
+  (rollback comes in M2), and the move happens under a per-environment lock
 - the build is untainted: the same declaration, and the same toolchain that ran the harness
 - the harness passed
 - a person approves

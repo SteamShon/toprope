@@ -267,3 +267,54 @@ def test_approving_without_a_domain_or_an_unknown_commit_is_an_authoring_error(t
     write(tmp_path / "d.domain.yaml", schema_doc_domain())
     with pytest.raises(AuthoringError, match="no commit"):
         ws.approve_commit("1-x", via="cli", who="ana")
+
+
+# -- gaps closed after review -------------------------------------------------------------------------
+def test_a_commit_includes_the_domains_own_representations(tmp_path):
+    st = CommitStore(tmp_path / "commits")
+    wc = write(tmp_path / "shop.domain.yaml", schema_doc_domain())
+    c1, _ = st.commit(wc)
+    (tmp_path / "ui.representation.yaml").write_text(yaml.safe_dump(
+        {"representation": "ui", "version": 1, "targets": {"domain": "example", "interface": "1.x"}, "views": {}}))
+    (tmp_path / "other.representation.yaml").write_text(yaml.safe_dump(
+        {"representation": "o", "version": 1, "targets": {"domain": "billing", "interface": "1.x"}, "views": {}}))
+    c2, created = st.commit(wc)
+    assert created and c2.content != c1.content                       # the UI is part of the release
+    reps = st.root / "example" / "objects" / c2.content / "representations"
+    assert sorted(p.name for p in reps.iterdir()) == ["ui.representation.yaml"]
+
+
+def test_commit_reports_the_last_approved_commit(tmp_path):
+    write(tmp_path / "d.domain.yaml", schema_doc_domain())
+    k = LocalKernel(tmp_path)
+    c1 = k.call("commit", {"declaration": "d.domain.yaml"})
+    assert c1["last_approved"] == ""
+    k.commits.approve("example", c1["id"], "ana")
+    raw = schema_doc_domain()
+    raw["glossary"]["x"] = "y"
+    write(tmp_path / "d.domain.yaml", raw)
+    c2 = k.call("commit", {"declaration": "d.domain.yaml"})
+    assert c2["last_approved"] == c1["id"]
+
+
+def test_the_regeneration_check_passes_with_creating_replies(tmp_path):
+    from toprope.harness.regen import effects_end_to_end
+    write(tmp_path / "authoring.domain.yaml", AUTHORING)
+    p = tmp_path / "self.composition.yaml"
+    p.write_text(yaml.safe_dump({"composition": "self", "version": 1,
+                                 "members": {"authoring": {"declaration": "authoring.domain.yaml"}}}))
+    (e2e,) = effects_end_to_end(p)
+    assert e2e["ok"], e2e
+    assert e2e["effects"][0]["resolution"] == "EffectSucceeded" and e2e["effects"][0]["reply"] == "ok"
+
+
+def test_an_unreadable_representation_stops_the_commit_and_an_explicit_empty_list_means_none(tmp_path):
+    st = CommitStore(tmp_path / "commits")
+    wc = write(tmp_path / "shop.domain.yaml", schema_doc_domain())
+    (tmp_path / "ui.representation.yaml").write_text(yaml.safe_dump(
+        {"representation": "ui", "version": 1, "targets": {"domain": "example", "interface": "1.x"}, "views": {}}))
+    alone, _ = st.commit(wc, representations=[])
+    assert not (st.root / "example" / "objects" / alone.content / "representations").exists()
+    (tmp_path / "broken.representation.yaml").write_text("views: [unclosed\n")
+    with pytest.raises(CommitError, match="broken.representation.yaml"):
+        st.commit(wc)

@@ -11,7 +11,8 @@ uv run toprope-author approve 2-cd34… --as ana       # only you; immutable
 
 ## Commits
 - **Content-addressed and append-only.** A commit's content is the hash of the canonical
-  declaration without `version`, plus its representations. Its id is `<seq>-<content>`, and
+  declaration without `version`, plus its representations: the `*.representation.yaml` files
+  next to the declaration whose `targets.domain` is this domain. Its id is `<seq>-<content>`, and
   reading it sets `version` to the sequence number.
   - Committing content identical to the head makes no new commit.
   - Returning to an earlier content makes a new commit that shares the stored object.
@@ -37,8 +38,12 @@ An approval is an immutable tag. Tagging again is a no-op. A wrong approval is s
 approving a newer commit. The kernel's `approve_commit` refuses unless the calling person is
 the approver.
 
+`commit` also reports `last_approved`, so a declaration can ask `diff` what changed since
+the last approved commit.
+
 ## Delivery
-`LocalEnvironment.deploy_commit` (or the `deploy` kernel service) moves the environment's ref
+`LocalEnvironment.deploy_commit` (or the `deploy` kernel service, or `toprope-deploy deploy`) is
+the only way to move an environment's ref
 to a commit, under a per-environment lock. Besides the build floor (untainted, the harness
 passed, a person approves, nothing stranded), it refuses a commit that is:
 - **unapproved**

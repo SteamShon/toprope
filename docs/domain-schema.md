@@ -431,7 +431,7 @@ works. The catalog is the kernel itself (ADR-0027):
 | `world_map` | `declaration` | `undecided`, `unreachable`, `edges` |
 | `read_source` | `source` | `chunks`, `local_only` |
 | `fetch_source` | `source` | `sha256` |
-| `commit` | `declaration` | `id`, `seq`, `content`, `created`, `parent`, `interface`, `to_review` (ADR-0029) |
+| `commit` | `declaration` | `id`, `seq`, `content`, `created`, `parent`, `interface`, `to_review`, `last_approved` (ADR-0029) |
 | `diff` | `domain`, `from`, `to` | `changed`, `added`, `removed`, `to_review` |
 | `approve_commit` | `domain`, `commit`, `approver` | `approved` (immutable tag) |
 | `preview` | `domain`, `commit` | `build`, `harness_ok` |
