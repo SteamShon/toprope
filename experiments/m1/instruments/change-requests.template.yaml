@@ -1,4 +1,4 @@
-# M1 change requests: TEMPLATE (format only). Researcher-written; agents must not fill or edit.
+# M1 change requests: TEMPLATE (format only). Researcher-written content; agents never fill it (format changes only on the researcher's request, AGENTS.md).
 # This file is shown to all arms. Write INTENTS in domain language, not element names
 # (names are an output of Phase A). The seeded-problem answers go in change-key.yaml, never here.
 instrument: change-requests

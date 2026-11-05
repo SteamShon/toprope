@@ -1,4 +1,4 @@
-# M1 post-deploy probe suite: TEMPLATE (format only). Researcher-written; agents must not fill or edit.
+# M1 post-deploy probe suite: TEMPLATE (format only). Researcher-written content; agents never fill it (format changes only on the researcher's request, AGENTS.md).
 # Run against every arm after each "deploy" (docs/experiments/M1-self-compile.md). It must not
 # overlap with the domain scenarios or the gold scenarios, and it does not reference the change key.
 instrument: probe-suite

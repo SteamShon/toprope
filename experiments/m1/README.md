@@ -4,9 +4,9 @@ Link: ① iterate safely, ② model is right. Experiment design:
 [`docs/experiments/M1-self-compile.md`](../../docs/experiments/M1-self-compile.md).
 
 The templates in `instruments/` define the **format only**. The content is written by the
-researcher, and agents must not fill or edit it (AGENTS.md). The one exception is
-`verdict-rules`, whose template carries the assistant's draft values for the researcher to
-review.
+researcher, and agents never fill it. Agents change the format only when the researcher
+asks (AGENTS.md). The one exception to "never fill" is `verdict-rules`, whose template carries
+the assistant's draft values for the researcher to review.
 
 A guide for writing them (coverage areas, what makes a good question, and a session
 plan) is in [`interview-guide.md`](interview-guide.md). It holds no content.
