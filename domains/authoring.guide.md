@@ -60,6 +60,7 @@ A domain owner's workflow lives in people's heads; turning it into a declared do
 | `record_check` | the kernel | **Commit**; params `passed` (boolean), `summary` (string) | — | the stage (per the matrix); `target.checks_passed` ← `params.passed`, `target.failing` ← `params.summary` | — | `CommitRecordCheck` |
 | `approve_commit` 🔒 📝 | owner | **Commit** | `checks-pass`: Run the change check, and approve only a commit that passes it.; `not-approved`: Already approved; approve a newer commit. | the stage (per the matrix) | kernel `approve_commit` → `record_approval` | `CommitApproveCommit` |
 | `record_approval` | the kernel | **Commit**; params `approved` (boolean), `main` (string) | — | the stage (per the matrix); `target.approved` ← `params.approved`, `target.main` ← `params.main` | — | `CommitRecordApproval` |
+| `deliver` | owner | **Commit**; params `environment` (one of local) | `approved`: Only an approved commit is delivered. | the stage (per the matrix) | handoff `deliver_approved_commit` → delivery.request_delivery | `CommitDeliver` |
 
 ## Transitions
 
@@ -67,9 +68,9 @@ For each stage: may the action happen, and where does it lead? A missing cell is
 
 ### Commit (`stage`)
 
-| stage | `check_commit` | `record_check` | `approve_commit` | `record_approval` |
-| --- | --- | --- | --- | --- |
-| `recorded` | → `recorded` | → `recorded` | → `recorded` | → `recorded` |
+| stage | `check_commit` | `record_check` | `approve_commit` | `record_approval` | `deliver` |
+| --- | --- | --- | --- | --- | --- |
+| `recorded` | → `recorded` | → `recorded` | → `recorded` | → `recorded` | → `recorded` |
 
 ### DecisionRequest (`stage`)
 
@@ -114,9 +115,13 @@ For each stage: may the action happen, and where does it lead? A missing cell is
 - scenario `a-decision-is-taken-once`: 2 step(s)
 - scenario `a-link-is-fetched-once`: 1 step(s)
 
+## Handoffs
+
+- `deliver_approved_commit`: after `deliver`, calls delivery.`request_delivery`
+
 ## What is generated
 
-- **MCP server** `toprope:authoring`: one tool per action (16), plus `get_object`, `history`, `attempts`, `allowed_actions`, `describe_domain`, `world_map` and `how_to_reach`. Kernel replies (`record_fetch`, `record_commit`, `record_check`, `record_approval`) are tools too, but only the kernel may take them.
-- **Events**: one per action (`AnswerCreated`, `CommitApproveCommit`, `CommitCheckCommit`, `CommitCreated`, `CommitRecordApproval`, `CommitRecordCheck`, `DecisionRequestCreated`, `DecisionRequestDecide`, `DraftCommitDraft`, `ElementConfirmElement`, `ElementCreated`, `ElementMarkUnknown`, `QuestionCreated`, `SourceCreated`, `SourceFetchSource`, `SourceRecordFetch`); the current state is the events replayed in order.
+- **MCP server** `toprope:authoring`: one tool per action (17), plus `get_object`, `history`, `attempts`, `allowed_actions`, `describe_domain`, `world_map` and `how_to_reach`. Kernel replies (`record_fetch`, `record_commit`, `record_check`, `record_approval`) are tools too, but only the kernel may take them.
+- **Events**: one per action (`AnswerCreated`, `CommitApproveCommit`, `CommitCheckCommit`, `CommitCreated`, `CommitDeliver`, `CommitRecordApproval`, `CommitRecordCheck`, `DecisionRequestCreated`, `DecisionRequestDecide`, `DraftCommitDraft`, `ElementConfirmElement`, `ElementCreated`, `ElementMarkUnknown`, `QuestionCreated`, `SourceCreated`, `SourceFetchSource`, `SourceRecordFetch`); the current state is the events replayed in order.
 - **World map** (`world-map.json`): every object, link, stage and (stage, action) edge.
-- **Harness**: passes; decided cells covered per level: model 51/51, execution 51/51, mcp 51/51; 0 finding(s).
+- **Harness**: passes; decided cells covered per level: model 54/54, execution 54/54, mcp 54/54; 0 finding(s).

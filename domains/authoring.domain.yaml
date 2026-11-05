@@ -467,6 +467,24 @@ actions:
       ref: interview:interview/authoring/log.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: proposed
+  deliver:
+    description: Ask Delivery to deliver an approved commit to an environment.
+    actor:
+    - owner
+    target: Commit
+    params:
+      environment:
+        enum:
+        - local
+    preconditions:
+    - id: approved
+      check: target.approved == true
+      reason: Only an approved commit is delivered.
+    source:
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L8
+      quote: 20번, 21번 둘 다 추천대로 동의.
+    status: proposed
 transitions:
   Source:
     field: stage
@@ -519,6 +537,7 @@ transitions:
         record_check: recorded
         approve_commit: recorded
         record_approval: recorded
+        deliver: recorded
 invariants:
 - id: approved-commits-passed-their-checks
   'on': Commit
@@ -704,3 +723,19 @@ scenarios:
     target: S-docs
     expect:
       denied_by: matrix
+handoffs:
+  deliver_approved_commit:
+    when:
+      action: deliver
+      outcome: ok
+    to:
+      domain: delivery
+      interface: 1.x
+      action: request_delivery
+    params:
+      domain_id: target.domain_id
+      commit: target.id
+      interface: target.interface
+      environment: params.environment
+      approver: actor.id
+    target: target.domain_id + ':' + target.id + ':' + params.environment

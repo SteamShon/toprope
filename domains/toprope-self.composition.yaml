@@ -1,0 +1,8 @@
+# The two self domains of M1 (ADR-0022, ADR-0026): Authoring hands approved commits to Delivery.
+composition: toprope-self
+version: 1
+members:
+  authoring: {declaration: authoring.domain.yaml, interface: 1}
+  delivery:  {declaration: delivery.domain.yaml,  interface: 1}
+wiring:
+  - {from: authoring.deliver_approved_commit, to: delivery.request_delivery}
