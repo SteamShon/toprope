@@ -45,7 +45,8 @@ effect = {"oneOf": [  # `create` is not in v1
     obj({"set": {"type": "object", "additionalProperties": {"type": ["string", "number", "boolean", "null"]}}},
         ["set"]),
     obj({"call": {"enum": ["validate", "compile", "check_composition", "run_harness", "world_map",
-                           "read_source", "fetch_source", "preview", "deploy"]},       # kernel services (ADR-0028)
+                           "read_source", "fetch_source", "commit", "diff", "approve_commit",
+                           "preview", "deploy"]},       # kernel services (ADR-0028, ADR-0029)
          "with": {"type": "object", "additionalProperties": EXPR},
          "reply": {"type": "string"}}, ["call", "reply"]),
 ]}

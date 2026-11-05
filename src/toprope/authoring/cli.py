@@ -6,6 +6,9 @@
   toprope-author progress [--workspace DIR]
   toprope-author fetch [SOURCE_ID] [--workspace DIR]   fetch link sources into snapshots
   toprope-author skip STAGE --reason TEXT             an optional stage has nothing
+  toprope-author commit [-m MESSAGE]                  compile the working copy into a commit (ADR-0029)
+  toprope-author diff [FROM] TO                       what changed directly between two commits
+  toprope-author approve COMMIT --as NAME [--yes]     tag a commit as approved (only you)
   toprope-author confirm PATH... [--workspace DIR] [--yes]   only you confirm
   toprope-author check [--workspace DIR]
 """
@@ -55,6 +58,17 @@ def main(argv: list[str] | None = None) -> None:
         if name == "skip":
             p.add_argument("stage")
             p.add_argument("--reason", required=True)
+    cm = sub.add_parser("commit")
+    cm.add_argument("--workspace", default=".")
+    cm.add_argument("-m", "--message", default="")
+    df = sub.add_parser("diff")
+    df.add_argument("commits", nargs="+", help="[FROM] TO")
+    df.add_argument("--workspace", default=".")
+    ap_ = sub.add_parser("approve")
+    ap_.add_argument("commit")
+    ap_.add_argument("--as", dest="who", required=True, help="your name: the approver")
+    ap_.add_argument("--workspace", default=".")
+    ap_.add_argument("--yes", action="store_true")
     c = sub.add_parser("confirm")
     c.add_argument("paths", nargs="+")
     c.add_argument("--workspace", default=".")
@@ -88,6 +102,18 @@ def main(argv: list[str] | None = None) -> None:
             out = ws.check()
             print(json.dumps(out, indent=2, ensure_ascii=False))
             raise SystemExit(0 if out.get("parses") and out.get("harness", {}).get("ok", False) else 1)
+        elif args.cmd == "commit":
+            print(json.dumps(ws.commit(args.message), indent=2))
+        elif args.cmd == "diff":
+            frm, to = (None, args.commits[0]) if len(args.commits) == 1 else args.commits[:2]
+            print(json.dumps(ws.commits.diff(ws.draft()["domain"], frm, to), indent=2))
+        elif args.cmd == "approve":
+            if not args.yes:
+                if not sys.stdin.isatty():
+                    raise SystemExit("approve needs your terminal (or --yes when you run it yourself)")
+                if input(f"Approve {args.commit} as {args.who}? [y/N] ").strip().lower() != "y":
+                    raise SystemExit("not approved")
+            print(json.dumps(ws.approve_commit(args.commit, via="cli", who=args.who), indent=2))
         elif args.cmd == "confirm":
             if not args.yes:
                 if not sys.stdin.isatty():

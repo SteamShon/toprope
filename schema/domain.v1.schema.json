@@ -379,6 +379,9 @@
                         "world_map",
                         "read_source",
                         "fetch_source",
+                        "commit",
+                        "diff",
+                        "approve_commit",
                         "preview",
                         "deploy"
                       ]

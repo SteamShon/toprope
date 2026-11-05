@@ -199,7 +199,8 @@ def test_local_kernel_services_on_files(tmp_path):
     assert k.call("world_map", {"declaration": "shop.domain.yaml"})["undecided"] == 1
     out = k.call("validate", {"declaration": "../outside.yaml"})
     assert not out["ok"] and "outside" in out["error"] and set(out) == set(CATALOG["validate"].fields())
-    nodeploy = k.call("deploy", {"build": "b", "approver": "ana"})
+    nodeploy = k.call("deploy", {"domain": "example", "commit": "1-x", "approver": "ana"},
+                      caller={"id": "ana", "kind": "person"})
     assert not nodeploy["ok"] and "no deploy environment" in nodeploy["error"]
 
 
@@ -208,11 +209,14 @@ def test_a_refused_deploy_keeps_its_reason(tmp_path):
     from test_decl import schema_doc_domain
     (tmp_path / "shop.domain.yaml").write_text(yaml.safe_dump(schema_doc_domain(), sort_keys=False))
     k = LocalKernel(tmp_path, environment=LocalEnvironment(tmp_path / "env"), harness_examples=5)
-    b = k.call("preview", {"declaration": "shop.domain.yaml"})
+    ana = {"id": "ana", "kind": "person"}
+    c = k.call("commit", {"declaration": "shop.domain.yaml"})
+    b = k.call("preview", {"domain": "example", "commit": c["id"]})
     assert b["ok"] and b["harness_ok"]
-    out = k.call("deploy", {"build": "nope", "approver": "ana"})
-    assert out == {**out, "ok": False, "deployed": False} and out["error"].startswith("no-build")
-    assert k.call("deploy", {"build": b["build"], "approver": "ana"})["deployed"] is True
+    out = k.call("deploy", {"domain": "example", "commit": c["id"], "approver": "ana"}, caller=ana)
+    assert out == {**out, "ok": False, "deployed": False} and out["error"].startswith("unapproved")
+    assert k.call("approve_commit", {"domain": "example", "commit": c["id"], "approver": "ana"}, caller=ana)["approved"]
+    assert k.call("deploy", {"domain": "example", "commit": c["id"], "approver": "ana"}, caller=ana)["deployed"] is True
 
 
 # -- served from a composition, and the regeneration check ------------------------------------------------

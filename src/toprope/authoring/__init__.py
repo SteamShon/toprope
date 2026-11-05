@@ -483,6 +483,39 @@ class Workspace:
             return {"stop": True, "why": "every attempted or effectful cell is decided", "open": []}
         return {"stop": False, "why": f"{len(open_cells)} attempted or effectful cells are undecided", "open": open_cells}
 
+    # -- commits (ADR-0029; bootstrap until the generated Authoring tool takes over) ---------
+    @property
+    def commits(self):
+        from ..commits import CommitStore
+        return CommitStore(self.root / ".toprope" / "commits")
+
+    def commit(self, message: str = "") -> dict[str, Any]:
+        """Compile the working copy into an immutable commit. Returns what to re-confirm: the
+        elements that changed directly since the last approved commit (or since the start)."""
+        try:
+            c, created = self.commits.commit(self.domain_path, message=message)
+        except ValidationError as e:
+            raise AuthoringError(f"the draft does not parse: {e.errors()[0]['msg']}") from None
+        base = self.commits.latest_approved(c.domain)
+        review = self.commits.diff(c.domain, base.id if base else None, c.id)
+        return {"commit": c.id, "seq": c.seq, "created": created, "interface": c.interface,
+                "since": base.id if base else None, **review}
+
+    def approve_commit(self, commit_id: str, via: str, who: str) -> dict[str, Any]:
+        """Tag a commit as approved. Only a person, through a human channel (as `confirm`)."""
+        if via not in ("cli", "elicitation"):
+            raise AuthoringError("only a person approves, through the CLI or an MCP elicitation")
+        d = self.draft().get("domain")
+        if not isinstance(d, str) or not d:
+            raise AuthoringError("the draft names no `domain`, so there is no commit log to approve in")
+        from ..commits import CommitError
+        try:
+            new = self.commits.approve(d, commit_id, who)
+        except CommitError as e:
+            raise AuthoringError(str(e)) from None
+        self._append(self.log_path, {"at": _now(), "kind": "approve", "commit": commit_id, "via": via, "who": who})
+        return {"commit": commit_id, "approved": True, "new": new}
+
     # -- logs ------------------------------------------------------------------------------
     def _append(self, path: Path, entry: dict[str, Any]) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)

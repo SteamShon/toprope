@@ -24,13 +24,19 @@ def complete(svc: Service, result: dict[str, Any]) -> dict[str, Any]:
 
 
 class KernelServices(ABC):
-    def call(self, service: str, inputs: dict[str, Any]) -> dict[str, Any]:
+    def call(self, service: str, inputs: dict[str, Any], caller: dict[str, Any] | None = None) -> dict[str, Any]:
+        """`caller` is the actor whose action made the call (`{id, kind}`), from the outbox
+        event. Services that record a person's decision check it, so no declaration can make
+        an agent, the system or the kernel approve or deploy (the fixed floor)."""
         svc = CATALOG.get(service)
         if svc is None:
             raise KeyError(f"no kernel service {service!r}")
         missing = [i for i in svc.inputs if i not in inputs]
         if missing:
             return svc.failure(f"missing inputs {missing}")
+        if "approver" in svc.inputs:
+            if not caller or caller.get("kind") != "person" or caller.get("id") != inputs["approver"]:
+                return svc.failure(f"{service} records a person's decision: the calling person must be the approver")
         try:
             return complete(svc, self.run(service, {k: inputs[k] for k in svc.inputs}))
         except Exception as e:   # a failure still replies: the declaration decides what it means
@@ -52,11 +58,13 @@ class RecordingKernel(KernelServices):
 
 class LocalKernel(KernelServices):
     def __init__(self, root: str | Path, workspace: Any = None, environment: Any = None,
-                 harness_examples: int = 50):
+                 harness_examples: int = 50, commits: Any = None):
+        from ..commits import CommitStore
         self.root = Path(root).resolve()
         self.workspace = workspace          # toprope.authoring.Workspace, for sources
         self.environment = environment      # toprope.deploy.LocalEnvironment, for preview and deploy
         self.examples = harness_examples
+        self.commits = commits or CommitStore(self.root / ".toprope" / "commits")
 
     def _path(self, rel: str) -> Path:
         p = (self.root / str(rel)).resolve()
@@ -64,8 +72,6 @@ class LocalKernel(KernelServices):
             raise ValueError(f"{rel} is outside the kernel's root")
         return p
 
-    def run(self, service, inputs):
-        return getattr(self, f"_{service}")(**inputs)
 
     def _domain(self, declaration: str):
         from ..decl import load_domain
@@ -122,19 +128,35 @@ class LocalKernel(KernelServices):
         (meta,) = self.workspace.fetch(source)
         return {"sha256": meta["sha256"]}
 
-    def _preview(self, declaration):
+    # -- commits (ADR-0029) -----------------------------------------------------------------
+    def _commit(self, declaration):
+        c, created = self.commits.commit(self._path(declaration))
+        review = self.commits.diff(c.domain, c.parents[0] if c.parents else None, c.id)["to_review"] if created else []
+        return {"id": c.id, "seq": c.seq, "content": c.content, "created": created,
+                "parent": c.parents[0] if c.parents else "", "interface": c.interface, "to_review": review}
+
+    def run(self, service, inputs):
+        if service == "diff":   # `from` is a Python keyword
+            return self.commits.diff(inputs["domain"], inputs["from"] or None, inputs["to"])
+        return getattr(self, f"_{service}")(**inputs)
+
+    def _approve_commit(self, domain, commit, approver):
+        self.commits.approve(domain, commit, approver)
+        return {"approved": True}
+
+    def _preview(self, domain, commit):
         if self.environment is None:
             raise RuntimeError("no deploy environment configured")
-        b = self.environment.preview(self._path(declaration), examples=self.examples)
+        b = self.environment.preview_commit(self.commits, domain, commit, examples=self.examples)
         return {"ok": b.harness_ok, "build": b.id, "harness_ok": b.harness_ok}
 
-    def _deploy(self, build, approver):
+    def _deploy(self, domain, commit, approver):
         from ..deploy import DeployRefused
         from ..types import Actor
         if self.environment is None:
             raise RuntimeError("no deploy environment configured")
         try:
-            self.environment.deploy(build, Actor(approver, "person"))
+            self.environment.deploy_commit(self.commits, domain, commit, Actor(approver, "person"))
         except DeployRefused as e:
             return {"ok": False, "deployed": False, "error": f"{e.rule}: {e.reason}"}
         return {"deployed": True}

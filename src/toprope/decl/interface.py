@@ -102,3 +102,61 @@ def diff_interface(old: dict[str, Element], new: dict[str, Element]) -> Interfac
         else:
             changed.append(k)
     return InterfaceDiff(added, removed, changed, text_only)
+
+
+# -- review (ADR-0029) ---------------------------------------------------------------------------
+PROVENANCE_KEYS = {"source", "status"}
+
+
+def _strip_provenance(obj: Any) -> Any:
+    if isinstance(obj, dict):
+        return {k: _strip_provenance(v) for k, v in obj.items() if k not in PROVENANCE_KEYS}
+    if isinstance(obj, list):
+        return [_strip_provenance(v) for v in obj]
+    return obj
+
+
+def review_hash(content: Any) -> str:
+    """The hash that decides whether a confirmation carries over: everything an element says,
+    references and wording included, except its provenance (`source`, `status`). Confirming an
+    element therefore does not change it."""
+    data = content if isinstance(content, dict) else {"value": content}
+    return hashlib.sha256(_canon(_strip_provenance(data)).encode()).hexdigest()[:16]
+
+
+def review_elements(d: Domain) -> dict[str, str]:
+    """Every reviewable element of a declaration, key → review hash. The interface's elements,
+    plus what an owner confirms but other layers do not compile against: roles, each object's
+    stage field and initial stage, handoffs, scenarios, fixtures and purpose."""
+    dump = lambda m: m.model_dump(mode="json", by_alias=True, exclude_none=True)  # noqa: E731
+    out = {k: review_hash(e.content) for k, e in interface(d).items()}
+    for r in d.roles:
+        out[f"role:{r}"] = review_hash({"role": r})
+    for obj, tr in d.transitions.items():
+        out[f"stages:{obj}"] = review_hash({"field": tr.field, "initial": tr.initial})
+    for name, h in d.handoffs.items():
+        out[f"handoff:{name}"] = review_hash(dump(h))
+    for sc in d.scenarios:
+        out[f"scenario:{sc.id}"] = review_hash(dump(sc))
+    for fx in d.world.fixtures:
+        ((obj, data),) = fx.items()
+        out[f"fixture:{obj}.{data.get('id')}"] = review_hash(data)
+    if d.purpose is not None:
+        out["purpose"] = review_hash(dump(d.purpose))
+    return out
+
+
+@dataclass(frozen=True)
+class ReviewDiff:
+    changed: list[str]     # directly changed: the owner re-confirms these
+    added: list[str]       # new: the owner confirms these
+    removed: list[str]
+
+    @property
+    def to_review(self) -> list[str]:
+        return sorted(self.changed + self.added)
+
+
+def review_diff(old: dict[str, str], new: dict[str, str]) -> ReviewDiff:
+    return ReviewDiff(changed=sorted(k for k in set(old) & set(new) if old[k] != new[k]),
+                      added=sorted(set(new) - set(old)), removed=sorted(set(old) - set(new)))

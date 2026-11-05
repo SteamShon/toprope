@@ -431,8 +431,17 @@ works. The catalog is the kernel itself (ADR-0027):
 | `world_map` | `declaration` | `undecided`, `unreachable`, `edges` |
 | `read_source` | `source` | `chunks`, `local_only` |
 | `fetch_source` | `source` | `sha256` |
-| `preview` | `declaration` | `build`, `harness_ok` |
-| `deploy` | `build`, `approver` | `deployed` (under the fixed floor, ADR-0022) |
+| `commit` | `declaration` | `id`, `seq`, `content`, `created`, `parent`, `interface`, `to_review` (ADR-0029) |
+| `diff` | `domain`, `from`, `to` | `changed`, `added`, `removed`, `to_review` |
+| `approve_commit` | `domain`, `commit`, `approver` | `approved` (immutable tag) |
+| `preview` | `domain`, `commit` | `build`, `harness_ok` |
+| `deploy` | `domain`, `commit`, `approver` | `deployed` (under the fixed floor, ADR-0022, ADR-0029) |
+
+`changed`, `added`, `removed` and `to_review` are lists of element keys: a reply param that
+receives one is `{type: string, many: true}`. `approve_commit` and `deploy` record a person's
+decision: the kernel refuses them unless the action that called them was taken by that person
+(the `approver`), so no declaration can make an agent, the system or the kernel approve or
+deploy.
 
 ```yaml
 actions:
@@ -467,6 +476,10 @@ Rules:
   reply exists, targets the same object type and allows `external:kernel`; the reply's
   params are fields of the result, of the same type. An action is either for
   `external:kernel` or for others, never both.
+- **A reply may create** the object a service names (ADR-0029): `commit` returns an `id`, and
+  a reply with `creates:` makes the Commit with that id. It runs only on success. If the
+  object exists already (the working copy was unchanged), nothing is created and that is not
+  an error.
 - **Testing.** In scenarios, the kernel's results are ordinary steps:
   `{actor: {external: kernel}, do: record_harness_result, target: V1, params: {ok: true, findings: 0}}`.
 

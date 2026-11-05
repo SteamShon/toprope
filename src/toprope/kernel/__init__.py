@@ -23,13 +23,14 @@ class Service:
     name: str
     description: str
     inputs: dict[str, str]                  # input → type (all inputs are required)
+    # field → type: boolean | integer | number | string | strings (a list of strings)
     result: dict[str, str] = field(default_factory=dict)   # field → type, besides ok and error
 
     def fields(self) -> dict[str, str]:
         return {"ok": "boolean", "error": "string", **self.result}
 
     def failure(self, error: str) -> dict[str, Any]:
-        default = {"boolean": False, "integer": 0, "number": 0.0, "string": ""}
+        default = {"boolean": False, "integer": 0, "number": 0.0, "string": "", "strings": []}
         return {**{k: default[t] for k, t in self.fields().items()}, "ok": False, "error": error}
 
 
@@ -48,9 +49,23 @@ CATALOG: dict[str, Service] = {s.name: s for s in (
             {"chunks": "integer", "local_only": "boolean"}),
     Service("fetch_source", "Fetch a workspace link source into its snapshot.", {"source": "string"},
             {"sha256": "string"}),
-    Service("preview", "Build a preview: the harness and world map for a declaration.", {"declaration": "string"},
+    # Commits (ADR-0029). `commit` returns an `id`, so a reply may create the Commit object.
+    Service("commit", "Snapshot a working copy as an immutable commit (no new commit if unchanged).",
+            {"declaration": "string"},
+            {"id": "string", "seq": "integer", "content": "string", "created": "boolean", "parent": "string",
+             "interface": "string", "to_review": "strings"}),
+    Service("diff", "The semantic diff between two commits: what changed directly.",
+            {"domain": "string", "from": "string", "to": "string"},
+            {"changed": "strings", "added": "strings", "removed": "strings", "to_review": "strings"}),
+    Service("approve_commit", "Tag a commit as approved; immutable. The calling person must be the approver.",
+            {"domain": "string", "commit": "string", "approver": "string"},
+            {"approved": "boolean"}),
+    Service("preview", "Build a commit for deployment: its harness and world map.",
+            {"domain": "string", "commit": "string"},
             {"build": "string", "harness_ok": "boolean"}),
-    Service("deploy", "Deploy a previewed build under the fixed floor (ADR-0022).", {"build": "string", "approver": "string"},
+    Service("deploy", "Point an environment at a commit, under the fixed floor (ADR-0022, ADR-0029). "
+            "The calling person must be the approver.",
+            {"domain": "string", "commit": "string", "approver": "string"},
             {"deployed": "boolean"}),
 )}
 
