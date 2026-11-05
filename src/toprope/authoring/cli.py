@@ -6,12 +6,15 @@
   toprope-author progress [--workspace DIR]
   toprope-author fetch [SOURCE_ID] [--workspace DIR]   fetch link sources into snapshots
   toprope-author skip STAGE --reason TEXT             an optional stage has nothing
-  toprope-author commit [-m MESSAGE] [--branch B] [--merge C]
+  toprope-author commit [-m MESSAGE] [--branch B] [--merge C] [--as NAME]
                                                       compile the working copy into a commit on a
                                                       branch (ADR-0029, ADR-0033; default `work`)
   toprope-author diff [FROM] TO                       what changed directly between two commits
   toprope-author merge [--branch B]                   bring main into the working copy; lists conflicts
   toprope-author branches                             every branch and the commit it points to
+  toprope-author log ELEMENT [--at COMMIT]            an element's history (ADR-0032), e.g. action:launch
+  toprope-author checkout COMMIT [--force]            load a commit into the working copy (a revert,
+                                                      once committed)
   toprope-author approve COMMIT --as NAME [--yes]     merge a commit into main and tag it (only you)
   toprope-author confirm PATH... [--workspace DIR] [--yes]   only you confirm
   toprope-author check [--workspace DIR]
@@ -67,6 +70,15 @@ def main(argv: list[str] | None = None) -> None:
     cm.add_argument("-m", "--message", default="")
     cm.add_argument("--branch", default="work")
     cm.add_argument("--merge", default=None, help="the commit whose conflicts this working copy resolves")
+    cm.add_argument("--as", dest="author", default="", help="your name: the commit's author")
+    lg = sub.add_parser("log")
+    lg.add_argument("element")
+    lg.add_argument("--at", default=None)
+    lg.add_argument("--workspace", default=".")
+    co = sub.add_parser("checkout")
+    co.add_argument("commit")
+    co.add_argument("--force", action="store_true", help="discard changes no commit holds")
+    co.add_argument("--workspace", default=".")
     mg = sub.add_parser("merge")
     mg.add_argument("--branch", default="work")
     mg.add_argument("--workspace", default=".")
@@ -114,7 +126,11 @@ def main(argv: list[str] | None = None) -> None:
             print(json.dumps(out, indent=2, ensure_ascii=False))
             raise SystemExit(0 if out.get("parses") and out.get("harness", {}).get("ok", False) else 1)
         elif args.cmd == "commit":
-            print(json.dumps(ws.commit(args.message, branch=args.branch, merge=args.merge), indent=2))
+            print(json.dumps(ws.commit(args.message, branch=args.branch, merge=args.merge, author=args.author), indent=2))
+        elif args.cmd == "log":
+            print(json.dumps(ws.element_log(args.element, args.at), indent=2, ensure_ascii=False))
+        elif args.cmd == "checkout":
+            print(json.dumps(ws.checkout(args.commit, force=args.force), indent=2))
         elif args.cmd == "merge":
             print(json.dumps(ws.merge_main(args.branch), indent=2, default=str))
         elif args.cmd == "branches":

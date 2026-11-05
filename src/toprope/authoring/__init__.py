@@ -498,14 +498,16 @@ class Workspace:
         from ..commits import CommitStore
         return CommitStore(self.root / ".toprope" / "commits")
 
-    def commit(self, message: str = "", branch: str = "work", merge: str | None = None) -> dict[str, Any]:
+    def commit(self, message: str = "", branch: str = "work", merge: str | None = None,
+               author: str = "") -> dict[str, Any]:
         """Compile the working copy into an immutable commit on a branch (ADR-0033). Returns what
         to re-confirm: the elements that changed directly since the branch's merge base with
         `main` (`since`; None before the first approval). `merge` names the commit whose
         conflicts this working copy resolves."""
         from ..commits import CommitError
         try:
-            c, created = self.commits.commit(self.domain_path, message=message, branch=branch, merge=merge)
+            c, created = self.commits.commit(self.domain_path, message=message, branch=branch, merge=merge,
+                                             author=author)
         except ValidationError as e:
             raise AuthoringError(f"the draft does not parse: {e.errors()[0]['msg']}") from None
         except CommitError as e:
@@ -516,13 +518,42 @@ class Workspace:
         return {"commit": c.id, "seq": c.seq, "branch": branch, "created": created, "interface": c.interface,
                 "since": base_id, **review}
 
+    def checkout(self, commit_id: str, force: bool = False) -> dict[str, Any]:
+        """Load a commit into the working copy (ADR-0032); committing it is a revert or a restart.
+        Refused when the working copy has changes no commit holds, unless `force`."""
+        from ..commits import CommitError
+        try:
+            d = self.draft().get("domain")
+        except Exception as e:                       # noqa: BLE001 - an unreadable draft
+            if not force:
+                raise AuthoringError(f"cannot read the working copy: {e}") from None
+            d = next((x.name for x in sorted(self.commits.root.glob("*")) if x.is_dir()
+                      and any(c.id == commit_id for c in self.commits.log(x.name))), None)
+        if not isinstance(d, str) or not d:
+            raise AuthoringError("the draft names no `domain`, so there is no commit log to check out from")
+        try:
+            c = self.commits.checkout(d, commit_id, self.domain_path, force=force)
+        except CommitError as e:
+            raise AuthoringError(str(e)) from None
+        return {"commit": c.id, "content": c.content}
+
+    def element_log(self, key: str, at: str | None = None) -> list[dict[str, Any]]:
+        """An element's history (ADR-0032): the commits that changed it, with what it cites."""
+        from ..commits import CommitError
+        d = self.draft().get("domain")
+        if not isinstance(d, str) or not d:
+            raise AuthoringError("the draft names no `domain`, so there is no commit log")
+        try:
+            return self.commits.element_log(d, key, at)
+        except CommitError as e:
+            raise AuthoringError(str(e)) from None
+
     def merge_main(self, branch: str = "work") -> dict[str, Any]:
         """Bring `main` into a branch's working copy (ADR-0033). Writes the semantic 3-way merge
         into the working copy and lists the conflicts for the person to resolve: at a path
         conflict the branch's value is kept; at an element conflict the element holds both
         sides' changes, field by field, for the person to judge. Then `commit(merge=<main>)` records both parents.
         Refuses when the working copy has changes not yet committed to the branch."""
-        from ..commits import content_id
         d = self.draft().get("domain")
         if not isinstance(d, str) or not d:
             raise AuthoringError("the draft names no `domain`, so there is no commit log to merge in")
@@ -532,24 +563,14 @@ class Workspace:
             raise AuthoringError(f"nothing to merge: {'main' if main is None else branch} has no commits")
         if self.commits.is_ancestor(d, main.id, head.id):
             return {"merge": main.id, "branch": branch, "up_to_date": True, "conflicts": []}
-        folder = self.domain_path.parent
         try:
-            present = self.commits.representations_for(d, folder)
-            reps = {p.name: load_yaml(p.read_text()) for p in present}
-            if content_id(self.draft(), reps) != head.content:
+            current, present = self.commits.working_copy(d, self.domain_path)
+            if current != head.content:
                 raise AuthoringError(f"the working copy has changes not committed to {branch}: commit them first")
             m = self.commits.merge3(d, head.id, main.id)
+            self.commits.write_working_copy(d, m.merged, self.domain_path, self.draft().get("version", 1), present)
         except CommitError as e:
             raise AuthoringError(str(e)) from None
-        body = m.merged["domain"]                                   # stored without `version`: keep the draft's
-        out = {"domain": body.get("domain"), "version": self.draft().get("version", 1),
-               **{k: v for k, v in body.items() if k != "domain"}}
-        self.domain_path.write_text(yaml.safe_dump(out, sort_keys=False, allow_unicode=True))
-        for name, rbody in m.merged["representations"].items():
-            (folder / name).write_text(yaml.safe_dump(rbody, sort_keys=False))
-        for p in present:                                           # a UI the merge removed is removed
-            if p.name not in m.merged["representations"]:
-                p.unlink()
         return {"merge": main.id, "branch": branch, "up_to_date": False,
                 "conflicts": [{"path": c.path, "base": c.base, "ours": c.ours, "theirs": c.theirs} for c in m.conflicts]}
 

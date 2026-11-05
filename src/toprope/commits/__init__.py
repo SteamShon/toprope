@@ -130,6 +130,7 @@ class Commit:
     interface: str = "1.0.0"     # the derived interface version (ADR-0008)
     message: str = ""
     branch: str = ""             # the branch it was made on (for reading; refs decide heads)
+    author: str = ""             # who compiled it (ADR-0032); "" when not known
 
 
 def _now() -> str:
@@ -333,7 +334,8 @@ class CommitStore:
 
     # -- writing ----------------------------------------------------------------------------------
     def commit(self, declaration: str | Path, representations: list[str | Path] | None = None,
-               message: str = "", branch: str = DEFAULT_BRANCH, merge: str | None = None) -> tuple[Commit, bool]:
+               message: str = "", branch: str = DEFAULT_BRANCH, merge: str | None = None,
+               author: str = "") -> tuple[Commit, bool]:
         """Snapshot a working copy onto a branch. Returns (commit, created). A new branch starts
         from `main`. Identical content to the branch head returns the head, created False.
         `merge` names a second parent: the commit whose conflicts this working copy resolves."""
@@ -359,10 +361,10 @@ class CommitStore:
                     self._move(dirp, branch, head.id)
                 return head, False
             parents = ([head.id] if head else []) + ([merge] if merge else [])
-            return self._write(dirp, d, raw, reps, cid, parents, message, branch), True
+            return self._write(dirp, d, raw, reps, cid, parents, message, branch, author), True
 
     def _write(self, dirp: Path, d: Domain, raw: dict[str, Any], reps: dict[str, Any], cid: str,
-               parents: list[str], message: str, branch: str) -> Commit:
+               parents: list[str], message: str, branch: str, author: str = "") -> Commit:
         """Store a commit and move `branch` to it. Called under the domain lock."""
         domain = d.domain
         seq = max((c.seq for c in self.log(domain)), default=0) + 1
@@ -370,7 +372,7 @@ class CommitStore:
         if parents:
             first = self.get(domain, parents[0])
             iface = _bump(first.interface, diff_interface(interface(self.domain(domain, first.id)), interface(d)).bump)
-        c = Commit(f"{seq}-{cid}", seq, domain, cid, parents, _now(), iface, message, branch)
+        c = Commit(f"{seq}-{cid}", seq, domain, cid, parents, _now(), iface, message, branch, author)
         obj = dirp / "objects" / cid
         if not obj.exists():
             tmp = Path(tempfile.mkdtemp(dir=dirp, prefix=".obj-"))
@@ -405,14 +407,17 @@ class CommitStore:
         self._append(dirp / "refs.jsonl", {"branch": branch, "commit": commit_id, "at": _now()})
 
     @staticmethod
-    def representations_for(domain: str, folder: Path) -> list[Path]:
+    def representations_for(domain: str, folder: Path, strict: bool = True) -> list[Path]:
         """The `*.representation.yaml` files next to a declaration that target its domain. A file
-        that cannot be read is an error, never skipped: a release would silently lose its UI."""
+        that cannot be read is an error, never skipped: a release would silently lose its UI.
+        (`strict=False` skips it, for a forced checkout that overwrites the working copy.)"""
         out = []
         for p in sorted(folder.glob("*.representation.yaml")):
             try:
                 body = load_yaml(p.read_text()) or {}
             except Exception as e:
+                if not strict:
+                    continue
                 raise CommitError(f"cannot read {p.name}: {e}") from None
             if isinstance(body, dict) and (body.get("targets") or {}).get("domain") == domain:
                 out.append(p)
@@ -443,7 +448,7 @@ class CommitStore:
                 d = self._check(c.id, m.merged["domain"])
                 reps = m.merged["representations"]
                 target = self._write(dirp, d, m.merged["domain"], reps, content_id(m.merged["domain"], reps),
-                                     [main.id, c.id], f"merge {c.id} into main", MAIN)
+                                     [main.id, c.id], f"merge {c.id} into main", MAIN, approver)
             self._append(dirp / "approvals.jsonl", {"commit": target.id, "approver": approver, "at": _now(),
                                                     **({"merged": c.id} if target.id != c.id else {})})
             return target
@@ -460,6 +465,133 @@ class CommitStore:
             raise CommitError(f"main with {commit_id} does not validate: "
                               + "; ".join(f"{i.code} at {i.where}" for i in errors[:3]))
         return d
+
+    # -- history and checkout (ADR-0032) --------------------------------------------------------
+    def element_log(self, domain: str, key: str, at: str | None = None) -> list[dict[str, Any]]:
+        """An element's history, like `git log -- path`: every commit reachable from `at` (default:
+        what `main` points to, else the `work` head) that added, changed or removed the element,
+        or changed its provenance (`source`, `status`: what it cites, and whether it is
+        confirmed). Oldest first. A merge commit is listed only when the element differs from
+        every parent, so a change that came in from a parent is credited where it was made."""
+        log = self.log(domain)
+        by_id = {c.id: c for c in log}
+        if at is None:
+            head = self.main(domain) or self.head(domain)
+            if head is None:
+                return []
+            at = head.id
+        elif at not in by_id:
+            raise CommitError(f"no commit {at} in {domain}")
+        reach = self._reach({c.id: c.parents for c in log}, at)
+        cache: dict[str, dict[str, Any]] = {}
+
+        def element(commit_id: str | None) -> Any:
+            if commit_id is None:
+                return None
+            c = by_id[commit_id]
+            if c.content not in cache:                 # read the object directly: no log re-reads
+                raw = load_yaml((self._dir(domain) / "objects" / c.content / "domain.yaml").read_text()) or {}
+                cache[c.content] = review_contents(Domain.model_validate({**raw, "version": c.seq}))
+            return cache[c.content].get(key)
+
+        def provenance(e: Any) -> dict[str, Any]:
+            return {k: e.get(k) for k in ("source", "status")} if isinstance(e, dict) else {}
+        def same(x: Any, y: Any) -> bool:
+            return (x is None and y is None) or (x is not None and y is not None and review_hash(x) == review_hash(y)
+                                                 and provenance(x) == provenance(y))
+        out = []
+        for c in (c for c in log if c.id in reach):
+            new = element(c.id)
+            parents = [element(p) for p in c.parents] or [None]
+            if any(same(new, old) for old in parents):
+                continue                              # unchanged from a parent: it came from there
+            old = parents[0]
+            if old is None:
+                change = "added"
+            elif new is None:
+                change = "removed"
+            elif review_hash(new) != review_hash(old):
+                change = "changed"
+            elif provenance(new) != provenance(old):
+                change = "provenance"
+            else:
+                continue
+            out.append({"commit": c.id, "seq": c.seq, "at": c.at, "author": c.author, "message": c.message,
+                        "change": change, **provenance(new if new is not None else old)})
+        return out
+
+    def working_copy(self, domain: str, declaration: str | Path, strict: bool = True) -> tuple[str | None, list[Path]]:
+        """The working copy's content id (None when it has no declaration) and this domain's
+        representation files next to it. Unreadable files are a CommitError when `strict`;
+        otherwise they are left out, so a forced overwrite can still recover."""
+        path = Path(declaration)
+        folder = path.parent
+        present = self.representations_for(domain, folder, strict=strict) if folder.exists() else []
+        if not strict:
+            return None, present
+        try:
+            reps = {p.name: load_yaml(p.read_text()) for p in present}
+            raw = (load_yaml(path.read_text()) or {}) if path.exists() else None
+        except Exception as e:                       # noqa: BLE001 - any parse error: report the file
+            raise CommitError(f"cannot read the working copy: {e}") from None
+        return (content_id(raw, reps) if raw is not None else None), present
+
+    def write_working_copy(self, domain: str, body: dict[str, Any], declaration: str | Path, version: int,
+                           present: list[Path]) -> None:
+        """Write a body (declaration and representations) into a working copy, under the domain
+        lock: every file goes to a temporary name first, then all are renamed in place, then
+        this domain's representations the body lacks are removed."""
+        path = Path(declaration)
+        folder = path.parent
+        folder.mkdir(parents=True, exist_ok=True)
+        decl = body["domain"]
+        out = {"domain": decl.get("domain"), "version": version, **{k: v for k, v in decl.items() if k != "domain"}}
+        files = {path: yaml.safe_dump(out, sort_keys=False, allow_unicode=True)}
+        files.update({folder / name: yaml.safe_dump(r, sort_keys=False, allow_unicode=True)
+                      for name, r in body["representations"].items()})
+        with self._lock(domain):
+            staged = []
+            try:
+                for target, text in files.items():
+                    fd, tmp = tempfile.mkstemp(dir=folder, prefix=f".{target.name}.")  # same folder: rename is atomic
+                    with os.fdopen(fd, "w") as f:
+                        f.write(text)
+                    staged.append((tmp, target))
+            except BaseException:
+                for tmp, _ in staged:
+                    os.unlink(tmp)
+                raise
+            for tmp, target in staged:
+                os.replace(tmp, target)
+            for p in present:
+                if p.name not in body["representations"] and p.exists():
+                    p.unlink()
+
+    def checkout(self, domain: str, commit_id: str, declaration: str | Path, force: bool = False) -> Commit:
+        """Load a commit's content into a working copy: its declaration and its representations,
+        removing this domain's representations it does not have. The draft keeps its `version`
+        (a new working copy takes the commit's sequence number). Committing the result makes a
+        new commit, so a revert is a commit. Refused when the working copy holds content no
+        commit has (uncommitted changes, including a UI next to a missing declaration), unless
+        `force`; a forced checkout also recovers from an unreadable working copy."""
+        c = self.get(domain, commit_id)
+        path = Path(declaration)
+        if force:
+            _, present = self.working_copy(domain, path, strict=False)
+        else:
+            current, present = self.working_copy(domain, path)
+            known = {x.content for x in self.log(domain)}
+            if (current is not None and current not in known) or (current is None and present):
+                raise CommitError(f"{path.name} has changes no commit holds: commit them first")
+        version = c.seq
+        try:
+            draft = load_yaml(path.read_text()) if path.exists() else None
+            if isinstance(draft, dict) and isinstance(draft.get("version"), int):
+                version = draft["version"]
+        except Exception:  # noqa: BLE001, S110 - only under force: the draft is overwritten
+            pass
+        self.write_working_copy(domain, self._body(domain, c.id), path, version, present)
+        return c
 
     # -- the semantic diff ------------------------------------------------------------------------
     def diff(self, domain: str, a: str | None, b: str) -> dict[str, Any]:
