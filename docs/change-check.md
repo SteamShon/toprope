@@ -1,8 +1,7 @@
 # The change check
 
-Link: ① iterate safely. ADR-0009, ADR-0018, ADR-0032 (records), ADR-0033 (the base). M0a
-sub-PR 8. The incremental version (impact report, affected-only reruns, a result cache) is
-sub-PR 9 (ADR-0013).
+Link: ① iterate safely. ADR-0009, ADR-0018, ADR-0032 (records), ADR-0033 (the base),
+ADR-0013 (incremental). M0a sub-PRs 8 and 9.
 
 ```bash
 uv run toprope-author change-check                    # the `work` head, against its merge base with main
@@ -38,6 +37,30 @@ is deployed. It exits 1 when a check reports an error. The report is printed, wr
   is not replayed, and a mistyped `--env` is an error, never an empty environment.
 - **A base with structural errors is no baseline**: nothing is reported as newly lost
   against it.
+
+## Incremental (ADR-0013)
+- **The impact report comes first**, before anything runs: the changed elements and the tests
+  and past actions they affect, in domain terms ("changes 1 cell(s); affects 4 cell test(s),
+  3 flow(s), exploration; replays past launch_experiment"). It is in the report as `impact`,
+  with its time (target ≤ 2 s).
+- **Dependencies are static and conservative.** A case test depends on everything about its
+  action (the action, params, preconditions; a cell test only its own cell), on every object
+  reachable from the action's object through links, on roles, handoffs and fixtures, and on
+  the case as the small world built it, and on the world's actor names. Dependencies are
+  taken over both versions, so removing an element affects what read it. Flows and
+  exploration depend on the whole declaration's shape: interface elements without their
+  text, the other elements whole (fixture and scenario data included), never the glossary
+  or purpose. A description or glossary change reruns nothing.
+- **Results are cached** in `.toprope/cache`, keyed by the hash of a test's inputs and the
+  toolchain (the kernel's source). Unchanged tests are not re-run; a damaged entry is a miss.
+  `--no-cache` runs everything.
+- **Log replay re-decides only affected actions**; the others still advance the replayed
+  state.
+- **Soundness.** `--full` also runs everything uncached and lists **selection misses**: tests
+  that fail uncached but passed from the cache, i.e. bugs in this analysis (target 0; the
+  command exits 1 if there are any). It compares with the cache, so it cannot run with
+  `--no-cache`. Run it in the background and before release PRs.
+- Not yet: the background exploration tier and build taint (ADR-0013 §3).
 
 ## The base
 By default the base is the commit's merge base with `main` (ADR-0033: a branch is reviewed

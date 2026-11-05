@@ -519,11 +519,14 @@ class Workspace:
                 "since": base_id, **review}
 
     def change_check(self, commit_id: str | None = None, branch: str = "work", since: str | None = None,
-              env: str | Path | None = None, examples: int = 50) -> dict[str, Any]:
+                     env: str | Path | None = None, examples: int = 50, cache: bool = True,
+                     full: bool = False) -> dict[str, Any]:
         """Run the change check on a commit (default: the branch head) and record it on the
         commit (ADR-0009, ADR-0032). `since` is the base (default: the merge base with `main`);
         `env` a deploy environment, whose event store feeds log replay and the in-flight check.
-        The report is also written to `.toprope/checks/<commit>.json`."""
+        The report is also written to `.toprope/checks/<commit>.json`. Unchanged tests come
+        from the result cache in `.toprope/cache` (ADR-0013) unless `cache` is False; `full`
+        also runs everything uncached and lists selection misses (target 0)."""
         from ..check import check_commit
         from ..commits import CommitError
         d = self.draft().get("domain")
@@ -538,14 +541,19 @@ class Workspace:
                     raise AuthoringError(f"no branch {branch!r}; branches: {sorted(refs)}")
                 commit_id = refs[branch]
             base = since if since is not None else "merge-base"
+            from ..incremental import ResultCache
+            if full and not cache:
+                raise AuthoringError("--full compares with the result cache; it cannot run with --no-cache")
+            rc = ResultCache(self.root / ".toprope" / "cache") if cache else None
             if env is not None:
                 from ..deploy import LocalEnvironment
                 if not Path(env).is_dir():
                     raise AuthoringError(f"no deploy environment at {env}")
                 with LocalEnvironment(env).events(d) as store:
-                    report = check_commit(self.commits, d, commit_id, base, events=store, examples=examples)
+                    report = check_commit(self.commits, d, commit_id, base, events=store, examples=examples,
+                                          cache=rc, full=full)
             else:
-                report = check_commit(self.commits, d, commit_id, base, examples=examples)
+                report = check_commit(self.commits, d, commit_id, base, examples=examples, cache=rc, full=full)
         except CommitError as e:
             raise AuthoringError(str(e)) from None
         out = {"commit": commit_id, **report.to_json()}

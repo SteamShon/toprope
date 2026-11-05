@@ -165,11 +165,13 @@ class LocalKernel(KernelServices):
 
     def _change_check(self, domain, commit):
         from ..check import check_commit
+        from ..incremental import ResultCache
+        rc = ResultCache(self.root / ".toprope" / "cache")
         if self.environment is not None:
             with self.environment.events(domain) as store:
-                r = check_commit(self.commits, domain, commit, events=store, examples=self.examples)
+                r = check_commit(self.commits, domain, commit, events=store, examples=self.examples, cache=rc)
         else:
-            r = check_commit(self.commits, domain, commit, examples=self.examples)
+            r = check_commit(self.commits, domain, commit, examples=self.examples, cache=rc)
         return {"passed": r.ok, "errors": r.errors, "warnings": r.warnings,
                 "failing": [n for n, c in r.checks.items() if not c.ok], "summary": r.summary()}
 
