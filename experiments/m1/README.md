@@ -1,6 +1,6 @@
 # M1 instruments
 
-Link: ① iterate safely, ② model is right. Experiment design:
+Link: ① iterate safely, ⑥ (partial); self-compile. ② moved to M2 (ADR-0030). Experiment design:
 [`docs/experiments/M1-self-compile.md`](../../docs/experiments/M1-self-compile.md).
 
 The templates in `instruments/` define the **format only**. The content is written by the
@@ -15,9 +15,9 @@ plan) is in [`interview-guide.md`](interview-guide.md). It holds no content.
 
 | File (copy from `*.template.yaml`) | Shown to | Written | Frozen |
 |---|---|---|---|
-| `gold-scenarios.yaml` (about 30 per self domain, in one file; half of each domain `held_out`; shared `fact` keys across domains) | no arm, ever (held out); answers are graded from the model's read surface | M0a, before change checks are built | M0a |
+| `gold-scenarios.yaml`: the **correctness set** (ADR-0030), about 10–15 items in all, across both self domains and their composition; `held_out` optional; shared `fact` keys across domains | graded from the compiled models' read surface | M0a, before change checks are built | M0a |
 | `probe-suite.yaml` | no arm before deploy; run after each deploy | M0a | M0a |
-| `change-requests.yaml` (about 20, written as **intents**) | all arms | M0a | M0a |
+| `change-requests.yaml` (about 20, written as **intents**, against the commit model of ADR-0029) | all arms | M0a | M0a |
 | `change-key.yaml` (seeded problems) | **sealed**: no arm, agent or reviewer during the experiment | M0a | M0a |
 | `verdict-rules.yaml` (start from the draft template) | everyone | M0a | M0a |
 | `binding.yaml` (intent → element names) | the harness | after Phase A, before any arm runs | then |

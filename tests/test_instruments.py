@@ -70,3 +70,9 @@ def test_a_fact_spanning_domains_names_the_composition(tmp_path, capsys):
     assert errs and "domain must be one of" in errs[0]
     errs, _ = run(filled(tmp_path, [item], compositions=["toprope-authoring"]), capsys)
     assert errs == ["gold: ['toprope-authoring'] listed as both a domain and a composition"]
+
+
+def test_an_all_shown_correctness_set_draws_no_held_out_warning(tmp_path, capsys):
+    items = [{"id": f"A{i}", "domain": "toprope-authoring", "held_out": False} for i in range(4)]
+    errs, out = run(filled(tmp_path, items), capsys)
+    assert errs == [] and "held out" not in out
