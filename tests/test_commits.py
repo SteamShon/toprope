@@ -255,3 +255,15 @@ def test_authoring_cli_commit_diff_approve(tmp_path):
     assert c2["since"] == c1["commit"] and c2["to_review"] == ["action:launch_experiment"]
     d = json.loads(run("diff", c1["commit"], c2["commit"]).stdout)
     assert d["changed"] == ["action:launch_experiment"]
+
+
+def test_approving_without_a_domain_or_an_unknown_commit_is_an_authoring_error(tmp_path):
+    from toprope.authoring import AuthoringError, Workspace
+    (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump({"domain": "d.domain.yaml", "sources": []}))
+    (tmp_path / "d.domain.yaml").write_text("version: 1\n")
+    ws = Workspace(tmp_path)
+    with pytest.raises(AuthoringError, match="names no `domain`"):
+        ws.approve_commit("1-x", via="cli", who="ana")
+    write(tmp_path / "d.domain.yaml", schema_doc_domain())
+    with pytest.raises(AuthoringError, match="no commit"):
+        ws.approve_commit("1-x", via="cli", who="ana")

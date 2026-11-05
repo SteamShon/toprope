@@ -506,7 +506,13 @@ class Workspace:
         if via not in ("cli", "elicitation"):
             raise AuthoringError("only a person approves, through the CLI or an MCP elicitation")
         d = self.draft().get("domain")
-        new = self.commits.approve(d, commit_id, who)
+        if not isinstance(d, str) or not d:
+            raise AuthoringError("the draft names no `domain`, so there is no commit log to approve in")
+        from ..commits import CommitError
+        try:
+            new = self.commits.approve(d, commit_id, who)
+        except CommitError as e:
+            raise AuthoringError(str(e)) from None
         self._append(self.log_path, {"at": _now(), "kind": "approve", "commit": commit_id, "via": via, "who": who})
         return {"commit": commit_id, "approved": True, "new": new}
 
