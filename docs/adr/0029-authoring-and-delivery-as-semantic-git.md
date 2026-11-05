@@ -26,7 +26,8 @@ Toprope already has the parts that make this semantic rather than textual:
 
 ## Decision (the researcher's, as handed off)
 1. **Authoring is a commit log.**
-   - One working copy per domain. There are no branches in M1.
+   - One working copy per domain. There are no branches in M1. *(Superseded by ADR-0033:
+     branches from the start.)*
    - Compiling the working copy makes an **immutable candidate commit**. Every later change
      is a new commit.
    - **Approve is an immutable tag on a commit.** It cannot be removed or undone. A wrong
@@ -141,6 +142,8 @@ researcher's choice and are repeated as open questions below.
    the change check on the merge result, with the merge commit approved as a new candidate.
    It is decided in M2's spec PR. To keep that open at no cost, a commit records its
    **parents as a list** (one parent in M1), and `diff` works between any two commits.
+   *Superseded by ADR-0033: branches from the start, with this merge shape and a protected
+   `main`.*
 4. **Reply-creates:** accepted. A kernel reply action may `creates:` an object of another
    type, so Commits are real, immutable objects. This amends ADR-0028 and, narrowly,
    ADR-0021: creation by a kernel reply only.

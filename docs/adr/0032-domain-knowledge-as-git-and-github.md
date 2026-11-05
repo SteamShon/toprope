@@ -24,7 +24,7 @@ not need the researcher.
 | diff | the semantic diff by element (review hash) | exists |
 | `git log -- path`, `git blame` | an element's history: the commits that changed it, with the source and answer it cites | **closed: add** an element log |
 | `git checkout <commit>` / `git revert` | load a commit's content into the working copy, then commit (a revert is a new commit) | **closed: add** a `checkout` kernel service and CLI command |
-| branch, merge | none in M1; M2 candidate (ADR-0029) | decided |
+| branch, merge | branches from the start (ADR-0033) | decided |
 | tag, release | approval tag; an environment ref to the deployed commit | exists |
 | pull request | no separate object: the review is the range from the last approved commit to the head, with its change report | **closed** (see 1) |
 | review comment on a line | a question attached to an element of a commit, answered in the interview | **closed** (see 2) |
@@ -61,9 +61,9 @@ not need the researcher.
    - an element log
    - `checkout`
 
-## Open (the researcher's)
-- **How sources connect.** Sources will range over operational databases and models,
-  BigQuery datasets, papers, Notion, Jira, Linear and more, so a Source port with connector
-  adapters is needed. Which way should connectors come in: as MCP clients of existing MCP
-  servers, or as Toprope's own adapters per system? This is recorded here and decided in its
-  own ADR.
+## Resolved (researcher, 2026-11-05)
+- **Sources connect through MCP.** Connectors for operational databases and models,
+  BigQuery, papers, Notion, Jira, Linear and others come in as MCP clients of existing MCP
+  servers. Toprope's Source port still applies redaction, local-only and citation refs to
+  everything read through them. The port's detail gets its own ADR when it is built (M0b).
+- **Branches from the start** (ADR-0033) replace this ADR's "branch, merge: M2" row.
