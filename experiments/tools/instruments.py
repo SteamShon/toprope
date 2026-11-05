@@ -135,7 +135,9 @@ def validate(d: Path, include_binding: bool = True) -> list[str]:
             by_domain.setdefault(str(s.get("domain") or g.get("domain")), []).append(s)
         for dom, xs in sorted(by_domain.items()):
             held = sum(1 for s in xs if s.get("held_out"))
-            if xs and not (0.35 <= held / len(xs) <= 0.65):
+            # Held-out is optional since ADR-0030 (a correctness set may be all shown): warn only
+            # about a split that is neither all shown nor about half.
+            if xs and held and not (0.35 <= held / len(xs) <= 0.65):
                 warn.append(f"gold {dom}: {held}/{len(xs)} held out (target about half)")
     if (r := docs["change-requests"]) and (k := docs["change-key"]):
         seqs = [x["seq"] for x in items(r, "requests")]
