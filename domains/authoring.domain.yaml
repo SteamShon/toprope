@@ -112,45 +112,30 @@ objects:
       ref: system:src/toprope/commits/__init__.py#L361-L480
     status: proposed
 links:
-  answers:
+  question:
     from: Answer
     to: Question
     cardinality: many-to-one
     required: true
     source:
-      kind: system
-      ref: system:src/toprope/authoring/__init__.py#L241-L360
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L3
+      quote: 7번, 8번 둘 다 추천대로 해도 될 것 같아.
     status: proposed
-  cites:
+  source:
     from: Element
     to: Source
     cardinality: many-to-one
-    source:
-      kind: system
-      ref: system:src/toprope/authoring/__init__.py#L241-L360
-    status: proposed
-  about:
+  element:
     from: DecisionRequest
     to: Element
     cardinality: many-to-one
-    source:
-      kind: record
-      ref: records:docs/adr/0032-domain-knowledge-as-git-and-github.md#L38-L63
-    status: proposed
   parents:
     from: Commit
     to: Commit
     cardinality: many-to-many
-    source:
-      kind: system
-      ref: system:src/toprope/commits/__init__.py#L1-L120
-    status: proposed
-  checks:
+  commit:
     from: CheckRecord
     to: Commit
     cardinality: many-to-one
     required: true
-    source:
-      kind: system
-      ref: system:src/toprope/commits/__init__.py#L361-L480
-    status: proposed

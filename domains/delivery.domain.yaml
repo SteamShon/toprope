@@ -80,39 +80,23 @@ objects:
       ref: records:docs/experiments/M1-self-domains-scope.md#L33-L56
     status: proposed
 links:
-  built_for:
+  request:
     from: Build
     to: DeliveryRequest
     cardinality: many-to-one
     required: true
-    source:
-      kind: system
-      ref: system:src/toprope/deploy/__init__.py#L1-L120
-    status: proposed
-  deploys:
+  build:
     from: Deployment
     to: Build
     cardinality: many-to-one
     required: true
-    source:
-      kind: system
-      ref: system:src/toprope/deploy/__init__.py#L121-L240
-    status: proposed
-  deployed_to:
+  environment:
     from: Deployment
     to: Environment
     cardinality: many-to-one
     required: true
-    source:
-      kind: system
-      ref: system:src/toprope/deploy/__init__.py#L121-L240
-    status: proposed
-  verifies:
+  deployment:
     from: Verification
     to: Deployment
     cardinality: many-to-one
     required: true
-    source:
-      kind: record
-      ref: records:docs/experiments/M1-self-domains-scope.md#L33-L56
-    status: proposed
