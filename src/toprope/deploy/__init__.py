@@ -136,6 +136,9 @@ class LocalEnvironment:
         b = self.preview(src, levels=levels, examples=examples)
         meta = {**asdict(b), "commit": c.id, "seq": c.seq, "commit_domain": domain}
         (self.root / "builds" / b.id / "commit.json").write_text(json.dumps(meta, indent=2))
+        if hasattr(commits, "record_check"):          # ADR-0032: the harness result is a check record
+            commits.record_check(domain, c.id, "preview-harness", b.harness_ok,
+                                 f"build {b.id}: harness {'passed' if b.harness_ok else 'failed'}")
         return b
 
     def deploy_commit(self, commits: Any, domain: str, commit_id: str, approver: Actor) -> dict[str, Any]:
@@ -200,29 +203,24 @@ class LocalEnvironment:
         return build
 
     def stranded(self, d: Domain) -> list[str]:
-        """Objects in this environment whose type, or state, the new declaration lacks."""
+        """Objects in this environment whose type, or state, the new declaration lacks (the
+        change check's in-flight check, ADR-0018)."""
+        from ..check import in_flight
+        with self.events() as store:
+            if store is None:
+                return []
+            return [f"{p.where} ({p.message})" for p in in_flight(d, store).problems]
+
+    @contextmanager
+    def events(self):
+        """The deployed domain's event store, or None when nothing was deployed yet."""
         if not self.store_path.exists():
-            return []
-        from ..semantics.model import project
+            yield None
+            return
         from ..store.sqlite import SQLiteEventStore
         store = SQLiteEventStore(str(self.store_path))
         try:
-            out = []
-            for stream in store.streams():
-                evs = store.read(stream)
-                if not evs or evs[0].kind != "domain":
-                    continue
-                obj, st = evs[0].aggregate, project(evs) or {}
-                if obj not in d.objects:
-                    out.append(f"{stream} ({obj} is gone)")
-                    continue
-                tr = d.transitions.get(obj)
-                if tr is not None:
-                    prop = d.objects[obj].properties.get(tr.field)
-                    states = set(tr.matrix) | set((prop.enum or []) if prop else []) | {tr.initial}
-                    if st.get(tr.field) not in states:
-                        out.append(f"{stream} (state {st.get(tr.field)!r} is gone)")
-            return out
+            yield store
         finally:
             store.close()
 

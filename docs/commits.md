@@ -86,6 +86,10 @@ included, except provenance (`source`, `status`). Confirming an element changes 
 - **Beyond the interface.** The diff also covers what the interface does not: roles, each
   object's stage field and initial stage, handoffs, scenarios, fixtures and purpose.
 
+## Check records (ADR-0032)
+`change-check` runs the change check on a commit and records the result on it, one record
+per check plus the whole; a preview records its harness. See [`change-check.md`](change-check.md).
+
 ## Approval
 An approval is an immutable tag on a commit `main` points to. Tagging again is a no-op. A
 wrong approval is superseded by approving a newer commit. The kernel's `approve_commit`

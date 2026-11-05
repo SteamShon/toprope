@@ -6,6 +6,8 @@ Layout under `<root>/<domain>/`:
   log.jsonl                           one line per commit: id, seq, content, parents, at, interface
   refs.jsonl                          one line per ref move: branch, commit, at (ADR-0033)
   approvals.jsonl                     one line per approval: commit, approver, at (never removed)
+  checks.jsonl                        one line per check run on a commit (ADR-0032): commit, check,
+                                      ok, summary, base, at (append-only, like approvals)
 
 - **Content-addressed.** `content` is the hash of the canonical declaration without
   `version`, plus its representations. A commit's id is `<seq>-<content>`. Reading a commit
@@ -465,6 +467,29 @@ class CommitStore:
             raise CommitError(f"main with {commit_id} does not validate: "
                               + "; ".join(f"{i.code} at {i.where}" for i in errors[:3]))
         return d
+
+    # -- check records (ADR-0032) -----------------------------------------------------------
+    def record_check(self, domain: str, commit_id: str, check: str, ok: bool, summary: str,
+                     base: str | None = None) -> dict[str, Any]:
+        """Append the result of a check run on a commit. Never rewritten: a later run of the
+        same check appends a newer record, and the newest one is the commit's status."""
+        with self._lock(domain) as dirp:
+            self.get(domain, commit_id)
+            entry = {"commit": commit_id, "check": check, "ok": bool(ok), "summary": summary,
+                     "base": base, "at": _now()}
+            self._append(dirp / "checks.jsonl", entry)
+            return entry
+
+    def checks(self, domain: str, commit_id: str | None = None) -> list[dict[str, Any]]:
+        rows = self._lines(self._dir(domain) / "checks.jsonl")
+        return [r for r in rows if commit_id is None or r["commit"] == commit_id]
+
+    def check_status(self, domain: str, commit_id: str) -> dict[str, dict[str, Any]]:
+        """The newest record of each check on a commit."""
+        out: dict[str, dict[str, Any]] = {}
+        for r in self.checks(domain, commit_id):
+            out[r["check"]] = r
+        return out
 
     # -- history and checkout (ADR-0032) --------------------------------------------------------
     def element_log(self, domain: str, key: str, at: str | None = None) -> list[dict[str, Any]]:
