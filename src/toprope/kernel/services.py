@@ -24,6 +24,8 @@ def complete(svc: Service, result: dict[str, Any]) -> dict[str, Any]:
 
 
 class KernelServices(ABC):
+    caller: dict[str, Any] | None = None
+
     def call(self, service: str, inputs: dict[str, Any], caller: dict[str, Any] | None = None) -> dict[str, Any]:
         """`caller` is the actor whose action made the call (`{id, kind}`), from the outbox
         event. Services that record a person's decision check it, so no declaration can make
@@ -37,6 +39,7 @@ class KernelServices(ABC):
         if "approver" in svc.inputs:
             if not caller or caller.get("kind") != "person" or caller.get("id") != inputs["approver"]:
                 return svc.failure(f"{service} records a person's decision: the calling person must be the approver")
+        self.caller = caller                # who made the call: a commit records it as its author
         try:
             return complete(svc, self.run(service, {k: inputs[k] for k in svc.inputs}))
         except Exception as e:   # a failure still replies: the declaration decides what it means
@@ -133,7 +136,7 @@ class LocalKernel(KernelServices):
 
     # -- commits (ADR-0029) -----------------------------------------------------------------
     def _commit(self, declaration):
-        c, created = self.commits.commit(self._path(declaration))
+        c, created = self.commits.commit(self._path(declaration), author=(self.caller or {}).get("id", ""))
         main = self.commits.main(c.domain)          # reviewed from the merge base with main (ADR-0033)
         base = self.commits.merge_base(c.domain, c.id, main.id) if main else None
         review = self.commits.diff(c.domain, base, c.id)["to_review"] if created else []
@@ -150,6 +153,10 @@ class LocalKernel(KernelServices):
     def _approve_commit(self, domain, commit, approver):
         self.commits.approve(domain, commit, approver)   # conflicts fail the call, as any error does
         return {"approved": True, "main": self.commits.main(domain).id}
+
+    def _checkout(self, domain, commit, declaration):
+        c = self.commits.checkout(domain, commit, self._path(declaration))
+        return {"content": c.content}
 
     def _preview(self, domain, commit):
         if self.environment is None:

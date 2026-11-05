@@ -498,14 +498,16 @@ class Workspace:
         from ..commits import CommitStore
         return CommitStore(self.root / ".toprope" / "commits")
 
-    def commit(self, message: str = "", branch: str = "work", merge: str | None = None) -> dict[str, Any]:
+    def commit(self, message: str = "", branch: str = "work", merge: str | None = None,
+               author: str = "") -> dict[str, Any]:
         """Compile the working copy into an immutable commit on a branch (ADR-0033). Returns what
         to re-confirm: the elements that changed directly since the branch's merge base with
         `main` (`since`; None before the first approval). `merge` names the commit whose
         conflicts this working copy resolves."""
         from ..commits import CommitError
         try:
-            c, created = self.commits.commit(self.domain_path, message=message, branch=branch, merge=merge)
+            c, created = self.commits.commit(self.domain_path, message=message, branch=branch, merge=merge,
+                                             author=author)
         except ValidationError as e:
             raise AuthoringError(f"the draft does not parse: {e.errors()[0]['msg']}") from None
         except CommitError as e:
@@ -515,6 +517,30 @@ class Workspace:
         review = self.commits.diff(c.domain, base_id, c.id)
         return {"commit": c.id, "seq": c.seq, "branch": branch, "created": created, "interface": c.interface,
                 "since": base_id, **review}
+
+    def checkout(self, commit_id: str, force: bool = False) -> dict[str, Any]:
+        """Load a commit into the working copy (ADR-0032); committing it is a revert or a restart.
+        Refused when the working copy has changes no commit holds, unless `force`."""
+        from ..commits import CommitError
+        d = self.draft().get("domain")
+        if not isinstance(d, str) or not d:
+            raise AuthoringError("the draft names no `domain`, so there is no commit log to check out from")
+        try:
+            c = self.commits.checkout(d, commit_id, self.domain_path, force=force)
+        except CommitError as e:
+            raise AuthoringError(str(e)) from None
+        return {"commit": c.id, "content": c.content}
+
+    def element_log(self, key: str, at: str | None = None) -> list[dict[str, Any]]:
+        """An element's history (ADR-0032): the commits that changed it, with what it cites."""
+        from ..commits import CommitError
+        d = self.draft().get("domain")
+        if not isinstance(d, str) or not d:
+            raise AuthoringError("the draft names no `domain`, so there is no commit log")
+        try:
+            return self.commits.element_log(d, key, at)
+        except CommitError as e:
+            raise AuthoringError(str(e)) from None
 
     def merge_main(self, branch: str = "work") -> dict[str, Any]:
         """Bring `main` into a branch's working copy (ADR-0033). Writes the semantic 3-way merge

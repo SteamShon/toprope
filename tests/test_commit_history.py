@@ -1,0 +1,118 @@
+"""ADR-0032's additions to the commit store: the commit's author, an element's history, and
+`checkout` (a revert is a new commit)."""
+import copy
+import json
+import subprocess
+
+import pytest
+import yaml
+from test_decl import schema_doc_domain
+
+from toprope.commits import CommitError, CommitStore
+from toprope.kernel.services import LocalKernel
+
+
+def write(p, raw):
+    p.write_text(yaml.safe_dump(raw, sort_keys=False))
+    return p
+
+
+def test_a_commit_records_its_author(tmp_path):
+    st = CommitStore(tmp_path / "commits")
+    c, _ = st.commit(write(tmp_path / "d.domain.yaml", schema_doc_domain()), author="ana")
+    assert c.author == "ana" and st.get("example", c.id).author == "ana"
+    k = LocalKernel(tmp_path)                                         # the kernel: the calling actor
+    raw = schema_doc_domain()
+    raw["glossary"]["x"] = "X."
+    write(tmp_path / "d.domain.yaml", raw)
+    out = k.call("commit", {"declaration": "d.domain.yaml"}, caller={"id": "bot", "kind": "agent"})
+    assert k.commits.get("example", out["id"]).author == "bot"
+
+
+def test_a_merge_commit_is_authored_by_its_approver(tmp_path):
+    st = CommitStore(tmp_path / "commits")
+    raw = schema_doc_domain()
+    c0, _ = st.commit(write(tmp_path / "w.yaml", raw))
+    st.approve("example", c0.id, "ana")
+    a, b = copy.deepcopy(raw), copy.deepcopy(raw)
+    a["glossary"]["a"] = "A."
+    b["glossary"]["b"] = "B."
+    ca, _ = st.commit(write(tmp_path / "a.yaml", a), branch="a")
+    cb, _ = st.commit(write(tmp_path / "b.yaml", b), branch="b")
+    st.approve("example", ca.id, "ana")
+    assert st.approve("example", cb.id, "eli").author == "eli"
+
+
+def test_an_element_log_lists_the_commits_that_changed_it(tmp_path):
+    st = CommitStore(tmp_path / "commits")
+    wc = tmp_path / "d.domain.yaml"
+    raw = schema_doc_domain()
+    key = "invariant:running-has-start"
+    c1, _ = st.commit(write(wc, raw), author="ana", message="first")
+    raw["glossary"]["x"] = "X."                                       # does not touch the element
+    st.commit(write(wc, raw))
+    inv = next(i for i in raw["invariants"] if i["id"] == "running-has-start")
+    inv["source"] = {"kind": "interview", "ref": "interview/2026-11-21#q3"}
+    inv["status"] = "confirmed"                                       # a confirmation: provenance only
+    c3, _ = st.commit(write(wc, raw), author="ana")
+    inv["reason"] = "A launched experiment records its start."
+    c4, _ = st.commit(write(wc, raw), author="eli", message="reword")
+    raw["invariants"].remove(inv)
+    del raw["objects"]["Experiment"]["properties"]["started_at"]
+    raw["actions"]["launch_experiment"]["effects"] = []
+    c5, _ = st.commit(write(wc, raw))
+    log = st.element_log("example", key, at=c5.id)
+    assert [(e["commit"], e["change"]) for e in log] == [
+        (c1.id, "added"), (c3.id, "provenance"), (c4.id, "changed"), (c5.id, "removed")]
+    assert log[0]["author"] == "ana" and log[0]["message"] == "first"
+    assert log[1]["status"] == "confirmed" and log[1]["source"]["ref"] == "interview/2026-11-21#q3"
+    assert log[2]["author"] == "eli"
+    assert [e["commit"] for e in st.element_log("example", key, at=c3.id)] == [c1.id, c3.id]
+    assert st.element_log("example", key) == log                      # default: the `work` head
+
+
+def test_checkout_loads_a_commit_and_a_revert_is_a_new_commit(tmp_path):
+    st = CommitStore(tmp_path / "commits")
+    wc = tmp_path / "d.domain.yaml"
+    raw = schema_doc_domain()
+    c1, _ = st.commit(write(wc, raw))
+    ui = tmp_path / "ui.representation.yaml"
+    ui.write_text(yaml.safe_dump({"representation": "ui", "version": 1,
+                                  "targets": {"domain": "example", "interface": "1.x"}, "views": {}}))
+    raw["glossary"]["x"] = "X."
+    c2, _ = st.commit(write(wc, raw))
+    assert st.checkout("example", c1.id, wc) == c1
+    assert "x" not in yaml.safe_load(wc.read_text())["glossary"] and not ui.exists()   # the UI came later
+    c3, created = st.commit(wc)
+    assert created and c3.parents == [c2.id] and c3.content == c1.content           # the revert
+    raw["glossary"]["y"] = "uncommitted"
+    write(wc, raw)
+    with pytest.raises(CommitError, match="changes no commit holds"):
+        st.checkout("example", c2.id, wc)
+    st.checkout("example", c2.id, wc, force=True)
+    assert yaml.safe_load(wc.read_text())["glossary"]["x"] == "X." and ui.exists()
+
+
+def test_the_checkout_service_and_the_cli(tmp_path):
+    (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump({"domain": "d.domain.yaml", "sources": []}))
+    raw = schema_doc_domain()
+    write(tmp_path / "d.domain.yaml", raw)
+
+    def run(*a):
+        return subprocess.run(["uv", "run", "--quiet", "toprope-author", *a, "--workspace", str(tmp_path)],
+                              capture_output=True, text=True, timeout=120, check=False)
+    c1 = json.loads(run("commit", "--as", "ana").stdout)["commit"]
+    raw["actions"]["launch_experiment"]["description"] = "Start traffic."
+    write(tmp_path / "d.domain.yaml", raw)
+    c2 = json.loads(run("commit", "--as", "eli").stdout)["commit"]
+    log = json.loads(run("log", "action:launch_experiment").stdout)
+    assert [(e["commit"], e["change"], e["author"]) for e in log] == [(c1, "added", "ana"), (c2, "changed", "eli")]
+    assert json.loads(run("checkout", c1).stdout)["commit"] == c1
+    assert yaml.safe_load((tmp_path / "d.domain.yaml").read_text())["actions"]["launch_experiment"]["description"] \
+        != "Start traffic."
+    k = LocalKernel(tmp_path)
+    assert k.call("checkout", {"domain": "example", "commit": c2, "declaration": "d.domain.yaml"})["ok"]
+    assert yaml.safe_load((tmp_path / "d.domain.yaml").read_text())["actions"]["launch_experiment"]["description"] \
+        == "Start traffic."
+    out = k.call("checkout", {"domain": "example", "commit": c2, "declaration": "../outside.yaml"})
+    assert not out["ok"] and "outside" in out["error"]

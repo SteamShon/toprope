@@ -12,6 +12,8 @@ uv run toprope-author approve 2-cd34… --as ana       # merge into main and tag
 uv run toprope-author merge --branch launch-rules    # bring main in when approve reports conflicts
 uv run toprope-author commit --branch launch-rules --merge 3-ef56…   # record the resolution
 uv run toprope-author branches                       # every branch and its commit
+uv run toprope-author log action:launch_experiment   # an element's history
+uv run toprope-author checkout 1-ab12…               # load a commit; committing it reverts
 ```
 
 ## Commits
@@ -26,6 +28,19 @@ uv run toprope-author branches                       # every branch and its comm
   removed or changed elements bump major, added elements minor, text-only changes patch.
 - **Storage.** The store lives under `<workspace>/.toprope/commits/<domain>/`. Keep
   `.toprope/` out of version control. Writes take a per-domain file lock.
+
+## Author, history and checkout (ADR-0032)
+- **Author.** A commit records who compiled it: `commit --as NAME`, or the calling actor
+  when the kernel's `commit` service runs. A merge commit is authored by its approver.
+- **An element's history**, like `git log -- path`: `log <element key>` lists the commits
+  that added, changed or removed the element, or changed its provenance (a confirmation,
+  or a new source). Each entry has the author, the message, and the `source` and `status`
+  the element cites. It reads from what `main` points to (else the `work` head), or
+  `--at <commit>`. A merge commit is compared with its first parent.
+- **Checkout.** `checkout <commit>` (or the kernel's `checkout` service) loads a commit's
+  declaration and representations into the working copy. Committing it makes a new commit,
+  so a revert is a commit. It is refused when the working copy holds content no commit
+  has, unless `--force`.
 
 ## Branches (ADR-0033)
 - **A branch is a named ref to a commit.** A commit goes onto a branch (`work` by default).

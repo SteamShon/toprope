@@ -130,6 +130,7 @@ class Commit:
     interface: str = "1.0.0"     # the derived interface version (ADR-0008)
     message: str = ""
     branch: str = ""             # the branch it was made on (for reading; refs decide heads)
+    author: str = ""             # who compiled it (ADR-0032); "" when not known
 
 
 def _now() -> str:
@@ -333,7 +334,8 @@ class CommitStore:
 
     # -- writing ----------------------------------------------------------------------------------
     def commit(self, declaration: str | Path, representations: list[str | Path] | None = None,
-               message: str = "", branch: str = DEFAULT_BRANCH, merge: str | None = None) -> tuple[Commit, bool]:
+               message: str = "", branch: str = DEFAULT_BRANCH, merge: str | None = None,
+               author: str = "") -> tuple[Commit, bool]:
         """Snapshot a working copy onto a branch. Returns (commit, created). A new branch starts
         from `main`. Identical content to the branch head returns the head, created False.
         `merge` names a second parent: the commit whose conflicts this working copy resolves."""
@@ -359,10 +361,10 @@ class CommitStore:
                     self._move(dirp, branch, head.id)
                 return head, False
             parents = ([head.id] if head else []) + ([merge] if merge else [])
-            return self._write(dirp, d, raw, reps, cid, parents, message, branch), True
+            return self._write(dirp, d, raw, reps, cid, parents, message, branch, author), True
 
     def _write(self, dirp: Path, d: Domain, raw: dict[str, Any], reps: dict[str, Any], cid: str,
-               parents: list[str], message: str, branch: str) -> Commit:
+               parents: list[str], message: str, branch: str, author: str = "") -> Commit:
         """Store a commit and move `branch` to it. Called under the domain lock."""
         domain = d.domain
         seq = max((c.seq for c in self.log(domain)), default=0) + 1
@@ -370,7 +372,7 @@ class CommitStore:
         if parents:
             first = self.get(domain, parents[0])
             iface = _bump(first.interface, diff_interface(interface(self.domain(domain, first.id)), interface(d)).bump)
-        c = Commit(f"{seq}-{cid}", seq, domain, cid, parents, _now(), iface, message, branch)
+        c = Commit(f"{seq}-{cid}", seq, domain, cid, parents, _now(), iface, message, branch, author)
         obj = dirp / "objects" / cid
         if not obj.exists():
             tmp = Path(tempfile.mkdtemp(dir=dirp, prefix=".obj-"))
@@ -443,7 +445,7 @@ class CommitStore:
                 d = self._check(c.id, m.merged["domain"])
                 reps = m.merged["representations"]
                 target = self._write(dirp, d, m.merged["domain"], reps, content_id(m.merged["domain"], reps),
-                                     [main.id, c.id], f"merge {c.id} into main", MAIN)
+                                     [main.id, c.id], f"merge {c.id} into main", MAIN, approver)
             self._append(dirp / "approvals.jsonl", {"commit": target.id, "approver": approver, "at": _now(),
                                                     **({"merged": c.id} if target.id != c.id else {})})
             return target
@@ -460,6 +462,75 @@ class CommitStore:
             raise CommitError(f"main with {commit_id} does not validate: "
                               + "; ".join(f"{i.code} at {i.where}" for i in errors[:3]))
         return d
+
+    # -- history and checkout (ADR-0032) --------------------------------------------------------
+    def element_log(self, domain: str, key: str, at: str | None = None) -> list[dict[str, Any]]:
+        """An element's history, like `git log -- path`: every commit reachable from `at` (default:
+        what `main` points to, else the `work` head) that added, changed or removed the element,
+        or changed its provenance (`source`, `status`: what it cites, and whether it is
+        confirmed). Oldest first. A merge commit is compared with its first parent."""
+        log = self.log(domain)
+        if at is None:
+            head = self.main(domain) or self.head(domain)
+            if head is None:
+                return []
+            at = head.id
+        reach = self._reach({c.id: c.parents for c in log}, at)
+        cache: dict[str, dict[str, Any]] = {}
+
+        def element(commit_id: str | None) -> Any:
+            if commit_id is None:
+                return None
+            c = self.get(domain, commit_id)
+            if c.content not in cache:
+                cache[c.content] = review_contents(self.domain(domain, c.id))
+            return cache[c.content].get(key)
+
+        def provenance(e: Any) -> dict[str, Any]:
+            return {k: e.get(k) for k in ("source", "status")} if isinstance(e, dict) else {}
+        out = []
+        for c in (c for c in log if c.id in reach):
+            new, old = element(c.id), element(c.parents[0] if c.parents else None)
+            if new is None and old is None:
+                continue
+            if old is None:
+                change = "added"
+            elif new is None:
+                change = "removed"
+            elif review_hash(new) != review_hash(old):
+                change = "changed"
+            elif provenance(new) != provenance(old):
+                change = "provenance"
+            else:
+                continue
+            out.append({"commit": c.id, "seq": c.seq, "at": c.at, "author": c.author, "message": c.message,
+                        "change": change, **provenance(new if new is not None else old)})
+        return out
+
+    def checkout(self, domain: str, commit_id: str, declaration: str | Path, force: bool = False) -> Commit:
+        """Load a commit's content into a working copy: its declaration (with `version` set to
+        its sequence number) and its representations, removing this domain's representations
+        it does not have. Committing the result makes a new commit, so a revert is a commit.
+        Refused when the working copy holds content no commit has (uncommitted changes),
+        unless `force`."""
+        c = self.get(domain, commit_id)
+        path = Path(declaration)
+        folder = path.parent
+        present = self.representations_for(domain, folder) if folder.exists() else []
+        if path.exists() and not force:
+            current = content_id(load_yaml(path.read_text()) or {},
+                                 {p.name: load_yaml(p.read_text()) for p in present})
+            if current not in {x.content for x in self.log(domain)}:
+                raise CommitError(f"{path.name} has changes no commit holds: commit them first")
+        body = self._body(domain, c.id)
+        folder.mkdir(parents=True, exist_ok=True)
+        self.export(domain, c.id, path)
+        for name, rbody in body["representations"].items():
+            (folder / name).write_text(yaml.safe_dump(rbody, sort_keys=False))
+        for p in present:
+            if p.name not in body["representations"]:
+                p.unlink()
+        return c
 
     # -- the semantic diff ------------------------------------------------------------------------
     def diff(self, domain: str, a: str | None, b: str) -> dict[str, Any]:
