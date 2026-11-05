@@ -7,6 +7,8 @@ This document is the **oracle**. The model interpreter implements it, and
 every generated surface must agree with it (ADR-0010 parity, ADR-0019). Where a surface
 disagrees, the surface is wrong.
 
+What objects, links, actions and the matrix are is explained in [`domain-model.md`](domain-model.md); this page gives their exact semantics.
+
 ## 1. Command
 A command is `(actor, on_behalf_of?, grant?, action, target?, params, idempotency_key, at)`:
 - `at` is the clock time (the virtual clock in the harness)
