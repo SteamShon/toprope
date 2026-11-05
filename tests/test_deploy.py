@@ -89,7 +89,8 @@ def test_floor_no_stranded_objects(tmp_path):
     m = ReferenceModel(Domain.model_validate(schema_doc_domain()), SQLiteEventStore(str(env.store_path)))
     m.seed("Experiment", {"id": "E-live", "status": "ended", "planned_days": 1, "guardrails": []})
     raw = schema_doc_domain()
-    del raw["transitions"]["Experiment"]["matrix"]["ended"]          # the new version drops a state in use
+    del raw["transitions"]["Experiment"]["matrix"]["ended"]          # the new version drops a state in use:
+    raw["objects"]["Experiment"]["properties"]["status"]["enum"].remove("ended")   # its row and its value
     st, env, c, b = committed(tmp_path, raw)
     assert b.harness_ok
     with pytest.raises(DeployRefused) as e:
@@ -111,3 +112,13 @@ def test_cli(tmp_path):
     assert json.loads(run("status").stdout)["current"]["commit"] == c.id
     unknown = run("deploy", "example", "9-nope", "--approver", "ana")
     assert unknown.returncode != 0 and "no commit" in unknown.stderr
+
+
+def test_a_terminal_state_without_a_matrix_row_is_not_stranded(tmp_path):
+    env = LocalEnvironment(tmp_path / "env")
+    m = ReferenceModel(Domain.model_validate(schema_doc_domain()), SQLiteEventStore(str(env.store_path)))
+    m.seed("Experiment", {"id": "E-done", "status": "decided", "planned_days": 1, "guardrails": []})
+    raw = schema_doc_domain()
+    del raw["transitions"]["Experiment"]["matrix"]["decided"]         # still a valid state, just no row
+    st, env, c, b = committed(tmp_path, raw)
+    assert env.stranded(Domain.model_validate(raw)) == []

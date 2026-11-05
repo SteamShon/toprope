@@ -67,7 +67,8 @@ class PostgresEventStore(EventStore):
                                       [(stream, e.version, event_to_json(e)) for e in out])
             except psycopg.errors.UniqueViolation as exc:
                 raise ConcurrencyError(str(exc)) from exc
-            return out
+            # What a read returns, so every adapter normalizes identically (replay parity, ADR-0012).
+            return [event_from_json(event_to_json(e)) for e in out]
 
     def read(self, stream: str) -> list[Event]:
         with self._lock:

@@ -215,8 +215,11 @@ class LocalEnvironment:
                     out.append(f"{stream} ({obj} is gone)")
                     continue
                 tr = d.transitions.get(obj)
-                if tr is not None and st.get(tr.field) not in tr.matrix:
-                    out.append(f"{stream} (state {st.get(tr.field)!r} is gone)")
+                if tr is not None:
+                    prop = d.objects[obj].properties.get(tr.field)
+                    states = set(tr.matrix) | set((prop.enum or []) if prop else []) | {tr.initial}
+                    if st.get(tr.field) not in states:
+                        out.append(f"{stream} (state {st.get(tr.field)!r} is gone)")
             return out
         finally:
             store.close()
@@ -237,8 +240,10 @@ class LocalEnvironment:
         return ["--domain", cur["declaration"], "--store", f"sqlite:{self.store_path}"]
 
     def _log(self, entry: dict[str, Any]) -> None:
-        with (self.root / "deployments.jsonl").open("a") as f:
+        with (self.root / "deployments.jsonl").open("a") as f:   # the audit trail: durable
             f.write(json.dumps(entry) + "\n")
+            f.flush()
+            os.fsync(f.fileno())
 
 
 __all__ = ["Build", "DeployRefused", "LocalEnvironment", "toolchain_hash"]

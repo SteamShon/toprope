@@ -173,11 +173,13 @@ def _reach(wmap, obj, frm, to, roles):
     return how_to_reach(wmap, obj, frm, to, roles)
 
 
-def _states_taking(wmap: dict[str, Any], obj: str, action: str, role: str | None = None) -> list[str]:
-    """States of `obj` in which `action` is allowed (for `role`, if given)."""
+def _states_taking(wmap: dict[str, Any], obj: str, action: str, role: str | None = None,
+                   include_new: bool = False) -> list[str]:
+    """States of `obj` in which `action` is allowed (for `role`, if given); with `include_new`,
+    also the "(new)" pseudo-state of a creating action."""
     from ..worldmap import NEW, _targets
     return [e["from"] for e in wmap["behavior"]["edges"]
-            if e["object"] == obj and e["action"] == action and e["from"] != NEW
+            if e["object"] == obj and e["action"] == action and (include_new or e["from"] != NEW)
             and any(role is None or r is None or r == role for r, _ in _targets(e["outcome"]))]
 
 
@@ -201,7 +203,7 @@ def how_to_reach_across(cmap: dict[str, Any], domain: str, obj: str, from_state:
             continue
         smap = members[domain]
         # 1. In the sender: reach a state where the handing-off action is allowed, then take it.
-        for st in _states_taking(smap, obj, w["from"]["action"]):
+        for st in _states_taking(smap, obj, w["from"]["action"], include_new=True):
             pre = (_reach(smap, obj, from_state, st, roles) if st != (from_state or NEW)
                    else {"reachable": True, "steps": []})
             take = _step(smap, obj, st, w["from"]["action"], roles)

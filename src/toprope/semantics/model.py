@@ -47,6 +47,9 @@ class ReferenceModel:
         `only_if_new`, it appends only at version 0, and returns False if the object already
         exists (another process may be seeding concurrently)."""
         oid = data["id"]
+        from .interpreter import RESERVED_ID_PREFIXES
+        if str(oid).startswith(RESERVED_ID_PREFIXES):
+            raise ValueError(f"object ids may not start with {RESERVED_ID_PREFIXES}: {oid}")
         ev = Event(f"{obj}Created", oid, obj, at=self.clock(), actor=SYSTEM.ref(),
                    payload={"changes": copy.deepcopy(data), "params": {}, "action": None, "fixture": True},
                    domain_version=self.d.version)
