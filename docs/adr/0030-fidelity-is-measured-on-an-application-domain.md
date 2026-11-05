@@ -5,6 +5,10 @@
 - Amends: ADR-0002 and ADR-0022 (what M1 gives a verdict on), the roadmap and README
   milestone table, `docs/experiments/M1-self-compile.md`; ADR-0019's ordering is unchanged
 
+> Amended by ADR-0034: M1 gives no link verdict. ① and ⑥ are piloted on the self
+> domains; the ① verdict moves to M2, and the self domains' M1 instruments are exempt from
+> the human-only rule.
+
 ## Context
 M1 was to give verdicts on ① (iterate safely) and ② (the model is right) on Toprope's own
 self domains, with held-out gold accuracy as the primary measure of ②. Writing that gold set

@@ -6,9 +6,9 @@ several links, but a milestone ends with a verdict. Budget is ~10h+/week. Dates 
 | Milestone | Link | Question | Target |
 |---|---|---|---|
 | M0a | none (enabler) | Thin slice: declaration + semantics, model interpreter, Execution, event store, `toprope-server` MCP and authoring MCP, source readers, world map, harness (model, Execution, MCP), change check incl. log replay and in-flight check, incremental analysis; kernel services as declared effects so the self domains are generated end to end (ADR-0028) | 5–7 weeks |
-| M1 | ① ⑥ (self; ⑥ partial via the handoff); self-compile feasibility. ② moved to M2 (ADR-0030) | Model Toprope's own Authoring and Delivery workflows by iterating, joined by a typed handoff (ADR-0022). Do compile-time checks catch what natural-language skills and structured specs without a compiler cannot? | 4–5 weeks (re-estimated in M1's spec PR) |
+| M1 | self-compile feasibility; ① and ⑥ piloted on the self domains, no link verdict (ADR-0030, ADR-0034) | Model Toprope's own Authoring and Delivery workflows by iterating, joined by a typed handoff (ADR-0022), and generate both. A pilot: do compile-time checks catch what natural-language skills and structured specs without a compiler cannot? | 4–5 weeks (re-estimated in M1's spec PR) |
 | M0b | none (enabler) | Surfaces and effects: representation compiler, `toprope-shell` (A2UI + CopilotKit), UI-level harness, GitHub brownfield adapter, embedded shape, migration plans, query tools, timers and functions, external sources other than `kernel`; regenerate the self domain's UI | 3–4 weeks |
-| M2 | ① ② ③ (dogfood) | Does the same hold on another domain, and does the harness-passing software work in real use? | 3–4 weeks |
+| M2 | ① ② ③ (dogfood; the first ① and ② verdicts) | Do compile-time checks catch the seeded problems on a domain whose expert is not the builder, and does the harness-passing software work in real use? | 3–4 weeks |
 | M3 | ④ | Do people and agents act on the same meaning through the capsule? | 3 weeks |
 | M4 | ⑤ | Do logs, proposals and decisions make domains better through use? (Runtime adapter, Aegra first, enters here) | 3 weeks |
 | M5 | ⑥ (partial) | Do typed handoffs between domains preserve intent? Write-up, go public | 3 weeks |
@@ -88,7 +88,7 @@ Done when, on the toy domain:
   harness ≤ 30 s, preview ≤ 30 s; set by the M1 verdict rules)
 - the full run finds no selection miss.
 
-## M1: Self-compile and safe iteration (①, ⑥ partial, 4–5 weeks; ② moved to M2 by ADR-0030)
+## M1: Self-compile and a pilot of safe iteration (① ⑥ pilot, 4–5 weeks; ② and the ① verdict in M2 by ADR-0030, ADR-0034)
 
 See [`experiments/M1-self-compile.md`](experiments/M1-self-compile.md).
 
@@ -139,7 +139,7 @@ Done when the toy domain runs as usable software through the shell and the green
 gates one GitHub effect, survives a state rename with stranded objects through a tested
 migration, and its harness passes on every surface.
 
-## M2: Dogfood domain (① ② replicated, ③, 3–4 weeks)
+## M2: Dogfood domain (① ② judged, ③, 3–4 weeks)
 
 Use the self-compiled authoring tool from M1, not the hand-built kernel, to model a
 second, everyday domain. The candidate is the experiment lifecycle (hypothesis → design →
@@ -150,7 +150,10 @@ held-out protocol built for M1 (`experiments/m1/interview-guide.md`, sealed vali
 fact keys, kernel-fact exclusion) is the starting point. M2's estimate is redone in its spec
 PR, and M3 may use M2's gold only after M2's verdict is frozen.
 
-Phase B (the change sequence vs. a natural-language skill) is repeated on this domain.
+Phase B (the change sequence vs. a natural-language skill and a structured spec) runs on this
+domain and gives **the first ① verdict (ADR-0034)**, on change requests from the expert who
+is not Toprope's builder. M1's verdict rules are the starting point; who seeds the problems
+and writes the key is decided in M2's spec PR.
 
 Questions:
 - Is the second domain cheaper than the first?

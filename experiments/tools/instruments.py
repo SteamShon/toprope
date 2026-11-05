@@ -7,17 +7,18 @@ Usage (from the repo root):
   uv run --with pyyaml python experiments/tools/instruments.py verify   experiments/m1/instruments [--run]
 
 validate        checks the filled files (not *.template.yaml) for format and cross-file consistency.
-freeze          stage 1, researcher only, in M0a before the checks are built: freezes the four
-                pre-check instruments, and a gold file if there is one (status must be `frozen`),
-                into FROZEN.json. The binding is
-                ignored at this stage.
+freeze          researcher only: freezes into FROZEN.json the probe suite and verdict rules
+                (stage 1, before the checks are built), plus the change requests, the change
+                key and a gold file when they exist (they may come later, before the pilot
+                runs; ADR-0034). Status must be `frozen`. The binding is ignored here.
 freeze-binding  stage 2, researcher only, after Phase A and before any arm runs: freezes
-                binding.yaml. Requires stage 1.
+                binding.yaml. Requires the four instruments frozen.
 --sealed        with validate: print nothing derived from change-key.yaml beyond errors
                 (use it whenever an agent runs the validator for you).
-verify          fails if a frozen file changed. It also fails unless all four stage-1 files are
-                frozen, and with --run (used by the harness before every arm run) unless the
-                binding is frozen too.
+verify          fails if a frozen file changed. It also fails unless the probe suite and verdict
+                rules are frozen (the gate for building the checks), and with --run (used by
+                the harness before every arm run) unless the change requests, the key and
+                the binding are frozen too.
 """
 from __future__ import annotations
 
@@ -38,10 +39,12 @@ FILES = {
     "verdict-rules": "verdict-rules.yaml",
 }
 SEALED = "--sealed" in sys.argv   # validate without printing anything derived from the sealed key
-# Stage 1 (ADR-0031): the four pre-check instruments of M1's ① experiment. A gold file is
-# optional in M1 (the self domains are confirmed by interview and sign-off); if present, it is
-# validated and frozen with them.
-BEFORE_CHECKS = ["probe-suite", "change-requests", "change-key", "verdict-rules"]
+# ADR-0034: the checks wait only for the probe suite and the verdict rules; the change requests
+# and their key are frozen before the pilot runs. A gold file is optional in M1 (ADR-0031); if
+# present, it is validated and frozen with them.
+BEFORE_CHECKS = ["probe-suite", "verdict-rules"]
+BEFORE_RUN = ["change-requests", "change-key"]
+INSTRUMENTS = BEFORE_CHECKS + BEFORE_RUN
 OPTIONAL_STAGE1 = ["gold-scenarios"]
 ANSWER_KINDS = {"yes_no", "outcome", "state", "actors", "free_text"}
 PROBLEMS = {"none", "conflict", "breakage"}
@@ -228,7 +231,10 @@ def _freeze(d: Path, keys: list[str]) -> list[str]:
 
 
 def freeze(d: Path) -> list[str]:
-    return _freeze(d, BEFORE_CHECKS + [k for k in OPTIONAL_STAGE1 if (d / FILES[k]).exists()])
+    later = [k for k in BEFORE_RUN + OPTIONAL_STAGE1 if (d / FILES[k]).exists()]
+    if any(k in later for k in BEFORE_RUN) and not all(k in later for k in BEFORE_RUN):
+        return ["freeze the change requests and the change key together"]
+    return _freeze(d, BEFORE_CHECKS + later)
 
 
 def freeze_binding(d: Path) -> list[str]:
@@ -236,9 +242,9 @@ def freeze_binding(d: Path) -> list[str]:
     if merrs:
         return merrs
     frozen = manifest["files"]
-    missing = [FILES[k] for k in BEFORE_CHECKS if FILES[k] not in frozen]
+    missing = [FILES[k] for k in INSTRUMENTS if FILES[k] not in frozen]
     if missing:
-        return [f"stage 1 not done; not frozen yet: {missing}"]
+        return [f"the instruments are not all frozen yet: {missing}"]
     return _freeze(d, ["binding"])
 
 
@@ -249,7 +255,7 @@ def verify(d: Path, run: bool = False) -> list[str]:
     if merrs:
         return merrs
     files = manifest["files"]
-    required = [FILES[k] for k in BEFORE_CHECKS] + ([FILES["binding"]] if run else [])
+    required = [FILES[k] for k in BEFORE_CHECKS] + ([FILES[k] for k in BEFORE_RUN] + [FILES["binding"]] if run else [])
     errs = [f"{f} is not frozen" for f in required if f not in files]
     for f, meta in files.items():
         if not (d / f).exists():

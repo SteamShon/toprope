@@ -3,6 +3,10 @@
 - Link: ① iterate safely, ⑥ (partial) · Status: accepted · 2026-11-05 · decided by: SteamShon
 - Amends: ADR-0030 (decision 3 and 4, revision 3: the correctness set)
 
+> Amended by ADR-0034: M1 gives no link verdict. ① and ⑥ are piloted on the self
+> domains; the ① verdict moves to M2, and the self domains' M1 instruments are exempt from
+> the human-only rule.
+
 ## Context
 ADR-0030 moved ② to M2 and kept a small frozen **correctness set** for the self domains, as a
 guard on the tool M2 builds with and as ⑥'s instrument. Domain Authoring and Domain Delivery

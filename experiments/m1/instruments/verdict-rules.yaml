@@ -2,10 +2,12 @@
 # (2026-11-05): the draft kept except iteration time (5 → 1 min), the preview target
 # (60 → 30 s, so the latency targets fit the iteration time) and the handoff rule when no
 # handoff-breaking change is seeded. The researcher freezes them in their own commit.
+# ADR-0034: in M1, `iterate` and `handoff` are PILOT TARGETS (reported, not a link verdict);
+# they are M2's starting point. `self_compile` is M1's feasibility result.
 instrument: verdict-rules
 experiment: M1
 status: draft
-iterate:                         # link ①
+iterate:                         # link ① (pilot target in M1, ADR-0034)
   supports:
     toprope_recall_min: 0.80
     toprope_precision_min: 0.70
@@ -26,7 +28,7 @@ self_compile:                    # a feasibility result, not a link verdict (ADR
     regeneration_check_passes: true      # ADR-0028
     probes_pass: true                    # ADR-0031: no gold set; the probes and the sign-off guard the tool
     switch_over_signed_off: true         # ADR-0022
-handoff:                         # link ⑥ (partial)
+handoff:                         # link ⑥ (partial; pilot target in M1, ADR-0034)
   supports:
     handoff_breaking_changes_caught_before_deploy_min: 1.0   # of those seeded, if any
     handoff_intent_probes_pass: true     # P07: a handed-off request arrives intact

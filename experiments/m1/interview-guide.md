@@ -15,9 +15,17 @@ written by the researcher (AGENTS.md). The researcher may edit or discard this g
   diff, and Delivery pointing an environment at one commit. Write everything against this
   model. Nothing refers to version states such as stale, withdrawn or rejected.
 
+## ADR-0034: M1 is a pilot, and agents may help
+M1 gives no link verdict: ① and ⑥ are piloted here and judged in M2. So the self domains'
+instruments may be drafted with an agent, including **multiple-choice options you select
+from**: the probes, the change requests, the key and the verdict rules. You select,
+review and freeze them in your own commit. Freeze the probe suite and the verdict rules
+before the change checks are built, and the change requests and key before the pilot runs.
+
 ## What stays sealed
-- **`change-key.yaml` and its mix** are never shown to an agent. When an agent runs the
-  validator for you, it uses `--sealed`.
+- **In M2 and later**, `change-key.yaml` and its mix are never shown to an agent. In M1 the
+  key may be drafted with an agent (ADR-0034). When an agent runs the validator for you, it
+  still uses `--sealed` by default.
 - **This guide is not a Phase A source.** The source readers never read `experiments/`.
 - The probe suite is not held-out evidence, so it may be drafted with an agent's help. You
   review it and commit it yourself.
@@ -56,8 +64,8 @@ its validator stay for M2's application domain.
 - **The intents.** About 20, in the order an owner would ask for them, as the owner would
   say them, each with a rationale. They are shown to every arm. Avoid "conflict", "break" or
   "seeded".
-- **The key.** It holds about 6 conflicts, 4 breakages and 10 clean changes. Write it
-  **alone**; never paste it into a chat. Include at least two problem types the checks were
+- **The key.** It holds about 6 conflicts, 4 breakages and 10 clean changes. In M1 it may be
+  drafted with an agent by multiple choice (ADR-0034); in M2 write it alone. Include at least two problem types the checks were
   **not** designed for. Whether to seed handoff-breaking changes is your decision; keep it
   to yourself.
 
@@ -101,7 +109,8 @@ yourself.
 ## A plan
 1. **About 30 min (agent help is fine):** the probe suite, including probes that check a
    handed-off request arrives intact (⑥).
-2. **About 30 min, alone:** the change intents (against the commit model), then the key.
+2. **About 30 min (agent help is fine in M1, ADR-0034):** the change intents (against the
+   commit model), then the key.
 3. **About 15 min:** the verdict rules.
 4. Validate, mark the files frozen, run `freeze`, and commit in your own commit, on a branch
    from `umbrella/m0a`:
@@ -109,4 +118,7 @@ yourself.
    uv run --with pyyaml python experiments/tools/instruments.py validate experiments/m1/instruments
    uv run --with pyyaml python experiments/tools/instruments.py freeze experiments/m1/instruments
    ```
-   Change-check work (M0a sub-PR 8) starts after this commit.
+   `freeze` freezes whichever of the four files exist with `status: frozen`, so the probe
+   suite and the verdict rules can be frozen first. Change-check work (M0a sub-PR 8) starts
+   once those two are frozen; run `freeze` again for the change requests and key before the
+   pilot runs (ADR-0034).
