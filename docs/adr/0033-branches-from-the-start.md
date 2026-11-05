@@ -1,8 +1,7 @@
 # ADR-0033: Branches from the start
 
-- Link: ① iterate safely, ④ shared language, ⑥ org productivity · Status: **proposed**. The
-  researcher decided to have branches from the start; the design below is the assistant's
-  draft, for the researcher to accept or change.
+- Link: ① iterate safely, ④ shared language, ⑥ org productivity · Status: accepted · 2026-11-05 ·
+  decided by: SteamShon (drafted by the assistant at the researcher's request)
 - Supersedes: ADR-0029 resolved question 3 ("branch and merge: not in M1") and ADR-0032's
   branch row
 - Builds on: ADR-0029 (commits, approval tags, semantic diff), ADR-0032 (the git/GitHub mapping)
@@ -13,7 +12,7 @@ already record their parents as a list, so merge commits need no migration. The 
 now wants branches from the start: several people or agents can work on a domain at once,
 and a change can be tried without touching what is approved.
 
-## Decision (proposed)
+## Decision
 1. **A branch is a named ref to a commit.** Each branch has its own working copy. `main`
    exists from the first commit.
 2. **`main` is protected.**
@@ -67,11 +66,13 @@ other than `main`.
   more Authoring vocabulary: Branch, Merge, Conflict.
 - **Probes.** A probe can check that an agent never merges into `main` on its own.
 
-## Open (for the researcher)
-- Is `main` protected as above, so that approval means merge into `main`? Or may commits be
-  approved on any branch?
-- Does Delivery deploy only from `main`, or also from a branch for preview environments
-  (more than one environment comes later)? Side effects of allowing it:
+## Resolved (researcher, 2026-11-05)
+- **`main` is protected; approval means merge into `main`.** Commits are never approved on
+  other branches.
+- **Delivery deploys only from `main` in M1.** Isolated preview environments are revisited
+  together with multiple environments. If added, they need their own store, recording
+  receivers and a RecordingKernel, and P05's "deploy" is scoped to production environments.
+  The side effects that led to this:
   - **The floor.** A branch commit is not approved, so a preview deploy deploys an
     unapproved commit. Probe P05 then holds only if "deploy" means production environments.
   - **State.** A preview needs its own event store. A shared store would hold events written
@@ -82,7 +83,5 @@ other than `main`.
   - **Data.** Copying production data into a preview carries redaction and local-only rules
     with it.
   - **Lifecycle.** Preview environments pile up and need cleanup.
-
-  The existing `preview` (build, harness, world map, no deploy) already gives most of the
-  review value without these. *Recommendation:* deploy only from `main` in M1. Revisit
-  isolated preview environments together with multiple environments.
+  - **The existing `preview`** (build, harness, world map, no deploy) already gives most of
+    the review value without these.

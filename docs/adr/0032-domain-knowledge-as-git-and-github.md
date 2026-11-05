@@ -24,7 +24,7 @@ not need the researcher.
 | diff | the semantic diff by element (review hash) | exists |
 | `git log -- path`, `git blame` | an element's history: the commits that changed it, with the source and answer it cites | **closed: add** an element log |
 | `git checkout <commit>` / `git revert` | load a commit's content into the working copy, then commit (a revert is a new commit) | **closed: add** a `checkout` kernel service and CLI command |
-| branch, merge | branches from the start (ADR-0033) | proposed |
+| branch, merge | branches from the start (ADR-0033) | decided |
 | tag, release | approval tag; an environment ref to the deployed commit | exists |
 | pull request | no separate object: the review is the range from the last approved commit to the head, with its change report | **closed** (see 1) |
 | review comment on a line | a question attached to an element of a commit, answered in the interview | **closed** (see 2) |
