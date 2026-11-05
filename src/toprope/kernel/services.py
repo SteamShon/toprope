@@ -53,7 +53,10 @@ class RecordingKernel(KernelServices):
 
     def run(self, service, inputs):
         self.calls.append((service, dict(inputs)))
-        return dict(self.results.get(service, {"ok": True}))
+        out = dict(self.results.get(service, {"ok": True}))
+        if "id" in CATALOG[service].result and "id" not in out:
+            out["id"] = f"{service}-{len(self.calls)}"     # a creating reply needs an id
+        return out
 
 
 class LocalKernel(KernelServices):
@@ -132,8 +135,10 @@ class LocalKernel(KernelServices):
     def _commit(self, declaration):
         c, created = self.commits.commit(self._path(declaration))
         review = self.commits.diff(c.domain, c.parents[0] if c.parents else None, c.id)["to_review"] if created else []
+        approved = self.commits.latest_approved(c.domain)
         return {"id": c.id, "seq": c.seq, "content": c.content, "created": created,
-                "parent": c.parents[0] if c.parents else "", "interface": c.interface, "to_review": review}
+                "parent": c.parents[0] if c.parents else "", "interface": c.interface, "to_review": review,
+                "last_approved": approved.id if approved else ""}
 
     def run(self, service, inputs):
         if service == "diff":   # `from` is a Python keyword

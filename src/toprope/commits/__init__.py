@@ -155,6 +155,8 @@ class CommitStore:
         returns the head, created False."""
         raw = load_yaml(Path(declaration).read_text()) or {}
         d = Domain.model_validate(raw)
+        if not representations:   # a released UI is the pair (ADR-0008): take this domain's own
+            representations = self.representations_for(d.domain, Path(declaration).parent)
         reps = {Path(r).name: load_yaml(Path(r).read_text()) for r in representations}
         cid = content_id(raw, reps)
         with self._lock(d.domain) as dirp:
@@ -181,6 +183,19 @@ class CommitStore:
                 os.replace(tmp, obj)
             self._append(dirp / "log.jsonl", asdict(c))
             return c, True
+
+    @staticmethod
+    def representations_for(domain: str, folder: Path) -> list[Path]:
+        """The `*.representation.yaml` files next to a declaration that target its domain."""
+        out = []
+        for p in sorted(folder.glob("*.representation.yaml")):
+            try:
+                body = load_yaml(p.read_text()) or {}
+            except Exception:
+                continue
+            if isinstance(body, dict) and (body.get("targets") or {}).get("domain") == domain:
+                out.append(p)
+        return out
 
     def approve(self, domain: str, commit_id: str, approver: str) -> bool:
         """Tag a commit as approved. Immutable; approving it again is a no-op (False)."""

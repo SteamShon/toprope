@@ -92,10 +92,14 @@ researcher's choice and are repeated as open questions below.
    - The shape hash drops `description`, `reason` and `deny`, which carry meaning.
 
    A **review hash** excludes only provenance (`status`, `source`): a confirmation carries
-   over exactly when it is unchanged. The interface also gains the elements it lacks today,
-   so that changes there are seen: roles, a transition's `field` and `initial`, handoffs,
-   scenarios, fixtures and purpose.
-4. **What a commit covers.** A released UI is a (domain, representation) pair (ADR-0008),
+   over exactly when it is unchanged. The review also covers what the interface lacks, so
+   that changes there are seen: roles, a transition's `field` and `initial`, handoffs,
+   scenarios, fixtures and purpose. (Implemented as a **review set** beside the interface,
+   not inside it: the interface stays what representations compile against, so changing an
+   example never bumps the interface version.)
+4. **What a commit covers** (implemented: the `*.representation.yaml` files next to the
+   declaration that target its domain are committed with it). A released UI is a
+   (domain, representation) pair (ADR-0008),
    and handoffs target an interface major. A commit therefore snapshots the declaration
    **and its representations**, and records the derived interface version. "The commit
    determines all three versions" holds only then.
