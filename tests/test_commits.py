@@ -407,3 +407,30 @@ def test_deploy_refuses_a_commit_approved_with_proposed_elements(tmp_path, monke
     with pytest.raises(DeployRefused) as e:
         env.deploy_commit(st, "example", c.id, ANA)
     assert e.value.rule == "proposed"
+
+
+# -- ADR-0041 Resolved 3: a commit may cite its evidence ---------------------------------------
+def test_a_commit_keeps_the_evidence_it_cites_and_old_records_still_load(store):
+    st, wc = store
+    c, _ = st.commit(write(wc, schema_doc_domain()), evidence=["interview:domains/x/interview.jsonl#L3"])
+    assert st.get("example", c.id).evidence == ["interview:domains/x/interview.jsonl#L3"]
+    log = st._dir("example") / "log.jsonl"
+    rows = [json.loads(line) for line in log.read_text().splitlines()]
+    for r in rows:
+        r.pop("evidence")                                       # a record from before ADR-0041
+    log.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    assert st.get("example", c.id).evidence == []
+
+
+def test_the_commit_service_takes_evidence_as_an_optional_input(tmp_path):
+    st = CommitStore(tmp_path / "commits")
+    k = LocalKernel(tmp_path, commits=st, harness_examples=0)
+    write(tmp_path / "d.domain.yaml", schema_doc_domain())
+    out = k.call("commit", {"declaration": "d.domain.yaml", "evidence": ["event:E-1#4"]})
+    assert out["ok"] and st.get("example", out["id"]).evidence == ["event:E-1#4"]
+    raw = schema_doc_domain()
+    raw["glossary"]["x"] = "y"
+    write(tmp_path / "d.domain.yaml", raw)
+    out = k.call("commit", {"declaration": "d.domain.yaml"})              # left out: still a commit
+    assert out["ok"] and st.get("example", out["id"]).evidence == []
+    assert not k.call("commit", {"evidence": []})["ok"]                   # the required input is still required

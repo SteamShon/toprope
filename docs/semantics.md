@@ -108,7 +108,9 @@ Recording:
 ## 5. Events
 - Each event has: `type`, `aggregate`, `id`, `version`, `at`, `actor`, `on_behalf_of`,
   `grant`, `thread_id`/`run_id` (if from an agent run), `causation` (the handoff id, if a
-  handoff issued it; ADR-0024), `domain_version`, `payload`.
+  handoff issued it; ADR-0024), `domain_version`, `payload`, and `permissions`: the actor's
+  roles, the principal's, and the grant's scope (actions, targets, expiry) in force when it ran
+  (ADR-0041). Events written before it have no `permissions`.
 - Projection is a pure fold over events. Replaying the same events yields the same state
   (replay parity).
 - Old events are read through upcasters (ADR-0012). They are never rewritten.

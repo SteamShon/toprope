@@ -160,6 +160,27 @@ state; they link here. The README claim-status table stays in the README, becaus
   an assertion, to get green: fix the code, or stop and explain. This applies equally to
   generated harnesses and to the M1 instruments.
 
+## Rules and what enforces them
+
+A rule that only text enforces is skipped by the first agent that does not read it. When the
+same mistake comes back, fix it at the highest level that works: make it impossible in the
+design, then a check whose error names the fix, then a test; text is last, for judgment calls.
+Show that the check fails on the real past mistake. Keep this table current: add a row when a
+check starts enforcing a rule, and drop a rule from the text once its mistake cannot happen.
+
+| Rule | Enforced by |
+|---|---|
+| `docs/STATUS.md` is current in every PR into `develop` or `umbrella/*` | `status` workflow (`tools/status_check.py`) |
+| A release PR follows a cleanup PR | `status` workflow (`Cleaned for release`) |
+| Tests pass on the memory and SQLite stores | `checks` workflow (`uv run pytest`) |
+| A frozen instrument changes only through `amend` | `checks` workflow (`instruments.py verify --run`) |
+| A workspace source points at files that exist (#91) | `Workspace.stale_sources`, tested in `checks` |
+| Agents write only `proposed`; only a person confirms or approves | the kernel (`requires: human`, `_demote`) |
+| The researcher's own steps from a cloud session run after their approval | `human-request` workflow (ADR-0039) |
+| Gold sets and sealed files are human-only | text only: review |
+| Real tests only; no skipped or weakened tests | text only: review |
+| No model identifiers in commits, PRs or code | text only: review |
+
 ## Development
 
 - `uv sync`, then `uv run pytest`.

@@ -304,7 +304,7 @@ def _check_call(d: Domain, name: str, a, k: int, e) -> list[Issue]:
     svc = CATALOG.get(e.call)
     if svc is None:
         return [Issue("unknown-service", where, f"no kernel service '{e.call}' (one of {sorted(CATALOG)})")]
-    for i in svc.inputs:
+    for i in svc.required():
         if i not in e.with_:
             out.append(Issue("missing-input", f"{where}.with", f"{e.call} needs '{i}'"))
     for i, src in e.with_.items():

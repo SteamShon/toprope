@@ -40,7 +40,7 @@ class KernelServices(ABC):
         svc = CATALOG.get(service)
         if svc is None:
             raise KeyError(f"no kernel service {service!r}")
-        missing = [i for i in svc.inputs if i not in inputs]
+        missing = [i for i in svc.required() if i not in inputs]
         if missing:
             return svc.failure(f"missing inputs {missing}")
         if "approver" in svc.inputs:
@@ -48,7 +48,7 @@ class KernelServices(ABC):
                 return svc.failure(f"{service} records a person's decision: the calling person must be the approver")
         token = _CALLER.set(caller)
         try:
-            return complete(svc, self.run(service, {k: inputs[k] for k in svc.inputs}))
+            return complete(svc, self.run(service, {k: inputs[k] for k in svc.inputs if k in inputs}))
         except Exception as e:   # a failure still replies: the declaration decides what it means
             return svc.failure(f"{type(e).__name__}: {e}")
         finally:
@@ -181,8 +181,9 @@ class LocalKernel(KernelServices):
         return {"skipped": True}
 
     # -- commits (ADR-0029) -----------------------------------------------------------------
-    def _commit(self, declaration):
-        c, created = self.commits.commit(self._path(declaration), author=str((self.caller or {}).get("id") or ""))
+    def _commit(self, declaration, evidence=None):
+        c, created = self.commits.commit(self._path(declaration), author=str((self.caller or {}).get("id") or ""),
+                                         evidence=list(evidence or []))
         base = self.commits.review_base(c.domain, c.id)      # ADR-0033
         review = self.commits.diff(c.domain, base, c.id)["to_review"] if created else []
         approved = self.commits.latest_approved(c.domain)

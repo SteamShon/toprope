@@ -120,7 +120,10 @@ exists.
    the declaration: who holds a role changes for reasons that are not rule changes. Issuing a grant
    or changing a role is recorded as an event, so it is an observation in the context graph. In the
    self domains, `toprope.identity.yaml` is in git, so changing it already goes through a
-   repository PR.
+   repository PR. *Refined (researcher, 2026-11-06):* Toprope does not issue grants or roles, it
+   only sees them, so every event and refused attempt records the `permissions` it ran under (the
+   actor's roles, the principal's, and the grant's actions, targets and expiry); a new grant or a
+   changed role shows as a difference between events.
 6. **Preferences and exceptions.**
    - Preferences are not a kind of their own: they are parameters with defaults, or proposed
      elements until someone confirms them. Revisit when a personal domain needs them.
