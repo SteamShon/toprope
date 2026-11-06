@@ -411,4 +411,25 @@ def run_probe(backend: Any, worlds: Path, p: dict[str, Any], out: Path, how: str
     return result
 
 
-__all__ = ["PROBES", "build_worlds", "generic_tools", "load_probes", "probe_tools", "run_probe"]
+def run_probes(backend: Any, worlds: Path, probes: list[dict[str, Any]], out: Path, how: str, materials: str,
+               toolchain: Path | None = None, jobs: int = 1) -> list[dict[str, Any]]:
+    """Every probe, `jobs` at a time. They are independent: each runs on its own copy of its
+    starting state and writes its own transcript. The results keep the probes' order. A usage
+    limit (or the cost cap) in any of them stops the run once the others have finished."""
+    from concurrent.futures import ThreadPoolExecutor
+    if jobs <= 1:
+        return [run_probe(backend, worlds, p, out, how, materials, toolchain) for p in probes]
+    with ThreadPoolExecutor(max_workers=jobs) as pool:
+        futures = [pool.submit(run_probe, backend, worlds, p, out, how, materials, toolchain) for p in probes]
+        results, stop = [], None
+        for f in futures:
+            try:
+                results.append(f.result())
+            except Exception as e:                       # noqa: BLE001 - UsageLimit or BudgetExceeded
+                stop = stop or e
+    if stop is not None:
+        raise stop
+    return results
+
+
+__all__ = ["PROBES", "build_worlds", "generic_tools", "load_probes", "probe_tools", "run_probe", "run_probes"]

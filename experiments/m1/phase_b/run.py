@@ -113,7 +113,7 @@ def in_order(all_: list[int], done: list[int], chosen: list[int]) -> list[int]:
 
 def run_arm(arm: Any, out: Path, requests: list[dict[str, Any]], backend: Backend, model_id: str,
             instruments: Path = INSTRUMENTS, extra: dict[str, Any] | None = None,
-            total: int | None = None, worlds: Path | None = None) -> dict[str, Any]:
+            total: int | None = None, worlds: Path | None = None, jobs: int = 1) -> dict[str, Any]:
     """Every request in order: edit, check, deploy (flagged or not), then the probes (with
     `worlds`, their starting states). Finished changes are skipped;
     a stop (the usage limit, the cost cap, Ctrl-C, an error) keeps them, and is recorded."""
@@ -132,7 +132,7 @@ def run_arm(arm: Any, out: Path, requests: list[dict[str, Any]], backend: Backen
         manifest = {"arm": arm.name, "model": model_id, "instruments": frozen, "materials": arm.materials_hash(),
                     "prompts": prompts, "of": total or len(requests), "done": [], "sessions": [], **extra}
     session: dict[str, Any] = {"started_at": _now(), "harness_commit": harness_commit(),
-                               "seqs": [r["seq"] for r in requests], "stopped": None, **extra}
+                               "seqs": [r["seq"] for r in requests], "stopped": None, "jobs": jobs, **extra}
     manifest["sessions"].append(session)
     write = lambda: mpath.write_text(json.dumps(manifest, indent=2) + "\n")
     write()
@@ -144,7 +144,8 @@ def run_arm(arm: Any, out: Path, requests: list[dict[str, Any]], backend: Backen
             shutil.rmtree(d0, ignore_errors=True)
             backend.progress = lambda s: _line(f"{arm.name} · before any change · probes · {s}")
             tp = time.monotonic()
-            probes0 = arm.probe({"seq": 0, "intent": "(before any change)"}, d0, worlds, load_probes(instruments))
+            probes0 = arm.probe({"seq": 0, "intent": "(before any change)"}, d0, worlds, load_probes(instruments),
+                                jobs=jobs)
             d0.mkdir(parents=True, exist_ok=True)
             (d0 / "record.json").write_text(json.dumps({"seq": 0, "probes": probes0,
                                                         "seconds": {"probes": time.monotonic() - tp}},
@@ -169,7 +170,7 @@ def run_arm(arm: Any, out: Path, requests: list[dict[str, Any]], backend: Backen
             if worlds is not None:
                 stage["step"] = "probes"
                 tp = time.monotonic()
-                probes = arm.probe(req, d, worlds, load_probes(instruments))
+                probes = arm.probe(req, d, worlds, load_probes(instruments), jobs=jobs)
                 probe_seconds = time.monotonic() - tp
             after = backend.report()
             record = {"seq": req["seq"], "intent": req["intent"], "edit": edit.data, "check": check.data,
@@ -283,6 +284,8 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     a.add_argument("--out", type=Path, default=DEFAULT_OUT, help="the run directory")
     a.add_argument("--seqs", help="e.g. 1-2 for the dry run (default: all)")
     a.add_argument("--instruments", type=Path, default=INSTRUMENTS)
+    a.add_argument("--jobs", type=int, default=4,
+                   help="probes run at once after each change (default 4); they are independent")
     a.add_argument("--no-probes", action="store_true",
                    help="skip the probes (not for a real run: ADR-0040 §6 runs all of them after every change)")
     sb = sub.add_parser("materials", help="build the structured-spec and Toprope arms' materials from the "
@@ -351,7 +354,7 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
                              "rebuild them with `materials`")
     arm = ARMS[args.arm](materials, work, backend, resume)
     m = run_arm(arm, work, [r for r in reqs if r["seq"] in chosen], backend, args.model or "unnamed",
-                args.instruments, extra, total=len(reqs), worlds=worlds)
+                args.instruments, extra, total=len(reqs), worlds=worlds, jobs=max(1, args.jobs))
     stopped = m["sessions"][-1]["stopped"]
     print(json.dumps({"arm": args.arm, "done": m["done"], "stopped": stopped, "usage": backend.report(),
                       "seconds": round(time.monotonic() - t, 1)}))

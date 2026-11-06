@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -20,6 +21,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 API_URL = "https://api.anthropic.com/v1/messages"
+_LOCK = threading.Lock()
 API_VERSION = "2023-06-01"
 
 
@@ -79,7 +81,8 @@ class Budget:
             raise BudgetExceeded(f"spent ${self.cost():.2f} of the ${self.cap_usd:.2f} cap")
 
     def add(self, u: Usage) -> None:
-        self.used = self.used + u
+        with _LOCK:                                      # probes run in parallel threads
+            self.used = self.used + u
 
     def report(self) -> dict[str, Any]:
         return {"tokens": asdict(self.used), "usd": round(self.cost(), 4), "cap_usd": self.cap_usd}
