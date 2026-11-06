@@ -45,7 +45,7 @@ replay and in-flight check, incremental analysis, commits and branches (ADR-0029
 | Domain commit store kept in git | ✅ | #75 |
 | Generated `toprope-run` and how-to-work guide (ADR-0036) | ✅ | #76 |
 | Switch-over (ADR-0037, umbrella #81): only the kernel stays hand-built | ✅ | #81 |
-| Phase B: the change sequence on the three arms | ⬜ | |
+| Phase B: the change sequence on the three arms (umbrella `umbrella/m1-phase-b`) | 🟡 | |
 | M1 report ([`experiments/M1-self-compile.md`](experiments/M1-self-compile.md)) | ⬜ | |
 
 ### Switch-over (umbrella #81)
@@ -62,6 +62,17 @@ replay and in-flight check, incremental analysis, commits and branches (ADR-0029
 Signed off by the researcher and merged into `develop` (#81). Nothing but the kernel is
 hand-built: the self domains run from their declarations, and their guides and the kernel's
 command reference are generated.
+
+### Phase B (umbrella `umbrella/m1-phase-b`)
+
+| Sub-PR | Status | PR |
+|---|---|---|
+| 1. Execution protocol (ADR-0040): a harness on the model API, run in Actions after approval; every change deploys; a stand-in takes the sandbox's person-only steps; only the scorer opens the key | 🟡 | |
+| 2. The three arms' materials (NL skill rendered blind; structured spec; Toprope sandbox), reviewed side by side by the researcher | ⬜ | |
+| 3. Runner and Toprope sandbox, tested with a fake model | ⬜ | |
+| 4. Scorer, tested with a synthetic key | ⬜ | |
+| 5. Dry run (changes 1–2): time and cost, then the cap | ⬜ | |
+| 6. Full run, scoring confirmed by the researcher, M1 report | ⬜ | |
 
 ### How the self domains run
 
@@ -87,8 +98,9 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 
 ## Next
 
-1. M1 Phase B: the change sequence on the three arms (every M1 instrument is frozen; the
-   harness runs `instruments.py verify --run` before each arm run), then the M1 report.
+1. M1 Phase B as ADR-0040 sets out (sub-PRs above): the arms' materials, the runner, the
+   scorer, a dry run, then the full run and the M1 report. The researcher adds the model API
+   key and a cost cap as repository settings before the dry run.
 2. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
 3. Before M2 (a domain whose sources may be private): a kernel `read_source` MCP tool that
    serves source text with redaction and refuses local-only sources, as the removed authoring

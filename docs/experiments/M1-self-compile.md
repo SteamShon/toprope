@@ -62,6 +62,9 @@ the sanity check for P0 (was the first draft already right?).
 
 ## Phase B: Change sequence, Toprope vs. natural-language skill (①)
 
+How it runs (who plays each role, where, the stand-in for person-only steps, and when the
+key is opened): [ADR-0040](../adr/0040-m1-phase-b-execution-protocol.md).
+
 ### Arms (equal information)
 
 - **NL arm.** The confirmed Phase A model is rendered by hand into a natural-language skill
