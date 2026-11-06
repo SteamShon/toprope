@@ -10,9 +10,9 @@ Execution, so the same rules apply: the matrix, actor rules, preconditions, inva
   toprope-run ... get ID | history ID | allowed ID | whoami | guide
 
 Who you are: with `--identity git` (the default when `toprope.identity.yaml` is in the current
-directory), your repository's git email, looked up in that file (ADR-0037). An action that
-requires a person asks you to confirm on your terminal, so nothing without one can take it as
-you. With `static:FILE` or `jwt`, the caller comes from TOPROPE_TOKEN (or --token), as for the server.
+directory and no token is given), your repository's git email, looked up in that file
+(ADR-0037). An action that requires a person asks you to confirm on your terminal, so an agent's
+ordinary shell cannot take it as you. With `static:FILE` or `jwt`, the caller comes from TOPROPE_TOKEN (or --token), as for the server.
 Exit status 1 when the command is denied or rejected.
 """
 
@@ -92,10 +92,10 @@ def build_parser(d: Domain) -> argparse.ArgumentParser:
     return ap
 
 
-def _identity(spec: str | None) -> Identity:
+def _identity(spec: str | None, token: str | None = None) -> Identity:
     from ...identity.git import FILE, GitIdentity
     from ..mcp.cli import open_identity
-    if spec is None and Path(FILE).is_file():
+    if spec is None and token is None and Path(FILE).is_file():     # a given token is never ignored
         spec = "git"
     if not spec:
         raise SystemExit(f"--identity is required for this command (or put {FILE} here)")
@@ -118,7 +118,8 @@ def _caller(identity: Identity, token: str | None) -> Caller:
 
 def _confirm_on_terminal(identity: Identity, caller: Caller, action: str, target: str) -> None:
     """A git identity is self-asserted, so an action that requires a person is confirmed on a
-    terminal: a process without one (an agent's shell, a script) cannot take it as you."""
+    terminal: a process without one (an agent's ordinary shell, a script) cannot take it as you.
+    It is a guard against mistakes, not a security boundary: a process can fake a terminal."""
     from ...identity.git import GitIdentity
     if not isinstance(identity, GitIdentity) or caller.actor.kind != "person":
         return
@@ -130,7 +131,7 @@ def _confirm_on_terminal(identity: Identity, caller: Caller, action: str, target
 
 def _execution(args: Any, d: Domain) -> Execution:
     from ..mcp.cli import _kernel, _member, open_store
-    identity = _identity(args.identity)
+    identity = _identity(args.identity, args.token or os.environ.get("TOPROPE_TOKEN"))
     services = _kernel(args)
     if args.composition:
         args.no_seed = not args.seed
@@ -189,8 +190,8 @@ def main(argv: list[str] | None = None) -> None:
     params = {name: getattr(args, f"p_{name}") for name in d.actions[args.cmd].params
               if getattr(args, f"p_{name}", None) is not None}
     from ...identity.git import GitIdentity
-    if isinstance(ex.identity, GitIdentity) or d.actions[args.cmd].requires == "human":
-        caller = _caller(ex.identity, token)          # a git identity says why it is not listed
+    if isinstance(ex.identity, GitIdentity):
+        caller = _caller(ex.identity, token)          # says why the git email is not listed
         if d.actions[args.cmd].requires == "human":
             _confirm_on_terminal(ex.identity, caller, args.cmd, args.target)
     from ..mcp import outcome_json

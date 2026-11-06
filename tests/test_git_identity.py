@@ -103,3 +103,15 @@ def test_the_repository_identity_file_grants_agents_no_person_only_action():
              for n, a in load_domain(ROOT / f"domains/{f}.domain.yaml").actions.items() if a.requires == "human"}
     agents = [c for c in table.values() if c.actor.kind == "agent"]
     assert human and agents and all(not (c.grant.actions & human) for c in agents)
+
+
+def test_a_repeated_email_is_refused(tmp_path):
+    (tmp_path / "ids.yaml").write_text("people:\n  a@x: {roles: [owner]}\n  a@x: {roles: [expert]}\n")
+    with pytest.raises(ValueError, match="duplicate key"):
+        load_table(tmp_path / "ids.yaml")
+
+
+def test_a_given_token_is_not_ignored_for_the_default_git_identity(tmp_path):
+    root = repo(tmp_path, "eli@example.com")
+    out = cli(root, "--token", "t-1", "whoami")
+    assert out.returncode == 1 and "--identity is required" in out.stderr

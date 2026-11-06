@@ -15,9 +15,12 @@ git identity (`user.email`), and what they may do is listed in the repository
 An actor's id is `name <email>`, the name taken from the file (not from each machine's git
 config), so the same person has the same id everywhere.
 
-A git email is self-asserted: anyone at the terminal can set it. So this adapter is for a
-person's own machine only (`toprope-run`); a shared server resolves credentials with `jwt`.
-`toprope-run` adds one guard for actions that require a person: it asks on the terminal.
+A git email is self-asserted: anyone at the terminal can set it, and an agent running on a
+person's machine has that person's git email. So this adapter is for a person's own machine only
+(`toprope-run`), and it trusts the processes there; a shared server resolves credentials with
+`jwt`. An `agents` entry applies to an agent that runs with its own git email (for example in its
+own container). `toprope-run` adds one guard for actions that require a person: it asks on the
+terminal, which stops an agent's ordinary shell, though not a process that fakes a terminal.
 """
 
 from __future__ import annotations
@@ -54,7 +57,12 @@ def _entry(email: str, c: Any, kind: str) -> Actor:
 def load_table(path: str | Path) -> dict[str, Caller]:
     """email → Caller, from the identity file. Raises ValueError naming the bad entry."""
     import yaml
-    raw = yaml.safe_load(Path(path).read_text()) or {}
+
+    from ..decl.yamlio import load_yaml
+    try:
+        raw = load_yaml(Path(path).read_text()) or {}         # a repeated email is an error
+    except yaml.YAMLError as e:
+        raise ValueError(str(e)) from None
     if not isinstance(raw, dict) or set(raw) - {"people", "agents"}:
         raise ValueError("the file has `people` and optionally `agents`")
     people = raw.get("people") or {}
