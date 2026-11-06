@@ -1,0 +1,8 @@
+{"at": "2026-11-06T02:31:37+00:00", "base": null, "check": "structural", "commit": "1-6e1501ab29937360", "ok": true, "run": "90416b1b76c3", "summary": "0 error(s), 0 warning(s)"}
+{"at": "2026-11-06T02:31:37+00:00", "base": null, "check": "semantic", "commit": "1-6e1501ab29937360", "ok": true, "run": "90416b1b76c3", "summary": "0 error(s), 0 warning(s)"}
+{"at": "2026-11-06T02:31:37+00:00", "base": null, "check": "scenarios", "commit": "1-6e1501ab29937360", "ok": true, "run": "90416b1b76c3", "summary": "0 error(s), 0 warning(s); 4/4 scenarios pass"}
+{"at": "2026-11-06T02:31:37+00:00", "base": null, "check": "harness", "commit": "1-6e1501ab29937360", "ok": true, "run": "90416b1b76c3", "summary": "0 error(s), 0 warning(s); 91 tests: 91 run, 0 from cache, 0.921 s"}
+{"at": "2026-11-06T02:31:37+00:00", "base": null, "check": "log_replay", "commit": "1-6e1501ab29937360", "ok": null, "run": "90416b1b76c3", "summary": "skipped: no event store (nothing deployed)"}
+{"at": "2026-11-06T02:31:37+00:00", "base": null, "check": "in_flight", "commit": "1-6e1501ab29937360", "ok": null, "run": "90416b1b76c3", "summary": "skipped: no event store (nothing deployed)"}
+{"at": "2026-11-06T02:31:37+00:00", "base": null, "check": "nl", "commit": "1-6e1501ab29937360", "ok": null, "run": "90416b1b76c3", "summary": "skipped: no natural-language checker configured"}
+{"at": "2026-11-06T02:31:37+00:00", "base": null, "check": "change-check", "commit": "1-6e1501ab29937360", "ok": true, "run": "90416b1b76c3", "summary": "passes; 0 error(s), 0 warning(s)"}
