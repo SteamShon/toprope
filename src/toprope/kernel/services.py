@@ -212,6 +212,13 @@ class LocalKernel(KernelServices):
         return {"passed": r.ok, "errors": r.errors, "warnings": r.warnings,
                 "failing": [n for n, c in r.checks.items() if not c.ok], "summary": r.summary()}
 
+    def _merge_main(self, domain, branch, declaration):
+        from ..decl.yamlio import load_yaml
+        path = self._path(declaration)
+        out = self.commits.merge_main(domain, path, branch, (load_yaml(path.read_text()) or {}).get("version", 1))
+        return {"merge": out["merge"], "up_to_date": out["up_to_date"], "conflicts": len(out["conflicts"]),
+                "paths": [c["path"] for c in out["conflicts"]]}
+
     def _checkout(self, domain, commit, declaration):
         c = self.commits.checkout(domain, commit, self._path(declaration))
         return {"content": c.content}

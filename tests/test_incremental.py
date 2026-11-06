@@ -109,20 +109,17 @@ def test_log_replay_re_decides_only_affected_actions():
     assert t.checks["log_replay"].note == "0 of 2 past action(s) re-decided; 0 would be blocked"
 
 
-def test_the_cli_reuses_results_and_checks_soundness(tmp_path):
+def test_the_workspace_reuses_results_and_checks_soundness(tmp_path):
+    from toprope.workspace import Workspace
     (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump({"domain": "d.domain.yaml", "sources": []}))
     (tmp_path / "d.domain.yaml").write_text(yaml.safe_dump(schema_doc_domain(), sort_keys=False))
-
-    def run(*a):
-        return subprocess.run(["uv", "run", "--quiet", "toprope-author", *a, "--workspace", str(tmp_path)],
-                              capture_output=True, text=True, timeout=180, check=False)
-    run("commit")
-    first = json.loads(run("change-check", "--examples", "10").stdout)
-    again = run("change-check", "--examples", "10", "--full")
-    out = json.loads(again.stdout)
-    assert again.returncode == 0 and out["selection_misses"] == []
-    assert "0 run" in out["checks"]["harness"]["note"] and "0 run" not in first["checks"]["harness"]["note"]
-    nocache = json.loads(run("change-check", "--examples", "10", "--no-cache").stdout)
+    ws = Workspace(tmp_path)
+    ws.commit()
+    first = ws.change_check(examples=10)
+    again = ws.change_check(examples=10, full=True)
+    assert again["ok"] and again["selection_misses"] == []
+    assert "0 run" in again["checks"]["harness"]["note"] and "0 run" not in first["checks"]["harness"]["note"]
+    nocache = ws.change_check(examples=10, cache=False)
     assert "0 from cache" in nocache["checks"]["harness"]["note"]
 
 

@@ -56,6 +56,7 @@ from ..decl.interface import review_hash
 
 MAIN = "main"
 DEFAULT_BRANCH = "work"
+MERGING = "merging.json"          # a merge in progress per branch (not shared: kept out of git)
 
 
 class CommitError(Exception):
@@ -351,7 +352,9 @@ class CommitStore:
                author: str = "") -> tuple[Commit, bool]:
         """Snapshot a working copy onto a branch. Returns (commit, created). A new branch starts
         from `main`. Identical content to the branch head returns the head, created False.
-        `merge` names a second parent: the commit whose conflicts this working copy resolves."""
+        `merge` names a second parent: the commit whose conflicts this working copy resolves.
+        Without it, a merge started by `merge_main` on this branch is used (like git's
+        MERGE_HEAD), and is cleared once the commit is written."""
         if branch == MAIN:
             raise CommitError("`main` is protected: commit to a branch, and approving merges it into main")
         raw = load_yaml(Path(declaration).read_text()) or {}
@@ -365,6 +368,9 @@ class CommitStore:
             # A new branch starts from `main`; before the first approval, from the domain's first
             # commit, so every branch shares a base (ADR-0033: main exists from the first commit).
             head = self.head(d.domain, branch) or self.main(d.domain) or (log[0] if log else None)
+            pending = merge is None and self.pending_merge(d.domain, branch)
+            if pending:
+                merge = pending
             if merge is not None:
                 self.get(d.domain, merge)
                 if head is not None and self.is_ancestor(d.domain, merge, head.id):
@@ -374,7 +380,57 @@ class CommitStore:
                     self._move(dirp, branch, head.id)
                 return head, False
             parents = ([head.id] if head else []) + ([merge] if merge else [])
-            return self._write(dirp, d, raw, reps, cid, parents, message, branch, author), True
+            c = self._write(dirp, d, raw, reps, cid, parents, message, branch, author)
+            if pending:
+                self._set_pending(dirp, branch, None)
+            return c, True
+
+    # -- a merge in progress (ADR-0033), kept per branch like git's MERGE_HEAD ------------------
+    def pending_merge(self, domain: str, branch: str = DEFAULT_BRANCH) -> str | None:
+        """The commit `merge_main` brought into this branch's working copy and no commit has
+        recorded yet."""
+        p = self._dir(domain) / MERGING
+        try:
+            return json.loads(p.read_text()).get(branch)
+        except (OSError, ValueError, AttributeError):
+            return None
+
+    def _set_pending(self, dirp: Path, branch: str, commit_id: str | None) -> None:
+        p = dirp / MERGING
+        try:
+            cur = json.loads(p.read_text())
+        except (OSError, ValueError):
+            cur = {}
+        if commit_id is None:
+            cur.pop(branch, None)
+        else:
+            cur[branch] = commit_id
+        if cur:
+            p.write_text(json.dumps(cur, sort_keys=True) + "\n")
+        else:
+            p.unlink(missing_ok=True)
+
+    def merge_main(self, domain: str, declaration: str | Path, branch: str = DEFAULT_BRANCH,
+                   version: int = 1) -> dict[str, Any]:
+        """Bring `main` into a branch's working copy (ADR-0033): write the semantic 3-way merge
+        into the working copy and list the conflicts for the person to resolve. At a path
+        conflict the branch's value is kept; at an element conflict the element holds both
+        sides' changes, field by field. The next commit on the branch records both parents.
+        Refused when the working copy has changes not yet committed to the branch."""
+        main, head = self.main(domain), self.head(domain, branch)
+        if main is None or head is None:
+            raise CommitError(f"nothing to merge: {'main' if main is None else branch} has no commits")
+        if self.is_ancestor(domain, main.id, head.id):
+            return {"merge": main.id, "branch": branch, "up_to_date": True, "conflicts": []}
+        current, present = self.working_copy(domain, declaration)
+        if current != head.content:
+            raise CommitError(f"the working copy has changes not committed to {branch}: commit them first")
+        m = self.merge3(domain, head.id, main.id)
+        self.write_working_copy(domain, m.merged, declaration, version, present)
+        with self._lock(domain) as dirp:
+            self._set_pending(dirp, branch, main.id)
+        return {"merge": main.id, "branch": branch, "up_to_date": False,
+                "conflicts": [{"path": c.path, "base": c.base, "ours": c.ours, "theirs": c.theirs} for c in m.conflicts]}
 
     def _write(self, dirp: Path, d: Domain, raw: dict[str, Any], reps: dict[str, Any], cid: str,
                parents: list[str], message: str, branch: str, author: str = "") -> Commit:
@@ -638,7 +694,17 @@ class CommitStore:
         except Exception:  # noqa: BLE001, S110 - only under force: the draft is overwritten
             pass
         self.write_working_copy(domain, self._body(domain, c.id), path, version, present)
+        with self._lock(domain) as dirp:          # a checkout abandons any merge in progress
+            for branch in list(self._pending_all(dirp)):
+                self._set_pending(dirp, branch, None)
         return c
+
+    @staticmethod
+    def _pending_all(dirp: Path) -> dict[str, str]:
+        try:
+            return json.loads((dirp / MERGING).read_text())
+        except (OSError, ValueError):
+            return {}
 
     # -- the semantic diff ------------------------------------------------------------------------
     def diff(self, domain: str, a: str | None, b: str) -> dict[str, Any]:

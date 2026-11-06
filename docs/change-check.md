@@ -3,10 +3,14 @@
 Link: ① iterate safely. ADR-0009, ADR-0018, ADR-0032 (records), ADR-0033 (the base),
 ADR-0013 (incremental). M0a sub-PRs 8 and 9.
 
+`$R` is the `toprope-run` prefix from [`workflow.md`](workflow.md), with `--member authoring`:
+
 ```bash
-uv run toprope-author change-check                    # the `work` head, against its merge base with main
-uv run toprope-author change-check 3-ab12… --since 1-cd34… --env .toprope/envs/local
+$R check_commit 3-ab12…      # Authoring's action: the kernel's change_check, against the merge base with main
+uv run toprope-commits checks DOMAIN 3-ab12…   # the newest record of each check on the commit
 ```
+
+In code: `Workspace.change_check(commit, since=…, env=…, full=…)`.
 
 It compares a commit with a base and reports what would break or conflict, before anything
 is deployed. It exits 1 when a check reports an error. The report is printed, written to

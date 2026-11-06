@@ -78,6 +78,10 @@ CATALOG: dict[str, Service] = {s.name: s for s in (
             "refused when the working copy has uncommitted changes. Committing it makes a new commit.",
             {"domain": "string", "commit": "string", "declaration": "string"},
             {"content": "string"}),
+    Service("merge_main", "Bring main into a branch's working copy (a semantic 3-way merge) and list the "
+            "conflicts for the person to resolve; the next commit on the branch records both parents.",
+            {"domain": "string", "branch": "string", "declaration": "string"},
+            {"merge": "string", "up_to_date": "boolean", "conflicts": "integer", "paths": "strings"}),
     Service("change_check", "Run the change check on a commit against its merge base with main, and "
             "record it on the commit (ADR-0009, ADR-0032).",
             {"domain": "string", "commit": "string"},

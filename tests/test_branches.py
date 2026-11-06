@@ -166,21 +166,6 @@ def test_the_deploy_floor_uses_main_and_ancestry(st, tmp_path):
     assert e.value.rule == "downgrade"
 
 
-def test_cli_branches_merge_and_approve(tmp_path):
-    (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump({"domain": "d.domain.yaml", "sources": []}))
-    raw = schema_doc_domain()
-    write(tmp_path / "d.domain.yaml", raw)
-    def run(*a):
-        return subprocess.run(["uv", "run", "--quiet", "toprope-author", *a, "--workspace", str(tmp_path)],
-                              capture_output=True, text=True, timeout=120, check=False)
-    c1 = json.loads(run("commit", "--branch", "feat").stdout)
-    assert c1["branch"] == "feat"
-    assert "protected" in run("commit", "--branch", "main").stderr
-    assert json.loads(run("approve", c1["commit"], "--as", "ana", "--yes").stdout)["main"] == c1["commit"]
-    assert json.loads(run("branches").stdout) == {"feat": c1["commit"], "main": c1["commit"]}
-    assert json.loads(run("merge", "--branch", "feat").stdout)["up_to_date"] is True
-
-
 # -- review findings -----------------------------------------------------------------------------
 def workspace(tmp_path, raw):
     from toprope.workspace import Workspace
@@ -344,3 +329,85 @@ def test_before_any_approval_a_commit_is_reviewed_against_its_parent(tmp_path):
     write(tmp_path / "d.domain.yaml", raw)
     out = ws.commit()
     assert out["since"] == first and out["to_review"] == ["action:launch_experiment"]
+
+
+def test_a_merge_in_progress_is_recorded_and_the_next_commit_uses_it(tmp_path):
+    """Like git's MERGE_HEAD: merging main into a branch is remembered until a commit records
+    both parents, so the kernel's plain `commit` service finishes a merge (ADR-0037)."""
+    raw = schema_doc_domain()
+    ws = workspace(tmp_path, raw)
+    ws.approve_commit(ws.commit()["commit"], via="cli", who="ana")
+    other = copy.deepcopy(raw)
+    other["glossary"]["o"] = "O."
+    main = land_on_main(ws, tmp_path, other)
+    raw["glossary"]["mine"] = "M."
+    write(tmp_path / "d.domain.yaml", raw)
+    ws.commit()
+    out = ws.merge_main()
+    assert out["conflicts"] == [] and ws.commits.pending_merge("example") == out["merge"]
+    c = ws.commits.get("example", ws.commit()["commit"])                       # no `merge=` given
+    assert len(c.parents) == 2 and c.parents[1] == out["merge"] and main
+    assert ws.commits.pending_merge("example") is None
+    assert not (tmp_path / ".toprope/commits/example/merging.json").exists()
+
+
+def test_the_kernel_merges_main_into_a_working_copy(tmp_path):
+    from toprope.kernel.services import LocalKernel
+    raw = schema_doc_domain()
+    ws = workspace(tmp_path, raw)
+    ws.approve_commit(ws.commit()["commit"], via="cli", who="ana")
+    other = copy.deepcopy(raw)
+    other["glossary"]["o"] = "O."
+    land_on_main(ws, tmp_path, other)
+    k = LocalKernel(tmp_path, harness_examples=5)
+    up = k.call("merge_main", {"domain": "example", "branch": "work", "declaration": "d.domain.yaml"})
+    assert up["ok"] and up["up_to_date"] is False and up["conflicts"] == 0
+    assert yaml.safe_load((tmp_path / "d.domain.yaml").read_text())["glossary"]["o"] == "O."
+    done = k.call("commit", {"declaration": "d.domain.yaml"}, caller={"id": "ana", "kind": "person"})
+    assert len(ws.commits.get("example", done["id"]).parents) == 2
+    again = k.call("merge_main", {"domain": "example", "branch": "work", "declaration": "d.domain.yaml"})
+    assert again["up_to_date"] is True
+
+
+def commits_cli(tmp_path, *a):
+    """`toprope-commits`, the kernel's read-only command for a commit store."""
+    r = subprocess.run(["uv", "run", "--quiet", "toprope-commits", "--commits", str(tmp_path / ".toprope/commits"),
+                        *a], capture_output=True, text=True, timeout=120, check=False)
+    return r
+
+
+def test_branches_merge_and_approve_and_the_read_command(tmp_path):
+    ws = workspace(tmp_path, schema_doc_domain())
+    from toprope.workspace import AuthoringError
+    c1 = ws.commit(branch="feat")
+    assert c1["branch"] == "feat"
+    with pytest.raises(AuthoringError, match="protected"):
+        ws.commit(branch="main")
+    assert ws.approve_commit(c1["commit"], via="cli", who="ana")["main"] == c1["commit"]
+    out = commits_cli(tmp_path, "branches", "example")
+    assert out.returncode == 0 and json.loads(out.stdout) == {"feat": c1["commit"], "main": c1["commit"]}
+    assert ws.merge_main("feat")["up_to_date"] is True
+    unknown = commits_cli(tmp_path, "checks", "example", "9-nope")
+    assert unknown.returncode == 1 and "no commit" in unknown.stderr
+    typo = commits_cli(tmp_path, "branches", "exampel")
+    assert typo.returncode == 1 and "no commits for domain 'exampel'" in typo.stderr
+    bad = commits_cli(tmp_path, "diff", "example", "1-a", "2-b", "3-c")
+    assert bad.returncode == 1 and "diff takes [FROM] TO" in bad.stderr
+
+
+def test_a_checkout_abandons_a_merge_in_progress(tmp_path):
+    raw = schema_doc_domain()
+    ws = workspace(tmp_path, raw)
+    ws.approve_commit(ws.commit()["commit"], via="cli", who="ana")
+    other = copy.deepcopy(raw)
+    other["glossary"]["o"] = "O."
+    land_on_main(ws, tmp_path, other)
+    raw["glossary"]["mine"] = "M."
+    write(tmp_path / "d.domain.yaml", raw)
+    head = ws.commit()["commit"]
+    assert ws.merge_main()["up_to_date"] is False and ws.commits.pending_merge("example")
+    ws.checkout(head, force=True)                                  # back to the branch, merge abandoned
+    assert ws.commits.pending_merge("example") is None
+    raw["glossary"]["later"] = "L."
+    write(tmp_path / "d.domain.yaml", raw)
+    assert len(ws.commits.get("example", ws.commit()["commit"]).parents) == 1
