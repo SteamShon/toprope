@@ -21,8 +21,17 @@ in the declarations appears in the skill: who may take each action, what it need
 it changes, which actions only a person may take, the states and what each refuses, the
 invariants, the handoff, and the glossary. Also check that the skill adds no rule of its own.
 
-A mechanical check found every name in the skill: the actions, the scenarios, the invariants
-and the objects of both domains. Whether each rule is right is for the review to say.
+Before this review, two blind checks ran (fresh agents that read only the declarations and the
+skill; the assistant that wrote the harness has seen the key, so it did not judge the skill
+itself):
+
+- The first rendering left out the kernel services, the parameter types and the invariants'
+  reasons, mixed transition-table denials into the preconditions, and said a person must
+  preview. The render prompt was made stricter and the skill rendered again (no hand edits).
+- The second found no missing or wrong rule. Left, as presentation only: the roles lines name
+  `external:kernel` and `system` as actors; two notation notes; the `approve_commit` effects
+  cell opens with the action's description; the links table says "Required: no" where the YAML
+  is silent.
 
 If the skill is wrong, delete `nl/` and render it again; do not edit it by hand (the arm's text
 must come from the declarations, not from someone who knows the key).
