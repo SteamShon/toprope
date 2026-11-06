@@ -96,9 +96,10 @@ each into `umbrella/pstack-lessons`. Each sub-PR changes only its own item below
   check recorded on the commit, or a stored event) and records its strength
   (pointed, ran or observed); `toprope-commits evidence` lists it (`docs/commits.md`). The Authoring
   declaration calls it: `cite_evidence` and its reply `record_evidence` were proposed through
-  `toprope-run` by the agent (commit `5-cde15830b0c0d6a7`, every check passes but `confirmed`),
-  and the agent's grant includes `cite_evidence`. Left: the researcher confirms them (human
-  request `confirm-cite-evidence`), then approves the confirmed commit (#124)
+  `toprope-run` by the agent and confirmed by the researcher (human request
+  `confirm-cite-evidence`); the confirmed commit `6-7a576971f3e73bb4` passes every check, and the
+  agent's grant includes `cite_evidence`. Left: the researcher approves that commit (human
+  request `approve-cite-evidence`) (#124)
 
 - ⬜ 4. World map state charts mark where the harness found a break, and draw minimal flows
 
