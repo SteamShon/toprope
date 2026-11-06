@@ -196,6 +196,10 @@ def check_commit(commits: Any, domain: str, commit_id: str, base: str | None = "
     report.diff["from"], report.diff["to"] = base, c.id
     rows = [(name, res.ok if res.ran else None, res.summary()) for name, res in report.checks.items()]
     rows.append(("change-check", report.ok, report.summary()))
+    from ..decl.provenance import proposed_elements
+    left = proposed_elements(commits.declaration(domain, c.id))
+    rows.append(("confirmed", not left, f"{len(left)} proposed element(s)"
+                 + (": " + ", ".join(left[:5]) if left else "")))   # approval needs none (ADR-0041)
     commits.record_checks(domain, c.id, rows, base)        # one run, one append: skipped checks too
     return report
 

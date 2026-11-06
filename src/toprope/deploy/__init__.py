@@ -10,7 +10,9 @@ An environment is a directory:
 **The fixed floor.** `deploy_commit` is the only way to move an environment (ADR-0029). It
 enforces, in code, rules no declaration can weaken (ADR-0022, ADR-0029, ADR-0033): the commit
 is approved (so it is on `main`), it is what `main` points to (not superseded), it is not the
-deployed commit or one of its ancestors (not a downgrade), and its build passes the build floor:
+deployed commit or one of its ancestors (not a downgrade), it holds no proposed element
+(ADR-0041; a backstop for commits approved before approval refused them), and its build passes
+the build floor:
 1. the build's declaration is unchanged since preview (its hash), and the toolchain that
    ran the harness is the current one (no taint)
 2. the harness passed for that build
@@ -158,6 +160,10 @@ class LocalEnvironment:
                     raise DeployRefused("unapproved", f"commit {c.id} has no approval on main")
                 if main.id != c.id:
                     raise DeployRefused("superseded", f"commit {c.id} is superseded by approved {main.id}")
+                from ..decl.provenance import proposed_elements
+                left = proposed_elements(commits.declaration(domain, c.id)) if hasattr(commits, "declaration") else []
+                if left:                                   # ADR-0041: a backstop for older approvals
+                    raise DeployRefused("proposed", f"commit {c.id} holds {len(left)} proposed element(s)")
                 cur = self.current()
                 if cur and cur.get("commit_domain") == domain and commits.is_ancestor(domain, c.id, cur.get("commit", "")):
                     raise DeployRefused("downgrade", f"{cur.get('commit')} is deployed; {c.id} is not newer "

@@ -359,6 +359,9 @@ class Workspace:
             if not is_element(segs) or not isinstance(el, dict) or "source" not in el:
                 raise AuthoringError(f"{p} is not a drafted element with a source")
             el["status"] = "confirmed"
+            for part in (el.get("by_role") or {}).values():   # a cell's per-role parts are one element
+                if isinstance(part, dict) and part.get("status") == "proposed":
+                    part["status"] = "confirmed"
         issues = self._write(doc)
         self._append(self.log_path, {"at": _now(), "kind": "confirm", "paths": paths, "via": via, "who": who})
         return {"confirmed": paths, "issues": issues}
@@ -494,27 +497,8 @@ class Workspace:
         return attempts * 100 + risk * 10 + len(cells)
 
     def _proposed(self, doc: dict[str, Any]) -> list[str]:
-        out = []
-        for kind in ("objects", "links", "actions"):
-            for name, el in (doc.get(kind) or {}).items():
-                if isinstance(el, dict) and el.get("status") == "proposed":
-                    out.append(f"{kind}.{name}")
-                if kind == "actions" and isinstance(el, dict):
-                    for p in el.get("preconditions") or []:
-                        if isinstance(p, dict) and p.get("status") == "proposed":
-                            out.append(f"actions.{name}.preconditions.{p.get('id')}")
-        for name, h in (doc.get("handoffs") or {}).items():
-            if isinstance(h, dict) and h.get("status") == "proposed":
-                out.append(f"handoffs.{name}")
-        for inv in doc.get("invariants") or []:
-            if isinstance(inv, dict) and inv.get("status") == "proposed":
-                out.append(f"invariants.{inv.get('id')}")
-        for obj, tr in (doc.get("transitions") or {}).items():
-            for state, cells in ((tr or {}).get("matrix") or {}).items():
-                for name, c in (cells or {}).items():
-                    if isinstance(c, dict) and c.get("status") == "proposed":
-                        out.append(f"transitions.{obj}.matrix.{state}.{name}")
-        return out
+        from ..decl.provenance import proposed_elements
+        return proposed_elements(doc)
 
     def _stop(self, d: Domain, attempts: dict[str, int]) -> dict[str, Any]:
         """ADR-0014 §4: stop when no attempted (or effectful) cell is undecided, or the budget

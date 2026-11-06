@@ -320,3 +320,90 @@ def test_an_unreadable_representation_stops_the_commit_and_an_explicit_empty_lis
         st.commit(wc)
 
 
+
+
+# -- ADR-0041 Resolved 1: main takes no unconfirmed proposal -----------------------------------
+def test_a_commit_with_a_proposed_element_is_not_approved(store):
+    st, wc = store
+    raw = schema_doc_domain()
+    raw["links"]["hypothesis"]["status"] = "proposed"
+    c, _ = st.commit(write(wc, raw))
+    with pytest.raises(CommitError, match=r"1 proposed element\(s\): links.hypothesis"):
+        st.approve("example", c.id, "ana")
+    assert st.main("example") is None and st.approvals("example") == []
+    raw["links"]["hypothesis"]["status"] = "confirmed"
+    c2, _ = st.commit(write(wc, raw))
+    assert st.approve("example", c2.id, "ana") == c2
+
+
+def test_a_merge_that_brings_in_a_proposed_element_is_not_approved(store, tmp_path):
+    st, wc = store
+    raw = schema_doc_domain()
+    base, _ = st.commit(write(wc, raw))
+    st.approve("example", base.id, "ana")
+    side = copy.deepcopy(raw)
+    side["actions"]["launch_experiment"]["status"] = "proposed"
+    c, _ = st.commit(write(tmp_path / "side.domain.yaml", side), branch="side")   # starts from main
+    raw["glossary"]["x"] = "y"
+    ahead, _ = st.commit(write(wc, raw))
+    st.approve("example", ahead.id, "ana")                     # main moves on: approving c merges
+    approvals, commits = st.approvals("example"), len(st.log("example"))
+    with pytest.raises(CommitError, match=r"proposed element\(s\): actions.launch_experiment"):
+        st.approve("example", c.id, "ana")
+    assert st.main("example") == ahead
+    assert st.approvals("example") == approvals and len(st.log("example")) == commits   # no merge commit
+
+
+def test_the_change_check_records_how_many_elements_are_still_proposed(store):
+    from toprope.check import check_commit
+    st, wc = store
+    raw = schema_doc_domain()
+    raw["links"]["hypothesis"]["status"] = "proposed"
+    c, _ = st.commit(write(wc, raw))
+    check_commit(st, "example", c.id)
+    rec = {r["check"]: r for r in st.checks("example", c.id)}["confirmed"]
+    assert rec["ok"] is False and rec["summary"] == "1 proposed element(s): links.hypothesis"
+
+
+def test_a_proposed_per_role_part_of_a_cell_blocks_approval_until_the_cell_is_confirmed(tmp_path):
+    from toprope.workspace import AuthoringError, Workspace
+    (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump({"domain": "d.domain.yaml", "sources": []}))
+    raw = schema_doc_domain()
+    raw["transitions"]["Experiment"]["matrix"]["draft"]["launch_experiment"] = {
+        "by_role": {"eng": {"deny": "Launch requires approval.", "status": "proposed"}},
+        "source": {"kind": "interview", "ref": "q1"}, "status": "confirmed"}
+    write(tmp_path / "d.domain.yaml", raw)
+    ws = Workspace(tmp_path)
+    c = ws.commit("by role")
+    with pytest.raises(AuthoringError, match="transitions.Experiment.matrix.draft.launch_experiment"):
+        ws.approve_commit(c["commit"], via="cli", who="ana")
+    ws.confirm(["transitions.Experiment.matrix.draft.launch_experiment"], via="cli", who="ana")
+    c2 = ws.commit("confirmed")
+    ws.approve_commit(c2["commit"], via="cli", who="ana")
+    assert ws.commits.main("example").id == c2["commit"]
+
+
+def test_the_change_check_service_fails_while_elements_are_proposed(tmp_path):
+    st = CommitStore(tmp_path / "commits")
+    raw = schema_doc_domain()
+    raw["links"]["hypothesis"]["status"] = "proposed"
+    c, _ = st.commit(write(tmp_path / "wc.yaml", raw))
+    k = LocalKernel(tmp_path, commits=st, harness_examples=0)
+    out = k._change_check("example", c.id)
+    assert out["passed"] is False and "confirmed" in out["failing"]
+    assert out["summary"].endswith("; 1 proposed element(s) to confirm")
+
+
+def test_deploy_refuses_a_commit_approved_with_proposed_elements(tmp_path, monkeypatch):
+    st = CommitStore(tmp_path / "commits")
+    env = LocalEnvironment(tmp_path / "env")
+    raw = schema_doc_domain()
+    raw["links"]["hypothesis"]["status"] = "proposed"
+    c, _ = st.commit(write(tmp_path / "wc.yaml", raw))
+    monkeypatch.setattr(CommitStore, "_confirmed", staticmethod(lambda *a: None))  # approved before ADR-0041
+    st.approve("example", c.id, "ana")
+    monkeypatch.undo()
+    env.preview_commit(st, "example", c.id, examples=0)
+    with pytest.raises(DeployRefused) as e:
+        env.deploy_commit(st, "example", c.id, ANA)
+    assert e.value.rule == "proposed"
