@@ -45,7 +45,7 @@ replay and in-flight check, incremental analysis, commits and branches (ADR-0029
 | Domain commit store kept in git | ✅ | #75 |
 | Generated `toprope-run` and how-to-work guide (ADR-0036) | ✅ | #76 |
 | Switch-over (ADR-0037, umbrella #81): only the kernel stays hand-built | ✅ | #81 |
-| Phase B: the change sequence on the three arms | ⬜ | |
+| Phase B: the change sequence on the three arms (umbrella `umbrella/m1-phase-b`) | 🟡 | |
 | M1 report ([`experiments/M1-self-compile.md`](experiments/M1-self-compile.md)) | ⬜ | |
 
 ### Switch-over (umbrella #81)
@@ -62,6 +62,25 @@ replay and in-flight check, incremental analysis, commits and branches (ADR-0029
 Signed off by the researcher and merged into `develop` (#81). Nothing but the kernel is
 hand-built: the self domains run from their declarations, and their guides and the kernel's
 command reference are generated.
+
+### Phase B (umbrella `umbrella/m1-phase-b`)
+
+| Sub-PR | Status | PR |
+|---|---|---|
+| 1. Execution protocol (ADR-0040); amended in 2a to run on the researcher's own Claude Code, on their machine | ✅ | #98 |
+| 2a. Harness core: each role a fresh `claude -p` with only the harness's confined tools; stop at the usage limit and resume; progress line; the NL and structured-spec arms; the NL skill's rendering. Tested with a fake model and a fake `claude` | ✅ | #100 |
+| 2b. The Toprope arm: a sandbox with fixed tools, the compiler's checks and a preview, the stand-in for person-only steps and its override of a failed check (the floors still hold). Tested on the real kernel | ✅ | #101 |
+| 2c. The probes: eight starting states built once per run with the approved tools (a small `library` domain), the same generic tools in every arm, the deployed domains' generated MCP in the Toprope arm; the probe agent never sees what a probe checks | ✅ | #103 |
+| 3. The three arms' materials (`experiments/m1/arms/`): structured and Toprope built from the approved commits, the NL skill rendered blind; reviewed side by side by the researcher | 🟡 | #105 |
+| 4. Scorer (`grade` proposes labels with a grader, `score` computes the metrics and pilot verdicts from the researcher's confirmed labels; the key opens only here and only after every arm ran every change), tested with a synthetic key; the probes now also run once before any change | 🟡 | #106 |
+| 5. Dry run (changes 1–2), run by the researcher: time and usage per change | 🟡 | #109 |
+| 6. Full run, scoring confirmed by the researcher, M1 report | ⬜ | |
+
+How a run works: the researcher runs `python -m phase_b arm ARM --model M` (from
+`experiments/m1`) in an ordinary terminal. Each conversation is written as it happens, and
+running the same command again continues a stopped run (ADR-0040 §1–2). The probes after each
+change run four at a time (`--jobs`); they are independent, each on its own copy of its starting
+state.
 
 ### How the self domains run
 
@@ -87,8 +106,9 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 
 ## Next
 
-1. M1 Phase B: the change sequence on the three arms (every M1 instrument is frozen; the
-   harness runs `instruments.py verify --run` before each arm run), then the M1 report.
+1. M1 Phase B as ADR-0040 sets out (sub-PRs above): the arms' materials, the runner, the
+   scorer, a dry run, then the full run and the M1 report. The researcher runs both runs from
+   their own terminal, on their Claude Code login; nothing to set up in GitHub.
 2. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
 3. Before M2 (a domain whose sources may be private): a kernel `read_source` MCP tool that
    serves source text with redaction and refuses local-only sources, as the removed authoring
@@ -100,6 +120,13 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    member), through a new ADR superseding decision 29A for that case; an export to git can
    keep the audit trail (decided 2026-11-06). Until then the self domains keep their logs in
    git (`domains/<domain>/events/`).
+
+5. Before M2's Phase B: a probe's starting state written as conditions on objects (for example
+   a Commit with `checks_passed` true and `approved` false), and generated from the declarations
+   by searching their actions for a way to reach it, instead of a hand-written setup per probe.
+   This needs a format change to the probe suite (an ADR). M1 keeps the hand-written setups in
+   `experiments/m1/phase_b/probes.py`, built only from the approved tools on a separate domain
+   (decided 2026-11-06).
 
 ## Left from reviews
 
@@ -129,6 +156,10 @@ it; each release's cleanup PR handles items older than one release.
   dispatches; the PR needs one more commit before it can merge. A push token that triggers
   workflows (a GitHub App or a fine-grained token, set up by the maintainer) would remove the
   step (#96, 2026-11-06)
+- Authoring's `record_questions` sets the stage and the bundle but not `params.questions`, so the
+  generated tools never show the bundle's questions (`next_questions` returns only the bundle id).
+  Found building probe P04's starting state (#103, 2026-11-06). Not fixed in M1: the self domains
+  are the experiment's baseline
 - The mechanical layer computes `unreachable_from_creation` twice per run (#71, 2026-11-05)
 - `merge_main` writes the working copy and records the merge in progress in two steps; a
   commit from another process between them gets one parent, and the next commit a stale
