@@ -135,6 +135,12 @@ class TextArm:
         _replace(self.deployed, self.workspace)
         return StepResult(time.monotonic() - t, {"deployed": True, "hash": tree_hash(self.deployed)})
 
+    def probe(self, req: dict[str, Any], out: Path, worlds: Path, probes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """The probes after this change, with the deployed text as the rules to follow."""
+        from .probes import run_probe
+        materials = "\n\n".join(f"=== {name} ===\n{text}" for name, text in snapshot(self.deployed).items())
+        return [run_probe(self.backend, worlds, p, out / "probes", self.described, materials) for p in probes]
+
 
 def _replace(target: Path, source: Path) -> None:
     """Make `target` a copy of `source` so that a stop at any point leaves either the old copy or

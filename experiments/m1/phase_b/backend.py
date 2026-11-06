@@ -40,6 +40,12 @@ from .toolserver import SERVER, ToolSpec, build_tools
 Progress = Callable[[str], None]
 
 
+def extra_servers(tools: ToolSpec) -> dict[str, Any]:
+    """MCP servers besides the harness's own, named in a ToolSpec's context (the Toprope arm's
+    probes: the generated servers of the deployed domains)."""
+    return json.loads(tools.context or "{}").get("servers") or {}
+
+
 class UsageLimit(RuntimeError):
     """The subscription's usage limit was reached; run again later to continue."""
 
@@ -74,6 +80,8 @@ class ApiBackend(Backend):
         self.model, self.budget = model, budget
 
     def converse(self, system, user, tools, transcript, max_turns=40):
+        if tools is not None and extra_servers(tools):
+            raise BackendError("the API backend cannot reach MCP servers; use the cli backend")
         out = converse(self.model, system, user, build_tools(tools) if tools else [], transcript, max_turns,
                        progress=self._say)
         if self.budget:
@@ -101,12 +109,13 @@ class CliBackend(Backend):
             raise SystemExit(f"`{claude}` is not on PATH: install Claude Code and log in first")
         self.model, self.claude = model, claude
 
-    def command(self, system: str, mcp_config: Path | None, max_turns: int) -> list[str]:
+    def command(self, system: str, mcp_config: Path | None, max_turns: int,
+                servers: tuple[str, ...] = (SERVER,)) -> list[str]:
         cmd = [self.claude, "-p", "--model", self.model, "--system-prompt", system, "--tools", "",
                "--strict-mcp-config", "--setting-sources", "local", "--output-format", "stream-json",
                "--verbose", "--max-turns", str(max_turns), "--no-session-persistence"]
         if mcp_config is not None:
-            cmd += ["--mcp-config", str(mcp_config), "--allowedTools", f"mcp__{SERVER}"]
+            cmd += ["--mcp-config", str(mcp_config), "--allowedTools", *(f"mcp__{s}" for s in servers)]
         return cmd
 
     def converse(self, system, user, tools, transcript, max_turns=40):
@@ -118,18 +127,21 @@ class CliBackend(Backend):
                 cfg = cwd.parent / f"{cwd.name}.mcp.json"
                 cfg.write_text(json.dumps({"mcpServers": {SERVER: {
                     "command": sys.executable, "args": ["-m", "phase_b.toolserver", tools.dumps()],
-                    "env": {"PYTHONPATH": str(Path(__file__).resolve().parents[1])}}}}))
+                    "env": {"PYTHONPATH": str(Path(__file__).resolve().parents[1])}}, **extra_servers(tools)}}))
             env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}   # the subscription
             transcript.write("start", system=system, user=user, tools=tools.kind if tools else None,
                              backend="claude-cli")
             try:
-                return self._run(self.command(system, cfg, max_turns), user, cwd, env, tools, transcript, errfile)
+                names = (SERVER, *extra_servers(tools)) if tools is not None else ()
+                return self._run(self.command(system, cfg, max_turns, names), user, cwd, env, tools, transcript,
+                                 errfile)
             finally:
                 if cfg is not None:
                     cfg.unlink(missing_ok=True)
 
     def _run(self, cmd, user, cwd, env, tools, transcript, errfile) -> str:
         allowed = {f"mcp__{SERVER}__{n}" for n in (tools.names() if tools else [])}
+        prefixes = tuple(f"mcp__{s}__" for s in extra_servers(tools)) if tools else ()
         p = subprocess.Popen(cmd, cwd=cwd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                              stderr=errfile, text=True)
         assert p.stdin and p.stdout
@@ -146,10 +158,11 @@ class CliBackend(Backend):
                 kind = ev.get("type")
                 if kind == "system" and ev.get("subtype") == "init":
                     got = set(ev.get("tools") or [])
-                    if got - allowed:
+                    other = {n for n in got - allowed if not (prefixes and n.startswith(prefixes))}
+                    if other:
                         p.kill()
                         transcript.write("refused", tools=sorted(got))
-                        raise BackendError(f"the conversation got tools it must not have: {sorted(got - allowed)}")
+                        raise BackendError(f"the conversation got tools it must not have: {sorted(other)}")
                     transcript.write("init", tools=sorted(got), model=ev.get("model"))
                 elif kind == "assistant":
                     turns += 1

@@ -39,6 +39,9 @@ class ToolSpec:
 def build_tools(spec: ToolSpec) -> list[Tool]:
     if spec.kind == "files":
         return file_tools(Path(spec.root))
+    if spec.kind == "probe":
+        from .probes import probe_tools
+        return probe_tools(Path(spec.root), json.loads(spec.context))
     if spec.kind == "toprope":
         from .toprope_arm import toprope_tools
         return toprope_tools(Path(spec.root), json.loads(spec.context))

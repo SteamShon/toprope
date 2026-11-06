@@ -40,6 +40,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -50,7 +51,8 @@ import yaml
 from .arms import PROMPTS, nl_arm, render_skill, structured_arm
 from .backend import ApiBackend, Backend, CliBackend, UsageLimit, user_memory
 from .model import AnthropicModel, Budget, BudgetExceeded
-from .toprope_arm import build_sandbox, toprope_arm
+from .probes import build_worlds, load_probes
+from .toprope_arm import build_sandbox, export_toolchain, toprope_arm
 
 ROOT = Path(__file__).resolve().parents[3]
 M1 = ROOT / "experiments/m1"
@@ -109,8 +111,9 @@ def in_order(all_: list[int], done: list[int], chosen: list[int]) -> list[int]:
 
 def run_arm(arm: Any, out: Path, requests: list[dict[str, Any]], backend: Backend, model_id: str,
             instruments: Path = INSTRUMENTS, extra: dict[str, Any] | None = None,
-            total: int | None = None) -> dict[str, Any]:
-    """Every request in order: edit, check, deploy (flagged or not). Finished changes are skipped;
+            total: int | None = None, worlds: Path | None = None) -> dict[str, Any]:
+    """Every request in order: edit, check, deploy (flagged or not), then the probes (with
+    `worlds`, their starting states). Finished changes are skipped;
     a stop (the usage limit, the cost cap, Ctrl-C, an error) keeps them, and is recorded."""
     out.mkdir(parents=True, exist_ok=True)
     mpath = out / "manifest.json"
@@ -146,11 +149,17 @@ def run_arm(arm: Any, out: Path, requests: list[dict[str, Any]], backend: Backen
             check = arm.check(req, d)
             stage["step"] = "deploy"
             deploy = arm.deploy(req, d)
+            probes, probe_seconds = None, 0.0
+            if worlds is not None:
+                stage["step"] = "probes"
+                tp = time.monotonic()
+                probes = arm.probe(req, d, worlds, load_probes(instruments))
+                probe_seconds = time.monotonic() - tp
             after = backend.report()
             record = {"seq": req["seq"], "intent": req["intent"], "edit": edit.data, "check": check.data,
-                      "deploy": deploy.data,
+                      "deploy": deploy.data, "probes": probes,
                       "seconds": {"edit": edit.seconds, "check": check.seconds, "deploy": deploy.seconds,
-                                  "edit_to_checked": edit.seconds + check.seconds},
+                                  "edit_to_checked": edit.seconds + check.seconds, "probes": probe_seconds},
                       "tokens": {k: after["tokens"][k] - before["tokens"][k] for k in after["tokens"]},
                       "usd_estimate": round(after["usd_estimate"] - before["usd_estimate"], 4)}
             (d / "record.json").write_text(json.dumps(record, indent=2, ensure_ascii=False) + "\n")
@@ -170,6 +179,40 @@ def run_arm(arm: Any, out: Path, requests: list[dict[str, Any]], backend: Backen
         session["usage"] = backend.report()
         write()
     return manifest
+
+
+def probe_worlds(out: Path) -> Path:
+    """The probes' starting states, built once per run directory and shared by every arm."""
+    worlds = out / "worlds"
+    if not worlds.is_dir():
+        _line("building the probes' starting states (once per run directory) ...", end="\n")
+        out.mkdir(parents=True, exist_ok=True)
+        tmp = Path(tempfile.mkdtemp(prefix="worlds.building-", dir=out))      # one per process: no race
+        try:
+            build_worlds(ROOT, export_toolchain(ROOT, tmp / "_toolchain"), tmp / "worlds")
+            try:
+                (tmp / "worlds").rename(worlds)
+            except OSError:                                # another arm finished first: use its worlds
+                if not worlds.is_dir():
+                    raise
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    return worlds
+
+
+def baseline() -> dict[str, str]:
+    """The self-domain commits everything starts from: each commit store's `main`."""
+    from toprope.commits import CommitStore
+    store = CommitStore(ROOT / ".toprope/commits")
+    return {d: store.main(d).id for d in ("authoring", "delivery")}
+
+
+def _worlds_hash(worlds: Path) -> str:
+    """What the probes start from, by each world's state and situation (its logs carry times)."""
+    h = hashlib.sha256()
+    for f in sorted([*worlds.glob("*/state.json"), *worlds.glob("*/situation.json")]):
+        h.update(str(f.relative_to(worlds)).encode() + b"\0" + f.read_bytes())
+    return h.hexdigest()
 
 
 def _line(text: str, end: str = "") -> None:
@@ -224,6 +267,8 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     a.add_argument("--out", type=Path, default=DEFAULT_OUT, help="the run directory")
     a.add_argument("--seqs", help="e.g. 1-2 for the dry run (default: all)")
     a.add_argument("--instruments", type=Path, default=INSTRUMENTS)
+    a.add_argument("--no-probes", action="store_true",
+                   help="skip the probes (not for a real run: ADR-0040 §6 runs all of them after every change)")
     sb = sub.add_parser("sandbox", help="build the Toprope arm's materials from this repository")
     sb.add_argument("--out", type=Path, default=M1 / "arms/toprope")
     s = sub.add_parser("status", help="how far each arm got")
@@ -239,8 +284,8 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     if backend is None:
         backend = make_backend(args)
     mem = user_memory()
-    extra = {"backend": args.backend,
-             "user_memory": hashlib.sha256(mem.read_bytes()).hexdigest() if mem and args.allow_user_memory else None}
+    extra: dict[str, Any] = {"backend": args.backend, "user_memory": hashlib.sha256(mem.read_bytes()).hexdigest()
+                             if mem and args.allow_user_memory else None}
     if args.cmd == "render":
         args.out.parent.mkdir(parents=True, exist_ok=True)
         render_skill(args.declarations, args.out, backend, args.out.parent / f"{args.out.name}.render.jsonl")
@@ -256,9 +301,20 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     done = json.loads((work / "manifest.json").read_text())["done"] if resume else []
     chosen = set(in_order(all_, done, seqs(args.seqs, all_)))
     t = time.monotonic()
-    arm = ARMS[args.arm](args.materials or M1 / "arms" / args.arm, work, backend, resume)
+    worlds = None if args.no_probes else probe_worlds(args.out)
+    extra["probes"] = None if worlds is None else _worlds_hash(worlds)
+    extra["baseline"] = baseline()             # every arm and the probes start from these commits
+    materials = args.materials or M1 / "arms" / args.arm
+    if args.arm == "toprope":
+        from toprope.commits import CommitStore
+        store = CommitStore(materials / ".toprope/commits")
+        got = {d: store.main(d).id for d in extra["baseline"]}
+        if got != extra["baseline"]:
+            raise SystemExit(f"the Toprope materials start from {got}, the repository from {extra['baseline']}: "
+                             "rebuild them with `sandbox`")
+    arm = ARMS[args.arm](materials, work, backend, resume)
     m = run_arm(arm, work, [r for r in reqs if r["seq"] in chosen], backend, args.model or "unnamed",
-                args.instruments, extra, total=len(reqs))
+                args.instruments, extra, total=len(reqs), worlds=worlds)
     stopped = m["sessions"][-1]["stopped"]
     print(json.dumps({"arm": args.arm, "done": m["done"], "stopped": stopped, "usage": backend.report(),
                       "seconds": round(time.monotonic() - t, 1)}))

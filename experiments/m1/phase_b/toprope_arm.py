@@ -92,6 +92,18 @@ def build_sandbox(root: Path, out: Path) -> Path:
     return out
 
 
+def export_toolchain(root: Path, out: Path) -> Path:
+    """The self domains as approved (each commit store's `main`), as a composition in `out`."""
+    from toprope.commits import CommitStore
+    store = CommitStore(root / ".toprope/commits")
+    out.mkdir(parents=True)
+    shutil.copy(root / "domains/toprope-self.composition.yaml", out / "toprope-self.composition.yaml")
+    for d in DOMAINS:
+        (out / d).mkdir()
+        store.export(d, store.main(d).id, out / d / f"{d}.domain.yaml")
+    return out
+
+
 def toprope_run() -> list[str]:
     exe = Path(sys.executable).parent / "toprope-run"
     if exe.exists():
@@ -100,12 +112,15 @@ def toprope_run() -> list[str]:
 
 
 class Sandbox:
-    def __init__(self, root: Path):
-        self.root = root
+    """A kernel root with the toolchain composition, its callers (`ids.yaml`) and, per domain, a
+    workspace and a deploy environment."""
+
+    def __init__(self, root: Path, tokens: dict[str, str] | None = None, reader: str = "standin"):
+        self.root, self.tokens, self.reader = root, tokens or TOKENS, reader
 
     def run(self, who: str, member: str, domain: str, *args: str) -> dict[str, Any]:
         cmd = [*toprope_run(), "--composition", COMPOSITION, "--kernel-root", ".", "--identity", "static:ids.yaml",
-               "--token", TOKENS[who], "--member", member, "--workspace", f"toprope.{domain}.workspace.yaml",
+               "--token", self.tokens[who], "--member", member, "--workspace", f"toprope.{domain}.workspace.yaml",
                "--env", f".toprope/env-{domain}", *args]
         r = subprocess.run(cmd, cwd=self.root, capture_output=True, text=True, check=False)
         try:
@@ -124,7 +139,7 @@ class Sandbox:
         return out
 
     def get(self, member: str, domain: str, oid: str) -> dict[str, Any]:
-        return self.run("standin", member, domain, "get", oid)
+        return self.run(self.reader, member, domain, "get", oid)
 
     def declaration(self, d: str) -> Path:
         return self.root / "domains" / d / f"{d}.domain.yaml"
@@ -355,6 +370,37 @@ class TopropeArm:
         except (CommitError, DeployRefused) as e:
             return {"deployed": False, "path": "override", "refused": f"{type(e).__name__}: {e}"}
         return {"deployed": True, "path": "override", "commit": target}
+
+    def probe(self, req: dict[str, Any], out: Path, worlds: Path, probes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """The probes after this change, through the tools generated from what is deployed."""
+        from .probes import run_probe
+        toolchain = _deployed(self.sb, out / "deployed-toolchain")
+        guides = _guides(toolchain)
+        return [run_probe(self.backend, worlds, p, out / "probes", "the Toprope tools generated from these "
+                          "domains (their MCP tools)", guides, toolchain) for p in probes]
+
+
+def _deployed(sb: Sandbox, out: Path) -> Path:
+    """The declarations the environments run now, as a composition: the probes' tools."""
+    shutil.rmtree(out, ignore_errors=True)
+    out.mkdir(parents=True)
+    shutil.copy(sb.root / COMPOSITION, out / "toprope-self.composition.yaml")
+    for d in DOMAINS:
+        (out / d).mkdir()
+        shutil.copy(sb.env(d).current()["declaration"], out / d / f"{d}.domain.yaml")
+    return out
+
+
+def _guides(toolchain: Path) -> str:
+    """The generated how-to-work guides of the deployed domains."""
+    import subprocess as sp
+    parts = []
+    for d in DOMAINS:
+        r = sp.run([*toprope_run(), "--composition", str(toolchain / "toprope-self.composition.yaml"), "--member", d,
+                    "--store", "memory", "--identity", "static:/dev/null", "guide"],
+                   capture_output=True, text=True, check=False)
+        parts.append(r.stdout if r.returncode == 0 else f"(the {d} guide could not be generated: {r.stderr[-500:]})")
+    return "\n\n".join(parts)
 
 
 def toprope_arm(materials: Path, work: Path, backend: Backend, resume: bool = False) -> TopropeArm:

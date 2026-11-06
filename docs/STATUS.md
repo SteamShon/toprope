@@ -69,8 +69,8 @@ command reference are generated.
 |---|---|---|
 | 1. Execution protocol (ADR-0040); amended in 2a to run on the researcher's own Claude Code, on their machine | ✅ | #98 |
 | 2a. Harness core: each role a fresh `claude -p` with only the harness's confined tools; stop at the usage limit and resume; progress line; the NL and structured-spec arms; the NL skill's rendering. Tested with a fake model and a fake `claude` | ✅ | #100 |
-| 2b. The Toprope arm: a sandbox with fixed tools, the compiler's checks and a preview, the stand-in for person-only steps and its override of a failed check (the floors still hold). Tested on the real kernel | 🟡 | #101 |
-| 2c. The probes: starting states and tools in every arm | ⬜ | |
+| 2b. The Toprope arm: a sandbox with fixed tools, the compiler's checks and a preview, the stand-in for person-only steps and its override of a failed check (the floors still hold). Tested on the real kernel | ✅ | #101 |
+| 2c. The probes: eight starting states built once per run with the approved tools (a small `library` domain), the same generic tools in every arm, the deployed domains' generated MCP in the Toprope arm; the probe agent never sees what a probe checks | 🟡 | #103 |
 | 3. The three arms' materials, reviewed side by side by the researcher | ⬜ | |
 | 4. Scorer, tested with a synthetic key | ⬜ | |
 | 5. Dry run (changes 1–2), run by the researcher: time and usage per change | ⬜ | |
@@ -143,6 +143,10 @@ it; each release's cleanup PR handles items older than one release.
   dispatches; the PR needs one more commit before it can merge. A push token that triggers
   workflows (a GitHub App or a fine-grained token, set up by the maintainer) would remove the
   step (#96, 2026-11-06)
+- Authoring's `record_questions` sets the stage and the bundle but not `params.questions`, so the
+  generated tools never show the bundle's questions (`next_questions` returns only the bundle id).
+  Found building probe P04's starting state (#103, 2026-11-06). Not fixed in M1: the self domains
+  are the experiment's baseline
 - The mechanical layer computes `unreachable_from_creation` twice per run (#71, 2026-11-05)
 - `merge_main` writes the working copy and records the merge in progress in two steps; a
   commit from another process between them gets one parent, and the next commit a stale
