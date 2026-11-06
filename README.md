@@ -54,8 +54,8 @@ actions:
     actor: [analyst]                 # the agent
     preconditions:
       - id: not-a-holdout
-        check: target.holdout == false
-        reason: Holdout campaigns keep their budget; changing it would break the test.
+        check: target.holdout == false or target.exception_approved == true
+        reason: Holdout campaigns keep their budget; changing it would break the test. A media lead can grant a one-time exception.
       - id: step-limit
         check: params.daily_budget - target.daily_budget <= 500
         reason: Raise a daily budget by at most 500 at a time.
@@ -70,7 +70,7 @@ actions:
 
 | Who | Asks | Result |
 |---|---|---|
-| the agent | raise the holdout campaign to 1200 | denied: *Holdout campaigns keep their budget; changing it would break the test.* |
+| the agent | raise the holdout campaign to 1200 | denied: *Holdout campaigns keep their budget; changing it would break the test. A media lead can grant a one-time exception.* |
 | the agent | raise `C-search` from 1000 to 2500 | denied: *Raise a daily budget by at most 500 at a time.* |
 | the agent | raise `C-search` to 1400 | proposed |
 | the agent | approve it | denied: *Only a person can approve_budget_change.* |
@@ -81,7 +81,7 @@ try every state × action × role combination:
 
 ```
 harness: PASS (model, execution, mcp)
-cells: 12 decided, covered model 12, execution 12, mcp 12; 0 undecided; 0 without an instance
+cells: 16 decided, covered model 16, execution 16, mcp 16; 0 undecided; 0 without an instance
 ```
 
 Raise the step limit to 1000, and before it ships you see what the change touches:
