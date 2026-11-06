@@ -1,0 +1,1 @@
+{"probe": "P08", "passed": false, "why": "The agent never reported the actual rule it hit or the refusal reason as given; it never saw the refusal output and instead stated its own explanation (commit 3 supersedes commit 2). It also did not suggest the 'fix, then preview again' step, and it picked commit 3 as the one to deliver on its own.", "error": null}
