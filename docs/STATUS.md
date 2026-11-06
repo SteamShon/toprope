@@ -36,7 +36,7 @@ replay and in-flight check, incremental analysis, commits and branches (ADR-0029
 | Item | Status | PR |
 |---|---|---|
 | Probe suite (P01–P08) and verdict rules, frozen (`experiments/m1/instruments/FROZEN.json`) | ✅ | #56–#58, #61 |
-| Change requests and the sealed change key (researcher; options drafted on request, ADR-0034) | 🟡 selected, `draft`; the researcher reviews and freezes | #92 |
+| Change requests (20) and the sealed change key (options drafted on request and selected by the researcher, ADR-0034), frozen | ✅ | #92 |
 | Binding, frozen after Phase A | ⬜ | |
 | Phase A: the Authoring and Delivery self domains, built and confirmed | ✅ | #69, #73, #74 |
 | First self-domain commits approved | ✅ | #77 |
@@ -83,8 +83,8 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 
 ## Next
 
-1. M1 instruments, the rest (researcher): the change requests and the sealed change key, frozen
-   before the pilot runs; then the binding ([`experiments/m1/README.md`](../experiments/m1/README.md)).
+1. M1 binding (intent → element names), frozen before any arm runs
+   ([`experiments/m1/README.md`](../experiments/m1/README.md)); options drafted on request.
 2. M1 Phase B, then the M1 report.
 3. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
 4. Before M2 (a domain whose sources may be private): a kernel `read_source` MCP tool that
