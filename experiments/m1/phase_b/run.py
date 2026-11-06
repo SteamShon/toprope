@@ -95,25 +95,37 @@ def _now() -> str:
     return datetime.now(UTC).isoformat()
 
 
+def in_order(all_: list[int], done: list[int], chosen: list[int]) -> list[int]:
+    """The chosen changes not yet done, which must be the next ones in the frozen order: the
+    sequence is cumulative, so none may be skipped or run early."""
+    todo = [s for s in all_ if s in set(chosen) and s not in set(done)]
+    expected = [s for s in all_ if s not in set(done)][:len(todo)]
+    if todo != expected:
+        raise SystemExit(f"changes run in order: next is {expected[:1] or 'nothing'}, asked for {todo}")
+    return todo
+
+
 def run_arm(arm: TextArm, out: Path, requests: list[dict[str, Any]], backend: Backend, model_id: str,
-            instruments: Path = INSTRUMENTS, extra: dict[str, Any] | None = None) -> dict[str, Any]:
+            instruments: Path = INSTRUMENTS, extra: dict[str, Any] | None = None,
+            total: int | None = None) -> dict[str, Any]:
     """Every request in order: edit, check, deploy (flagged or not). Finished changes are skipped;
-    a stop (the usage limit, the cost cap, Ctrl-C) keeps them, and is recorded."""
+    a stop (the usage limit, the cost cap, Ctrl-C, an error) keeps them, and is recorded."""
     out.mkdir(parents=True, exist_ok=True)
     mpath = out / "manifest.json"
     frozen = {f: m["sha256"] for f, m in json.loads((instruments / "FROZEN.json").read_text())["files"].items()}
     prompts = _hashes(sorted(PROMPTS.glob("*.md")))
+    extra = extra or {}
     if mpath.exists():
         manifest = json.loads(mpath.read_text())
         for k, now in (("model", model_id), ("materials", arm.materials_hash()), ("instruments", frozen),
-                       ("prompts", prompts)):
-            if manifest[k] != now:
+                       ("prompts", prompts), *extra.items()):
+            if manifest.get(k) != now:
                 raise SystemExit(f"cannot resume {out}: its {k} differs from this run's")
     else:
         manifest = {"arm": arm.name, "model": model_id, "instruments": frozen, "materials": arm.materials_hash(),
-                    "prompts": prompts, "done": [], "sessions": [], **(extra or {})}
+                    "prompts": prompts, "of": total or len(requests), "done": [], "sessions": [], **extra}
     session: dict[str, Any] = {"started_at": _now(), "harness_commit": harness_commit(),
-                               "seqs": [r["seq"] for r in requests], "stopped": None}
+                               "seqs": [r["seq"] for r in requests], "stopped": None, **extra}
     manifest["sessions"].append(session)
     write = lambda: mpath.write_text(json.dumps(manifest, indent=2) + "\n")
     write()
@@ -148,9 +160,13 @@ def run_arm(arm: TextArm, out: Path, requests: list[dict[str, Any]], backend: Ba
         session["stopped"] = f"{type(e).__name__}: {str(e)[:300]}"
     except KeyboardInterrupt:
         session["stopped"] = "interrupted"
-    session["finished_at"] = _now()
-    session["usage"] = backend.report()
-    write()
+    except BaseException as e:
+        session["stopped"] = f"error: {type(e).__name__}: {str(e)[:300]}"
+        raise
+    finally:
+        session["finished_at"] = _now()
+        session["usage"] = backend.report()
+        write()
     return manifest
 
 
@@ -169,7 +185,7 @@ def status(out: Path) -> list[dict[str, Any]]:
         man = json.loads(m.read_text())
         last = (man.get("sessions") or [{}])[-1]
         tokens = sum(sum((s.get("usage") or {}).get("tokens", {}).values()) for s in man.get("sessions", []))
-        rows.append({"arm": man["arm"], "done": len(man["done"]), "of": len(change_requests()),
+        rows.append({"arm": man["arm"], "done": len(man["done"]), "of": man.get("of"),
                      "last_stopped": last.get("stopped"), "sessions": len(man.get("sessions", [])),
                      "tokens": tokens})
     return rows
@@ -227,13 +243,15 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     if errs:
         raise SystemExit("the instruments do not verify; nothing runs:\n" + "\n".join(errs))
     reqs = change_requests(args.instruments)
-    chosen = set(seqs(args.seqs, [r["seq"] for r in reqs]))
+    all_ = [r["seq"] for r in reqs]
     work = args.out / args.arm
     resume = (work / "manifest.json").exists()
+    done = json.loads((work / "manifest.json").read_text())["done"] if resume else []
+    chosen = set(in_order(all_, done, seqs(args.seqs, all_)))
     t = time.monotonic()
     arm = ARMS[args.arm](args.materials or M1 / "arms" / args.arm, work, backend, resume)
     m = run_arm(arm, work, [r for r in reqs if r["seq"] in chosen], backend, args.model or "unnamed",
-                args.instruments, extra)
+                args.instruments, extra, total=len(reqs))
     stopped = m["sessions"][-1]["stopped"]
     print(json.dumps({"arm": args.arm, "done": m["done"], "stopped": stopped, "usage": backend.report(),
                       "seconds": round(time.monotonic() - t, 1)}))

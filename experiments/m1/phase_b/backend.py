@@ -88,7 +88,8 @@ def user_memory() -> Path | None:
     return p if p.is_file() and p.read_text().strip() else None
 
 
-LIMIT_WORDS = ("usage limit", "session limit", "weekly limit", "rate limit", "hit your limit")
+# The subscription's limits only: a transient rate limit or overload is not one of them.
+LIMIT_WORDS = ("usage limit", "session limit", "weekly limit", "hit your limit")
 
 
 class CliBackend(Backend):
@@ -128,9 +129,10 @@ class CliBackend(Backend):
 
     def _run(self, cmd, user, cwd, env, tools, transcript) -> str:
         allowed = {f"mcp__{SERVER}__{n}" for n in (tools.names() if tools else [])}
+        errfile = tempfile.TemporaryFile(mode="w+")             # not a pipe: a full one would block claude
         p = subprocess.Popen(cmd, cwd=cwd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE, text=True)
-        assert p.stdin and p.stdout and p.stderr
+                             stderr=errfile, text=True)
+        assert p.stdin and p.stdout
         p.stdin.write(user)
         p.stdin.close()
         result: dict[str, Any] | None = None
@@ -161,8 +163,10 @@ class CliBackend(Backend):
                 elif kind == "result":
                     result = ev
         finally:
-            err = p.stderr.read()
             p.wait()
+            errfile.seek(0)
+            err = errfile.read()
+            errfile.close()
         if result is None:
             text = err.strip()[-2000:]
             if any(w in text.lower() for w in LIMIT_WORDS):

@@ -64,15 +64,17 @@ def request_text(req: dict[str, Any]) -> str:
 
 
 def parse_findings(text: str) -> tuple[list[dict[str, Any]], str | None]:
-    """The reviewer's findings, and an error when its answer was not the JSON asked for."""
-    m = re.search(r"\{.*\}", text, re.DOTALL)
-    try:
-        data = json.loads(m.group(0)) if m else None
-    except json.JSONDecodeError:
-        data = None
-    if not isinstance(data, dict) or not isinstance(data.get("findings"), list):
-        return [], "the review did not answer with the JSON asked for"
-    return [f for f in data["findings"] if isinstance(f, dict)], None
+    """The reviewer's findings: the first JSON object in its answer with a `findings` list, and
+    an error when there is none."""
+    dec = json.JSONDecoder()
+    for m in re.finditer(r"\{", text):
+        try:
+            data, _ = dec.raw_decode(text, m.start())
+        except json.JSONDecodeError:
+            continue
+        if isinstance(data, dict) and isinstance(data.get("findings"), list):
+            return [f for f in data["findings"] if isinstance(f, dict)], None
+    return [], "the review did not answer with the JSON asked for"
 
 
 @dataclass
@@ -94,6 +96,7 @@ class TextArm:
         self.workspace, self.deployed = work / "workspace", work / "deployed"
         self.materials = tree_hash(materials)
         if resume:
+            _recover(self.deployed)
             if not self.deployed.is_dir():
                 raise FileNotFoundError(f"nothing to resume in {work}")
             shutil.rmtree(self.workspace, ignore_errors=True)
@@ -129,9 +132,30 @@ class TextArm:
 
     def deploy(self, req: dict[str, Any], out: Path) -> StepResult:
         t = time.monotonic()
-        shutil.rmtree(self.deployed)
-        shutil.copytree(self.workspace, self.deployed)
+        _replace(self.deployed, self.workspace)
         return StepResult(time.monotonic() - t, {"deployed": True, "hash": tree_hash(self.deployed)})
+
+
+def _replace(target: Path, source: Path) -> None:
+    """Make `target` a copy of `source` so that a stop at any point leaves either the old copy or
+    the new one (`_recover` finishes the job on resume)."""
+    new, old = target.with_name(target.name + ".new"), target.with_name(target.name + ".old")
+    shutil.rmtree(new, ignore_errors=True)
+    shutil.copytree(source, new)
+    shutil.rmtree(old, ignore_errors=True)
+    target.rename(old)
+    new.rename(target)
+    shutil.rmtree(old)
+
+
+def _recover(target: Path) -> None:
+    new, old = target.with_name(target.name + ".new"), target.with_name(target.name + ".old")
+    if not target.exists() and new.is_dir() and old.is_dir():
+        new.rename(target)                      # stopped between the two renames: the copy was complete
+    elif not target.exists() and old.is_dir():
+        old.rename(target)
+    shutil.rmtree(new, ignore_errors=True)
+    shutil.rmtree(old, ignore_errors=True)
 
 
 def nl_arm(materials: Path, work: Path, backend: Backend, resume: bool = False) -> TextArm:

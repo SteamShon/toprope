@@ -49,13 +49,18 @@ from phase_b.toolserver import ToolSpec, make_server
 SEALED = "SEALED-MARKER-7f3a"     # appears only in the synthetic key and binding
 
 
-def instruments(tmp: Path) -> Path:
-    """Frozen instruments with the real change requests and a synthetic, marked key and binding."""
+def instruments(tmp: Path, keep: int | None = None) -> Path:
+    """Frozen instruments with the real change requests (the first `keep` of them) and a
+    synthetic, marked key and binding."""
     d = tmp / "instruments"
     d.mkdir()
     real = ROOT / "experiments/m1/instruments"
     for f in ("change-requests.yaml", "probe-suite.yaml", "verdict-rules.yaml"):
         shutil.copy(real / f, d / f)
+    if keep:
+        cr = yaml.safe_load((d / "change-requests.yaml").read_text())
+        cr["requests"] = cr["requests"][:keep]
+        (d / "change-requests.yaml").write_text(yaml.safe_dump(cr))
     seqs = [r["seq"] for r in yaml.safe_load((d / "change-requests.yaml").read_text())["requests"]]
     (d / "change-key.yaml").write_text(yaml.safe_dump({"entries": [
         {"seq": s, "problem": "none", "note": f"{SEALED} key {s}"} for s in seqs]}))
@@ -176,13 +181,17 @@ FAKE_CLAUDE = r'''#!{python}
 import json, os, sys
 args = sys.argv[1:]
 prompt = sys.stdin.read()
+def out(ev): print(json.dumps(ev), flush=True)
 log = os.environ["FAKE_CLAUDE_LOG"]
 with open(log, "a") as f:
     f.write(json.dumps({{"args": args, "cwd": os.getcwd(), "stdin": prompt,
                         "api_key": "ANTHROPIC_API_KEY" in os.environ}}) + "\n")
 mode = os.environ.get("FAKE_CLAUDE_MODE", "ok")
 tools = os.environ.get("FAKE_CLAUDE_TOOLS", "")
-def out(ev): print(json.dumps(ev), flush=True)
+if mode == "noisy":
+    sys.stderr.write("w" * 300_000); sys.stderr.flush()
+if mode == "rate-limit":
+    out({{"type": "result", "subtype": "error", "is_error": True, "result": "API error: rate limit exceeded"}}); sys.exit(1)
 if mode == "limit-stderr":
     sys.stderr.write("You've hit your session limit · resets 3pm\n"); sys.exit(1)
 out({{"type": "system", "subtype": "init", "tools": [t for t in tools.split(",") if t], "model": "m"}})
@@ -355,3 +364,80 @@ def test_a_new_run_does_not_overwrite_an_old_one(tmp_path):
     structured_arm(m, tmp_path / "run", api()[0])
     with pytest.raises(FileExistsError):
         structured_arm(m, tmp_path / "run", api()[0])
+
+
+# -- review fixes ----------------------------------------------------------------------------
+
+def test_changes_run_in_the_frozen_order(tmp_path):
+    inst = instruments(tmp_path)
+    with pytest.raises(SystemExit, match=r"next is \[1\], asked for \[3\]"):
+        runner.main(arm_args(tmp_path, inst, "nl", "--seqs", "3"), backend=api()[0])
+    runner.main(arm_args(tmp_path, inst, "nl", "--seqs", "1-2"), backend=api()[0])
+    with pytest.raises(SystemExit, match=r"next is \[3\], asked for \[4, 5\]"):
+        runner.main(arm_args(tmp_path, inst, "nl", "--seqs", "4-5"), backend=api()[0])
+    runner.main(arm_args(tmp_path, inst, "nl", "--seqs", "1-3"), backend=api()[0])     # done ones are skipped
+
+
+@pytest.mark.parametrize("left", [("old", "new"), ("old",)])
+def test_a_deploy_stopped_halfway_is_recovered_on_resume(tmp_path, left):
+    inst = instruments(tmp_path)
+    runner.main(arm_args(tmp_path, inst, "nl", "--seqs", "1"), backend=api()[0])
+    work = tmp_path / "run/nl"
+    for suffix in left:                                    # a stop between the copy and the renames
+        shutil.copytree(work / "deployed", work / f"deployed.{suffix}")
+    shutil.rmtree(work / "deployed")
+    runner.main(arm_args(tmp_path, inst, "nl", "--seqs", "1-2"), backend=api()[0])
+    assert json.loads((work / "manifest.json").read_text())["done"] == [1, 2]
+    assert not (work / "deployed.old").exists() and not (work / "deployed.new").exists()
+
+
+def test_an_error_is_recorded_on_the_session_before_it_propagates(tmp_path):
+    inst = instruments(tmp_path)
+
+    def boom(system, messages, tools):
+        raise RuntimeError("claude crashed")
+    with pytest.raises(RuntimeError, match="crashed"):
+        runner.main(arm_args(tmp_path, inst, "nl", "--seqs", "1"), backend=api(boom)[0])
+    (s,) = json.loads((tmp_path / "run/nl/manifest.json").read_text())["sessions"]
+    assert s["stopped"] == "error: RuntimeError: claude crashed" and s["finished_at"]
+
+
+def test_a_noisy_claude_does_not_block_the_run(tmp_path, monkeypatch, fake_claude):
+    import threading
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "noisy")
+    got = {}
+    th = threading.Thread(target=lambda: got.update(out=CliBackend("m").converse(
+        "r", "m", None, Transcript(tmp_path / "t.jsonl"))), daemon=True)
+    th.start()
+    th.join(30)
+    assert got.get("out") == "the answer"
+
+
+def test_a_rate_limit_is_an_error_not_the_usage_limit(tmp_path, monkeypatch, fake_claude):
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", "rate-limit")
+    with pytest.raises(BackendError, match="rate limit"):
+        CliBackend("m").converse("r", "m", None, Transcript(tmp_path / "t.jsonl"))
+
+
+def test_a_run_does_not_resume_with_other_user_memory(tmp_path, monkeypatch):
+    cfg = tmp_path / "cfg"
+    cfg.mkdir()
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(cfg))
+    inst = instruments(tmp_path)
+    runner.main(arm_args(tmp_path, inst, "nl", "--seqs", "1"), backend=api()[0])
+    (cfg / "CLAUDE.md").write_text("Be brief.")
+    with pytest.raises(SystemExit, match="user_memory differs"):
+        runner.main(arm_args(tmp_path, inst, "nl", "--seqs", "1-2", "--allow-user-memory"), backend=api()[0])
+
+
+def test_status_counts_the_runs_own_requests(tmp_path, capsys):
+    inst = instruments(tmp_path, keep=3)
+    runner.main(arm_args(tmp_path, inst, "nl", "--seqs", "1"), backend=api()[0])
+    capsys.readouterr()
+    runner.main(["status", "--out", str(tmp_path / "run")])
+    assert json.loads(capsys.readouterr().out)[0]["of"] == 3
+
+
+def test_findings_are_found_among_other_braces():
+    text = 'Note {previewed} is renamed.\n{"findings": [{"problem": "p"}]}\nSee {built}.'
+    assert parse_findings(text) == ([{"problem": "p"}], None)
