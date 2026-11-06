@@ -176,3 +176,18 @@ def test_an_object_s_own_id_is_a_known_path(raw):
     assert errors(Domain.model_validate(raw)) == []
     raw["invariants"][0]["check"] = "exists(target.id.name)"
     assert {i.code for i in errors(Domain.model_validate(raw))} == {"unknown-path"}
+
+
+# -- ADR-0041 Resolved 2: a decision action takes an optional rationale --------------------------
+def test_a_decision_action_takes_an_optional_rationale(raw):
+    d = Domain.model_validate(raw)
+    assert raw["actions"]["approve_experiment"].get("records_decision") is True
+    p = d.actions["approve_experiment"].params["rationale"]
+    assert p.type == "string" and p.optional
+    assert "rationale" not in d.actions["launch_experiment"].params      # not a decision action
+
+
+def test_a_decision_action_may_not_declare_its_own_rationale(raw):
+    raw["actions"]["approve_experiment"]["params"]["rationale"] = {"type": "integer"}
+    with pytest.raises(ValueError, match="`rationale` is reserved"):
+        Domain.model_validate(raw)

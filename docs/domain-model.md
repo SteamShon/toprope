@@ -57,7 +57,7 @@ An action connects to more than it seems:
 | what it is allowed to do in each stage | **one column of the transition matrix** | allowed (and the next stage), denied with a reason, not applicable, or undecided |
 | what it changes | the next stage (from the matrix), then `set` effects | the new state, including link values |
 | what it starts elsewhere | `call` effects to kernel services, `handoffs` to another domain | work that runs after the change is recorded, with a reply or a handoff |
-| what it leaves behind | its event (`event`), and `records_decision` for decisions | the history: who, when, the params, and for decisions the prior state (a rationale only if a param carries one) |
+| what it leaves behind | its event (`event`), and `records_decision` for decisions | the history: who, when, the params, and for decisions the prior state and the rationale given |
 
 There are three kinds of change: **create** an object (`creates`), **move** its stage (the
 matrix), and **set** facts (`set` effects, which also set link values). Creating a different

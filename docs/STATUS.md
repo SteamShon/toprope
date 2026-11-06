@@ -101,11 +101,11 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    keep the audit trail (decided 2026-11-06). Until then the self domains keep their logs in
    git (`domains/<domain>/events/`).
 5. ADR-0041's follow-up work, one PR each (decided 2026-11-06). Done: approval refuses commits
-   with proposed elements, and the change check records how many are left. Left: a reserved
-   `rationale` parameter on decision actions; an optional evidence field on commits;
-   `actor.principal` in checks; events for issued grants and role changes; the exception
-   pattern in `examples/paid-media/`. The first and third close the matching *Left from reviews*
-   items.
+   with proposed elements, and the change check records how many are left; every decision
+   action takes an optional `rationale`, stored with the decision. Left: an optional evidence
+   field on commits; `actor.principal` in checks; events for issued grants and role changes;
+   the exception pattern in `examples/paid-media/`. `actor.principal` closes the matching *Left
+   from reviews* item.
 
 ## Left from reviews
 
@@ -120,9 +120,6 @@ it; each release's cleanup PR handles items older than one release.
   id and roles, not `on_behalf_of`. So `target.proposed_by != actor.id` does not stop a person
   from approving a change their own agent proposed (`examples/paid-media/`; found writing the
   example, 2026-11-06)
-- `records_decision` events carry the action's params and the prior state, not a rationale; none
-  of the self domains' decision actions declares a rationale param. ADR-0012 still describes
-  decisions as "with inputs and rationale" (review of ADR-0041, 2026-11-06)
 - `then` in `toprope-run` reads only the target's stream, so a call or handoff set off on
   another stream (for example by a newly created object) is not shown (#86, 2026-11-06)
 - The effect-resolution summary is written twice, in `toprope-run` (`followed`) and in the

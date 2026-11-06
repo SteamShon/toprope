@@ -28,7 +28,7 @@ An approved domain version must become working software in an environment, and n
 | `request_delivery` | system | creates **DeliveryRequest**; params `domain_id` (string), `commit` (string), `interface` (string), `environment` (string), `approver` (string) | — | — | — | `DeliveryRequestCreated` |
 | `preview` | approver | **DeliveryRequest** | — | the stage (per the matrix) | kernel `preview` → `record_build` | `DeliveryRequestPreview` |
 | `record_build` | the kernel | **DeliveryRequest**; params `build` (string), `harness_ok` (boolean) | — | the stage (per the matrix); `target.build` ← `params.build`, `target.harness_ok` ← `params.harness_ok` | — | `DeliveryRequestRecordBuild` |
-| `deploy` 🔒 📝 | approver | **DeliveryRequest** | `harness-passed`: Deploy only a build whose harness passed. | the stage (per the matrix) | kernel `deploy` → `record_deployment` | `DeliveryRequestDeploy` |
+| `deploy` 🔒 📝 | approver | **DeliveryRequest**; params `rationale` (string, optional) | `harness-passed`: Deploy only a build whose harness passed. | the stage (per the matrix) | kernel `deploy` → `record_deployment` | `DeliveryRequestDeploy` |
 | `record_deployment` | the kernel | **DeliveryRequest**; params `deployed` (boolean), `error` (string) | — | the stage (per the matrix); `target.deployed` ← `params.deployed`, `target.refusal` ← `params.error` | — | `DeliveryRequestRecordDeployment` |
 | `verify` 🔒 | approver | **DeliveryRequest**; params `verified` (boolean) | `deployed`: Only a deployment that happened can be verified. | the stage (per the matrix); `target.verified` ← `params.verified` | — | `DeliveryRequestVerify` |
 

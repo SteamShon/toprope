@@ -85,3 +85,12 @@ def test_paid_media_raising_the_step_limit_gets_an_impact_report():
     assert r.ok and r.diff["to_review"] == ["precondition:propose_budget_change.step-limit"]
     assert r.impact["summary"] == ("changes 1 precondition(s); affects 4 cell test(s), "
                                    "1 precondition test(s), exploration; replays past propose_budget_change")
+
+
+def test_paid_media_an_approval_records_the_rationale_given(capsys, tmp_path):
+    s = f"sqlite:{tmp_path / 'e.db'}"
+    pm(capsys, s, "t-bot", "propose_budget_change", "C-search", "--daily-budget", "1400", "--reason", "x", seed=True)
+    pm(capsys, s, "t-ana", "approve_budget_change", "C-search", "--rationale", "CPA held for two weeks")
+    events = open_store(s).read("C-search")
+    decision = next(e for e in events if e.type == "DecisionRecorded")
+    assert decision.payload["rationale"] == "CPA held for two weeks"

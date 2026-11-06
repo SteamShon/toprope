@@ -124,6 +124,19 @@ class Action(Provenance):
     requires: Literal["human"] | None = None
     approvals: dict[str, Any] | None = None
 
+    @model_validator(mode="before")
+    @classmethod
+    def _rationale(cls, raw: Any) -> Any:
+        """A decision action takes an optional `rationale` (ADR-0041, Resolved 2): the reason a
+        person gives, stored with the decision. It is added here, so every surface offers it."""
+        if isinstance(raw, dict) and raw.get("records_decision"):
+            params = dict(raw.get("params") or {})
+            if "rationale" in params:
+                raise ValueError("`rationale` is reserved on a decision action: every one takes it")
+            params["rationale"] = {"type": "string", "optional": True}
+            raw = {**raw, "params": params}
+        return raw
+
     @model_validator(mode="after")
     def _target_or_creates(self) -> Action:
         if (self.target is None) == (self.creates is None):

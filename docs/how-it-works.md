@@ -39,7 +39,7 @@ tendency that depends on conditions), a rule (a condition accepted as binding) a
 | instances and current state | derived from the event log; what the gate checks | projections | built |
 | observations, memory | context graph | domain events, refused attempts, effect outcomes; the interview log | built; read-back from external systems M0b |
 | interpretations, hypotheses | context graph | elements with `status: proposed` (agents can write nothing else); still compiled and enforced, as `status` is provenance only | built |
-| decisions | context graph | `DecisionRecorded` events: who, when, the params and the prior state | built; rationale only if a param carries one; no expected outcome or re-review condition |
+| decisions | context graph | `DecisionRecorded` events: who, when, the params, the prior state, an optional rationale | built; no expected outcome or re-review condition (M4) |
 | evidence | context graph | `world` fixtures and `scenarios`, which the harness also runs | built |
 | sources and history | context graph | `source` and `status` on every element; commits, approvals, check records | built |
 | open questions | context graph | the question behind each `undecided` cell; `status: unknown` | built |
