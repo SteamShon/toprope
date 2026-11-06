@@ -43,3 +43,18 @@ with the first verdict and its reason. The grader is not stable on these; your r
 
 Status is `reviewed (findings and edits); probes graded again, to review`. Set it to `confirmed`
 once the probes are reviewed.
+
+## Round 3: the rubric (approved by the researcher, 2026-11-06)
+
+All 504 probe runs were graded item by item by `rubric.yaml`: computed items from the record, and
+judged items asked three times with the full record, a quote required, the majority deciding. On a
+sample of 40 runs graded three times, the rubric gave the same verdict every time on all 40; the
+whole-probe grading did so on 33 (`stability.json`). Against the 66 runs the second review judged,
+the rubric agreed on 58 (`agreement.json`).
+
+`confirmed.yaml` now holds:
+- the findings and edits as reviewed (rounds 1 and 2);
+- the 66 probe runs a person judged, with that verdict (`review`); the rubric's is `rubric_passed`;
+- every other probe run as the rubric graded it, with `items` (each must and must-not: met, and why)
+  and `votes`;
+- `look: true` on the 15 runs where the three judgements of an item split: a person decides those.
