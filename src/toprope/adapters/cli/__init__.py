@@ -144,6 +144,34 @@ def _execution(args: Any, d: Domain) -> Execution:
     return ex
 
 
+def followed(ex: Execution, d: Domain, target: str, before: int) -> list[dict[str, Any]]:
+    """What the command set off: each kernel call with its reply (and the object a creating reply
+    made, such as the new Commit), and each handoff, so you know what to do next."""
+    from ...handoff import Outbox, effect_id, handoff_id
+    out: list[dict[str, Any]] = []
+    for e in ex.store.read(target)[before:]:
+        if e.type == "EffectRequested":
+            res = Outbox(ex).resolution(effect_id(e), "effect")
+            entry: dict[str, Any] = {"kernel": e.payload["service"], "reply": e.payload["reply"]}
+            if res is None:
+                entry["status"] = "pending"
+            else:
+                result = res.payload.get("result") or {}
+                reply = d.actions.get(e.payload["reply"])
+                # the service's own failure first: a failed call still replies (ADR-0028)
+                entry["status"] = "failed" if result.get("ok") is False else res.payload.get("status") or res.type
+                entry["object"] = result.get("id") if reply is not None and reply.creates else res.payload.get("object")
+                if result.get("error") or res.payload.get("reason"):
+                    entry["error"] = result.get("error") or res.payload.get("reason")
+            out.append(entry)
+        elif e.type == "HandoffRequested":
+            res = Outbox(ex).resolution(handoff_id(e), "handoff")
+            to = e.payload.get("to") or {}
+            out.append({"handoff": e.payload.get("handoff"), "to": f"{to.get('domain')}.{to.get('action')}",
+                        "object": e.payload.get("target"), "status": res.type if res else "pending"})
+    return out
+
+
 def _domain(args: Any) -> Domain:
     if bool(args.domain) == bool(args.composition) or bool(args.composition) != bool(args.member):
         raise SystemExit("give --domain, or --composition with --member")
@@ -197,8 +225,12 @@ def main(argv: list[str] | None = None) -> None:
         if d.actions[args.cmd].requires == "human":
             _confirm_on_terminal(ex.identity, caller, args.cmd, args.target)
     from ..mcp import outcome_json
+    before = ex.store.version(args.target)
     o = ex.submit(token, args.cmd, args.target, params, idempotency_key=args.key or str(uuid.uuid4()))
-    print(json.dumps(outcome_json(o), indent=2, ensure_ascii=False, default=str))
+    out = outcome_json(o)
+    if o.ok and (follow := followed(ex, d, args.target, before)):
+        out["then"] = follow
+    print(json.dumps(out, indent=2, ensure_ascii=False, default=str))
     if not o.ok:
         raise SystemExit(1)
 
