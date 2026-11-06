@@ -24,8 +24,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .agent import Transcript, converse, file_tools
-from .model import Model
+from .agent import Transcript
+from .backend import Backend
+from .toolserver import ToolSpec
 
 PROMPTS = Path(__file__).parent / "prompts"
 
@@ -81,25 +82,37 @@ class StepResult:
 
 
 class TextArm:
-    """An arm whose domain is a set of text files, checked by an LLM review."""
+    """An arm whose domain is a set of text files, checked by an LLM review.
 
-    def __init__(self, name: str, described: str, materials: Path, work: Path, model: Model):
-        self.name, self.described, self.model = name, described, model
+    A new run copies the materials. Resuming one (`resume=True`) starts again from what was last
+    deployed: an edit left half done when the run stopped is thrown away, and that change runs
+    again from the start."""
+
+    def __init__(self, name: str, described: str, materials: Path, work: Path, backend: Backend,
+                 resume: bool = False):
+        self.name, self.described, self.backend = name, described, backend
         self.workspace, self.deployed = work / "workspace", work / "deployed"
-        if self.workspace.exists():
-            raise FileExistsError(f"{self.workspace} exists: a run starts from fresh materials")
-        shutil.copytree(materials, self.workspace)
-        shutil.copytree(materials, self.deployed)
+        self.materials = tree_hash(materials)
+        if resume:
+            if not self.deployed.is_dir():
+                raise FileNotFoundError(f"nothing to resume in {work}")
+            shutil.rmtree(self.workspace, ignore_errors=True)
+            shutil.copytree(self.deployed, self.workspace)
+        else:
+            if self.workspace.exists() or self.deployed.exists():
+                raise FileExistsError(f"{work} has a run: resume it, or start a new run directory")
+            shutil.copytree(materials, self.workspace)
+            shutil.copytree(materials, self.deployed)
         self._before: dict[str, str] = {}
 
     def materials_hash(self) -> str:
-        return tree_hash(self.deployed)
+        return self.materials
 
     def edit(self, req: dict[str, Any], out: Path) -> StepResult:
         self._before = snapshot(self.workspace)
         t = time.monotonic()
-        summary = converse(self.model, prompt("edit", arm=self.described), request_text(req),
-                           file_tools(self.workspace), Transcript(out / "edit.jsonl"))
+        summary = self.backend.converse(prompt("edit", arm=self.described), request_text(req),
+                                        ToolSpec("files", str(self.workspace)), Transcript(out / "edit.jsonl"))
         changed = diff(self._before, snapshot(self.workspace))
         return StepResult(time.monotonic() - t, {"summary": summary, "diff": changed, "changed": bool(changed)})
 
@@ -109,8 +122,8 @@ class TextArm:
         user = (f"{request_text(req)}\n\n--- The diff ---\n{diff(self._before, after) or '(no change)'}\n\n"
                 f"--- Every file after the change ---\n{files}")
         t = time.monotonic()
-        answer = converse(self.model, prompt("review", arm=self.described), user, [],
-                          Transcript(out / "review.jsonl"))
+        answer = self.backend.converse(prompt("review", arm=self.described), user, None,
+                                       Transcript(out / "review.jsonl"))
         findings, error = parse_findings(answer)
         return StepResult(time.monotonic() - t, {"findings": findings, "error": error})
 
@@ -121,25 +134,25 @@ class TextArm:
         return StepResult(time.monotonic() - t, {"deployed": True, "hash": tree_hash(self.deployed)})
 
 
-def nl_arm(materials: Path, work: Path, model: Model) -> TextArm:
+def nl_arm(materials: Path, work: Path, backend: Backend, resume: bool = False) -> TextArm:
     return TextArm("nl", "a natural-language skill for two domains (SKILL.md, with worked examples)",
-                   materials, work, model)
+                   materials, work, backend, resume)
 
 
-def structured_arm(materials: Path, work: Path, model: Model) -> TextArm:
+def structured_arm(materials: Path, work: Path, backend: Backend, resume: bool = False) -> TextArm:
     return TextArm("structured", "the YAML declarations of two domains and the composition that joins them",
-                   materials, work, model)
+                   materials, work, backend, resume)
 
 
-def render_skill(declarations: Path, out: Path, model: Model, transcript: Path) -> str:
+def render_skill(declarations: Path, out: Path, backend: Backend, transcript: Path) -> str:
     """The NL arm's materials, rendered from the declarations by a fresh conversation that sees
     only them (ADR-0040 §3). `out` starts as a copy of the declarations; the YAML is removed
     once SKILL.md and EXAMPLES.md are written."""
     if out.exists():
         raise FileExistsError(out)
     shutil.copytree(declarations, out)
-    answer = converse(model, prompt("render"), "Write SKILL.md and EXAMPLES.md from the files in the workspace.",
-                      file_tools(out), Transcript(transcript))
+    answer = backend.converse(prompt("render"), "Write SKILL.md and EXAMPLES.md from the files in the workspace.",
+                              ToolSpec("files", str(out)), Transcript(transcript))
     missing = [f for f in ("SKILL.md", "EXAMPLES.md") if not (out / f).is_file()]
     if missing:
         raise RuntimeError(f"the rendering did not write {missing}")

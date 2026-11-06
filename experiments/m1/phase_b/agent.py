@@ -42,14 +42,16 @@ def text_of(reply: dict[str, Any]) -> str:
 
 
 def converse(model: Model, system: str, user: str, tools: list[Tool], transcript: Transcript,
-             max_turns: int = 40) -> str:
+             max_turns: int = 40, progress: Callable[[str], None] | None = None) -> str:
     """Run until the model answers without calling a tool; return that answer's text."""
     by_name = {t.name: t for t in tools}
     specs = [t.spec() for t in tools]
     messages: list[dict[str, Any]] = [{"role": "user", "content": user}]
     transcript.write("start", system=system, user=user, tools=[t.name for t in tools])
-    for _ in range(max_turns):
+    for turn in range(1, max_turns + 1):
         reply = model(system, messages, specs)
+        if progress:
+            progress(f"turn {turn}")
         transcript.write("reply", content=reply.get("content"), stop_reason=reply.get("stop_reason"),
                          usage=reply.get("usage"))
         messages.append({"role": "assistant", "content": reply.get("content", [])})

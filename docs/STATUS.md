@@ -67,12 +67,18 @@ command reference are generated.
 
 | Sub-PR | Status | PR |
 |---|---|---|
-| 1. Execution protocol (ADR-0040): a harness on the model API, run in Actions after approval; every change deploys; a stand-in takes the sandbox's person-only steps; only the scorer opens the key | 🟡 | #98 |
-| 2. The three arms' materials (NL skill rendered blind; structured spec; Toprope sandbox), reviewed side by side by the researcher | ⬜ | |
-| 3. Runner and Toprope sandbox, tested with a fake model | ⬜ | |
+| 1. Execution protocol (ADR-0040); amended in 2a to run on the researcher's own Claude Code, on their machine | ✅ | #98 |
+| 2a. Harness core: each role a fresh `claude -p` with only the harness's confined tools; stop at the usage limit and resume; progress line; the NL and structured-spec arms; the NL skill's rendering. Tested with a fake model and a fake `claude` | 🟡 | |
+| 2b. The Toprope arm: a sandbox, the compiler's checks, the stand-in for person-only steps | ⬜ | |
+| 2c. The probes: starting states and tools in every arm | ⬜ | |
+| 3. The three arms' materials, reviewed side by side by the researcher | ⬜ | |
 | 4. Scorer, tested with a synthetic key | ⬜ | |
-| 5. Dry run (changes 1–2): time and cost, then the cap | ⬜ | |
+| 5. Dry run (changes 1–2), run by the researcher: time and usage per change | ⬜ | |
 | 6. Full run, scoring confirmed by the researcher, M1 report | ⬜ | |
+
+How a run works: the researcher runs `python -m phase_b arm ARM --model M` (from
+`experiments/m1`) in an ordinary terminal. Each conversation is written as it happens, and
+running the same command again continues a stopped run (ADR-0040 §1–2).
 
 ### How the self domains run
 
@@ -99,8 +105,8 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 ## Next
 
 1. M1 Phase B as ADR-0040 sets out (sub-PRs above): the arms' materials, the runner, the
-   scorer, a dry run, then the full run and the M1 report. The researcher adds the model API
-   key and a cost cap as repository settings before the dry run.
+   scorer, a dry run, then the full run and the M1 report. The researcher runs both runs from
+   their own terminal, on their Claude Code login; nothing to set up in GitHub.
 2. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
 3. Before M2 (a domain whose sources may be private): a kernel `read_source` MCP tool that
    serves source text with redaction and refuses local-only sources, as the removed authoring
