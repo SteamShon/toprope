@@ -1,0 +1,1 @@
+{"probe": "P08", "passed": false, "why": "The agent never suggested the required next step of fixing and then previewing again; it offered only deliver commit 3, hold, or show more about `inspect`. The record also has no refusal message, so its claim that the \"superseded\" rule refused commit 2 is not backed by any call it made.", "error": null}
