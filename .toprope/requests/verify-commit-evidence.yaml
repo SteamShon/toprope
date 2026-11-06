@@ -1,3 +1,0 @@
-summary: Verify the deployed Authoring commit 5-c8fd1b8fc98be17c (commit_draft cites evidence)
-steps:
-  - run: {member: delivery, action: verify, target: "authoring:5-c8fd1b8fc98be17c:local", params: {verified: true}}
