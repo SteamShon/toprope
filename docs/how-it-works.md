@@ -2,7 +2,8 @@
 
 Link: ① ② ③ ④ ⑤ (the claims this design must deliver; [Terms](../README.md#terms) in the
 README). Why it exists is in [`problem.md`](problem.md); the design principles, claims and
-hypotheses are in [`charter.md`](charter.md). This page walks through the pieces. Layers, ports
+hypotheses are in [`charter.md`](charter.md). This page walks through the pieces;
+[`concepts.md`](concepts.md) defines each one and shows how they work together. Layers, ports
 and pipelines in detail: [`architecture.md`](architecture.md). Everything here describes the
 design. Where a part is not built yet, it says *planned* and names the milestone; the full
 picture is in [`STATUS.md`](STATUS.md).
