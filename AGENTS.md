@@ -121,9 +121,10 @@ state; they link here. The README claim-status table stays in the README, becaus
   bindings. Verdict rules and thresholds may be *drafted* by an agent when the researcher
   asks. They are marked `draft` until the researcher reviews and freezes them in their own
   commit, before the experiment's checks are built.
-- **Exception: the self domains' M1 instruments** (ADR-0034). M1 gives no link verdict, so
-  its probe suite, change requests, change key and verdict rules may be drafted by an agent
-  when the researcher asks, including multiple-choice options the researcher selects from.
+- **Exception: the self domains' M1 instruments** (ADR-0034, ADR-0038). M1 gives no link
+  verdict, so its probe suite, change requests, change key, verdict rules and binding may be
+  drafted by an agent when the researcher asks, including multiple-choice options the
+  researcher selects from.
   The researcher selects, reviews and freezes them in their own commit, before the pilot
   runs. Everything that feeds a link verdict (M2 and later instruments, any gold set) stays
   human-only.

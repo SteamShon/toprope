@@ -83,8 +83,9 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 
 ## Next
 
-1. M1 binding (intent → element names), frozen before any arm runs
-   ([`experiments/m1/README.md`](../experiments/m1/README.md)); options drafted on request.
+1. M1 binding (intent → element names), drafted by an agent on request (ADR-0038), selected
+   and frozen by the researcher before any arm runs
+   ([`experiments/m1/README.md`](../experiments/m1/README.md)).
 2. M1 Phase B, then the M1 report.
 3. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
 4. Before M2 (a domain whose sources may be private): a kernel `read_source` MCP tool that
