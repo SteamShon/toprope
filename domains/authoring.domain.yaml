@@ -449,7 +449,7 @@ actions:
         kind: interview
         ref: interview:interview/authoring/log.jsonl#L6
         quote: 전부 다 추천한 거 동의.
-      status: proposed
+      status: confirmed
     - id: not-approved
       check: target.approved != true
       reason: Already approved; approve a newer commit.
@@ -457,7 +457,7 @@ actions:
         kind: interview
         ref: interview:interview/authoring/log.jsonl#L6
         quote: 전부 다 추천한 거 동의.
-      status: proposed
+      status: confirmed
   record_approval:
     description: Record the approval and what main points to.
     actor:
@@ -480,12 +480,12 @@ actions:
         kind: interview
         ref: interview:interview/authoring/log.jsonl#L11
         quote: 25번은 A로 추천으로 해도 될 것 같고, 이십육 번도 A로.
-      status: proposed
+      status: confirmed
     source:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L11
       quote: 25번은 A로 추천으로 해도 될 것 같고, 이십육 번도 A로.
-    status: proposed
+    status: confirmed
   deliver:
     description: Ask Delivery to deliver an approved commit to an environment.
     actor:
@@ -503,7 +503,7 @@ actions:
         kind: interview
         ref: interview:interview/authoring/log.jsonl#L8
         quote: 20번, 21번 둘 다 추천대로 동의.
-      status: proposed
+      status: confirmed
     source:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L8
@@ -521,14 +521,14 @@ transitions:
             kind: interview
             ref: interview:interview/authoring/log.jsonl#L6
             quote: 전부 다 추천한 거 동의.
-          status: proposed
+          status: confirmed
         record_fetch:
           to: fetched
           source:
             kind: interview
             ref: interview:interview/authoring/log.jsonl#L6
             quote: 전부 다 추천한 거 동의.
-          status: proposed
+          status: confirmed
       fetched:
         fetch_source:
           deny: A link is fetched once into a snapshot; add a new source to read it
@@ -537,7 +537,7 @@ transitions:
             kind: interview
             ref: interview:interview/authoring/log.jsonl#L6
             quote: 전부 다 추천한 거 동의.
-          status: proposed
+          status: confirmed
         record_fetch: n/a
   Element:
     field: review
@@ -550,14 +550,14 @@ transitions:
             kind: interview
             ref: interview:interview/authoring/log.jsonl#L6
             quote: 전부 다 추천한 거 동의.
-          status: proposed
+          status: confirmed
         mark_unknown:
           to: unknown
           source:
             kind: interview
             ref: interview:interview/authoring/log.jsonl#L6
             quote: 전부 다 추천한 거 동의.
-          status: proposed
+          status: confirmed
       unknown:
         confirm_element:
           to: confirmed
@@ -565,7 +565,7 @@ transitions:
             kind: interview
             ref: interview:interview/authoring/log.jsonl#L6
             quote: 전부 다 추천한 거 동의.
-          status: proposed
+          status: confirmed
         mark_unknown: n/a
       confirmed:
         confirm_element: n/a
@@ -576,7 +576,7 @@ transitions:
             kind: interview
             ref: interview:interview/authoring/log.jsonl#L6
             quote: 전부 다 추천한 거 동의.
-          status: proposed
+          status: confirmed
   DecisionRequest:
     field: stage
     initial: open
@@ -588,7 +588,7 @@ transitions:
             kind: interview
             ref: interview:interview/authoring/log.jsonl#L6
             quote: 전부 다 추천한 거 동의.
-          status: proposed
+          status: confirmed
       decided:
         decide:
           deny: Already decided; a new decision needs a new request.
@@ -596,7 +596,7 @@ transitions:
             kind: interview
             ref: interview:interview/authoring/log.jsonl#L6
             quote: 전부 다 추천한 거 동의.
-          status: proposed
+          status: confirmed
   Draft:
     field: stage
     initial: open
@@ -608,7 +608,7 @@ transitions:
             kind: interview
             ref: interview:interview/authoring/log.jsonl#L6
             quote: 전부 다 추천한 거 동의.
-          status: proposed
+          status: confirmed
   Commit:
     field: stage
     initial: recorded
@@ -620,35 +620,35 @@ transitions:
             kind: interview
             ref: interview:interview/authoring/log.jsonl#L6
             quote: 전부 다 추천한 거 동의.
-          status: proposed
+          status: confirmed
         record_check:
           to: recorded
           source:
             kind: interview
             ref: interview:interview/authoring/log.jsonl#L6
             quote: 전부 다 추천한 거 동의.
-          status: proposed
+          status: confirmed
         approve_commit:
           to: recorded
           source:
             kind: interview
             ref: interview:interview/authoring/log.jsonl#L6
             quote: 전부 다 추천한 거 동의.
-          status: proposed
+          status: confirmed
         record_approval:
           to: recorded
           source:
             kind: interview
             ref: interview:interview/authoring/log.jsonl#L6
             quote: 전부 다 추천한 거 동의.
-          status: proposed
+          status: confirmed
         deliver:
           to: recorded
           source:
             kind: interview
             ref: interview:interview/authoring/log.jsonl#L6
             quote: 전부 다 추천한 거 동의.
-          status: proposed
+          status: confirmed
 invariants:
 - id: approved-commits-passed-their-checks
   'on': Commit
@@ -658,7 +658,7 @@ invariants:
     kind: interview
     ref: interview:interview/authoring/log.jsonl#L7
     quote: '19: a'
-  status: proposed
+  status: confirmed
 - id: decided-requests-record-the-choice
   'on': DecisionRequest
   check: target.stage != 'decided' or exists(target.choice)
@@ -667,7 +667,7 @@ invariants:
     kind: interview
     ref: interview:interview/authoring/log.jsonl#L7
     quote: '19: a'
-  status: proposed
+  status: confirmed
 - id: fetched-sources-have-a-snapshot
   'on': Source
   check: target.stage != 'fetched' or exists(target.sha256)
@@ -676,7 +676,7 @@ invariants:
     kind: interview
     ref: interview:interview/authoring/log.jsonl#L7
     quote: '19: a'
-  status: proposed
+  status: confirmed
 - id: elements-cite-a-source
   'on': Element
   check: exists(target.origin)
@@ -685,7 +685,7 @@ invariants:
     kind: interview
     ref: interview:interview/authoring/log.jsonl#L7
     quote: '19: a'
-  status: proposed
+  status: confirmed
 world:
   actors:
     owner:
@@ -874,7 +874,7 @@ handoffs:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L8
       quote: 20번, 21번 둘 다 추천대로 동의.
-    status: proposed
+    status: confirmed
 glossary:
   commit: An immutable snapshot of the working copy. Every change is a new commit;
     nothing is edited in place.

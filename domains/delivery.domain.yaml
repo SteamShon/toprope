@@ -152,7 +152,7 @@ actions:
         kind: interview
         ref: interview:interview/delivery/log.jsonl#L5
         quote: 전부 다 추천한 거 동의.
-      status: proposed
+      status: confirmed
   record_deployment:
     description: Record whether the deploy happened, or which floor rule refused it.
     actor:
@@ -197,7 +197,7 @@ actions:
         kind: interview
         ref: interview:interview/delivery/log.jsonl#L5
         quote: 전부 다 추천한 거 동의.
-      status: proposed
+      status: confirmed
 transitions:
   DeliveryRequest:
     field: stage
@@ -210,7 +210,7 @@ transitions:
             kind: interview
             ref: interview:interview/delivery/log.jsonl#L5
             quote: 전부 다 추천한 거 동의.
-          status: proposed
+          status: confirmed
         record_build: n/a
         deploy:
           deny: Preview it first.
@@ -218,7 +218,7 @@ transitions:
             kind: interview
             ref: interview:interview/delivery/log.jsonl#L5
             quote: 전부 다 추천한 거 동의.
-          status: proposed
+          status: confirmed
         record_deployment: n/a
         verify: n/a
       previewing:
@@ -228,21 +228,21 @@ transitions:
             kind: interview
             ref: interview:interview/delivery/log.jsonl#L5
             quote: 전부 다 추천한 거 동의.
-          status: proposed
+          status: confirmed
         record_build:
           to: previewed
           source:
             kind: interview
             ref: interview:interview/delivery/log.jsonl#L5
             quote: 전부 다 추천한 거 동의.
-          status: proposed
+          status: confirmed
         deploy:
           deny: The preview has not finished.
           source:
             kind: interview
             ref: interview:interview/delivery/log.jsonl#L5
             quote: 전부 다 추천한 거 동의.
-          status: proposed
+          status: confirmed
         record_deployment: n/a
         verify: n/a
       previewed:
@@ -252,7 +252,7 @@ transitions:
             kind: interview
             ref: interview:interview/delivery/log.jsonl#L5
             quote: 전부 다 추천한 거 동의.
-          status: proposed
+          status: confirmed
         record_build: n/a
         deploy:
           to: deploying
@@ -260,7 +260,7 @@ transitions:
             kind: interview
             ref: interview:interview/delivery/log.jsonl#L5
             quote: 전부 다 추천한 거 동의.
-          status: proposed
+          status: confirmed
         record_deployment: n/a
         verify: n/a
       deploying:
@@ -270,7 +270,7 @@ transitions:
             kind: interview
             ref: interview:interview/delivery/log.jsonl#L5
             quote: 전부 다 추천한 거 동의.
-          status: proposed
+          status: confirmed
         record_build: n/a
         deploy:
           deny: A deploy is running.
@@ -278,14 +278,14 @@ transitions:
             kind: interview
             ref: interview:interview/delivery/log.jsonl#L5
             quote: 전부 다 추천한 거 동의.
-          status: proposed
+          status: confirmed
         record_deployment:
           to: done
           source:
             kind: interview
             ref: interview:interview/delivery/log.jsonl#L5
             quote: 전부 다 추천한 거 동의.
-          status: proposed
+          status: confirmed
         verify: n/a
       done:
         preview:
@@ -294,7 +294,7 @@ transitions:
             kind: interview
             ref: interview:interview/delivery/log.jsonl#L5
             quote: 전부 다 추천한 거 동의.
-          status: proposed
+          status: confirmed
         record_build: n/a
         deploy:
           to: deploying
@@ -302,7 +302,7 @@ transitions:
             kind: interview
             ref: interview:interview/delivery/log.jsonl#L5
             quote: 전부 다 추천한 거 동의.
-          status: proposed
+          status: confirmed
         record_deployment: n/a
         verify:
           to: verified
@@ -310,7 +310,7 @@ transitions:
             kind: interview
             ref: interview:interview/delivery/log.jsonl#L5
             quote: 전부 다 추천한 거 동의.
-          status: proposed
+          status: confirmed
       verified:
         preview: n/a
         record_build: n/a
@@ -322,7 +322,7 @@ transitions:
             kind: interview
             ref: interview:interview/delivery/log.jsonl#L5
             quote: 전부 다 추천한 거 동의.
-          status: proposed
+          status: confirmed
 invariants:
 - id: deployed-builds-passed-their-harness
   'on': DeliveryRequest
@@ -332,7 +332,7 @@ invariants:
     kind: interview
     ref: interview:interview/delivery/log.jsonl#L6
     quote: '19: a'
-  status: proposed
+  status: confirmed
 - id: verified-requests-were-deployed
   'on': DeliveryRequest
   check: target.stage != 'verified' or target.deployed == true
@@ -341,7 +341,7 @@ invariants:
     kind: interview
     ref: interview:interview/delivery/log.jsonl#L6
     quote: '19: a'
-  status: proposed
+  status: confirmed
 - id: finished-deploys-record-the-outcome
   'on': DeliveryRequest
   check: target.stage not in ['done', 'verified'] or exists(target.deployed)
@@ -350,7 +350,7 @@ invariants:
     kind: interview
     ref: interview:interview/delivery/log.jsonl#L6
     quote: '19: a'
-  status: proposed
+  status: confirmed
 - id: deploying-builds-passed-their-harness
   'on': DeliveryRequest
   check: target.stage != 'deploying' or target.harness_ok == true
@@ -359,7 +359,7 @@ invariants:
     kind: interview
     ref: interview:interview/delivery/log.jsonl#L11
     quote: 25번은 A로 추천으로 해도 될 것 같고, 이십육 번도 A로.
-  status: proposed
+  status: confirmed
 world:
   actors:
     approver:
