@@ -1,0 +1,21 @@
+# Who may act in this repository's self domains, by git email (ADR-0037, resolved 2).
+# `toprope-run` reads your `git config user.email` and looks it up here; an actor's id is
+# `name <email>`. Roles are the declarations' roles: authoring (owner, expert), delivery (approver).
+# A git email is self-asserted, so this is for your own machine only; an action that requires
+# a person is also confirmed on your terminal.
+people:
+  steamshon@apache.org:
+    name: steamshon
+    roles: [owner, approver]
+
+# An agent's own git email, acting for a person under a grant. The grant lists what it may
+# draft; it never covers answering for you, confirming, deciding, approving or deploying.
+agents:
+  noreply@anthropic.com:
+    name: claude
+    roles: [owner, approver]
+    on_behalf_of: steamshon@apache.org
+    grant:
+      id: drafting
+      actions: [add_source, fetch_source, ask_question, propose_element, request_decision,
+                next_questions, search, commit_draft, check_commit, preview]
