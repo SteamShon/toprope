@@ -97,14 +97,17 @@ class MemoryEventStore(EventStore):
 
 
 def open_store(spec: str) -> EventStore:
-    """`memory`, `sqlite:PATH` or `postgres:DSN`."""
+    """`memory`, `sqlite:PATH`, `postgres:DSN` or `jsonl:DIR` (append-only lines, for git)."""
     if spec == "memory":
         return MemoryEventStore()
     kind, _, arg = spec.partition(":")
     if kind == "sqlite":
         from .sqlite import SQLiteEventStore
         return SQLiteEventStore(arg)
+    if kind == "jsonl":
+        from .jsonl import JSONLEventStore
+        return JSONLEventStore(arg)
     if kind == "postgres":
         from .postgres import PostgresEventStore
         return PostgresEventStore(arg)
-    raise ValueError(f"unknown store {spec!r}: use memory, sqlite:PATH or postgres:DSN")
+    raise ValueError(f"unknown store {spec!r}: use memory, sqlite:PATH, postgres:DSN or jsonl:DIR")

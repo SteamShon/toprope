@@ -30,6 +30,9 @@ uv run toprope-author checkout 1-ab12…               # load a commit; committi
   git** (decided by the researcher, 2026-11-06): commits, branches, approvals and check records
   are decisions, so they are shared and audited like code. The rest of `.toprope/` (caches,
   snapshots, environments, reports) stays local. Writes take a per-domain file lock.
+- **Per-domain layout** (ADR-0037). Everything about one domain lives under
+  `domains/<domain>/`: its declaration, its generated guide, its interview log, and, when it
+  runs, its event log (`jsonl:domains/<domain>/events`, an append-only store kept in git).
 
 ## Author, history and checkout (ADR-0032)
 - **Author.** A commit records who compiled it: `commit --as NAME`, or the calling actor
