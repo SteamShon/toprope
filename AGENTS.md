@@ -142,3 +142,6 @@ These cannot be enforced from the repository files. Set them in GitHub:
 - Allowed merge methods: squash and merge commit. Disable rebase merging.
 - Branch protection on `main` and `develop`: require a pull request, and block force
   pushes and deletion.
+- Automatically delete head branches: on, so a work branch is removed when its PR
+  merges. `develop` is safe as the default branch; a deleted branch can be restored from
+  its merged PR.
