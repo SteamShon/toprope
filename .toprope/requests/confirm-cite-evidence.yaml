@@ -1,3 +1,0 @@
-summary: Confirm the Authoring elements for citing evidence on a commit (cite_evidence, record_evidence and their cells)
-steps:
-  - run: {member: authoring, action: confirm_all_proposed, target: authoring}

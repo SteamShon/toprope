@@ -855,7 +855,7 @@ actions:
     source:
       kind: record
       ref: records:docs/commits.md#L103-L119
-    status: proposed
+    status: confirmed
   cite_evidence:
     description: 'Cite evidence for a commit''s change: an interview line, a source
       chunk, a check recorded on the commit, or a stored event. The ref must resolve.'
@@ -886,7 +886,7 @@ actions:
     source:
       kind: record
       ref: records:docs/commits.md#L103-L119
-    status: proposed
+    status: confirmed
 transitions:
   Source:
     field: stage
@@ -1120,13 +1120,13 @@ transitions:
           source:
             kind: record
             ref: records:docs/commits.md#L103-L119
-          status: proposed
+          status: confirmed
         cite_evidence:
           to: recorded
           source:
             kind: record
             ref: records:docs/commits.md#L103-L119
-          status: proposed
+          status: confirmed
   Answer:
     field: stage
     initial: recorded
