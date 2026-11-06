@@ -344,3 +344,41 @@ def test_before_any_approval_a_commit_is_reviewed_against_its_parent(tmp_path):
     write(tmp_path / "d.domain.yaml", raw)
     out = ws.commit()
     assert out["since"] == first and out["to_review"] == ["action:launch_experiment"]
+
+
+def test_a_merge_in_progress_is_recorded_and_the_next_commit_uses_it(tmp_path):
+    """Like git's MERGE_HEAD: merging main into a branch is remembered until a commit records
+    both parents, so the kernel's plain `commit` service finishes a merge (ADR-0037)."""
+    raw = schema_doc_domain()
+    ws = workspace(tmp_path, raw)
+    ws.approve_commit(ws.commit()["commit"], via="cli", who="ana")
+    other = copy.deepcopy(raw)
+    other["glossary"]["o"] = "O."
+    main = land_on_main(ws, tmp_path, other)
+    raw["glossary"]["mine"] = "M."
+    write(tmp_path / "d.domain.yaml", raw)
+    ws.commit()
+    out = ws.merge_main()
+    assert out["conflicts"] == [] and ws.commits.pending_merge("example") == out["merge"]
+    c = ws.commits.get("example", ws.commit()["commit"])                       # no `merge=` given
+    assert len(c.parents) == 2 and c.parents[1] == out["merge"] and main
+    assert ws.commits.pending_merge("example") is None
+    assert not (tmp_path / ".toprope/commits/example/merging.json").exists()
+
+
+def test_the_kernel_merges_main_into_a_working_copy(tmp_path):
+    from toprope.kernel.services import LocalKernel
+    raw = schema_doc_domain()
+    ws = workspace(tmp_path, raw)
+    ws.approve_commit(ws.commit()["commit"], via="cli", who="ana")
+    other = copy.deepcopy(raw)
+    other["glossary"]["o"] = "O."
+    land_on_main(ws, tmp_path, other)
+    k = LocalKernel(tmp_path, harness_examples=5)
+    up = k.call("merge_main", {"domain": "example", "branch": "work", "declaration": "d.domain.yaml"})
+    assert up["ok"] and up["up_to_date"] is False and up["conflicts"] == 0
+    assert yaml.safe_load((tmp_path / "d.domain.yaml").read_text())["glossary"]["o"] == "O."
+    done = k.call("commit", {"declaration": "d.domain.yaml"}, caller={"id": "ana", "kind": "person"})
+    assert len(ws.commits.get("example", done["id"]).parents) == 2
+    again = k.call("merge_main", {"domain": "example", "branch": "work", "declaration": "d.domain.yaml"})
+    assert again["up_to_date"] is True

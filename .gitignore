@@ -12,3 +12,4 @@ __pycache__/
 .toprope/commits/**/.refs-*
 # Each domain's event log (domains/<domain>/events) is kept in git; its lock is not.
 domains/*/events/.lock
+.toprope/commits/**/merging.json

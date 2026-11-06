@@ -388,6 +388,7 @@
                         "commit",
                         "diff",
                         "checkout",
+                        "merge_main",
                         "change_check",
                         "approve_commit",
                         "preview",

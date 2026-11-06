@@ -56,7 +56,7 @@ replay and in-flight check, incremental analysis, commits and branches (ADR-0029
 | 2. Per-domain layout and a JSONL event store in git; Authoring calls the interview services | ✅ | #82, #83 |
 | 3. `toprope-run` as yourself from your git identity (`toprope.identity.yaml`) | ✅ | #85 |
 | 4. The whole loop on the generated tools, end to end; the regeneration check passes | ✅ | #86 |
-| 5. Remove `toprope-author`, `toprope-deploy` and their hand-written guides; generate the kernel's command reference | ⬜ | |
+| 5. Remove `toprope-author`, `toprope-deploy` and their hand-written guides; generate the kernel's command reference | 🟡 merge, checkout and confirm-all declared (proposed); removal next | #89 |
 | Researcher sign-off; the umbrella merges into `develop` | ⬜ | |
 
 Sub-PRs 1–4 are on the umbrella branch, not yet on `develop`.

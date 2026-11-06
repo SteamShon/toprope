@@ -647,21 +647,10 @@ class Workspace:
         if not isinstance(d, str) or not d:
             raise AuthoringError("the draft names no `domain`, so there is no commit log to merge in")
         from ..commits import CommitError
-        main, head = self.commits.main(d), self.commits.head(d, branch)
-        if main is None or head is None:
-            raise AuthoringError(f"nothing to merge: {'main' if main is None else branch} has no commits")
-        if self.commits.is_ancestor(d, main.id, head.id):
-            return {"merge": main.id, "branch": branch, "up_to_date": True, "conflicts": []}
         try:
-            current, present = self.commits.working_copy(d, self.domain_path)
-            if current != head.content:
-                raise AuthoringError(f"the working copy has changes not committed to {branch}: commit them first")
-            m = self.commits.merge3(d, head.id, main.id)
-            self.commits.write_working_copy(d, m.merged, self.domain_path, self.draft().get("version", 1), present)
+            return self.commits.merge_main(d, self.domain_path, branch, self.draft().get("version", 1))
         except CommitError as e:
             raise AuthoringError(str(e)) from None
-        return {"merge": main.id, "branch": branch, "up_to_date": False,
-                "conflicts": [{"path": c.path, "base": c.base, "ours": c.ours, "theirs": c.theirs} for c in m.conflicts]}
 
     def approve_commit(self, commit_id: str, via: str, who: str) -> dict[str, Any]:
         """Approve a commit: merge it into `main` and tag the result (ADR-0033). Only a person,
