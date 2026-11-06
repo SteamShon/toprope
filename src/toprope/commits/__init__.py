@@ -61,8 +61,10 @@ MERGING = "merging.json"          # a merge in progress per branch (not shared: 
 
 # What a commit may cite as evidence, and how strong each kind is: a person's words or a source
 # line point at the reason; a check record shows a run against the real declaration; an event
-# shows the behavior in use. A claim with no pointer is not evidence.
-EVIDENCE = {"interview": "pointed", "source": "pointed", "check": "ran", "event": "observed"}
+# shows the behavior in use; an approval run is a person's approval recorded in GitHub
+# (ADR-0039). A claim with no pointer is not evidence.
+EVIDENCE = {"interview": "pointed", "source": "pointed", "check": "ran", "event": "observed",
+            "approval-run": "approved"}
 
 
 class CommitError(Exception):

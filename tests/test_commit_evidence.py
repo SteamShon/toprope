@@ -98,3 +98,13 @@ def test_toprope_commits_lists_a_commits_evidence(kernel, capsys):
     commits_cli(["--commits", str(k.commits.root), "evidence", "example", c])
     (row,) = json.loads(capsys.readouterr().out)
     assert row["kind"] == "source" and row["strength"] == "pointed"
+
+
+def test_an_approval_run_is_evidence_once_the_human_request_workflow_recorded_it(kernel):
+    k, c = kernel
+    url = "https://github.com/SteamShon/toprope/actions/runs/42"
+    assert not cite(k, c, "approval-run", url)["ok"]                       # never ran as an approval
+    (k.root / ".toprope").mkdir(exist_ok=True)
+    (k.root / ".toprope" / "approval-runs.jsonl").write_text(json.dumps({"run": url, "approver": "SteamShon"}) + "\n")
+    assert cite(k, c, "approval-run", url)["strength"] == "approved"
+    assert not cite(k, c, "approval-run", url + "3")["ok"]

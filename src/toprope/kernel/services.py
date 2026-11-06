@@ -24,6 +24,8 @@ def complete(svc: Service, result: dict[str, Any]) -> dict[str, Any]:
     return full
 
 
+APPROVAL_RUNS = ".toprope/approval-runs.jsonl"   # written by tools/human_request.py (ADR-0039)
+
 _CALLER: ContextVar[dict[str, Any] | None] = ContextVar("kernel_caller", default=None)
 
 
@@ -208,8 +210,20 @@ class LocalKernel(KernelServices):
                     raise RuntimeError(f"{domain} is not deployed here: no events to cite")
                 if not stream or not version.isdigit() or not 1 <= int(version) <= store.version(stream):
                     raise ValueError(f"no event {ref!r}: give <stream>@<version> of a stored event")
+        elif kind == "approval-run":
+            self._approval_run(ref)
         e = self.commits.cite(domain, commit, kind, ref, by=str((self.caller or {}).get("id") or ""))
         return {"strength": e["strength"]}
+
+    def _approval_run(self, url):
+        """A GitHub Actions run that approved a human request (ADR-0039). The workflow records
+        each approved run in `.toprope/approval-runs.jsonl` with the result it pushes, so the
+        record survives a squash merge."""
+        import json
+        log = self.root / APPROVAL_RUNS
+        runs = {json.loads(x).get("run") for x in log.read_text().splitlines() if x.strip()} if log.exists() else set()
+        if url not in runs:
+            raise ValueError(f"no approved human request ran as {url!r} ({APPROVAL_RUNS})")
 
     def run(self, service, inputs):
         if service == "diff":   # `from` is a Python keyword
