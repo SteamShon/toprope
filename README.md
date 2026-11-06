@@ -8,7 +8,13 @@
 
 Toprope turns what your team decided into tools and rules your agent follows. It checks every
 action, by an agent or a person, against those rules, and it reviews changes to the rules the
-way code changes are reviewed.
+way code changes are reviewed. And when the system does not exist yet, the same declaration
+builds it.
+
+- **Govern what you have.** Put the rules in front of the tools and systems your agents already
+  use.
+- **Build what you need.** Declare the domain in the style of domain-driven design, and the
+  software for it is generated and tested, instead of written by a coding agent line by line.
 
 > Status: **a research prototype.** *Built* below means it runs today; *planned* names the
 > milestone ([Terms](#terms)). What is done and what is left: [`docs/STATUS.md`](docs/STATUS.md).
@@ -25,6 +31,12 @@ with the reason, and what only a person may do, it cannot do.
 **Teams building an agent product.** Every support ticket means another prompt fix, and every fix
 breaks something that used to work. With Toprope each case you fix becomes a scenario in the
 declaration, and a change to the rules shows which scenarios it breaks before it ships.
+
+**Teams building a new system with coding agents.** The agent writes code fast, but nothing
+says whether the code does what the domain requires, and every change risks a state nobody
+meant to allow. With Toprope you declare the domain (objects, links, actions, functions, which
+action is allowed in which state, and what must always hold) and generate from it the tools, the
+tests that try every combination, and, as the factory grows, the backend and the UI.
 
 **Teams running operations with agents: marketing, support, finance.** You work out a policy by
 looking at the numbers, and a week later someone, or some agent, does it the old way. With
@@ -106,18 +118,42 @@ In this example, approving updates Toprope's own record. Calling the ad platform
 4. Put one write action behind it: the one that would hurt most if the agent got it wrong.
 5. Connect it to the system that action changes (adapters: *planned*, M0b).
 
+## Two graphs
+
+A Toprope domain keeps two kinds of knowledge apart.
+
+| | **World model**: what exists and what may happen | **Context graph**: why, and what happened |
+|---|---|---|
+| Holds | objects, links, actions, functions, states; the rules adopted over them (transition matrix, invariants, preconditions); who may do what | observations (events, refused attempts, outcomes), interview answers, rule candidates not yet adopted, decisions with their reasons, sources, versions and open conflicts |
+| Is | enforced: compiled into the gate, the tools and the tests | not enforced: it explains and proposes |
+| Produces | software | reviews and the next change |
+
+One rule joins them: something in the context graph becomes a rule or a permission in the world
+model only through a reviewed change, a commit that passes its checks and a person approves.
+Knowing a method, or having done something before, grants nothing by itself. "New creatives go
+to a test campaign first" is a hypothesis in the context graph while the team checks it against
+the numbers, and a rule in the world model once it is approved. Most of the context graph exists
+today as records (event logs, sources on every element, commits, approvals, check records);
+querying it as one graph is *planned* (M0b). More:
+[`docs/how-it-works.md`](docs/how-it-works.md#two-graphs).
+
 ## What it gives you
 
-| | Status |
+| Govern what you have | Status |
 |---|---|
-| a declaration: objects and links, actions, a transition matrix (next state or a refusal, per state and action) and invariants (rules that always hold) | built |
-| functions that compute over the domain | planned (M0b) |
 | the gate every action passes through, and an event log of actions, refusals and decisions | built |
-| MCP tools, a command line, a guide, a generated harness | built |
-| a UI, a backend for systems that do not exist yet, query tools over the history | planned (M0b) |
+| MCP tools, a command line and a guide for the agent and for people | built |
 | commits, the change check, approval by merge, deploys of approved commits only ([`docs/commits.md`](docs/commits.md)) | built |
 | adapters to existing systems, with read-back | planned (M0b) |
 | proposals for the next change, from the history | planned (M4) |
+
+| Build what you need | Status |
+|---|---|
+| a declaration: objects and links, actions, a transition matrix (next state or a refusal, per state and action) and invariants (rules that always hold) | built |
+| a generated harness: every state × action × role combination, every invariant, at the model, gate and MCP levels | built |
+| functions that compute over the domain | planned (M0b) |
+| a generated backend and UI | planned (M0b) |
+| software that passes the harness working in real use, so writing it becomes nearly free | hypothesis ③, tested in M2 |
 
 Toprope's own workflows, making a domain and delivering it, are declared the same way, and their
 tools are generated from those declarations; only a small kernel is hand-built. More:

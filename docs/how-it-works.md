@@ -20,6 +20,35 @@ passes a harness checking **every allowed state transition**, not just a call gr
 had almost no problems in production. This is *observed* in the researcher's own projects,
 *not measured*. It is link ③, a hypothesis until M2, and Toprope exists to measure it.
 
+## Two graphs
+
+A domain keeps two kinds of knowledge apart: the **world model** says what exists and what may
+happen, and is enforced; the **context graph** says why it is so and what happened, and is not.
+The split follows kinds of knowledge that must not be mixed: an observation (what happened), a
+memory (its record), an interpretation or hypothesis (what it may mean), a preference (a
+tendency that depends on conditions), a rule (a condition accepted as binding) and a permission
+(what one actor may do). Only the last two are enforced.
+
+| Kind | Graph | Where it is in Toprope | Status |
+|---|---|---|---|
+| objects, links, actions, states | world model | the declaration | built |
+| functions | world model | function ports (ADR-0015) | planned (M0b) |
+| rules | world model | confirmed matrix cells, invariants, preconditions | built |
+| permissions | world model | roles, actor rules, `requires: human`, grants (ADR-0016) | built |
+| observations | context graph | domain events, refused attempts, effect outcomes | built; read-back from external systems M0b |
+| memory | context graph | the event log, the interview log | built |
+| interpretations, hypotheses | context graph | elements with `status: proposed` (only agents write them) | built; proposals from history M4 |
+| decisions | context graph | `records_decision` events: who, when, inputs, rationale | built; expected outcome and re-review condition not yet |
+| sources and history | context graph | `source` and `status` on every element; commits, approvals, check records | built |
+| open questions and conflicts | context graph | `undecided` cells, `status: unknown` | built |
+| preferences | context graph | — | not modeled |
+| one queryable graph over all of it | context graph | query tools over the history | planned (M0b) |
+
+**The one rule between them:** anything in the context graph becomes a rule or a permission in
+the world model only through a reviewed change, a commit that passes its checks and a person
+approves (ADR-0029, ADR-0033). Knowing a method, having adopted something as a default, and
+approving this one action are different things. A proposal is never its own approval.
+
 ## The three layers
 
 ```
