@@ -278,7 +278,7 @@ def test_a_text_arm_edits_checks_and_deploys_each_change(tmp_path):
     assert "built" in (tmp_path / "run/nl/deployed/SKILL.md").read_text()      # deployed though flagged
     review = next(c for c in m.calls if "review a change" in c["system"])
     assert "+Stages: drafted, built." in review["messages"][0]["content"]     # the reviewer sees the diff
-    assert man["materials"] and set(man["prompts"]) == {"edit.md", "review.md", "render.md"}
+    assert man["materials"] and set(man["prompts"]) == {"edit.md", "edit_toprope.md", "review.md", "render.md"}
     assert rec["tokens"]["input"] == 0                    # the fake API backend has no budget to count
 
 

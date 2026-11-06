@@ -4,6 +4,7 @@ Run it yourself, from `experiments/m1`, in an ordinary terminal (not inside an a
 which can read the repository):
 
   uv run python -m phase_b render --model M                      the NL arm's materials
+  uv run python -m phase_b sandbox                                the Toprope arm's materials
   uv run python -m phase_b arm nl --model M --seqs 1-2           the dry run, on one arm
   uv run python -m phase_b arm nl --model M                      every change; resumes a stopped run
   uv run python -m phase_b status                                 how far each arm got
@@ -46,14 +47,15 @@ from typing import Any
 
 import yaml
 
-from .arms import PROMPTS, TextArm, nl_arm, render_skill, structured_arm
+from .arms import PROMPTS, nl_arm, render_skill, structured_arm
 from .backend import ApiBackend, Backend, CliBackend, UsageLimit, user_memory
 from .model import AnthropicModel, Budget, BudgetExceeded
+from .toprope_arm import build_sandbox, toprope_arm
 
 ROOT = Path(__file__).resolve().parents[3]
 M1 = ROOT / "experiments/m1"
 INSTRUMENTS = M1 / "instruments"
-ARMS = {"nl": nl_arm, "structured": structured_arm}
+ARMS = {"nl": nl_arm, "structured": structured_arm, "toprope": toprope_arm}
 DEFAULT_OUT = M1 / "runs/phase-b"
 
 
@@ -105,7 +107,7 @@ def in_order(all_: list[int], done: list[int], chosen: list[int]) -> list[int]:
     return todo
 
 
-def run_arm(arm: TextArm, out: Path, requests: list[dict[str, Any]], backend: Backend, model_id: str,
+def run_arm(arm: Any, out: Path, requests: list[dict[str, Any]], backend: Backend, model_id: str,
             instruments: Path = INSTRUMENTS, extra: dict[str, Any] | None = None,
             total: int | None = None) -> dict[str, Any]:
     """Every request in order: edit, check, deploy (flagged or not). Finished changes are skipped;
@@ -222,12 +224,17 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     a.add_argument("--out", type=Path, default=DEFAULT_OUT, help="the run directory")
     a.add_argument("--seqs", help="e.g. 1-2 for the dry run (default: all)")
     a.add_argument("--instruments", type=Path, default=INSTRUMENTS)
+    sb = sub.add_parser("sandbox", help="build the Toprope arm's materials from this repository")
+    sb.add_argument("--out", type=Path, default=M1 / "arms/toprope")
     s = sub.add_parser("status", help="how far each arm got")
     s.add_argument("--out", type=Path, default=DEFAULT_OUT)
     args = ap.parse_args(argv)
 
     if args.cmd == "status":
         print(json.dumps(status(args.out), indent=2))
+        return
+    if args.cmd == "sandbox":
+        print(json.dumps({"built": str(build_sandbox(ROOT, args.out))}))
         return
     if backend is None:
         backend = make_backend(args)
