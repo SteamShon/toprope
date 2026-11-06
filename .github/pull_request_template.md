@@ -10,6 +10,11 @@
 
 <!-- How it was verified: tests, a rendered doc, an experiment run, etc. -->
 
+## STATUS.md
+
+<!-- Update docs/STATUS.md in this PR, or replace this comment with a line
+`STATUS.md: no change - <reason>`. CI checks it (AGENTS.md, Progress). -->
+
 ## PR type
 
 - [ ] Work PR → `develop` (squash)

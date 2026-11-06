@@ -9,3 +9,4 @@ In short:
   merge commit.
 - Never push directly to `main` or `develop`.
 - Name the claim-chain link your change serves.
+- Update [`docs/STATUS.md`](docs/STATUS.md), or say why not in the PR description. CI checks it.
