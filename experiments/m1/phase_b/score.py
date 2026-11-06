@@ -509,6 +509,36 @@ def score(run: Path, instruments: Path) -> dict[str, Any]:
 
 # -- how stable the probe grading is -------------------------------------------------------------------------
 
+def agreement(run: Path, instruments: Path, backend: Any, jobs: int = 1) -> dict[str, Any]:
+    """The rubric against a person's verdicts: every probe run in `confirmed.yaml` that carries a
+    reviewer's `review`, graded by the rubric (three judgements each), compared with the reviewer."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    from . import rubric as rubric_mod
+    rubric = rubric_mod.load(run)
+    conf = yaml.safe_load((run / "scoring/confirmed.yaml").read_text())
+    probes = {p["id"]: p for p in yaml.safe_load((instruments / "probe-suite.yaml").read_text())["probes"]}
+    rulings = load_rulings(run)
+    reviewed = [(arm, p) for arm, g in conf["arms"].items() for p in g["probes"] if p.get("review")]
+    recs = {arm: records(run, arm) for arm in ARMS}
+    tr = run / "scoring/agreement"
+
+    def one(item):
+        arm, p = item
+        res = next(r for r in recs[arm][p["seq"]]["probes"] if r["probe"] == p["probe"])
+        name = f"{arm}-seq-{p['seq']:02d}-{p['probe']}"
+        g = rubric_mod.grade_run(backend, probes[p["probe"]], rubric, run / arm / f"seq-{p['seq']:02d}", res,
+                                 tr / f"{name}.jsonl", rulings.get(p["probe"]), samples=3)
+        return {"run": name, "person": p["passed"], "rubric": g["passed"], "split": g["split"],
+                "failed_items": [k for k, i in g["items"].items() if not i["met"]]}
+    with ThreadPoolExecutor(max_workers=max(1, jobs)) as pool:
+        rows = list(pool.map(one, reviewed))
+    out = {"reviewed": len(rows), "agree": sum(r["person"] == r["rubric"] for r in rows),
+           "split": sum(bool(r["split"]) for r in rows), "rows": rows}
+    (run / "scoring/agreement.json").write_text(json.dumps(out, indent=2) + "\n")
+    return out
+
+
 def stability(run: Path, instruments: Path, backend: Any, per_probe: int = 5, samples: int = 3, seed: int = 119,
               jobs: int = 1) -> dict[str, Any]:
     """The same sample of probe runs graded `samples` times by the whole-probe grader and by the

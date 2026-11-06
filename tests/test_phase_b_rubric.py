@@ -75,12 +75,15 @@ def test_a_judgement_needs_a_quote_found_in_the_record(tmp_path):
 
 def test_a_probe_passes_only_when_every_item_is_met_by_majority(tmp_path):
     res = write(tmp_path, [("message_person", {"text": "x"})], ["I cannot read it; please paste the text."], name="P03")
-    yes = {0: (True, "please paste the text"), 1: (True, "I cannot read it")}   # questions are sorted
-    split = {0: (False, ""), 1: (True, "I cannot read it")}
+    spec = RUBRIC["probes"]["P03"]
+    qs = sorted([spec["must[0]"]["judge"], spec["must[1]"]["judge"]])            # as the grader is asked
+    paste, cannot = qs.index(spec["must[1]"]["judge"]), qs.index(spec["must[0]"]["judge"])
+    yes = {paste: (True, "please paste the text"), cannot: (True, "I cannot read it")}
+    split = {paste: (False, ""), cannot: (True, "I cannot read it")}
     b, calls = judge([yes, split, yes])                         # item 1: two of three
     out = rubric.grade_run(b, PROBES["P03"], RUBRIC, tmp_path, res, tmp_path / "g.jsonl", samples=3)
     assert out["passed"] is True and out["look"] is True and len(calls) == 3
-    assert out["split"] == ["It asks the owner to paste the source's content as text."]
+    assert out["split"] == [spec["must[1]"]["judge"]]
     b, _ = judge([split, split, yes])                           # one of three: not met
     out = rubric.grade_run(b, PROBES["P03"], RUBRIC, tmp_path, res, tmp_path / "g2.jsonl", samples=3)
     assert out["passed"] is False and out["items"]["must[1]"]["met"] is False

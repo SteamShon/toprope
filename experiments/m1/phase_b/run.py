@@ -307,6 +307,8 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     st.add_argument("--per-probe", type=int, default=5)
     st.add_argument("--samples", type=int, default=3)
     st.add_argument("--jobs", type=int, default=4)
+    st.add_argument("--against-review", action="store_true",
+                    help="instead: the rubric on every probe run a reviewer judged, against their verdicts")
     rp = sub.add_parser("reprobe", parents=[common], help="run probes again on a finished Toprope run "
                         "(a probe world set up wrong); the old results are kept")
     rp.add_argument("arm", choices=["toprope"])
@@ -345,8 +347,9 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
                           "usage": backend.report()}))
         return
     if args.cmd == "stability":
-        from .score import stability
-        s = stability(args.out, args.instruments, backend, args.per_probe, args.samples, jobs=args.jobs)
+        from .score import agreement, stability
+        s = (agreement(args.out, args.instruments, backend, jobs=args.jobs) if args.against_review else
+             stability(args.out, args.instruments, backend, args.per_probe, args.samples, jobs=args.jobs))
         print(json.dumps({k: v for k, v in s.items() if k != "rows"} | {"usage": backend.report()}))
         return
     if args.cmd == "grade":
