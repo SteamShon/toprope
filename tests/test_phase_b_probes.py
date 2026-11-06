@@ -230,6 +230,8 @@ def test_a_run_probes_after_every_change(worlds, tmp_path):
     rec = json.loads((out / "nl/seq-01/record.json").read_text())
     assert [p["probe"] for p in rec["probes"]] == PROBES and rec["seconds"]["probes"] > 0
     assert len(list((out / "nl/seq-01/probes").glob("P0*.jsonl"))) == 8
+    before = json.loads((out / "nl/seq-00/record.json").read_text())             # the probes before any change
+    assert [p["probe"] for p in before["probes"]] == PROBES
     man = json.loads((out / "nl/manifest.json").read_text())
     assert man["probes"] and man["sessions"][-1]["probes"] == man["probes"]
     assert man["baseline"] == runner.baseline() and set(man["baseline"]) == {"authoring", "delivery"}
