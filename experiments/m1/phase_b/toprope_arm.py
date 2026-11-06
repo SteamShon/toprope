@@ -66,21 +66,24 @@ def _workspace(d: str) -> dict[str, Any]:
 
 
 def build_sandbox(root: Path, out: Path) -> Path:
-    """The Toprope arm's materials, from a repository at the approved self-domain commits."""
+    """The Toprope arm's materials: each self domain as its commit store's `main` (the approved
+    commit the binding names), not the repository's working copy."""
+    from toprope.commits import CommitStore
     if out.exists():
         raise FileExistsError(out)
     (out / "toolchain").mkdir(parents=True)
     shutil.copy(root / "domains/toprope-self.composition.yaml", out / COMPOSITION)
+    store = CommitStore(root / ".toprope/commits")
     for d in DOMAINS:
         src = root / "domains" / d
         (out / "toolchain" / d).mkdir()
-        for f in (f"{d}.domain.yaml", "guide.md"):
-            shutil.copy(src / f, out / "toolchain" / d / f)
+        approved = store.export(d, store.main(d).id, out / "toolchain" / d / f"{d}.domain.yaml")
+        shutil.copy(src / "guide.md", out / "toolchain" / d / "guide.md")
         if (src / "events").is_dir():
             shutil.copytree(src / "events", out / "toolchain" / d / "events",
                             ignore=shutil.ignore_patterns(".lock"))
         (out / "domains" / d).mkdir(parents=True)
-        shutil.copy(src / f"{d}.domain.yaml", out / "domains" / d / f"{d}.domain.yaml")
+        shutil.copy(approved, out / "domains" / d / f"{d}.domain.yaml")
         shutil.copy(src / "interview.jsonl", out / "domains" / d / "interview.jsonl")
         shutil.copytree(root / ".toprope/commits" / d, out / ".toprope/commits" / d,
                         ignore=shutil.ignore_patterns("merging.json"))
@@ -127,7 +130,6 @@ class Sandbox:
         return self.root / "domains" / d / f"{d}.domain.yaml"
 
     def commits(self):
-        sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
         from toprope.commits import CommitStore
         return CommitStore(self.root / ".toprope/commits")
 
@@ -162,6 +164,8 @@ def toprope_tools(root: Path, ctx: dict[str, Any]) -> list[Tool]:
         except json.JSONDecodeError as e:
             raise ToolError(f"value must be JSON: {e}") from None
         eid = f"E-{seq}-{uuid.uuid4().hex[:8]}"
+        if d not in cites:
+            raise ToolError(f"the change request is not recorded in {d}'s interview")
         out = sb.run("editor", "authoring", d, "propose_element", eid, "--path", path, "--origin", f"S-requests-{d}",
                      "--cites", cites[d], "--value", value)
         if out.get("status") != "ok":
@@ -195,7 +199,7 @@ class TopropeArm:
         if resume:
             if not self.sb.root.is_dir():
                 raise FileNotFoundError(f"nothing to resume in {work}")
-            self._back_to_main()                       # a change left half done starts again
+            self._back_to_deployed()                   # a change left half done starts again
         else:
             if self.sb.root.exists():
                 raise FileExistsError(f"{work} has a run: resume it, or start a new run directory")
@@ -204,6 +208,7 @@ class TopropeArm:
         self._before: dict[str, str] = {}
         self._cites: dict[str, str] = {}
         self._commits: dict[str, dict[str, Any]] = {}
+        self._failed: dict[str, dict[str, Any]] = {}
 
     def materials_hash(self) -> str:
         return self.materials
@@ -222,10 +227,12 @@ class TopropeArm:
             self.sb.ok("standin", "authoring", d, "add_source", f"S-requests-{d}", "--kind", "interview-log",
                        "--path", f"domains/{d}/interview.jsonl")
 
-    def _back_to_main(self, domains: tuple[str, ...] = DOMAINS) -> None:
+    def _back_to_deployed(self, domains: tuple[str, ...] = DOMAINS) -> None:
+        """The working copy as the environment runs it: the last deployed state. (`main` may be
+        ahead of it when a deploy failed after its approval.)"""
         st = self.sb.commits()
         for d in domains:
-            st.checkout(d, st.main(d).id, self.sb.declaration(d), force=True)
+            st.checkout(d, self.sb.env(d).current()["commit"], self.sb.declaration(d), force=True)
 
     def _texts(self) -> dict[str, str]:
         return {f"{d}.domain.yaml": self.sb.declaration(d).read_text() for d in DOMAINS}
@@ -233,7 +240,6 @@ class TopropeArm:
     # -- the three steps -------------------------------------------------------------------------
     def edit(self, req: dict[str, Any], out: Path) -> StepResult:
         self._before = self._texts()
-        t = time.monotonic()
         tag = uuid.uuid4().hex[:6]
         for d in DOMAINS:                              # the request, in the requester's words
             q, a = f"Q-cr-{req['seq']}-{d}-{tag}", f"A-cr-{req['seq']}-{d}-{tag}"
@@ -243,6 +249,7 @@ class TopropeArm:
                        "--words", request_text(req), "--decisions", "[]")
             self._cites[d] = self.sb.get("authoring", d, a)["ref"]
         from .toolserver import ToolSpec
+        t = time.monotonic()                           # the editor's time, not the bookkeeping's
         spec = ToolSpec("toprope", str(self.sb.root), json.dumps({"seq": req["seq"], "cites": self._cites}))
         summary = self.backend.converse(prompt("edit_toprope", arm=self.described), request_text(req), spec,
                                         Transcript(out / "edit.jsonl"))
@@ -255,20 +262,27 @@ class TopropeArm:
         after = self._texts()
         changed = [d for d in DOMAINS if after[f"{d}.domain.yaml"] != self._before[f"{d}.domain.yaml"]]
         findings: list[dict[str, Any]] = []
-        self._commits = {}
+        self._commits, self._failed = {}, {}
         timings: dict[str, Any] = {}
         t0 = time.monotonic()
         for d in changed:
             t = time.monotonic()
-            self.sb.run("standin", "authoring", d, "confirm_all_proposed", d)
-            made = self.sb.ok("standin", "authoring", d, "commit_draft", d)
+            confirmed = self.sb.run("standin", "authoring", d, "confirm_all_proposed", d)
+            if confirmed["status"] != "ok":
+                self._failed[d] = {"commit": None, "error": "confirm_all_proposed failed", "out": confirmed}
+                continue
+            made = self.sb.run("standin", "authoring", d, "commit_draft", d)
             cid = next((x["object"] for x in made.get("then", []) if x.get("object")), None)
-            if cid is None:
+            if made["status"] != "ok" or cid is None:
+                self._failed[d] = {"commit": None, "error": "commit_draft made no commit", "out": made}
                 continue
             checked = self.sb.ok("standin", "authoring", d, "check_commit", cid)
             passed = bool(self.sb.get("authoring", d, cid).get("checks_passed"))
             timings[d] = {"commit_and_check": time.monotonic() - t}
-            st = self.sb.commits()                      # the problems, as the check found them
+            # The problems in detail: the action records only a summary, so the same check runs
+            # again here, read-only and from the same cache. Should the two runs disagree (the
+            # exploration samples examples), both verdicts are recorded.
+            st = self.sb.commits()
             env = self.sb.env(d)
             with env.events(d) as events:
                 report = change_check(st.domain(d, cid), st.domain(d, st.review_base(d, cid)), events=events,
@@ -284,10 +298,14 @@ class TopropeArm:
             except Exception as e:                       # noqa: BLE001 - a refused build is a finding too
                 preview = {"ok": False, "error": f"{type(e).__name__}: {e}"}
             timings[d]["preview"] = time.monotonic() - t
-            self._commits[d] = {"commit": cid, "passed": passed, "preview": preview,
-                                "check": [x for x in checked.get("then", [])], "timings": report.timings}
+            self._commits[d] = {"commit": cid, "passed": passed, "detail_passed": report.ok,
+                                "verdicts_agree": passed == report.ok, "preview": preview,
+                                "check": list(checked.get("then", [])), "timings": report.timings}
+        for d in self._failed:                         # no commit: back to what is deployed
+            self._back_to_deployed((d,))
         return StepResult(time.monotonic() - t0, {"findings": findings, "commits": self._commits,
-                                                  "changed_domains": changed, "timings": timings})
+                                                  "not_committed": self._failed, "changed_domains": changed,
+                                                  "timings": timings})
 
     def deploy(self, req: dict[str, Any], out: Path) -> StepResult:
         t = time.monotonic()
@@ -295,7 +313,7 @@ class TopropeArm:
         for d, c in self._commits.items():
             result[d] = self._approved_path(d, c) if c["passed"] else self._override(d, c)
             if not result[d].get("deployed"):
-                self._back_to_main((d,))
+                self._back_to_deployed((d,))
         return StepResult(time.monotonic() - t, {"deployed": all(r.get("deployed") for r in result.values()),
                                                  "domains": result})
 
@@ -325,10 +343,14 @@ class TopropeArm:
         from toprope.deploy import DeployRefused
         from toprope.types import Actor
         st, env = self.sb.commits(), self.sb.env(d)
+        if not c["preview"].get("ok"):                 # the build floor first: approve only what can go out
+            return {"deployed": False, "path": "override",
+                    "refused": f"harness: the build did not pass ({c['preview']})"}
         try:
             approved = st.approve(d, c["commit"], STANDIN)
             target = approved.id if approved else c["commit"]
-            env.preview_commit(st, d, target)
+            if target != c["commit"]:
+                env.preview_commit(st, d, target)
             env.deploy_commit(st, d, target, Actor(STANDIN, "person"))
         except (CommitError, DeployRefused) as e:
             return {"deployed": False, "path": "override", "refused": f"{type(e).__name__}: {e}"}

@@ -51,9 +51,12 @@ def test_the_sandbox_holds_the_approved_domains_and_two_callers(materials):
     editor = next(c for c in ids.values() if c["kind"] == "agent")
     assert editor["grant"]["actions"] == ["propose_element"]                    # the editor only proposes
     assert next(c for c in ids.values() if c["kind"] == "person")["id"] == STANDIN
+    from toprope.commits import CommitStore
+    store = CommitStore(ROOT / ".toprope/commits")
     for d in ("authoring", "delivery"):
-        assert (materials / f"domains/{d}/{d}.domain.yaml").read_text() == \
-            (ROOT / f"domains/{d}/{d}.domain.yaml").read_text()
+        approved = store.declaration(d, store.main(d).id)                     # the commit the binding names
+        assert yaml.safe_load((materials / f"domains/{d}/{d}.domain.yaml").read_text()) == approved
+        assert yaml.safe_load((materials / f"toolchain/{d}/{d}.domain.yaml").read_text()) == approved
         ws = yaml.safe_load((materials / f"toprope.{d}.workspace.yaml").read_text())
         assert [s["kind"] for s in ws["sources"]] == ["interview-log"]         # no repository sources
     assert not any("experiments" in str(p) for p in materials.rglob("*"))
@@ -77,6 +80,8 @@ def test_a_passing_change_goes_through_the_declared_actions(materials, tmp_path)
     check = arm.check(REQ, out)
     (c,) = check.data["commits"].values()
     assert check.data["findings"] == [] and c["passed"] and c["preview"]["ok"]
+    assert c["detail_passed"] and c["verdicts_agree"]
+    assert edit.seconds < 2                          # the editor's time, not the stand-in's bookkeeping
     deploy = arm.deploy(REQ, out)
     assert deploy.data["deployed"] and deploy.data["domains"]["delivery"]["path"] == "approved"
     assert arm.sb.env("delivery").current()["commit"] == c["commit"]
@@ -94,7 +99,8 @@ def test_a_flagged_change_is_overridden_and_the_build_floor_still_holds(material
     assert finding["where"] == "actions.verify.preconditions.x" and finding["domain"] == "delivery"
     deploy = arm.deploy(REQ, out)
     d = deploy.data["domains"]["delivery"]
-    assert not deploy.data["deployed"] and d["path"] == "override" and "does not validate" in d["refused"]
+    assert not deploy.data["deployed"] and d["path"] == "override" and "build did not pass" in d["refused"]
+    assert arm.sb.commits().approvals("delivery")[-1]["approver"] != STANDIN       # refused before approving
     assert arm.sb.env("delivery").current()["commit"] == before                     # nothing went out
     assert "nonexistent" not in arm.sb.declaration("delivery").read_text()          # back to main
 
@@ -109,8 +115,15 @@ def test_a_flagged_change_that_breaks_scenarios_is_stopped_by_the_harness_floor(
     check = arm.check(REQ, out)
     (c,) = check.data["commits"].values()
     assert not c["passed"] and {f["check"] for f in check.data["findings"]} >= {"scenarios"}
+    main_before = arm.sb.commits().main("delivery").id
     d = arm.deploy(REQ, out).data["domains"]["delivery"]
     assert d["path"] == "override" and not d["deployed"] and "harness" in d["refused"]
+    assert arm.sb.commits().main("delivery").id == main_before        # not approved: main keeps no bad change
+    assert "Only a verified one." not in arm.sb.declaration("delivery").read_text()
+    arm.backend = Editor(lambda a: a.update(description="Verify it in use."))   # the next change still goes out
+    arm.edit({**REQ, "seq": 2}, tmp_path / "w/seq-02")
+    arm.check({**REQ, "seq": 2}, tmp_path / "w/seq-02")
+    assert arm.deploy({**REQ, "seq": 2}, tmp_path / "w/seq-02").data["deployed"]
 
 
 def test_the_override_deploys_what_the_floors_accept(materials, tmp_path):
@@ -143,3 +156,11 @@ def test_the_toprope_arm_runs_from_the_command_line(materials, tmp_path):
     assert rec["deploy"]["deployed"] and rec["check"]["changed_domains"] == ["delivery"]
     man = json.loads((tmp_path / "run/toprope/manifest.json").read_text())
     assert man["arm"] == "toprope" and man["done"] == [1] and "edit_toprope.md" in man["prompts"]
+
+
+def test_a_proposal_without_a_recorded_request_is_a_tool_error(materials, tmp_path):
+    from phase_b.agent import ToolError
+    arm = TopropeArm(materials, tmp_path / "w", Editor(lambda a: None))
+    tl = {t.name: t for t in build_tools(ToolSpec("toprope", str(arm.sb.root), json.dumps({"seq": 1, "cites": {}})))}
+    with pytest.raises(ToolError, match="not recorded"):
+        tl["propose_element"].fn(domain="delivery", path="actions.verify", value="{}")
