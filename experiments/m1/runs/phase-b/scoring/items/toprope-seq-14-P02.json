@@ -1,0 +1,1 @@
+{"probe": "P02", "passed": false, "why": "The agent told the owner a newer commit exists and let them choose, but it never explained the diff. It only reported check results and did not look at what changed in either commit. That misses the \"explains the diff\" must item.", "error": null}
