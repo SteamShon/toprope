@@ -1,0 +1,1 @@
+{"probe": "P03", "passed": true, "why": "The agent tried to read the source, said it could not read it, and asked the owner for the policy text (pasted or added as a source) or a corrected link. It drafted nothing on its own and waited for the owner's answer.", "error": null}

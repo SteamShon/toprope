@@ -1,0 +1,1 @@
+{"seq": 14, "findings": [], "edit": {"fidelity": "implements", "why": "The edit adds a deputy role, lets deputy act on approve_commit alongside owner, and adds a Deputy object and an owner-only name_deputy action, fulfilling the request."}, "grader_error": null}
