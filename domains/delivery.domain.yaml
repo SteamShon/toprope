@@ -248,6 +248,10 @@ invariants:
   'on': DeliveryRequest
   check: target.stage not in ['done', 'verified'] or exists(target.deployed)
   reason: A finished deploy records whether it happened.
+- id: deploying-builds-passed-their-harness
+  'on': DeliveryRequest
+  check: target.stage != 'deploying' or target.harness_ok == true
+  reason: A deploy starts only from a build whose harness passed.
 world:
   actors:
     approver:

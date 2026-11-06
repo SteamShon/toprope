@@ -462,11 +462,15 @@ actions:
     - set:
         target.approved: params.approved
         target.main: params.main
+    preconditions:
+    - id: approved-only-if-checked
+      check: params.approved != true or target.checks_passed == true
+      reason: A commit is recorded as approved only if its change check passed.
     source:
       kind: interview
-      ref: interview:interview/authoring/log.jsonl#L5
-      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: confirmed
+      ref: interview:interview/authoring/log.jsonl#L11
+      quote: 25번은 A로 추천으로 해도 될 것 같고, 이십육 번도 A로.
+    status: proposed
   deliver:
     description: Ask Delivery to deliver an approved commit to an environment.
     actor:
