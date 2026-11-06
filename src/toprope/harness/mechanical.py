@@ -142,6 +142,7 @@ def run_mechanical(d: Domain, surfaces: dict[str, Any], clock: Callable[[], date
     surface is the reference for parity. `surfaces` maps a level to a fresh Surface. Each cell
     has its own seeded generator, so a cell's objects never depend on which other cells ran."""
     import hashlib
+
     from .run import Finding
     res = Mechanical(unreachable_from_creation=unreachable_from_creation(d))
     interp = Interpreter(d, clock)
