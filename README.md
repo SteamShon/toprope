@@ -135,7 +135,7 @@ to a test campaign first" is a hypothesis in the context graph while the team ch
 the numbers, and a rule in the world model once it is approved. Most of the context graph exists
 today as records (event logs, sources on every element, commits, approvals, check records);
 querying it as one graph is *planned* (M0b). More:
-[`docs/how-it-works.md`](docs/how-it-works.md#two-graphs).
+[`docs/how-it-works.md`](docs/how-it-works.md#two-graphs); the definition is ADR-0041 (proposed).
 
 ## What it gives you
 

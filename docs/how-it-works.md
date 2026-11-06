@@ -22,7 +22,7 @@ had almost no problems in production. This is *observed* in the researcher's own
 
 ## Two graphs
 
-A domain keeps two kinds of knowledge apart: the **world model** says what exists and what may
+A domain keeps two kinds of knowledge apart (ADR-0041, proposed): the **world model** says what exists and what may
 happen, and is enforced; the **context graph** says why it is so and what happened, and is not.
 The split follows kinds of knowledge that must not be mixed: an observation (what happened), a
 memory (its record), an interpretation or hypothesis (what it may mean), a preference (a
