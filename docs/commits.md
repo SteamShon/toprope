@@ -104,6 +104,9 @@ per check plus the whole; a preview records its harness. See [`change-check.md`]
 An approval is an immutable tag on a commit `main` points to. Tagging again is a no-op. A
 wrong approval is superseded by approving a newer commit. The kernel's `approve_commit`
 refuses unless the calling person is the approver, and returns the commit `main` points to.
+`main` takes no unconfirmed proposal (ADR-0041): approving a commit, or the merge it makes, is
+refused while it holds any element with `status: proposed`, and the change check records how
+many are left (the `confirmed` check record). Drafts and previews still compile and test them.
 
 `commit` also reports `last_approved`, so a declaration can ask `diff` what changed since
 the last approved commit.

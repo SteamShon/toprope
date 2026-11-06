@@ -142,6 +142,7 @@ def test_now_is_a_call_not_a_root(raw):
 
 
 def test_interface_bumps_follow_adr_0008(raw):
+    raw["links"]["hypothesis"]["status"] = "proposed"       # an agent's proposal, confirmed below
     old = interface(Domain.model_validate(raw))
     ref = copy.deepcopy(raw)
     ref["actions"]["approve_experiment"]["params"]["note"] = {"ref": "Metric", "optional": True}

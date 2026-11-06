@@ -71,7 +71,7 @@ objects:
 links:                      # a link is navigable from its `from` object by its name
   hypothesis:     {from: Experiment, to: Hypothesis, cardinality: many-to-one, required: true,
                    source: {kind: record, ref: "docs/experiments.md", quote: "Every experiment tests one hypothesis."},
-                   status: proposed}
+                   status: confirmed}
   primary_metric: {from: Experiment, to: Metric, cardinality: many-to-one, required: true}
   guardrails:     {from: Experiment, to: Metric, cardinality: many-to-many}
   readout:        {from: Experiment, to: Readout, cardinality: one-to-one}

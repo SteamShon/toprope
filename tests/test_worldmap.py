@@ -31,7 +31,7 @@ def edge(m, eid):
 
 
 def test_structure_and_behavior_layers_come_from_the_declaration():
-    m = build_world_map(dom())
+    m = build_world_map(dom(lambda r: r["links"]["hypothesis"].update(status="proposed")))
     assert {n["id"] for n in m["structure"]["nodes"]} == {"Experiment", "Hypothesis", "Metric", "Readout"}
     hyp = next(e for e in m["structure"]["edges"] if e["id"] == "hypothesis")
     assert (hyp["from"], hyp["to"], hyp["required"], hyp["status"]) == ("Experiment", "Hypothesis", True, "proposed")

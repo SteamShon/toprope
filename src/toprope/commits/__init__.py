@@ -508,6 +508,7 @@ class CommitStore:
             if main is None or self.is_ancestor(domain, main.id, c.id):
                 body = self._body(domain, c.id)               # fast-forward: main takes this commit
                 self._check(c.id, body["domain"])               # (a resolved merge comes this way too)
+                self._confirmed(c.id, body["domain"])
                 target = c
                 self._move(dirp, MAIN, c.id)
             else:
@@ -515,12 +516,24 @@ class CommitStore:
                 if m.conflicts:
                     raise MergeConflict(m.conflicts)
                 d = self._check(c.id, m.merged["domain"])
+                self._confirmed(c.id, m.merged["domain"])
                 reps = m.merged["representations"]
                 target = self._write(dirp, d, m.merged["domain"], reps, content_id(m.merged["domain"], reps),
                                      [main.id, c.id], f"merge {c.id} into main", MAIN, approver)
             self._append(dirp / "approvals.jsonl", {"commit": target.id, "approver": approver, "at": _now(),
                                                     **({"merged": c.id} if target.id != c.id else {})})
             return target
+
+    @staticmethod
+    def _confirmed(commit_id: str, raw: dict[str, Any]) -> None:
+        """What `main` takes holds no unconfirmed proposal (ADR-0041, Resolved 1): an agent's
+        proposal becomes a rule only once a person confirms it."""
+        from ..decl.provenance import proposed_elements
+        left = proposed_elements(raw)
+        if left:
+            shown = ", ".join(left[:5]) + (f" and {len(left) - 5} more" if len(left) > 5 else "")
+            raise CommitError(f"{commit_id} still holds {len(left)} proposed element(s): {shown}; "
+                              "confirm them, then commit and approve again")
 
     @staticmethod
     def _check(commit_id: str, raw: dict[str, Any]) -> Domain:
