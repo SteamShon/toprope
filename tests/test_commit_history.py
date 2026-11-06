@@ -140,7 +140,7 @@ def test_checkout_never_drops_an_uncommitted_ui_next_to_a_missing_declaration(tm
 
 
 def test_a_forced_checkout_recovers_an_unreadable_working_copy(tmp_path):
-    from toprope.authoring import AuthoringError, Workspace
+    from toprope.workspace import AuthoringError, Workspace
     (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump({"domain": "d.domain.yaml", "sources": []}))
     write(tmp_path / "d.domain.yaml", schema_doc_domain())
     ws = Workspace(tmp_path)
@@ -178,7 +178,7 @@ def test_a_caller_without_an_id_authors_nothing(tmp_path):
 
 
 def test_a_merge_resolution_is_not_credited_with_mains_changes(tmp_path):
-    from toprope.authoring import Workspace
+    from toprope.workspace import Workspace
     (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump({"domain": "d.domain.yaml", "sources": []}))
     raw = schema_doc_domain()
     write(tmp_path / "d.domain.yaml", raw)

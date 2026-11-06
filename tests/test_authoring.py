@@ -10,7 +10,7 @@ from mcp import Client, types
 from mcp.shared.exceptions import MCPError
 
 from test_decl import schema_doc_domain
-from toprope.authoring import AuthoringError, Workspace
+from toprope.workspace import AuthoringError, Workspace
 from toprope.authoring.mcp import build_authoring_server
 from toprope.sources import SourceSpec, read, redact
 
@@ -316,7 +316,7 @@ def test_bad_values_and_config_are_authoring_errors(ws):
 
 def test_a_workspace_may_be_named_by_its_file(tmp_path):
     """Several domains' workspaces can share one directory (the self domains share the repo)."""
-    from toprope.authoring import Workspace
+    from toprope.workspace import Workspace
     (tmp_path / "docs").mkdir()
     (tmp_path / "docs" / "a.md").write_text("# A\nrules\n")
     for name in ("one", "two"):
@@ -333,7 +333,7 @@ def test_a_cli_confirmation_records_the_git_identity(tmp_path):
     """Who confirmed comes from the terminal's git identity, without anyone typing it."""
     import json
     import subprocess
-    from toprope.authoring import Workspace
+    from toprope.workspace import Workspace
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     subprocess.run(["git", "-C", str(tmp_path), "config", "user.name", "Ana Owner"], check=True)
     subprocess.run(["git", "-C", str(tmp_path), "config", "user.email", "ana@example.org"], check=True)
@@ -353,7 +353,7 @@ def test_a_cli_confirmation_records_the_git_identity(tmp_path):
 
 def test_a_handoff_is_an_element_to_confirm(tmp_path):
     """A handoff is a decision about what crosses into another domain: drafted, then confirmed."""
-    from toprope.authoring import Workspace
+    from toprope.workspace import Workspace
     (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump(
         {"domain": "d.domain.yaml", "sources": [{"id": "docs", "kind": "records", "path": "docs"}]}))
     (tmp_path / "docs").mkdir()
@@ -376,7 +376,7 @@ def test_cli_confirms_every_proposed_element_at_once(tmp_path):
     (tmp_path / "docs").mkdir()
     (tmp_path / "docs" / "a.md").write_text("# A\nrules\n")
     (tmp_path / "d.domain.yaml").write_text(yaml.safe_dump(schema_doc_domain(), sort_keys=False))
-    from toprope.authoring import Workspace
+    from toprope.workspace import Workspace
     ws = Workspace(tmp_path)
     for a in ("approve_experiment", "launch_experiment"):
         ws.propose(f"actions.{a}", ws.draft()["actions"][a], "docs:docs/a.md#L1-L2")

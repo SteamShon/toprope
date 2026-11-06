@@ -8,7 +8,7 @@ import pytest
 import yaml
 from mcp import Client
 
-from toprope.authoring import AuthoringError, Workspace
+from toprope.workspace import AuthoringError, Workspace
 from toprope.authoring.mcp import build_authoring_server
 
 CONFIG = {"domain": "drafts/d.domain.yaml", "interview_log": "interview/log.jsonl",

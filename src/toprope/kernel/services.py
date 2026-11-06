@@ -76,7 +76,7 @@ class LocalKernel(KernelServices):
                  harness_examples: int = 50, commits: Any = None):
         from ..commits import CommitStore
         self.root = Path(root).resolve()
-        self.workspace = workspace          # toprope.authoring.Workspace, for sources
+        self.workspace = workspace          # toprope.workspace.Workspace: sources and the interview
         self.environment = environment      # toprope.deploy.LocalEnvironment, for preview and deploy
         self.examples = harness_examples
         self.commits = commits or CommitStore(self.root / ".toprope" / "commits")
@@ -142,6 +142,41 @@ class LocalKernel(KernelServices):
             raise RuntimeError("no authoring workspace configured")
         (meta,) = self.workspace.fetch(source)
         return {"sha256": meta["sha256"]}
+
+    # -- the interview (ADR-0025, ADR-0037) ------------------------------------------------------
+    def _ws(self):
+        if self.workspace is None:
+            raise RuntimeError("no authoring workspace configured")
+        return self.workspace
+
+    def _search_sources(self, query):
+        return {"refs": [h["ref"] for h in self._ws().search_sources(query)]}
+
+    def _stage_questions(self):
+        q = self._ws().questions()
+        return {"stage": q.get("stage") or "", "bundle": q.get("bundle_id") or "",
+                "questions": [x["text"] for x in q.get("questions", [])]}
+
+    def _propose_element(self, path, value, source):
+        import json
+        out = self._ws().propose(path, json.loads(value), source)
+        errors = [i for i in out["issues"] if i.get("severity") == "error"]
+        return {"ok": not errors, "issues": len(errors), "summary": "; ".join(i["message"] for i in errors[:3])}
+
+    def _record_answer(self, question, answer, decisions):
+        import json
+        out = self._ws().answer(question, answer, json.loads(decisions or "[]"), question=question)
+        return {"ref": out["ref"]}
+
+    def _confirm_element(self, paths, approver):
+        ws = self._ws()
+        chosen = ws._proposed(ws.draft()) if paths.strip() == "all" else paths.split()
+        ws.confirm(chosen, via="kernel", who=approver)
+        return {"confirmed": chosen}
+
+    def _skip_stage(self, stage, reason):
+        self._ws().skip_stage(stage, reason)
+        return {"skipped": True}
 
     # -- commits (ADR-0029) -----------------------------------------------------------------
     def _commit(self, declaration):

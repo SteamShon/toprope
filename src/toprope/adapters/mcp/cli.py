@@ -132,7 +132,7 @@ def _kernel(args):
     from ...kernel.services import LocalKernel
     ws = env = None
     if args.workspace:
-        from ...authoring import Workspace
+        from ...workspace import Workspace
         ws = Workspace(args.workspace)
     if args.env:
         from ...deploy import LocalEnvironment
