@@ -106,6 +106,21 @@ def _matches(rel: str, patterns) -> bool:
     return any(fnmatch.fnmatch(rel, p) or (p.startswith("**/") and fnmatch.fnmatch(rel, p[3:])) for p in patterns)
 
 
+def stale(spec: SourceSpec, root: Path, exclude: tuple[str, ...] = DEFAULT_EXCLUDE) -> list[str]:
+    """What in a source no longer points at a file: a missing path, or a glob the source names
+    that matches no file. A link source with no snapshot yet is not stale: it is fetched later."""
+    if spec.url:
+        return []
+    base = root / spec.path
+    if not base.exists():
+        return [f"source {spec.id}: {spec.path} does not exist"]
+    if base.is_file() or not spec.globs:
+        return []
+    rels = [p.relative_to(base).as_posix() for p in files(spec, root, exclude)]
+    return [f"source {spec.id}: {spec.path}/{g} matches no file" for g in spec.globs
+            if not any(_matches(r, (g,)) for r in rels)]
+
+
 def files(spec: SourceSpec, root: Path, exclude: tuple[str, ...] = DEFAULT_EXCLUDE) -> list[Path]:
     base = (root / spec.path).resolve()
     rootr = root.resolve()
@@ -263,4 +278,4 @@ def fetch(spec: SourceSpec, root: Path, timeout: float = 20) -> dict:
 
 
 __all__ = ["DEFAULT_EXCLUDE", "ELEMENT_KIND", "SNAPSHOTS", "Chunk", "FetchError", "SourceSpec", "fetch", "files",
-           "read", "redact"]
+           "read", "redact", "stale"]
