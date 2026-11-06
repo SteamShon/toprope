@@ -35,7 +35,7 @@ tendency that depends on conditions), a rule (a condition accepted as binding) a
 | functions | world model | function ports (ADR-0015) | planned (M0b) |
 | rules | world model | matrix cells (an `undecided` cell refuses), invariants, preconditions | built |
 | permissions, declared | world model | roles, actor rules, `requires: human` | built |
-| permissions, at runtime | outside the declaration | role holders and grants from the Identity port (ADR-0016) | built |
+| permissions, at runtime | outside the declaration | role holders and grants from the Identity port (ADR-0016); each event records the ones in force | built |
 | instances and current state | derived from the event log; what the gate checks | projections | built |
 | observations, memory | context graph | domain events, refused attempts, effect outcomes; the interview log | built; read-back from external systems M0b |
 | interpretations, hypotheses | context graph | elements with `status: proposed` (agents can write nothing else); still compiled and enforced, as `status` is provenance only | built |

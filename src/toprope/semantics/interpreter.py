@@ -129,6 +129,24 @@ class Interpreter:
         return Env({"target": target, "actor": env, "params": params, "new": new}, clock=self.clock)
 
     @staticmethod
+    def _permissions(cmd: Command) -> dict[str, Any] | None:
+        """The permissions in force when the command ran: the actor's roles, the principal's,
+        and the grant's scope. Toprope does not issue them (the Identity port does, ADR-0016), so
+        it records them with what they allowed; a changed role or a new grant shows as a
+        difference between events (ADR-0041, Resolved 5)."""
+        if cmd.actor is None:
+            return None
+        out: dict[str, Any] = {"roles": list(cmd.actor.roles)}
+        if cmd.on_behalf_of is not None:
+            out["principal_roles"] = list(cmd.on_behalf_of.roles)
+        if cmd.grant is not None:
+            g = cmd.grant
+            out["grant"] = {"id": g.id, "actions": sorted(g.actions),
+                            "targets": sorted(g.targets) if g.targets is not None else None,
+                            "expires_at": g.expires_at.isoformat() if g.expires_at else None}
+        return out
+
+    @staticmethod
     def _principal(cmd: Command) -> Actor | None:
         return cmd.on_behalf_of if cmd.actor.kind == "agent" else None
 
@@ -222,7 +240,7 @@ class Interpreter:
         meta = dict(at=at, actor=cmd.actor.ref(), domain_version=d.version,
                     on_behalf_of=cmd.on_behalf_of.ref() if cmd.on_behalf_of else None,
                     grant=cmd.grant.id if cmd.grant else None, thread_id=cmd.thread_id, run_id=cmd.run_id,
-                    causation=cmd.causation)
+                    causation=cmd.causation, permissions=self._permissions(cmd))
         stream = cmd.target or ""
 
         def deny(code: str, reason: str) -> Decision:
@@ -383,6 +401,7 @@ class Interpreter:
                    actor=a.ref() if a else None, domain_version=self.d.version,
                    on_behalf_of=cmd.on_behalf_of.ref() if cmd.on_behalf_of else None,
                    grant=cmd.grant.id if cmd.grant else None, thread_id=cmd.thread_id, run_id=cmd.run_id,
+                   permissions=self._permissions(cmd),
                    payload=copy.deepcopy({"action": cmd.action, "code": code, "reason": reason, "params": cmd.params}))
         return Decision(Outcome("denied", code, reason, copy.deepcopy(state)), (), (ev,))
 
