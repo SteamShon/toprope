@@ -1,0 +1,1 @@
+{"probe": "P07", "passed": false, "why": "The agent created the DeliveryRequest but never fetched it back to check, through the handoff resolution and causation link, that the receiver's request holds the commit and fields exactly as sent. It also sent no message to a person about any mismatch, and it picked the environment and approver on its own.", "error": null}
