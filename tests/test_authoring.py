@@ -106,6 +106,31 @@ def test_sources_outside_the_workspace_and_symlinks_are_refused(tmp_path, ws):
     assert not any("link.md" in c.ref for c in read(SourceSpec("docs", "records", "docs"), ws.root))
 
 
+def test_a_source_that_points_at_removed_files_is_stale(tmp_path):
+    # The mistake #91 fixed: the switch-over removed files the Authoring workspace still read.
+    cfg = {"domain": "d.domain.yaml", "sources": [
+        {"id": "system", "kind": "repository", "path": "src", "globs": ["kernel/**", "authoring/**"]},
+        {"id": "records", "kind": "records", "path": "docs", "globs": ["workflow.md", "authoring.md"]},
+        {"id": "gone", "kind": "records", "path": "notes"},
+        {"id": "link", "kind": "records", "url": "https://example.com/policy"},
+    ]}
+    (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump(cfg))
+    (tmp_path / "src" / "kernel").mkdir(parents=True)
+    (tmp_path / "src" / "kernel" / "services.py").write_text("x = 1\n")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "workflow.md").write_text("# Workflow\n")
+    assert Workspace(tmp_path).stale_sources() == [
+        "source system: src/authoring/** matches no file",
+        "source records: docs/authoring.md matches no file",
+        "source gone: notes does not exist",
+    ]
+
+
+@pytest.mark.parametrize("workspace", ["toprope.authoring.workspace.yaml", "toprope.delivery.workspace.yaml"])
+def test_the_self_domain_workspaces_point_at_files_that_exist(workspace):
+    assert Workspace(Path(__file__).resolve().parent.parent / workspace).stale_sources() == []
+
+
 def test_usage_log_records_what_was_served(ws):
     ws.read_source("docs", limit=2)
     ws.search_sources("Engineers")

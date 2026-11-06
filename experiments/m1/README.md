@@ -11,6 +11,9 @@ the assistant's draft values for the researcher to review.
 A guide for writing them (coverage areas, what makes a good question, and a session
 plan) is in [`interview-guide.md`](interview-guide.md). It holds no content.
 
+How Phase B's arms are run and graded (blinding, repeated runs, the run log):
+[`run-protocol.md`](run-protocol.md), a **draft** until the researcher freezes it.
+
 ## What to fill, and when
 
 | File (copy from `*.template.yaml`) | Shown to | Written | Frozen |

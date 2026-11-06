@@ -35,7 +35,7 @@ tendency that depends on conditions), a rule (a condition accepted as binding) a
 | functions | world model | function ports (ADR-0015) | planned (M0b) |
 | rules | world model | matrix cells (an `undecided` cell refuses), invariants, preconditions | built |
 | permissions, declared | world model | roles, actor rules, `requires: human` | built |
-| permissions, at runtime | outside the declaration | role holders and grants from the Identity port (ADR-0016) | built |
+| permissions, at runtime | outside the declaration | role holders and grants from the Identity port (ADR-0016); each event records the ones in force | built |
 | instances and current state | derived from the event log; what the gate checks | projections | built |
 | observations, memory | context graph | domain events, refused attempts, effect outcomes; the interview log | built; read-back from external systems M0b |
 | interpretations, hypotheses | context graph | elements with `status: proposed` (agents can write nothing else); still compiled and enforced, as `status` is provenance only | built |
@@ -50,8 +50,29 @@ tendency that depends on conditions), a rule (a condition accepted as binding) a
 change, a commit on the domain's protected `main` that `approve_commit` merges, which only a
 person may take and which requires passing checks (ADR-0029, ADR-0033). Knowing a method, having
 adopted something as a default, and approving this one action are different things. Role holders
-and grants are issued at runtime, outside this rule. Approval will refuse proposed elements, and author ≠ approver
-becomes declarable (ADR-0041, Resolved 1 and 4; not built yet).
+and grants are issued at runtime, outside this rule; each event records the ones in force.
+Approval refuses a commit that still holds proposed elements, and a rule can compare
+`actor.principal` to keep a person from approving what they, or their agent, proposed (ADR-0041,
+Resolved 1 and 4).
+
+**A vocabulary for the context graph.** The [Decision ontology](https://w3id.org/do) (v0.2.0)
+names the parts of a decision the context graph keeps. It defines a premise as a precondition a
+decision *uses without checking*: the same line as between the two graphs, since Toprope's
+preconditions are checked and its evidence is not.
+
+| Decision ontology | Toprope today |
+|---|---|
+| `Decision`, `attributedTo` | a `DecisionRecorded` event; `actor` and `actor.principal` |
+| `inContext` | the domain, the Draft |
+| `hasOption`, `chooses` | Authoring's `request_decision` and `decide` (`choice`) |
+| `hasArgument` | `rationale` |
+| `hasPremise` | a commit's `evidence` |
+| `hasUnconfirmedPremise` | elements with `status: proposed` |
+| `revises` | none: a newer approval supersedes an older one without naming it |
+| `triggeredBy` | in part: a handoff's `causation` |
+
+It is a reference, not adopted: whether to use it, for example to export the context graph as
+RDF, is decided with the M4 decision-record spec.
 
 ## The three layers
 
