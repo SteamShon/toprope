@@ -167,3 +167,11 @@ def test_unsupported_effects_are_compile_errors(raw):
     raw["actions"]["approve_experiment"]["effects"].append({"create": "Readout"})
     raw["actions"]["launch_experiment"]["effects"].append({"set": {"new.name": "actor.id"}})
     assert [i.code for i in errors(Domain.model_validate(raw))] == ["unsupported-effect", "unsupported-effect"]
+
+
+def test_an_object_s_own_id_is_a_known_path(raw):
+    """`target.id` names the object itself (its stream id), e.g. to pass it to a kernel service."""
+    raw["invariants"][0]["check"] = "exists(target.id) and exists(target.hypothesis.id)"
+    assert errors(Domain.model_validate(raw)) == []
+    raw["invariants"][0]["check"] = "exists(target.id.name)"
+    assert {i.code for i in errors(Domain.model_validate(raw))} == {"unknown-path"}

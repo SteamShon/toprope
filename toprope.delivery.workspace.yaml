@@ -1,0 +1,20 @@
+# M1 Phase A: the Domain Delivery self domain (ADR-0022, ADR-0025, ADR-0031).
+# Sources are drafted from in this order: the system (code), then records (docs), then the interview.
+# `experiments/**` is never read (DEFAULT_EXCLUDE).
+domain: domains/delivery.domain.yaml
+interview_log: interview/delivery/log.jsonl
+usage_log: interview/delivery/sources-used.jsonl
+sources:
+  - id: system
+    kind: repository
+    path: src/toprope
+    globs: ["deploy/**", "handoff/**", "compose/**", "check/**", "harness/regen.py", "kernel/**"]
+  - id: records
+    kind: records
+    path: docs
+    globs: ["handoffs-and-deploy.md", "change-check.md", "harness.md", "server.md", "commits.md",
+            "experiments/M1-self-domains-scope.md",
+            "adr/0018-*", "adr/0022-*", "adr/0024-*", "adr/0026-*", "adr/0028-*", "adr/0029-*", "adr/0033-*"]
+  - id: interview
+    kind: interview-log
+    path: interview/delivery/log.jsonl

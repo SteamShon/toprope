@@ -142,8 +142,14 @@ def _demote(v: Any) -> Any:
 
 class Workspace:
     def __init__(self, root: str | Path):
-        self.root = Path(root).resolve()
-        cfg_path = self.root / CONFIG
+        """`root` is a workspace directory (with `toprope.workspace.yaml`), or a workspace file
+        itself, so that one directory can hold several domains' workspaces (e.g. the two self
+        domains reading the same repository)."""
+        given = Path(root).resolve()
+        if given.is_file():
+            self.root, cfg_path = given.parent, given
+        else:
+            self.root, cfg_path = given, given / CONFIG
         if not cfg_path.exists():
             raise AuthoringError(f"no {CONFIG} in {self.root}")
         cfg = load_yaml(cfg_path.read_text()) or {}

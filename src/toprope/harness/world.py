@@ -97,15 +97,17 @@ def grow_world(d: Domain, clock: Callable[[], datetime] | None = None) -> SmallW
     seen: set[tuple[str, str | None]] = set()
     frontier: list[Instance] = []
 
-    def add(inst: Instance) -> None:
+    def add(inst: Instance, always: bool = False) -> None:
         key = (inst.obj, inst.state_of(d))
         instances.setdefault(key, []).append(inst)
-        if key not in seen:
+        if key not in seen or always:
             seen.add(key)
             frontier.append(inst)
 
+    # Every example is explored, not one per stage: two examples in the same stage can differ
+    # in what their preconditions allow (a refused and a successful deploy are both `done`).
     for obj, data in fixtures:
-        add(Instance(obj, data["id"], copy.deepcopy(data)))
+        add(Instance(obj, data["id"], copy.deepcopy(data)), always=True)
 
     # A scratch model: every attempt runs on a fresh clone, so instances never interfere.
     m = ReferenceModel(d, clock=clock, seed_world=False)

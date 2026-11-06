@@ -44,6 +44,10 @@ def _resolve(d: Domain, obj: str, attrs: tuple[str, ...]) -> str | None:
         if cur not in d.objects:
             return None
         o = d.objects[cur]
+        if a == "id":                      # every object has its id (the stream it lives in)
+            if i != len(attrs) - 1:
+                return f"'id' of {cur} is a string; it has no attribute '{attrs[i + 1]}'"
+            return None
         if a in o.properties:
             if i != len(attrs) - 1:
                 return f"'{a}' is a property of {cur}; it has no attribute '{attrs[i + 1]}'"

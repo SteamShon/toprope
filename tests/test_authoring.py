@@ -312,3 +312,18 @@ def test_bad_values_and_config_are_authoring_errors(ws):
     (ws.root / "toprope.workspace.yaml").write_text(yaml.safe_dump({**CONFIG, "event_store": "mongo:x"}))
     with pytest.raises(AuthoringError, match="event_store"):
         Workspace(ws.root).questions()
+
+
+def test_a_workspace_may_be_named_by_its_file(tmp_path):
+    """Several domains' workspaces can share one directory (the self domains share the repo)."""
+    from toprope.authoring import Workspace
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "a.md").write_text("# A\nrules\n")
+    for name in ("one", "two"):
+        (tmp_path / f"toprope.{name}.workspace.yaml").write_text(yaml.safe_dump({
+            "domain": f"domains/{name}.domain.yaml", "interview_log": f"interview/{name}/log.jsonl",
+            "sources": [{"id": "docs", "kind": "records", "path": "docs"}]}))
+    one, two = Workspace(tmp_path / "toprope.one.workspace.yaml"), Workspace(tmp_path / "toprope.two.workspace.yaml")
+    assert one.root == two.root == tmp_path.resolve()
+    assert one.domain_path.name == "one.domain.yaml" and two.log_path.parts[-2] == "two"
+    assert one.chunks("docs")
