@@ -89,7 +89,7 @@ actions:
         reason: An experiment needs at least one guardrail metric before approval.
     effects:
       - set: {target.approved_by: actor.id}
-    records_decision: true  # produces a Decision with who, when, inputs and rationale
+    records_decision: true  # produces a Decision: who, when, the params and the prior state
   launch_experiment:
     description: Start traffic to an approved experiment.
     actor: [eng]

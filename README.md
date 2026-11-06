@@ -124,17 +124,20 @@ A Toprope domain keeps two kinds of knowledge apart.
 
 | | **World model**: what exists and what may happen | **Context graph**: why, and what happened |
 |---|---|---|
-| Holds | objects, links, actions, functions, states; the rules adopted over them (transition matrix, invariants, preconditions); who may do what | observations (events, refused attempts, outcomes), interview answers, rule candidates not yet adopted, decisions with their reasons, sources, versions and open conflicts |
+| Holds | objects, links, actions, functions, states; the rules adopted over them (transition matrix, invariants, preconditions); the permissions (roles, actor rules, `requires: human`) | observations (events, refused attempts, outcomes), interview answers, rule candidates not yet adopted, decisions with their reasons, sources, versions and open conflicts |
 | Is | enforced: compiled into the gate, the tools and the tests | not enforced: it explains and proposes |
 | Produces | software | reviews and the next change |
 
-One rule joins them: something in the context graph becomes a rule or a permission in the world
-model only through a reviewed change, a commit that passes its checks and a person approves.
-Knowing a method, or having done something before, grants nothing by itself. "New creatives go
+One rule joins them: a declared rule or permission changes only through a reviewed change, a
+commit whose checks passed and that a person approves. Knowing a method, or having done
+something before, changes nothing that is enforced. Two things sit between the graphs: the
+current state, derived from the event log, is what the gate checks; and an `undecided` cell
+refuses (a rule) while the question behind it stays open (context). "New creatives go
 to a test campaign first" is a hypothesis in the context graph while the team checks it against
 the numbers, and a rule in the world model once it is approved. Most of the context graph exists
-today as records (event logs, sources on every element, commits, approvals, check records);
-querying it as one graph is *planned* (M0b). More:
+today as separate records (event logs, sources on every element, commits, approvals, check
+records); query tools over the event log are *planned* (M0b), and joining the rest into one
+graph has no plan yet. More:
 [`docs/how-it-works.md`](docs/how-it-works.md#two-graphs); the definition is ADR-0041 (proposed).
 
 ## What it gives you
