@@ -1,0 +1,160 @@
+# M1 binding (status: draft). Drafted by the assistant at the researcher's request (ADR-0038):
+# each frozen change request (and its key entry) named in the approved self-domain models'
+# own element keys (`<domain>/<interface key>`, as `toprope-commits diff` prints them).
+# The researcher reviews, selects where options are offered (seq 13), sets `frozen` and runs
+# `freeze-binding` in their own commit, before any arm runs. Not shown to any arm.
+instrument: binding
+experiment: M1
+status: draft
+domain_version: authoring@4-b0c8834e25d9bbc7, delivery@1-584aaeea5e686ee8
+bindings:
+- seq: 1
+  elements:
+  - authoring/action:ask_question
+  unbindable: false
+  note: 'who may ask: the action''s actor rule'
+- seq: 2
+  elements:
+  - authoring/object:DecisionRequest
+  - authoring/action:request_decision
+  unbindable: false
+  note: a new property, set when the request is made
+- seq: 3
+  elements:
+  - authoring/action:confirm_element
+  - authoring/action:confirm_all_proposed
+  unbindable: false
+  note: 'requires: human on both; the key''s rule'
+- seq: 4
+  elements:
+  - authoring/param:deliver.environment
+  - delivery/param:request_delivery.environment
+  - delivery/property:DeliveryRequest.environment
+  unbindable: false
+  note: the environment enum on the sending side
+- seq: 5
+  elements:
+  - delivery/property:DeliveryRequest.stage
+  - delivery/cell:DeliveryRequest.previewed.deploy
+  - delivery/cell:DeliveryRequest.previewed.preview
+  - delivery/cell:DeliveryRequest.previewed.record_build
+  - delivery/cell:DeliveryRequest.previewed.record_deployment
+  - delivery/cell:DeliveryRequest.previewed.verify
+  - delivery/cell:DeliveryRequest.previewing.record_build
+  unbindable: false
+  note: the stage, its row, and the cell that moves into it
+- seq: 6
+  elements:
+  - authoring/action:confirm_element
+  - authoring/object:Element
+  unbindable: false
+  note: a new param on confirming, kept on the element
+- seq: 7
+  elements:
+  - authoring/action:approve_commit
+  - authoring/precondition:approve_commit.checks-pass
+  - authoring/invariant:approved-commits-passed-their-checks
+  - authoring/precondition:record_approval.approved-only-if-checked
+  unbindable: false
+  note: the key's rule, in all three places it is stated
+- seq: 8
+  elements:
+  - authoring/action:confirm_element
+  - authoring/object:Element
+  unbindable: false
+  note: a second confirmation for some elements
+- seq: 9
+  elements:
+  - delivery/action:request_delivery
+  - authoring/action:deliver
+  - authoring/property:Commit.branch
+  - authoring/handoff:deliver_approved_commit
+  unbindable: false
+  note: the handoff's params; the handoff is not an interface element, named here for scoring
+- seq: 10
+  elements:
+  - authoring/object:Element
+  - authoring/property:Element.review
+  - authoring/cell:Element.proposed.confirm_element
+  - authoring/cell:Element.proposed.mark_unknown
+  - authoring/cell:Element.proposed.record_confirmation
+  - authoring/cell:Element.proposed.record_proposal
+  unbindable: false
+  note: a new way out of `proposed`
+- seq: 11
+  elements:
+  - delivery/action:verify
+  - delivery/precondition:verify.deployed
+  - delivery/invariant:verified-requests-were-deployed
+  - delivery/cell:DeliveryRequest.deploying.verify
+  - delivery/cell:DeliveryRequest.done.verify
+  - delivery/cell:DeliveryRequest.previewed.verify
+  - delivery/cell:DeliveryRequest.previewing.verify
+  - delivery/cell:DeliveryRequest.requested.verify
+  - delivery/cell:DeliveryRequest.verified.verify
+  unbindable: false
+  note: the key's rule and where verify is allowed
+- seq: 12
+  elements:
+  - delivery/object:DeliveryRequest
+  - delivery/action:deploy
+  unbindable: false
+  note: a new property, filled when a deploy happens
+- seq: 13
+  elements:
+  - authoring/action:skip_stage
+  unbindable: false
+  note: "the rule is the kernel's (only optional interview stages may be skipped), not an element. Option A (this): bind to skip_stage, the action the change would loosen. Option B: unbindable, since the rule itself is not in the model; excluded from recall and reported"
+- seq: 14
+  elements:
+  - authoring/action:approve_commit
+  unbindable: false
+  note: a new role in the approver rule
+- seq: 15
+  elements:
+  - delivery/property:DeliveryRequest.stage
+  - delivery/cell:DeliveryRequest.previewing.deploy
+  - delivery/cell:DeliveryRequest.previewing.preview
+  - delivery/cell:DeliveryRequest.previewing.record_build
+  - delivery/cell:DeliveryRequest.previewing.record_deployment
+  - delivery/cell:DeliveryRequest.previewing.verify
+  - delivery/cell:DeliveryRequest.deploying.preview
+  - delivery/cell:DeliveryRequest.done.preview
+  - delivery/cell:DeliveryRequest.previewed.preview
+  - delivery/cell:DeliveryRequest.previewing.preview
+  - delivery/cell:DeliveryRequest.requested.preview
+  - delivery/cell:DeliveryRequest.verified.preview
+  unbindable: false
+  note: the stage removed, its row, and every cell that moves into it
+- seq: 16
+  elements:
+  - authoring/object:Commit
+  - authoring/action:record_approval
+  unbindable: false
+  note: a name set when a commit is approved
+- seq: 17
+  elements:
+  - delivery/action:deploy
+  - delivery/action:record_build
+  - delivery/cell:DeliveryRequest.previewing.record_build
+  unbindable: false
+  note: 'requires: human on deploy; the build''s reply would start it'
+- seq: 18
+  elements:
+  - authoring/invariant:approved-commits-passed-their-checks
+  - authoring/precondition:approve_commit.checks-pass
+  - authoring/action:record_check
+  - authoring/property:Commit.checks_passed
+  unbindable: false
+  note: a time limit on what counts as checked
+- seq: 19
+  elements:
+  - authoring/object:Element
+  - authoring/action:propose_element
+  unbindable: false
+  note: who drafted, recorded at proposal
+- seq: 20
+  elements:
+  - authoring/action:decide
+  unbindable: false
+  note: 'requires: human; probe P01'
