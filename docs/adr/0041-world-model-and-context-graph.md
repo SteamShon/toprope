@@ -1,9 +1,12 @@
 # ADR-0041: A domain keeps two graphs: the world model and the context graph
 
-- Link: ② model is right, ⑤ evolves · Status: **proposed** · 2026-11-06 · decided by: (pending)
-  SteamShon (definition from the researcher's notes; drafted by the assistant)
+- Link: ① iterate safely, ② model is right, ⑤ evolves · Status: accepted · 2026-11-06 · decided
+  by: SteamShon (the definition, from the researcher's notes, and the recommended answer to each
+  open question; drafted by the assistant)
 - Builds on: ADR-0004 (provenance and status), ADR-0011 (the world model), ADR-0012 (event
   sourcing), ADR-0016 (authorization), ADR-0029 and ADR-0033 (commits, approval by merge)
+- Amends: ADR-0012 (what a decision record carries: Resolved 2), charter §5 ("No
+  self-approval": its scope in M1, Resolved 4)
 
 ## Context
 Toprope already keeps two different kinds of knowledge, but the documents do not name the
@@ -31,7 +34,7 @@ exists.
 1. **Two graphs, as a classification.** Every piece of a domain is classified as **world model**
    or **context graph**. This is a classification, not a storage split: an element's `source` and
    `status` (context) sit inside the declared element (world model), and one declaration file
-   holds both.
+   holds both. The context graph is a view derived from existing records, not a new store.
    - The **world model** is what exists and what may happen: objects, links, actions, functions,
      states, and the **rules** and **permissions** declared over them (matrix cells, invariants,
      preconditions; roles, actor rules, `requires: human`). It is enforced: the gate, the
@@ -72,7 +75,7 @@ exists.
    | permissions, at runtime | (outside the declaration) | role holders and grants from the Identity port (ADR-0016) |
    | instances and current state | derived; checked by the gate | projections of the event log |
    | observations, memory | context graph | domain events, refused attempts, effect outcomes; the interview log |
-   | interpretations, hypotheses | context graph | elements with `status: proposed`, by provenance (see Open 1) |
+   | interpretations, hypotheses | context graph | elements with `status: proposed`, by provenance (Resolved 1) |
    | decisions | context graph | `DecisionRecorded` events: who, when, the action's params and the target's prior state |
    | evidence | context graph | `world` fixtures and `scenarios`, which the harness also runs as checks |
    | sources and history | context graph | `source` and `status` on elements; commits, approvals, check records |
@@ -82,30 +85,55 @@ exists.
 ## Consequences
 - The README and `docs/how-it-works.md` use the two names, with this ADR as the definition.
 - Reviewing a change means checking both graphs: what the world model will enforce (the change
-  check, the harness) and why (the context the change cites).
+  check, the harness) and why (the evidence the commit cites, Resolved 3).
 - The proposal engine (M4) reads the context graph and writes only proposals. Accepting one is an
   approved commit, whichever surface it is accepted in.
 - The query tools (M0b) cover the event store (ADR-0012). Joining commits, sources and the
-  interview log into one queryable graph has no plan yet (Open 3); until then the context graph
-  is a set of records linked by element keys, commit ids and event streams.
+  interview log into one queryable graph has no plan yet; until then the context graph is a set
+  of records linked by element keys, commit ids and event streams (Resolved 3).
 
-## Open
-1. **Proposed elements are enforced.** `status` is provenance: nothing in the gate, the harness or
-   the deploy reads it, so a proposed element is compiled and enforced like a confirmed one, and
-   approving a commit does not refuse one that still holds proposed elements. Should
-   `approve_commit` require every element to be confirmed?
-2. **Decision records.** The notes ask a decision to carry its reason, expected outcome, scope
-   and a condition for reviewing it again. A `DecisionRecorded` event carries a rationale only if
-   the action declares a parameter for it, and none of the self domains' decision actions does.
-   Add rationale, expected outcome and a re-review condition to the event?
-3. **Edges in the context graph.** Which links are first-class: an element to its source, a rule
-   to the decision that adopted it, an exception to the rule it bends, a commit to the
-   observations that motivated it? Today only the first is declared, on every element.
-4. **Whose agent acted, and who approves.** A rule cannot refer to an agent's principal (`actor`
-   carries only its own id and roles), and nothing keeps a commit's author from approving it.
-   Both are under *Left from reviews* in `docs/STATUS.md`. Until they are closed, "a proposal is
-   never its own approval" holds only for the agent itself (`requires: human`).
-5. **Runtime permissions.** Role holders and grants change without a commit. Should they be
-   declared, or recorded as reviewed changes of their own?
-6. **Preferences and exceptions.** Should preferences be modeled at all (as parameters, or as
-   elements with a scope and an expiry)? And how is an exception granted, scoped and recorded?
+## Resolved (researcher, 2026-11-06: the recommendation in each case)
+1. **Proposed elements.** Drafts and previews keep compiling and testing proposed elements, so a
+   proposal can be tried. `approve_commit` refuses a commit that still holds any element with
+   `status: proposed`: `check_commit` records how many there are, and approval requires none.
+   Ignoring proposed elements in the gate was rejected, because a preview and a deploy would then
+   behave differently without saying so.
+2. **Decision records.** An action with `records_decision: true` takes an optional reserved
+   parameter `rationale` (like `idempotency_key`), stored in its `DecisionRecorded` event. This is
+   what ADR-0012's "with inputs and rationale" now means. An expected outcome and a re-review
+   condition are decided in the M4 spec, by the proposal engine that reads them.
+3. **Edges.** The context graph stays a derived view. Its edges today: an element to its source
+   (`source`), a commit to the elements it changed (the semantic diff), a rule to the commit that
+   adopted it (the element log), a decision to its action and target (the event). One edge is
+   added: a commit may cite its evidence (interview lines, events, check records). An exception to
+   the rule it bends waits for exceptions (6).
+4. **Whose agent acted, and who approves.**
+   - A check can read `actor.principal`: the principal's id and roles for an agent, the actor
+     itself otherwise. Rules can then say "not the proposer, nor the proposer's agent".
+   - Author ≠ approver is not required in the self domains during M1: ADR-0032 keeps one approver,
+     and a local agent shares the researcher's git email (`docs/STATUS.md`, Open questions). A
+     domain may declare it (`target.author != actor.principal`); it becomes the default when a
+     domain has more than one owner (M2 or later).
+   - In M1, charter §5's "No self-approval" means that an agent never approves (`requires:
+     human`).
+5. **Runtime permissions.** Role holders and grants stay with the Identity port (ADR-0016), not in
+   the declaration: who holds a role changes for reasons that are not rule changes. Issuing a grant
+   or changing a role is recorded as an event, so it is an observation in the context graph. In the
+   self domains, `toprope.identity.yaml` is in git, so changing it already goes through a
+   repository PR.
+6. **Preferences and exceptions.**
+   - Preferences are not a kind of their own: they are parameters with defaults, or proposed
+     elements until someone confirms them. Revisit when a personal domain needs them.
+   - An exception is a pattern, not a new construct: an action such as `grant_exception`
+     (`requires: human`, `records_decision: true`) sets a flag on one target, and the rule reads
+     `<rule> or target.exception_approved`. How many exceptions pile up on a rule is an input to
+     the M4 proposals.
+
+## Follow-up work
+Each is its own PR, with tests:
+- `check_commit` counts proposed elements; `approve_commit` requires none (Resolved 1)
+- the reserved `rationale` parameter on decision actions (Resolved 2)
+- an optional evidence field on commits (Resolved 3)
+- `actor.principal` in checks, and `not-the-proposer` in `examples/paid-media/` using it (Resolved 4)
+- events for issued grants and role changes (Resolved 5)
+- the exception pattern in `examples/paid-media/` (Resolved 6)

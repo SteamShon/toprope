@@ -100,6 +100,11 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    member), through a new ADR superseding decision 29A for that case; an export to git can
    keep the audit trail (decided 2026-11-06). Until then the self domains keep their logs in
    git (`domains/<domain>/events/`).
+5. ADR-0041's follow-up work, one PR each (decided 2026-11-06): approval refuses commits with
+   proposed elements; a reserved `rationale` parameter on decision actions; an optional evidence
+   field on commits; `actor.principal` in checks; events for issued grants and role changes; the
+   exception pattern in `examples/paid-media/`. The first, second and fourth close the matching
+   *Left from reviews* items.
 
 ## Left from reviews
 

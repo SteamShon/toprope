@@ -22,7 +22,7 @@ had almost no problems in production. This is *observed* in the researcher's own
 
 ## Two graphs
 
-A domain keeps two kinds of knowledge apart (ADR-0041, proposed): the **world model** says what exists and what may
+A domain keeps two kinds of knowledge apart (ADR-0041): the **world model** says what exists and what may
 happen, and is enforced; the **context graph** says why it is so and what happened, and is not.
 The split follows kinds of knowledge that must not be mixed: an observation (what happened), a
 memory (its record), an interpretation or hypothesis (what it may mean), a preference (a
@@ -50,8 +50,8 @@ tendency that depends on conditions), a rule (a condition accepted as binding) a
 change, a commit on the domain's protected `main` that `approve_commit` merges, which only a
 person may take and which requires passing checks (ADR-0029, ADR-0033). Knowing a method, having
 adopted something as a default, and approving this one action are different things. Role holders
-and grants are issued at runtime, outside this rule. Author ≠ approver is not enforced yet
-(ADR-0041, Open).
+and grants are issued at runtime, outside this rule. Approval will refuse proposed elements, and author ≠ approver
+becomes declarable (ADR-0041, Resolved 1 and 4; not built yet).
 
 ## The three layers
 

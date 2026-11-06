@@ -138,7 +138,7 @@ the numbers, and a rule in the world model once it is approved. Most of the cont
 today as separate records (event logs, sources on every element, commits, approvals, check
 records); query tools over the event log are *planned* (M0b), and joining the rest into one
 graph has no plan yet. More:
-[`docs/how-it-works.md`](docs/how-it-works.md#two-graphs); the definition is ADR-0041 (proposed).
+[`docs/how-it-works.md`](docs/how-it-works.md#two-graphs); the definition is ADR-0041.
 
 ## What it gives you
 
