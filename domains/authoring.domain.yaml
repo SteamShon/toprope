@@ -38,7 +38,7 @@ objects:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: proposed
+    status: confirmed
   Question:
     description: A question in a stage's bundle, for the owner to answer.
     properties:
@@ -50,7 +50,7 @@ objects:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: proposed
+    status: confirmed
   Answer:
     description: The owner's answer, in their words; its decisions become proposed
       elements.
@@ -61,7 +61,7 @@ objects:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: proposed
+    status: confirmed
   Element:
     description: One part of the draft declaration (an object, action, cell, invariant...),
       proposed by an agent or confirmed by a person.
@@ -77,7 +77,7 @@ objects:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: proposed
+    status: confirmed
   DecisionRequest:
     description: A decision only a person may take, proposed with grounds and a recommendation
       and sent to that person's outbox.
@@ -99,7 +99,7 @@ objects:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: proposed
+    status: confirmed
   Commit:
     description: An immutable snapshot of the working copy on a branch.
     properties:
@@ -138,7 +138,7 @@ objects:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: proposed
+    status: confirmed
   Draft:
     description: 'The working copy of a domain''s declaration on a branch: what a
       commit snapshots.'
@@ -156,7 +156,7 @@ objects:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: proposed
+    status: confirmed
 links:
   question:
     from: Answer
@@ -167,7 +167,7 @@ links:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: proposed
+    status: confirmed
   element:
     from: DecisionRequest
     to: Element
@@ -176,7 +176,7 @@ links:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: proposed
+    status: confirmed
   parents:
     from: Commit
     to: Commit
@@ -185,7 +185,7 @@ links:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: proposed
+    status: confirmed
   origin:
     from: Element
     to: Source
@@ -194,7 +194,7 @@ links:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: proposed
+    status: confirmed
 actions:
   add_source:
     description: 'Add a source of raw material: code, records, transcripts or the
@@ -218,7 +218,7 @@ actions:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: proposed
+    status: confirmed
   fetch_source:
     description: Fetch a link source into a snapshot, once.
     actor:
@@ -233,7 +233,7 @@ actions:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: proposed
+    status: confirmed
   record_fetch:
     description: Record the fetched snapshot's hash.
     actor:
@@ -249,7 +249,7 @@ actions:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: proposed
+    status: confirmed
   ask_question:
     description: Ask a question of the current stage's bundle.
     actor:
@@ -264,7 +264,7 @@ actions:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: proposed
+    status: confirmed
   answer_question:
     description: Answer a question, in the person's own words.
     actor:
@@ -280,7 +280,7 @@ actions:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: proposed
+    status: confirmed
   propose_element:
     description: Propose a draft element that cites where it came from.
     actor:
@@ -295,7 +295,7 @@ actions:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: proposed
+    status: confirmed
   confirm_element:
     description: Confirm a drafted element. Only a person confirms.
     actor:
@@ -306,7 +306,7 @@ actions:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: proposed
+    status: confirmed
   mark_unknown:
     description: Mark an element as not known yet, instead of guessing.
     actor:
@@ -317,7 +317,7 @@ actions:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: proposed
+    status: confirmed
   request_decision:
     description: Ask the owner for a decision only a person may take, with grounds
       and a recommendation.
@@ -337,7 +337,7 @@ actions:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: proposed
+    status: confirmed
   decide:
     description: Decide a requested decision.
     actor:
@@ -354,7 +354,7 @@ actions:
     source:
       kind: record
       ref: records:docs/adr/0032-domain-knowledge-as-git-and-github.md#L38-L63
-    status: proposed
+    status: confirmed
   commit_draft:
     description: Snapshot the working copy as an immutable commit.
     actor:
@@ -369,7 +369,7 @@ actions:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: proposed
+    status: confirmed
   record_commit:
     description: Record the commit the kernel made.
     actor:
@@ -386,7 +386,7 @@ actions:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: proposed
+    status: confirmed
   check_commit:
     description: Run the change check on a commit.
     actor:
@@ -402,7 +402,7 @@ actions:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: proposed
+    status: confirmed
   record_check:
     description: Record the change check's result on the commit.
     actor:
@@ -421,7 +421,7 @@ actions:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: proposed
+    status: confirmed
   approve_commit:
     description: 'Approve a commit: merge it into main and tag it. Only a person approves.'
     actor:
@@ -440,7 +440,7 @@ actions:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: proposed
+    status: confirmed
     preconditions:
     - id: checks-pass
       check: target.checks_passed == true
@@ -466,7 +466,7 @@ actions:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: proposed
+    status: confirmed
   deliver:
     description: Ask Delivery to deliver an approved commit to an environment.
     actor:
@@ -484,7 +484,7 @@ actions:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L8
       quote: 20번, 21번 둘 다 추천대로 동의.
-    status: proposed
+    status: confirmed
 transitions:
   Source:
     field: stage
