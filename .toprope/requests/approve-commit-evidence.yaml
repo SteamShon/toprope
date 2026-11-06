@@ -1,7 +1,0 @@
-summary: Approve and deploy Authoring commit 5-c8fd1b8fc98be17c (commit_draft cites evidence, ADR-0041)
-steps:
-  - run: {member: authoring, action: approve_commit, target: 5-c8fd1b8fc98be17c,
-          params: {rationale: "ADR-0041 Resolved 3: a commit cites what the change rests on"}}
-  - run: {member: authoring, action: deliver, target: 5-c8fd1b8fc98be17c, params: {environment: local}}
-  - run: {member: delivery, action: preview, target: "authoring:5-c8fd1b8fc98be17c:local"}
-  - run: {member: delivery, action: deploy, target: "authoring:5-c8fd1b8fc98be17c:local"}
