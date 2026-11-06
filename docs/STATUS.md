@@ -70,8 +70,8 @@ command reference are generated.
 | 1. Execution protocol (ADR-0040); amended in 2a to run on the researcher's own Claude Code, on their machine | ✅ | #98 |
 | 2a. Harness core: each role a fresh `claude -p` with only the harness's confined tools; stop at the usage limit and resume; progress line; the NL and structured-spec arms; the NL skill's rendering. Tested with a fake model and a fake `claude` | ✅ | #100 |
 | 2b. The Toprope arm: a sandbox with fixed tools, the compiler's checks and a preview, the stand-in for person-only steps and its override of a failed check (the floors still hold). Tested on the real kernel | ✅ | #101 |
-| 2c. The probes: eight starting states built once per run with the approved tools (a small `library` domain), the same generic tools in every arm, the deployed domains' generated MCP in the Toprope arm; the probe agent never sees what a probe checks | 🟡 | #103 |
-| 3. The three arms' materials, reviewed side by side by the researcher | ⬜ | |
+| 2c. The probes: eight starting states built once per run with the approved tools (a small `library` domain), the same generic tools in every arm, the deployed domains' generated MCP in the Toprope arm; the probe agent never sees what a probe checks | ✅ | #103 |
+| 3. The three arms' materials (`experiments/m1/arms/`): structured and Toprope built from the approved commits, the NL skill rendered blind; reviewed side by side by the researcher | 🟡 | #105 |
 | 4. Scorer, tested with a synthetic key | ⬜ | |
 | 5. Dry run (changes 1–2), run by the researcher: time and usage per change | ⬜ | |
 | 6. Full run, scoring confirmed by the researcher, M1 report | ⬜ | |
@@ -118,6 +118,13 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    member), through a new ADR superseding decision 29A for that case; an export to git can
    keep the audit trail (decided 2026-11-06). Until then the self domains keep their logs in
    git (`domains/<domain>/events/`).
+
+5. Before M2's Phase B: a probe's starting state written as conditions on objects (for example
+   a Commit with `checks_passed` true and `approved` false), and generated from the declarations
+   by searching their actions for a way to reach it, instead of a hand-written setup per probe.
+   This needs a format change to the probe suite (an ADR). M1 keeps the hand-written setups in
+   `experiments/m1/phase_b/probes.py`, built only from the approved tools on a separate domain
+   (decided 2026-11-06).
 
 ## Left from reviews
 

@@ -4,7 +4,7 @@ Run it yourself, from `experiments/m1`, in an ordinary terminal (not inside an a
 which can read the repository):
 
   uv run python -m phase_b render --model M                      the NL arm's materials
-  uv run python -m phase_b sandbox                                the Toprope arm's materials
+  uv run python -m phase_b materials                              the structured and Toprope arms' materials
   uv run python -m phase_b arm nl --model M --seqs 1-2           the dry run, on one arm
   uv run python -m phase_b arm nl --model M                      every change; resumes a stopped run
   uv run python -m phase_b status                                 how far each arm got
@@ -269,8 +269,9 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     a.add_argument("--instruments", type=Path, default=INSTRUMENTS)
     a.add_argument("--no-probes", action="store_true",
                    help="skip the probes (not for a real run: ADR-0040 §6 runs all of them after every change)")
-    sb = sub.add_parser("sandbox", help="build the Toprope arm's materials from this repository")
-    sb.add_argument("--out", type=Path, default=M1 / "arms/toprope")
+    sb = sub.add_parser("materials", help="build the structured-spec and Toprope arms' materials from the "
+                        "approved self-domain commits (the NL arm's comes from `render`)")
+    sb.add_argument("--out", type=Path, default=M1 / "arms", help="writes OUT/structured and OUT/toprope")
     s = sub.add_parser("status", help="how far each arm got")
     s.add_argument("--out", type=Path, default=DEFAULT_OUT)
     args = ap.parse_args(argv)
@@ -278,8 +279,10 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     if args.cmd == "status":
         print(json.dumps(status(args.out), indent=2))
         return
-    if args.cmd == "sandbox":
-        print(json.dumps({"built": str(build_sandbox(ROOT, args.out))}))
+    if args.cmd == "materials":
+        print(json.dumps({"baseline": baseline(),
+                          "structured": str(export_toolchain(ROOT, args.out / "structured")),
+                          "toprope": str(build_sandbox(ROOT, args.out / "toprope"))}))
         return
     if backend is None:
         backend = make_backend(args)
@@ -311,7 +314,7 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
         got = {d: store.main(d).id for d in extra["baseline"]}
         if got != extra["baseline"]:
             raise SystemExit(f"the Toprope materials start from {got}, the repository from {extra['baseline']}: "
-                             "rebuild them with `sandbox`")
+                             "rebuild them with `materials`")
     arm = ARMS[args.arm](materials, work, backend, resume)
     m = run_arm(arm, work, [r for r in reqs if r["seq"] in chosen], backend, args.model or "unnamed",
                 args.instruments, extra, total=len(reqs), worlds=worlds)

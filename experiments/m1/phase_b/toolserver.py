@@ -25,6 +25,11 @@ class ToolSpec:
     root: str
     context: str = "{}"                 # JSON: what the kind's tools need besides the root
 
+    def __post_init__(self) -> None:
+        # The tools may run in another process and directory (the CLI backend's MCP server):
+        # a relative root would name a different, empty directory there.
+        object.__setattr__(self, "root", str(Path(self.root).resolve()))
+
     def dumps(self) -> str:
         return json.dumps(asdict(self))
 
