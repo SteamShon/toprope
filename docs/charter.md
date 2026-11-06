@@ -88,6 +88,12 @@ intelligence layer that proposes actions and an effect layer that performs them 
   **Domain Authoring** and **Domain Delivery** are the first domains modeled, joined by a
   typed handoff (ADR-0022). The tools for both are generated from those models and used on
   other domains.
+- **Your own Toprope process is a declaration.** Because Authoring and Delivery are declared
+  domains, not code, an organization can change how it authors and delivers domains by
+  changing those declarations: who reviews, how many approve, what must pass before a
+  deploy. Toprope is a framework: the **kernel** provides what every domain shares and the
+  rules no declaration can weaken (the deploy floor); each domain **declares** what varies;
+  the **tools are generated** from the declarations (ADR-0027, ADR-0037).
 - **Different from Foundry-style ontologies:** authoring is cheap, agents are first-class
   users, the domain evolves through operation, and it is light and open enough for small
   teams.
