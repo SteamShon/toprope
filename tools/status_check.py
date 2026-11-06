@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 STATUS = "docs/STATUS.md"
-SECTIONS = ("## Where we are", "## Done", "## In progress", "## Next", "## Open questions")
+SECTIONS = ("## Summary", "## Next", "## Left from reviews", "## Open questions")
 OPT_OUT = re.compile(r"^\s*STATUS\.md:\s*no change\s*[-–—:]\s*\S", re.IGNORECASE | re.MULTILINE)
 RELEASE_TITLE = re.compile(r"^Release\s+(\S+)\s*$")
 CLEANED = re.compile(r"Cleaned for release:\s*`?([^\s`]+)`?")
