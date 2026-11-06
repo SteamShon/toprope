@@ -55,7 +55,7 @@ A domain owner's workflow lives in people's heads; turning it into a declared do
 | `request_decision` | owner | creates **DecisionRequest**; params `element` (a Element), `subject` (string), `grounds` (string), `recommendation` (string) | — | — | — | `DecisionRequestCreated` |
 | `decide` 🔒 📝 | owner | **DecisionRequest**; params `choice` (string) | — | the stage (per the matrix); `target.choice` ← `params.choice` | — | `DecisionRequestDecide` |
 | `commit_draft` | owner | **Draft** | — | the stage (per the matrix) | kernel `commit` → `record_commit` | `DraftCommitDraft` |
-| `record_commit` | the kernel | creates **Commit**; params `seq` (integer), `content` (string), `interface` (string) | — | — | — | `CommitCreated` |
+| `record_commit` | the kernel | creates **Commit**; params `seq` (integer), `content` (string), `interface` (string), `domain` (string), `branch` (string), `author` (string) | — | `target.domain_id` ← `params.domain`, `target.branch` ← `params.branch`, `target.author` ← `params.author` | — | `CommitCreated` |
 | `check_commit` | owner | **Commit** | — | the stage (per the matrix) | kernel `change_check` → `record_check` | `CommitCheckCommit` |
 | `record_check` | the kernel | **Commit**; params `passed` (boolean), `summary` (string) | — | the stage (per the matrix); `target.checks_passed` ← `params.passed`, `target.failing` ← `params.summary` | — | `CommitRecordCheck` |
 | `approve_commit` 🔒 📝 | owner | **Commit** | `checks-pass`: Run the change check, and approve only a commit that passes it.; `not-approved`: Already approved; approve a newer commit. | the stage (per the matrix) | kernel `approve_commit` → `record_approval` | `CommitApproveCommit` |
@@ -70,6 +70,7 @@ A domain owner's workflow lives in people's heads; turning it into a declared do
 | `record_search` | the kernel | **Draft**; params `refs` (string, many) | — | the stage (per the matrix) | — | `DraftRecordSearch` |
 | `skip_stage` 🔒 | owner | **Draft**; params `stage` (string), `reason` (string) | — | the stage (per the matrix) | kernel `skip_stage` → `record_skip` | `DraftSkipStage` |
 | `record_skip` | the kernel | **Draft**; params `skipped` (boolean) | — | the stage (per the matrix) | — | `DraftRecordSkip` |
+| `open_draft` | owner | creates **Draft**; params `domain_id` (string), `declaration` (string), `branch` (string) | — | — | — | `DraftCreated` |
 
 ## Transitions
 
@@ -124,7 +125,7 @@ For each stage: may the action happen, and where does it lead? A missing cell is
 
 ## Examples and scenarios
 
-- 11 example object(s): Source `S-code`, Source `S-docs`, Question `Q1`, Answer `A1`, Element `E1`, Element `E2`, Element `E3`, DecisionRequest `DR1`, Draft `D1`, Commit `C1`, Commit `C2`
+- 12 example object(s): Source `S-code`, Source `S-docs`, Question `Q1`, Answer `A1`, Element `E1`, Element `E2`, Element `E3`, DecisionRequest `DR1`, Draft `D1`, Commit `C1`, Commit `C2`, Commit `C3`
 - scenario `approve-only-after-a-passing-check`: 5 step(s)
 - scenario `a-confirmed-element-is-not-unknown-again`: 2 step(s)
 - scenario `a-decision-is-taken-once`: 2 step(s)
@@ -170,6 +171,7 @@ Generated from the actions, their actors, the matrix and the kernel calls: for e
 
 ### Draft
 
+- **open_draft** by `owner` → `open`. Run: `toprope-run --domain authoring.domain.yaml open_draft NEW_ID --domain-id DOMAIN_ID --declaration DECLARATION --branch BRANCH`
 
 **In `open`:**
 
@@ -217,7 +219,7 @@ Generated from the actions, their actors, the matrix and the kernel calls: for e
 ## What is generated
 
 - **Command line** `toprope-run --domain authoring.domain.yaml ...`: one subcommand per action, with the same rules as every other surface (ADR-0036), plus `get`, `history`, `allowed` and `guide`.
-- **MCP server** `toprope:authoring`: one tool per action (26), plus `get_object`, `history`, `attempts`, `allowed_actions`, `describe_domain`, `world_map` and `how_to_reach`. Kernel replies (`record_fetch`, `record_commit`, `record_check`, `record_approval`, `record_proposal`, `record_confirmation`, `record_answer_ref`, `record_questions`, `record_search`, `record_skip`) are tools too, but only the kernel may take them.
-- **Events**: one per action (`AnswerCreated`, `AnswerRecordAnswerRef`, `CommitApproveCommit`, `CommitCheckCommit`, `CommitCreated`, `CommitDeliver`, `CommitRecordApproval`, `CommitRecordCheck`, `DecisionRequestCreated`, `DecisionRequestDecide`, `DraftCommitDraft`, `DraftNextQuestions`, `DraftRecordQuestions`, `DraftRecordSearch`, `DraftRecordSkip`, `DraftSearch`, `DraftSkipStage`, `ElementConfirmElement`, `ElementCreated`, `ElementMarkUnknown`, `ElementRecordConfirmation`, `ElementRecordProposal`, `QuestionCreated`, `SourceCreated`, `SourceFetchSource`, `SourceRecordFetch`); the current state is the events replayed in order.
+- **MCP server** `toprope:authoring`: one tool per action (27), plus `get_object`, `history`, `attempts`, `allowed_actions`, `describe_domain`, `world_map` and `how_to_reach`. Kernel replies (`record_fetch`, `record_commit`, `record_check`, `record_approval`, `record_proposal`, `record_confirmation`, `record_answer_ref`, `record_questions`, `record_search`, `record_skip`) are tools too, but only the kernel may take them.
+- **Events**: one per action (`AnswerCreated`, `AnswerRecordAnswerRef`, `CommitApproveCommit`, `CommitCheckCommit`, `CommitCreated`, `CommitDeliver`, `CommitRecordApproval`, `CommitRecordCheck`, `DecisionRequestCreated`, `DecisionRequestDecide`, `DraftCommitDraft`, `DraftCreated`, `DraftNextQuestions`, `DraftRecordQuestions`, `DraftRecordSearch`, `DraftRecordSkip`, `DraftSearch`, `DraftSkipStage`, `ElementConfirmElement`, `ElementCreated`, `ElementMarkUnknown`, `ElementRecordConfirmation`, `ElementRecordProposal`, `QuestionCreated`, `SourceCreated`, `SourceFetchSource`, `SourceRecordFetch`); the current state is the events replayed in order.
 - **World map** (`world-map.json`): every object, link, stage and (stage, action) edge.
 - **Harness**: passes; decided cells covered per level: model 93/93, execution 93/93, mcp 93/93; 0 finding(s).

@@ -40,8 +40,10 @@ def _base_parser(add_help: bool) -> argparse.ArgumentParser:
     ap.add_argument("--domain", help="one declaration (or --composition with --member)")
     ap.add_argument("--composition", help="a *.composition.yaml: every member wired in this process")
     ap.add_argument("--member", help="with --composition: the member whose actions these are")
-    ap.add_argument("--store", default="memory", help="with --domain: the event store (sqlite:FILE, postgres:DSN)")
-    ap.add_argument("--store-dir", help="with --composition: one SQLite store per member, <dir>/<member>.db")
+    ap.add_argument("--store", default=None, help="with --domain: the event store (memory, the default; sqlite:FILE, "
+                    "postgres:DSN, jsonl:DIR); with --composition, memory keeps nothing")
+    ap.add_argument("--store-dir", help="with --composition: one SQLite store per member, <dir>/<member>.db "
+                    "(default: each member's event log, <its directory>/events, kept in git)")
     ap.add_argument("--identity", help="git[:FILE] (your git email, looked up in FILE, default "
                     "toprope.identity.yaml; the default when that file is here), static:FILE or jwt")
     ap.add_argument("--token", help="your credential (default: TOPROPE_TOKEN)")
@@ -136,7 +138,7 @@ def _execution(args: Any, d: Domain) -> Execution:
     if args.composition:
         args.no_seed = not args.seed
         return _member(args, identity, services)
-    ex = Execution(d, open_store(args.store), identity, services=services)
+    ex = Execution(d, open_store(args.store or "memory"), identity, services=services)
     if args.seed:
         ex.seed_world()
     return ex

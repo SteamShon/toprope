@@ -427,11 +427,21 @@ actions:
         type: string
       interface:
         type: string
+      domain:
+        type: string
+      branch:
+        type: string
+      author:
+        type: string
+    effects:
+    - set:
+        target.domain_id: params.domain
+        target.branch: params.branch
+        target.author: params.author
     source:
-      kind: interview
-      ref: interview:domains/authoring/interview.jsonl#L5
-      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: confirmed
+      kind: record
+      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L26-L54
+    status: proposed
   check_commit:
     description: Run the change check on a commit.
     actor:
@@ -699,6 +709,23 @@ actions:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
     status: confirmed
+  open_draft:
+    description: Open a working copy of a domain's declaration on a branch, so it
+      can be interviewed, committed and checked.
+    actor:
+    - owner
+    creates: Draft
+    params:
+      domain_id:
+        type: string
+      declaration:
+        type: string
+      branch:
+        type: string
+    source:
+      kind: record
+      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L26-L54
+    status: proposed
 transitions:
   Source:
     field: stage
@@ -1008,6 +1035,15 @@ world:
       domain_id: authoring
       stage: recorded
       checks_passed: false
+  - Commit:
+      id: C3
+      seq: 3
+      content: e5f6
+      branch: work
+      interface: 1.2.0
+      domain_id: authoring
+      stage: recorded
+      checks_passed: true
 scenarios:
 - id: approve-only-after-a-passing-check
   given:
