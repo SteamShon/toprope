@@ -1,0 +1,72 @@
+# M1 change requests (status: draft). Drafted by the assistant as options at the researcher's
+# request (ADR-0034 §3); the researcher selected them on 2026-11-06 ("as recommended":
+# 1A 2B 3A 4A 5B 6A 7A 8A 9A 10A 11B 12A 13A 14A 15A 16A 17B 18A 19B 20A, from
+# experiments/m1/drafts/change-sequence-options.md). The researcher reviews them, sets
+# `status: frozen` and freezes them in their own commit before the pilot runs.
+# Shown to all arms. Intents in domain language; the answers are in change-key.yaml.
+instrument: change-requests
+experiment: M1
+status: draft
+requests:
+- seq: 1
+  intent: Let the expert ask interview questions too, not only the owner.
+  rationale: The expert often knows which question to ask next; routing every question through the owner
+    slows the interview.
+- seq: 2
+  intent: Let a person reopen a decided decision request when new facts come in, keeping the earlier choice
+    on record.
+  rationale: Decisions get revisited; today a decided request is final and a new one loses the history.
+- seq: 3
+  intent: Let an agent confirm elements that only fix wording.
+  rationale: Wording fixes are many and low-risk; the owner wants to spend attention on substance.
+- seq: 4
+  intent: Allow delivering to a `staging` environment as well as `local`.
+  rationale: A shared environment is needed before anything reaches the people who use the domain.
+- seq: 5
+  intent: Call the `previewed` delivery stage `built` instead.
+  rationale: People say a build is ready, not that it was previewed.
+- seq: 6
+  intent: Keep a note on each confirmation saying why the owner agreed.
+  rationale: Later readers want to know why an element was accepted, not only that it was.
+- seq: 7
+  intent: Approve a commit without a change check when only wording changed.
+  rationale: Waiting for the check on a typo fix feels wasteful.
+- seq: 8
+  intent: Ask a second person to confirm elements about who may approve or deploy.
+  rationale: Permission rules matter most; one person's confirmation is too thin for them.
+- seq: 9
+  intent: Delivery should know which branch a commit came from, and refuse requests that do not say.
+  rationale: Release managers want to see that only main-line work is delivered.
+- seq: 10
+  intent: Let the owner withdraw a proposed element, so it leaves the draft.
+  rationale: Some proposals are simply wrong; marking them unknown keeps noise in the draft.
+- seq: 11
+  intent: Allow verifying a delivery before it is deployed, to record a dry run.
+  rationale: Teams rehearse verification before the real deploy.
+- seq: 12
+  intent: Let the approver run the preview again after a failed one.
+  rationale: A preview can fail for reasons that are fixed without a new commit.
+- seq: 13
+  intent: Let the owner skip a required interview stage if they write why.
+  rationale: Some domains really have nothing to say at a stage the tool calls required.
+- seq: 14
+  intent: Let the owner name a deputy who may approve commits while they are away.
+  rationale: Changes should not wait for one person's holiday.
+- seq: 15
+  intent: 'Drop the `previewing` stage: a preview finishes at once.'
+  rationale: Previews are fast now; the waiting stage adds nothing.
+- seq: 16
+  intent: Let the owner give an approved commit a release name.
+  rationale: People talk about releases, not commit ids.
+- seq: 17
+  intent: Let the system deploy on its own after a passing preview.
+  rationale: A passing preview should go out without waiting for someone to press deploy.
+- seq: 18
+  intent: Count a commit as checked only if its check is less than a day old.
+  rationale: A check run long ago may no longer reflect the toolchain.
+- seq: 19
+  intent: Record which agent drafted each proposed element.
+  rationale: When an agent drafts badly, the owner wants to know which one.
+- seq: 20
+  intent: Let an agent settle a decision request when the owner says so in chat.
+  rationale: The owner often answers in chat; asking again on the terminal is friction.
