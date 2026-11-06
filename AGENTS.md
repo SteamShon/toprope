@@ -87,16 +87,24 @@ roadmap and the milestone and experiment docs. Other documents do not restate th
 state; they link here. The README claim-status table stays in the README, because its
 `Status` column follows the verdict rule above.
 
-- **Every PR into `develop` or an `umbrella/*` branch updates it**: move what the PR
-  finishes to Done, add what it starts to In progress, and change `Updated:`. A PR that
-  changes nothing there says so in its description with a line
-  `STATUS.md: no change - <reason>`.
+- **Its shape.** A *Summary* table with one row per milestone (✅ done, 🟡 in part, ⬜ not
+  started); a section per active milestone with an item table (item, status, PRs) and short
+  notes on how things work now; *Next*, numbered; *Left from reviews*; *Open questions*.
+- **Every PR into `develop` or an `umbrella/*` branch fixes any line it makes untrue**: an item
+  added, a status changed, its PR number filled in, a review leftover resolved (delete it),
+  and `Updated:` changed. A PR that changes nothing there says so in its description with a
+  line `STATUS.md: no change - <reason>`.
+- **Review leftovers.** What a review defers ("later", or a finding reported as skipped) goes
+  under *Left from reviews* with the PR and the review date, in the commit that addresses the
+  review. Leftovers from a PR's last review round go in the next PR that changes STATUS.md;
+  do not change a PR's head for that alone.
 - **CI enforces this.** `.github/workflows/status.yml` runs `tools/status_check.py` on every
-  PR. It also checks that the file keeps its sections: Where we are, Done, In progress,
-  Next, Open questions.
-- **Each release trims it.** In the cleanup PR before a release: remove Done items that the
-  release ships (the release PR description lists them), remove anything no longer true,
-  collapse finished sub-items into one line, and set `Cleaned for release: <name>`.
+  PR. It also checks that the file keeps its sections: Summary, Next, Left from reviews,
+  Open questions.
+- **Each release trims it.** In the cleanup PR before a release: collapse what the release
+  ships (the release PR description lists it) into one line per milestone, remove anything no
+  longer true, handle review leftovers older than one release (resolve, keep with a reason,
+  or drop), and set `Cleaned for release: <name>`.
 
 ## Project conventions every PR follows
 

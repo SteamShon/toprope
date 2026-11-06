@@ -10,10 +10,9 @@ check = status_check.check
 
 STATUS = """# Status
 Updated: 2026-11-06 · Cleaned for release: `v0.1.0`
-## Where we are
-## Done
-## In progress
+## Summary
 ## Next
+## Left from reviews
 ## Open questions
 """
 
@@ -83,3 +82,10 @@ def test_cli_exit_codes(tmp_path):
     assert status_check.main(args) == 1
     changed.write_text("src/x.py\ndocs/STATUS.md\n")
     assert status_check.main(args) == 0
+
+
+def test_status_keeps_its_review_leftovers_section():
+    """Items deferred in reviews are kept on the page until a PR resolves them."""
+    without = STATUS.replace("## Left from reviews\n", "")
+    errors = check("develop", "Add x", "", {"docs/STATUS.md"}, without)
+    assert errors == ["docs/STATUS.md is missing sections: ## Left from reviews."]
