@@ -32,7 +32,8 @@ class Editor(Backend):
         self.change, self.seen = change, None
 
     def converse(self, system, user, tools, transcript, max_turns=40):
-        self.seen = (system, user, tools)
+        import time
+        self.seen, self.started = (system, user, tools), time.monotonic()
         tl = {t.name: t for t in build_tools(tools)}
         decl = yaml.safe_load(tl["read_declaration"].fn(domain="delivery"))
         action = {k: v for k, v in decl["actions"]["verify"].items() if k not in ("source", "status")}
@@ -74,14 +75,16 @@ def test_a_passing_change_goes_through_the_declared_actions(materials, tmp_path)
     ed = Editor(lambda a: a.update(description="Verify the deployment in use."))
     arm = TopropeArm(materials, tmp_path / "w", ed)
     out = tmp_path / "w/seq-01"
+    import time
     edit = arm.edit(REQ, out)
+    ended = time.monotonic()
     assert "+    description: Verify the deployment in use." in edit.data["diff"]
+    assert edit.seconds < ended - ed.started + 0.5      # timed from the editor's start, not the bookkeeping's
     assert "Change request 1: An intent." in ed.seen[1]
     check = arm.check(REQ, out)
     (c,) = check.data["commits"].values()
     assert check.data["findings"] == [] and c["passed"] and c["preview"]["ok"]
     assert c["detail_passed"] and c["verdicts_agree"]
-    assert edit.seconds < 2                          # the editor's time, not the stand-in's bookkeeping
     deploy = arm.deploy(REQ, out)
     assert deploy.data["deployed"] and deploy.data["domains"]["delivery"]["path"] == "approved"
     assert arm.sb.env("delivery").current()["commit"] == c["commit"]
