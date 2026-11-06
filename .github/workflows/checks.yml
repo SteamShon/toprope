@@ -1,0 +1,25 @@
+name: checks
+
+# Runs the rules AGENTS.md lists as enforced by a check ("Rules and what enforces them"):
+# the test suite, and the frozen experiment instruments.
+on:
+  pull_request:
+  push:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync
+      - name: Tests (memory and SQLite stores)
+        run: uv run pytest -q
+      - name: Frozen instruments unchanged (amend records every change)
+        run: uv run python experiments/tools/instruments.py verify experiments/m1/instruments --run

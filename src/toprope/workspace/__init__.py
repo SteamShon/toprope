@@ -37,6 +37,7 @@ from ..sources import (
     SourceSpec,
     fetch,
     read,
+    stale,
 )
 
 CONFIG = "toprope.workspace.yaml"
@@ -180,6 +181,10 @@ class Workspace:
         if spec.kind == "interview-log" or source_id not in self._chunks:
             self._chunks[source_id] = read(spec, self.root, self.extra, self.exclude)
         return self._chunks[source_id]
+
+    def stale_sources(self) -> list[str]:
+        """Sources that no longer point at a file (a removed path, a glob matching nothing)."""
+        return [m for s in self.sources.values() for m in stale(s, self.root, self.exclude)]
 
     def list_sources(self) -> list[dict[str, Any]]:
         out = []
