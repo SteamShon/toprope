@@ -141,7 +141,8 @@ M4) are a separate stream of agent-execution records, linked to domain events by
 ## Stack (ADR-0007, ADR-0017)
 
 - Domain core: pure Python (`uv`), with no runtime imports.
-- `toprope-server`: Python (MCP + HTTP + query tools); it can also be imported as a library.
+- `toprope-server`: Python (MCP + HTTP; query tools from M0b); it can also be imported as a
+  library.
   `toprope-run`: the command line generated from a declaration (ADR-0036).
 - Event store: PostgreSQL in its own schema; SQLite and in-memory for tests; an append-only
   JSONL log kept in git for the self domains.

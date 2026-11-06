@@ -1,6 +1,7 @@
 # Charter
 
-Link: all. Version 1.0, 2026-11-04.
+Link: all. Version 1.0, 2026-11-04; edited 2026-11-06 (a link to the problem page, and the
+README's ground rules added to §7).
 
 ## 1. Problem
 
@@ -17,8 +18,8 @@ These workflows are implicit:
 - **Not accumulated.** Decisions are made in chats and meetings. Nothing structured links
   them to their inputs, so neither agents nor the organization can learn from them.
 
-Agents make this sharper: a system's safety was half in the machine and half in people's heads,
-and an agent that replaces the person takes the second half with it. The long form, with
+In our view, agents make this sharper: a system's safety was half in the machine and half in
+people's heads, and an agent that replaces the person takes the second half with it. The long form, with
 examples: [`problem.md`](problem.md).
 
 ## 2. What Toprope is

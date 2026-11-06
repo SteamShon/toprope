@@ -3,8 +3,9 @@
 Link: ① ② ③ ④ ⑤ (what the design must deliver). Why it exists is in
 [`problem.md`](problem.md); the design principles, claims and hypotheses are in
 [`charter.md`](charter.md). This page walks through the pieces. Layers, ports and pipelines in
-detail: [`architecture.md`](architecture.md). Everything here describes the design; what is
-built so far is in [`STATUS.md`](STATUS.md).
+detail: [`architecture.md`](architecture.md). Everything here describes the design. Where a
+part is not built yet, it says *planned* and names the milestone; the full picture is in
+[`STATUS.md`](STATUS.md).
 
 ## The bet
 
@@ -15,8 +16,8 @@ precisely enough, writing the code is nearly free.
 That last sentence comes from the researcher's experience building with DDD and coding
 agents. With a well-defined domain, a transition matrix and invariants, generated code that
 passes a harness checking **every allowed state transition**, not just a call graph, has
-had almost no problems in production. This is *observed, not measured*. Toprope exists to
-measure it.
+had almost no problems in production. This is *observed* in the researcher's own projects,
+*not measured*. It is link ③, a hypothesis until M2, and Toprope exists to measure it.
 
 ## The three layers
 
@@ -47,10 +48,11 @@ confirmed it. Agents only propose; humans confirm.
 One declaration compiles into:
 - an **MCP server** for agents, with typed actions whose descriptions and denial reasons
   come from the model
-- a **greenfield backend**: a domain API over an event store
-- a **UI** for people, generated from a separately versioned *representation* layer that
+- a **greenfield backend**: a domain API over an event store (*planned*, M0b)
+- a **UI** for people (*planned*, M0b), generated from a separately versioned *representation* layer that
   hosts can override with their own components
-- **read-only query tools** over the event history
+- **read-only query tools** over the event history (*planned*, M0b)
+- a **command line** (`toprope-run`) and a **guide** for people (built, ADR-0036)
 - a **harness** (below).
 
 ### 3. The harness checks the whole matrix ([`harness.md`](harness.md))
@@ -62,8 +64,8 @@ examples, the compiler generates:
   flows
 - the expert's own example flows.
 
-All of it runs against the model, the Execution gate, the MCP server, the UI and the
-adapters. The same test must give the same answer on every surface.
+Today it runs against the model and the Execution gate. Running the same tests against the
+MCP server, the UI and the adapters, with the same answer on every surface, is *planned* (M0b).
 
 ### 4. Change safely, and fast ([`change-check.md`](change-check.md))
 Every edit first gets an **impact report** in domain terms, before anything runs. For
@@ -73,7 +75,7 @@ checks the affected set for:
 - conflicting rules
 - example regressions
 - what past events would have done under the new rules
-- natural-language conflicts (warnings only).
+- natural-language conflicts (warnings only; the port exists, no checker is configured yet).
 
 The edit gets a **preview** to try before deploying. Only affected artifacts and tests are
 rebuilt, and everything else comes from a hash-keyed cache. The draft targets are an
@@ -84,8 +86,8 @@ Changes to a declaration are handled the way code is (ADR-0029, ADR-0032, ADR-00
 - a change is a **commit** on a branch, content-addressed, with a **semantic diff**: only
   elements that changed directly are reviewed again
 - the change check and the harness run on it, and their results are **recorded on the commit**
-- a review comment is an **interview question**; a review request is a **decision request** to
-  the person who may decide
+- a review comment is to become an **interview question**, and a review request a **decision
+  request** to the person who may decide (decided in ADR-0032; *planned*)
 - a person **approves by merging into `main`**; nobody approves their own change
 - **Delivery** points an environment at one approved commit on `main`, and the deploy floor
   requires a passing harness.
@@ -103,8 +105,8 @@ The compiler also emits a **world map**, a skill-tree view of the domain (ADR-00
 - Pick an actor and where an object stands. Unlocked actions light up, locked ones show
   exactly what would unlock them, and undecided cells sit in fog.
 - Agents get the same map through MCP (`world_map`, `how_to_reach`).
-- Every impact report includes the map diff: what a change newly unlocks or locks, and for
-  whom.
+- Every impact report is to include the map diff: what a change newly unlocks or locks, and
+  for whom (*planned*, M0b).
 
 ```mermaid
 stateDiagram-v2
@@ -231,14 +233,16 @@ Full schema: [`domain-schema.md`](domain-schema.md).
 
 ## How it differs
 
-| | Natural-language skills (`SKILL.md`, `AGENTS.md`) | Ontology platforms | Toprope |
-|---|---|---|---|
-| Who authors | anyone, in prose | engineers, often deployed on site | domain experts through an interview, with agents drafting |
-| Conflicts found | after deployment | at build time, by engineers | at compile time, reported in domain terms |
-| Behavior verified | not mechanically | per project | designed to check every matrix cell and invariant on every surface |
-| Cost of a change | a text edit, unchecked | an engineering project | an edit, an impact report, a preview |
-| Agents | read text and hope | integrate via APIs | first-class users via generated MCP |
-| Decisions | lost in chat | varies | event-sourced and queryable |
+Our reading of the alternatives, in broad strokes:
+
+| | Natural-language skills (`SKILL.md`, `AGENTS.md`) | Rules engines, BPMN/DMN, policy-as-code | Ontology platforms | Toprope (design) |
+|---|---|---|---|---|
+| Who authors | anyone, in prose | engineers | engineers, often deployed on site | domain experts through an interview, with agents drafting |
+| Conflicts found | after deployment | in tests of the rule set | at build time, by engineers | at compile time, reported in domain terms |
+| Behavior verified | not mechanically | per rule set | per project | designed to check every matrix cell and invariant on every surface |
+| Cost of a change | a text edit, unchecked | a code change | an engineering project | an edit, an impact report, a preview |
+| Agents | read text and hope | call it as a decision service | integrate via APIs | first-class users via generated MCP |
+| Decisions | lost in chat | decision logs, varies | varies | event-sourced and queryable |
 
 ## Where it fits, and where it does not
 
