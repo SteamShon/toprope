@@ -7,6 +7,7 @@ __pycache__/
 # approvals and check records are decisions, shared and audited through git (decided 2026-11-06).
 .toprope/*
 !.toprope/commits/
+!.toprope/requests/
 .toprope/commits/**/.lock
 .toprope/commits/**/.obj-*
 .toprope/commits/**/.refs-*

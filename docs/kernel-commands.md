@@ -17,7 +17,7 @@ Its subcommands are the domain's actions, one per action, plus `get`, `history`,
 | `--member` `MEMBER` | with --composition: the member whose actions these are |
 | `--store` `STORE` | with --domain: the event store (memory, the default; sqlite:FILE, postgres:DSN, jsonl:DIR); with --composition, memory keeps nothing |
 | `--store-dir` `STORE_DIR` | with --composition: one SQLite store per member, <dir>/<member>.db (default: each member's event log, <its directory>/events, kept in git) |
-| `--identity` `IDENTITY` | git[:FILE] (your git email, looked up in FILE, default toprope.identity.yaml; the default when that file is here), static:FILE or jwt |
+| `--identity` `IDENTITY` | git[:FILE] (your git email, looked up in FILE, default toprope.identity.yaml; the default when that file is here), github[:FILE] (the approver of a GitHub run, ADR-0039), static:FILE or jwt |
 | `--token` `TOKEN` | your credential (default: TOPROPE_TOKEN) |
 | `--kernel-root` `KERNEL_ROOT` | run declared kernel-service effects on files under this directory |
 | `--workspace` `WORKSPACE` | authoring workspace, for the source services |

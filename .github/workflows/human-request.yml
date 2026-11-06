@@ -1,0 +1,105 @@
+name: human-request
+
+# A human request (ADR-0039): steps only the researcher may take, written as
+# .toprope/requests/<id>.yaml on a work branch. `plan` validates the request and shows it on
+# this run's page; `act` waits until the researcher approves the run (environment
+# `researcher`, required reviewer), then runs the steps as the approver and pushes the
+# result to the branch.
+on:
+  push:
+    branches-ignore: [main, develop]
+    paths: [".toprope/requests/*.yaml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: human-request-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      request: ${{ steps.find.outputs.request }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Find the request
+        id: find
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if git cat-file -e "$BEFORE" 2>/dev/null; then range="$BEFORE..$GITHUB_SHA"; else range="$GITHUB_SHA~1..$GITHUB_SHA"; fi
+          git diff --name-only --diff-filter=AM "$range" -- '.toprope/requests/*.yaml' > "$RUNNER_TEMP/requests.txt"
+          n=$(wc -l < "$RUNNER_TEMP/requests.txt")
+          if [ "$n" -ne 1 ]; then echo "push exactly one new or changed request (found $n)"; cat "$RUNNER_TEMP/requests.txt"; exit 1; fi
+          echo "request=$(cat "$RUNNER_TEMP/requests.txt")" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check it and show it
+        env:
+          REQUEST: ${{ steps.find.outputs.request }}
+        run: |
+          pip install --quiet pyyaml
+          python tools/human_request.py check "$REQUEST"
+          python tools/human_request.py render "$REQUEST" >> "$GITHUB_STEP_SUMMARY"
+          echo "Commit: \`$GITHUB_SHA\`. Approve this run to take these steps as yourself." >> "$GITHUB_STEP_SUMMARY"
+
+  act:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: researcher
+    permissions:
+      contents: write
+      actions: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}          # exactly what `plan` showed
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v6
+      - name: Who approved
+        id: who
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          login=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/approvals" \
+            --jq '[.[] | select(.state == "approved")] | last | .user.login')
+          if [ -z "$login" ] || [ "$login" = "null" ]; then echo "no approval found"; exit 1; fi
+          echo "login=$login" >> "$GITHUB_OUTPUT"
+      - name: Take the steps as the approver
+        env:
+          REQUEST: ${{ needs.plan.outputs.request }}
+          APPROVER: ${{ steps.who.outputs.login }}
+        run: |
+          uv sync --quiet
+          uv run python tools/human_request.py run "$REQUEST" --approver "$APPROVER" > "$RUNNER_TEMP/done.json"
+          cat "$RUNNER_TEMP/done.json"
+      - name: Commit and push
+        env:
+          REQUEST: ${{ needs.plan.outputs.request }}
+          APPROVER: ${{ steps.who.outputs.login }}
+          BRANCH: ${{ github.ref_name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          summary=$(uv run python -c "import sys,yaml; print(yaml.safe_load(open(sys.argv[1]))['summary'])" "$REQUEST")
+          person=$(uv run python -c "import json,sys; print(json.load(open(sys.argv[1]))['as'])" "$RUNNER_TEMP/done.json")
+          git rm --quiet "$REQUEST"
+          git add -A
+          git -c user.name="toprope-human-request" -c user.email="actions@users.noreply.github.com" \
+            commit --quiet --author "$person" -m "$summary" \
+            -m "Approved-by: $APPROVER (GitHub environment review)" -m "Approval: $RUN_URL"
+          git push origin "HEAD:refs/heads/$BRANCH"     # a fast-forward of the approved commit, or nothing
+      - name: Run the status check on the new head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          pr=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$pr" ]; then gh workflow run status.yml --ref "$BRANCH" -f pr="$pr"; fi

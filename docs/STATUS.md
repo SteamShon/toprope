@@ -73,6 +73,9 @@ command reference are generated.
   that require a person also ask on your terminal: a guard against mistakes, not a boundary.
 - `toprope-run` reports what a command set off (`then`): each kernel call, its reply, the
   object a creating reply made (for example the new commit's id), and each handoff.
+- From a cloud session, the researcher's own steps (freeze, confirm, approve, deploy) are
+  committed as a human request and run after the researcher approves the run in GitHub
+  (ADR-0039, #95); the environment `researcher` must be set up once.
 - Approving a change is `commit_draft`, `check_commit`, `approve_commit` (there is no `ship`
   shortcut any more); `confirm_all_proposed` confirms every proposed element at once. Reads
   are `toprope-commits` (branches, log, diff, checks, deployed).
