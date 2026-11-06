@@ -719,4 +719,4 @@ class Workspace:
         return out
 
 
-__all__ = ["AuthoringError", "CONFIG", "Question", "Workspace"]
+__all__ = ["CONFIG", "AuthoringError", "Question", "Workspace"]

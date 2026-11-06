@@ -2,8 +2,8 @@
 import json
 
 import yaml
-
 from test_decl import schema_doc_domain
+
 from toprope.kernel.services import LocalKernel
 from toprope.workspace import Workspace
 
