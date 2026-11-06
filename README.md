@@ -64,8 +64,8 @@ actions:
     requires: human
     preconditions:
       - id: not-the-proposer
-        check: target.proposed_by != actor.id
-        reason: Whoever proposed a change cannot approve it.
+        check: target.proposed_by != actor.principal.id    # the agent's person, or the person
+        reason: Whoever proposed a change, or had their agent propose it, cannot approve it.
 ```
 
 | Who | Asks | Result |
@@ -171,8 +171,6 @@ description of the workflow.
 ## Limits
 
 - It covers only actions that go through it.
-- A declaration cannot yet see whose agent acted, so a person could approve a change their own
-  agent proposed ([`docs/STATUS.md`](docs/STATUS.md), *Left from reviews*).
 - It says whether an action was *allowed*, not whether the rules are right or a decision was good.
 - None of the claims below is tested yet.
 
