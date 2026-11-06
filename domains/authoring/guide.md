@@ -54,7 +54,7 @@ A domain owner's workflow lives in people's heads; turning it into a declared do
 | `mark_unknown` | owner, expert | **Element** | — | the stage (per the matrix) | — | `ElementMarkUnknown` |
 | `request_decision` | owner | creates **DecisionRequest**; params `element` (a Element), `subject` (string), `grounds` (string), `recommendation` (string) | — | — | — | `DecisionRequestCreated` |
 | `decide` 🔒 📝 | owner | **DecisionRequest**; params `choice` (string), `rationale` (string, optional) | — | the stage (per the matrix); `target.choice` ← `params.choice` | — | `DecisionRequestDecide` |
-| `commit_draft` | owner | **Draft** | — | the stage (per the matrix) | kernel `commit` → `record_commit` | `DraftCommitDraft` |
+| `commit_draft` | owner | **Draft**; params `evidence` (string, many, optional) | — | the stage (per the matrix) | kernel `commit` → `record_commit` | `DraftCommitDraft` |
 | `record_commit` | the kernel | creates **Commit**; params `seq` (integer), `content` (string), `interface` (string), `domain` (string), `branch` (string), `author` (string) | — | `target.domain_id` ← `params.domain` | — | `CommitCreated` |
 | `check_commit` | owner | **Commit** | `not-approved`: An approved commit passed its check; check a new commit instead. | the stage (per the matrix) | kernel `change_check` → `record_check` | `CommitCheckCommit` |
 | `record_check` | the kernel | **Commit**; params `passed` (boolean), `summary` (string) | — | the stage (per the matrix); `target.checks_passed` ← `params.passed`, `target.failing` ← `params.summary` | — | `CommitRecordCheck` |

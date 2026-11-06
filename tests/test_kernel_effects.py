@@ -326,3 +326,12 @@ def test_an_optional_service_input_may_be_left_out_or_null():
     assert not [i for i in validate_domain(Domain.model_validate(raw)) if i.code == "missing-input"]
     raw["actions"]["commit_draft"]["effects"][0]["with"]["evidence"] = "params.evidence"
     assert not [i for i in validate_domain(Domain.model_validate(raw)) if i.code in ("missing-input", "unknown-input")]
+    from toprope.semantics import Actor, Command, Interpreter
+    it = Interpreter(Domain.model_validate(raw))
+    owner = Actor("ana", "person", ("owner",))
+    state = {"id": "D", "declaration": "d.domain.yaml", "status": "open"}
+    for params, want in (({"evidence": ["records:docs/x.md#L1-L2", "event:E-1#4"]}, ["records:docs/x.md#L1-L2", "event:E-1#4"]),
+                         ({}, None)):                    # a list of strings, or left out (null)
+        dec = it.decide(Command(owner, "commit_draft", "D", params), state, lambda *_: None)
+        req = next(e for e in dec.events if e.type == "EffectRequested")
+        assert req.payload["error"] is None and req.payload["inputs"]["evidence"] == want

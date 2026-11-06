@@ -100,14 +100,15 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    member), through a new ADR superseding decision 29A for that case; an export to git can
    keep the audit trail (decided 2026-11-06). Until then the self domains keep their logs in
    git (`domains/<domain>/events/`).
-5. ADR-0041's follow-up work, one PR each (decided 2026-11-06), in
-   `umbrella/adr-0041-follow-ups` from the third on. Done: approval refuses commits with
-   proposed elements, and the change check records how many are left; every decision action
-   takes an optional `rationale`, stored with the decision; a check can read `actor.principal`;
-   `examples/paid-media/` shows the exception pattern; every event records the permissions it
-   ran under. Left: an optional evidence field on commits (it changes the Authoring
-   declaration, so it goes through the self domains' own loop and needs the researcher's
-   approval).
+5. ADR-0041's follow-up work (decided 2026-11-06), the third on in
+   `umbrella/adr-0041-follow-ups` (#114). Done: approval refuses commits with proposed
+   elements, and the change check records how many are left (#110); every decision action takes
+   an optional `rationale` (#111); a check can read `actor.principal` (#113);
+   `examples/paid-media/` shows the exception pattern (#115); every event records the
+   permissions it ran under (#116); a commit may cite its evidence (#117), and Authoring's
+   `commit_draft` passes it, changed through the self domains' own loop and approved and
+   deployed by the researcher in GitHub (#118: commit `5-c8fd1b8fc98be17c`, deployed and
+   verified).
 
 ## Left from reviews
 

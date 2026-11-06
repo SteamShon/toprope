@@ -93,6 +93,8 @@ def _of_type(v: Any, t: str) -> bool:
         return isinstance(v, int) and not isinstance(v, bool)
     if t == "number":
         return isinstance(v, (int, float)) and not isinstance(v, bool)
+    if t == "strings":
+        return isinstance(v, list) and all(isinstance(x, str) for x in v)
     return isinstance(v, str)
 
 
