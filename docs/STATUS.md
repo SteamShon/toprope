@@ -97,12 +97,11 @@ each into `umbrella/pstack-lessons`. Each sub-PR changes only its own item below
   It is left for the researcher to review and freeze before any arm runs. Its four questions
   need answers first (#123)
 
-- ✅ 3. Commits cite evidence, with how strong it is (ADR-0041 follow-up). The kernel's
+- 🟡 3. Commits cite evidence, with how strong it is (ADR-0041 follow-up). Done: the kernel's
   `cite_evidence` refuses a ref that does not resolve (an interview line, a source chunk, a
-  check recorded on the commit, or a stored event) and records its strength (pointed, ran or
-  observed); `toprope-commits evidence` lists it (`docs/commits.md`). The Authoring declaration
-  calls it through the loop: proposed by the agent, confirmed and approved by the researcher
-  (human requests, Authoring `main` is `6-7a576971f3e73bb4`); the agent's grant includes it (#124)
+  check recorded on the commit, or a stored event) and records its strength
+  (pointed, ran or observed); `toprope-commits evidence` lists it (`docs/commits.md`). Left: an
+  Authoring action that calls it, proposed through the loop for the owner to confirm (#124)
 
 - ⬜ 4. World map state charts mark where the harness found a break, and draw minimal flows
 
@@ -127,12 +126,15 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    member), through a new ADR superseding decision 29A for that case; an export to git can
    keep the audit trail (decided 2026-11-06). Until then the self domains keep their logs in
    git (`domains/<domain>/events/`).
-5. ADR-0041's follow-up work, one PR each (decided 2026-11-06). Done: approval refuses commits
-   with proposed elements, and the change check records how many are left; every decision
-   action takes an optional `rationale`, stored with the decision; commits cite evidence
-   (pstack umbrella, item 3). Left: `actor.principal` in checks; events for issued grants and role changes;
-   the exception pattern in `examples/paid-media/`. `actor.principal` closes the matching *Left
-   from reviews* item.
+5. ADR-0041's follow-up work (decided 2026-11-06), the third on in
+   `umbrella/adr-0041-follow-ups` (#114). Done: approval refuses commits with proposed
+   elements, and the change check records how many are left (#110); every decision action takes
+   an optional `rationale` (#111); a check can read `actor.principal` (#113);
+   `examples/paid-media/` shows the exception pattern (#115); every event records the
+   permissions it ran under (#116); a commit may cite its evidence (#117), and Authoring's
+   `commit_draft` passes it, changed through the self domains' own loop and approved and
+   deployed by the researcher in GitHub (#118: commit `5-c8fd1b8fc98be17c`, deployed and
+   verified).
 
 ## Left from reviews
 
@@ -143,10 +145,6 @@ it; each release's cleanup PR handles items older than one release.
   person approves (`requires: human`) a commit whose checks passed. Charter §5 says "no
   self-approval"; ADR-0032 keeps one approver in M1. Decide whether to enforce author ≠
   approver before M2, when a domain gets more than one owner (#102, 2026-11-06)
-- A declaration cannot see whose agent acted: `actor` in a check carries only the actor's own
-  id and roles, not `on_behalf_of`. So `target.proposed_by != actor.id` does not stop a person
-  from approving a change their own agent proposed (`examples/paid-media/`; found writing the
-  example, 2026-11-06)
 - `then` in `toprope-run` reads only the target's stream, so a call or handoff set off on
   another stream (for example by a newly created object) is not shown (#86, 2026-11-06)
 - The effect-resolution summary is written twice, in `toprope-run` (`followed`) and in the
@@ -154,10 +152,6 @@ it; each release's cleanup PR handles items older than one release.
 - Neither the validator nor the harness catches a creating action that leaves a required
   property unset (`record_commit` made Commits without `domain_id`; found running the loop)
   (#86, 2026-11-06)
-- `propose_element` writes an element even when it makes the declaration invalid (an action
-  whose `reply` is not declared yet); `toprope-run` then cannot load the composition at all, so
-  no further action can fix it. Propose in dependency order until the proposal is refused
-  instead (#124, 2026-11-06)
 - `propose_element` on a path that is not an element (for example `glossary.<term>`) writes the
   value without provenance instead of failing (#86, 2026-11-06)
 - `toprope-run` reads `git config` twice per command (once to check the caller, once in

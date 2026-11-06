@@ -63,6 +63,7 @@ class Event:
     thread_id: str | None = None
     run_id: str | None = None
     causation: str | None = None   # the handoff id that caused it (linked in both domains)
+    permissions: dict[str, Any] | None = None   # what the action ran under (ADR-0041, Resolved 5)
 
 
 Status = Literal["ok", "denied", "rejected", "pending"]

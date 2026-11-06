@@ -24,6 +24,8 @@ def complete(svc: Service, result: dict[str, Any]) -> dict[str, Any]:
     return full
 
 
+APPROVAL_RUNS = ".toprope/approval-runs.jsonl"   # written by tools/human_request.py (ADR-0039)
+
 _CALLER: ContextVar[dict[str, Any] | None] = ContextVar("kernel_caller", default=None)
 
 
@@ -40,7 +42,7 @@ class KernelServices(ABC):
         svc = CATALOG.get(service)
         if svc is None:
             raise KeyError(f"no kernel service {service!r}")
-        missing = [i for i in svc.inputs if i not in inputs]
+        missing = [i for i in svc.required() if i not in inputs]
         if missing:
             return svc.failure(f"missing inputs {missing}")
         if "approver" in svc.inputs:
@@ -48,7 +50,7 @@ class KernelServices(ABC):
                 return svc.failure(f"{service} records a person's decision: the calling person must be the approver")
         token = _CALLER.set(caller)
         try:
-            return complete(svc, self.run(service, {k: inputs[k] for k in svc.inputs}))
+            return complete(svc, self.run(service, {k: inputs[k] for k in svc.inputs if k in inputs}))
         except Exception as e:   # a failure still replies: the declaration decides what it means
             return svc.failure(f"{type(e).__name__}: {e}")
         finally:
@@ -181,8 +183,9 @@ class LocalKernel(KernelServices):
         return {"skipped": True}
 
     # -- commits (ADR-0029) -----------------------------------------------------------------
-    def _commit(self, declaration):
-        c, created = self.commits.commit(self._path(declaration), author=str((self.caller or {}).get("id") or ""))
+    def _commit(self, declaration, evidence=None):
+        c, created = self.commits.commit(self._path(declaration), author=str((self.caller or {}).get("id") or ""),
+                                         evidence=list(evidence or []))
         base = self.commits.review_base(c.domain, c.id)      # ADR-0033
         review = self.commits.diff(c.domain, base, c.id)["to_review"] if created else []
         approved = self.commits.latest_approved(c.domain)
@@ -207,8 +210,20 @@ class LocalKernel(KernelServices):
                     raise RuntimeError(f"{domain} is not deployed here: no events to cite")
                 if not stream or not version.isdigit() or not 1 <= int(version) <= store.version(stream):
                     raise ValueError(f"no event {ref!r}: give <stream>@<version> of a stored event")
+        elif kind == "approval-run":
+            self._approval_run(ref)
         e = self.commits.cite(domain, commit, kind, ref, by=str((self.caller or {}).get("id") or ""))
         return {"strength": e["strength"]}
+
+    def _approval_run(self, url):
+        """A GitHub Actions run that approved a human request (ADR-0039). The workflow records
+        each approved run in `.toprope/approval-runs.jsonl` with the result it pushes, so the
+        record survives a squash merge."""
+        import json
+        log = self.root / APPROVAL_RUNS
+        runs = {json.loads(x).get("run") for x in log.read_text().splitlines() if x.strip()} if log.exists() else set()
+        if url not in runs:
+            raise ValueError(f"no approved human request ran as {url!r} ({APPROVAL_RUNS})")
 
     def run(self, service, inputs):
         if service == "diff":   # `from` is a Python keyword

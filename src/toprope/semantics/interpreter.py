@@ -93,6 +93,8 @@ def _of_type(v: Any, t: str) -> bool:
         return isinstance(v, int) and not isinstance(v, bool)
     if t == "number":
         return isinstance(v, (int, float)) and not isinstance(v, bool)
+    if t == "strings":
+        return isinstance(v, list) and all(isinstance(x, str) for x in v)
     return isinstance(v, str)
 
 
@@ -117,9 +119,38 @@ class Interpreter:
             self._parsed[src] = parse(src)
         return self._parsed[src]
 
-    def _env(self, target: Any, actor: Actor | None, params: dict[str, Any], new: Any = None) -> Env:
-        return Env({"target": target, "actor": actor.as_env() if actor else None,
-                    "params": params, "new": new}, clock=self.clock)
+    def _env(self, target: Any, actor: Actor | None, params: dict[str, Any], new: Any = None,
+             principal: Actor | None = None) -> Env:
+        """`actor.principal` is whom the actor answers for (ADR-0041, Resolved 4): an agent's
+        principal, or the actor itself, so a rule can say "not the proposer, nor their agent"."""
+        env = None
+        if actor is not None:
+            env = actor.as_env()
+            who = principal if principal is not None and actor.kind == "agent" else actor
+            env["principal"] = {k: v for k, v in who.as_env().items() if k in ("id", "kind", "roles", "role")}
+        return Env({"target": target, "actor": env, "params": params, "new": new}, clock=self.clock)
+
+    @staticmethod
+    def _permissions(cmd: Command) -> dict[str, Any] | None:
+        """The permissions in force when the command ran: the actor's roles, the principal's,
+        and the grant's scope. Toprope does not issue them (the Identity port does, ADR-0016), so
+        it records them with what they allowed; a changed role or a new grant shows as a
+        difference between events (ADR-0041, Resolved 5)."""
+        if cmd.actor is None:
+            return None
+        out: dict[str, Any] = {"roles": list(cmd.actor.roles)}
+        if cmd.on_behalf_of is not None:
+            out["principal_roles"] = list(cmd.on_behalf_of.roles)
+        if cmd.grant is not None:
+            g = cmd.grant
+            out["grant"] = {"id": g.id, "actions": sorted(g.actions),
+                            "targets": sorted(g.targets) if g.targets is not None else None,
+                            "expires_at": g.expires_at.isoformat() if g.expires_at else None}
+        return out
+
+    @staticmethod
+    def _principal(cmd: Command) -> Actor | None:
+        return cmd.on_behalf_of if cmd.actor.kind == "agent" else None
 
     def _rule_ok(self, rule: str | ActorRule, actor: Actor, view: Any, params: dict) -> bool:
         role = rule.role if isinstance(rule, ActorRule) else rule
@@ -211,7 +242,7 @@ class Interpreter:
         meta = dict(at=at, actor=cmd.actor.ref(), domain_version=d.version,
                     on_behalf_of=cmd.on_behalf_of.ref() if cmd.on_behalf_of else None,
                     grant=cmd.grant.id if cmd.grant else None, thread_id=cmd.thread_id, run_id=cmd.run_id,
-                    causation=cmd.causation)
+                    causation=cmd.causation, permissions=self._permissions(cmd))
         stream = cmd.target or ""
 
         def deny(code: str, reason: str) -> Decision:
@@ -242,7 +273,7 @@ class Interpreter:
 
         for pre in action.preconditions:                                                    # step 6
             try:
-                passed = evaluate(self._expr(pre.check), self._env(view, cmd.actor, cmd.params)) is True
+                passed = evaluate(self._expr(pre.check), self._env(view, cmd.actor, cmd.params, principal=self._principal(cmd))) is True
             except EvalError as e:
                 return deny(pre.id, f"{pre.reason} (could not evaluate: {e})")
             if not passed:
@@ -273,7 +304,7 @@ class Interpreter:
                 attr = key.split(".", 1)[1] if key.startswith(("target.", "new.")) else key
                 if isinstance(value, str):
                     try:
-                        value = evaluate(self._expr(value), self._env(view, cmd.actor, cmd.params))
+                        value = evaluate(self._expr(value), self._env(view, cmd.actor, cmd.params, principal=self._principal(cmd)))
                     except EvalError as e:
                         return Decision(Outcome("rejected", "effect-error", f"{key}: {e}", state), (), ())
                 if isinstance(value, datetime):
@@ -310,11 +341,13 @@ class Interpreter:
                 continue
             payload: dict[str, Any] = {"service": eff.call, "reply": eff.reply, "index": k, "inputs": {}, "error": None}
             try:
-                env = self._env(view, cmd.actor, cmd.params)
+                env = self._env(view, cmd.actor, cmd.params, principal=self._principal(cmd))
                 payload["inputs"] = {i: evaluate(self._expr(src), env) for i, src in eff.with_.items()}
                 svc = CATALOG.get(eff.call)
                 for i, v in payload["inputs"].items():
                     want = svc.inputs.get(i) if svc else None
+                    if v is None and svc and i in svc.optional:
+                        continue
                     if want and not _of_type(v, want):
                         raise EvalError(f"input '{i}' must be a {want}, got {v!r}")
             except EvalError as e:
@@ -337,7 +370,7 @@ class Interpreter:
             payload: dict[str, Any] = {"handoff": name, "to": h.to.model_dump(), "origin": origin,
                                        "target": None, "params": {}, "error": None}
             try:
-                env = self._env(view, cmd.actor, cmd.params)
+                env = self._env(view, cmd.actor, cmd.params, principal=self._principal(cmd))
                 target = evaluate(self._expr(h.target), env)
                 if not isinstance(target, str) or not target:
                     raise EvalError(f"target must be a non-empty string, got {target!r}")
@@ -372,6 +405,7 @@ class Interpreter:
                    actor=a.ref() if a else None, domain_version=self.d.version,
                    on_behalf_of=cmd.on_behalf_of.ref() if cmd.on_behalf_of else None,
                    grant=cmd.grant.id if cmd.grant else None, thread_id=cmd.thread_id, run_id=cmd.run_id,
+                   permissions=self._permissions(cmd),
                    payload=copy.deepcopy({"action": cmd.action, "code": code, "reason": reason, "params": cmd.params}))
         return Decision(Outcome("denied", code, reason, copy.deepcopy(state)), (), (ev,))
 
@@ -427,7 +461,7 @@ class Interpreter:
                 if any(p.root == "params" for p in paths_read(self._expr(pre.check))):
                     continue
                 try:
-                    ok = evaluate(self._expr(pre.check), self._env(view, actor, {})) is True
+                    ok = evaluate(self._expr(pre.check), self._env(view, actor, {}, principal=on_behalf_of)) is True
                 except EvalError:
                     ok = False
                 if not ok:

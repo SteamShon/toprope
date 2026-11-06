@@ -344,3 +344,18 @@ def test_target_of_another_type_is_not_found():
     m = model()
     assert do(m, ANA, "approve_experiment", "H1").code == "not-found"
     assert m.store.version("H1") == 1
+
+
+# -- ADR-0041 Resolved 4: actor.principal ------------------------------------------------------
+def test_actor_principal_is_the_agents_principal_or_the_actor_itself():
+    from toprope.semantics import Actor, Interpreter
+    from test_decl import schema_doc_domain
+    from toprope.decl import Domain
+    it = Interpreter(Domain.model_validate(schema_doc_domain()))
+    ana = Actor("ana", "person", ("approver",))
+    bot = Actor("bot", "agent", ("approver",))
+    env = lambda a, p=None: it._env({}, a, {}, principal=p).roots["actor"]            # noqa: E731
+    assert env(ana)["principal"]["id"] == "ana"
+    assert env(bot, ana)["principal"] == {"id": "ana", "kind": "person", "roles": ["approver"], "role": "approver"}
+    assert env(bot)["principal"]["id"] == "bot"                    # an agent with no principal answers for itself
+    assert env(ana, bot)["principal"]["id"] == "ana"               # only an agent has a principal

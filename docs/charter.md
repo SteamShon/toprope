@@ -201,3 +201,7 @@ without a real organization, and that limit is stated wherever ⑥ is discussed.
 - Harness²: Recursive Agent Harnessing for an Open World, arXiv:2610.14224v1 (comparison
   for automated improvement loops)
 - Temporal, LangGraph (runtime candidates); CopilotKit OpenDots (host candidate)
+- Decision ontology, https://w3id.org/do (v0.2.0, CC BY 4.0): decisions, options, arguments,
+  premises (unchecked), revisions; a candidate vocabulary for the context graph (ADR-0041;
+  see [`how-it-works.md`](how-it-works.md#two-graphs)). Documented with Horoi
+  (github.com/kvistgaard/horoi), which generates an ontology's page from its file

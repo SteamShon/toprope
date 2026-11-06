@@ -19,4 +19,4 @@ agents:
     grant:
       id: drafting
       actions: [add_source, fetch_source, ask_question, propose_element, request_decision,
-                next_questions, search, commit_draft, check_commit, cite_evidence, preview]
+                next_questions, search, commit_draft, check_commit, preview]

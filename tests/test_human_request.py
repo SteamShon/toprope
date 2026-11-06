@@ -116,3 +116,15 @@ def test_an_approved_request_freezes_instruments(tmp_path, monkeypatch):
     (tmp_path / "toprope.identity.yaml").write_text(yaml.safe_dump(IDS))
     hr.run({"summary": "Freeze", "steps": [{"freeze": "experiments/m1/instruments"}]}, "ana-gh", cwd=tmp_path)
     assert {"change-requests.yaml", "change-key.yaml"} <= set(json.loads((inst / "FROZEN.json").read_text())["files"])
+
+
+def test_an_approved_run_is_recorded_so_a_commit_can_cite_it_after_any_merge(tmp_path):
+    req = {"summary": "Approve commit 6", "steps": [{"run": {"member": "authoring", "action": "approve_commit",
+                                                            "target": "6-ab"}}]}
+    url = "https://github.com/o/r/actions/runs/7"
+    hr.record(req, "Ana-GH", "ana <ana@example.com>", url, cwd=tmp_path)
+    (row,) = [json.loads(x) for x in (tmp_path / hr.APPROVAL_RUNS).read_text().splitlines()]
+    assert row["run"] == url and row["approver"] == "Ana-GH" and row["as"] == "ana <ana@example.com>"
+    assert row["steps"] == req["steps"] and row["summary"] == "Approve commit 6"
+    workflow = (ROOT / ".github/workflows/human-request.yml").read_text()
+    assert "human_request.py record" in workflow.split("git rm")[0]          # recorded, then committed
