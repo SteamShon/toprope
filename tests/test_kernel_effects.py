@@ -310,3 +310,19 @@ def test_the_schema_lists_every_kernel_service():
                 yield from calls(v)
     (enum,) = list(calls(schema))
     assert set(enum) == set(CATALOG)
+
+
+def test_an_optional_service_input_may_be_left_out_or_null():
+    from toprope.decl import Domain, validate_domain
+    raw = {"domain": "d", "version": 1, "roles": ["owner"],
+           "objects": {"Draft": {"properties": {"declaration": {"type": "string"}, "status": {"enum": ["open"]}}}},
+           "actions": {
+               "commit_draft": {"description": "x", "actor": ["owner"], "target": "Draft",
+                                "params": {"evidence": {"type": "string", "many": True, "optional": True}},
+                                "effects": [{"call": "commit", "with": {"declaration": "target.declaration"},
+                                             "reply": "done"}]},
+               "done": {"description": "x", "actor": ["external:kernel"], "target": "Draft"}},
+           "transitions": {"Draft": {"field": "status", "matrix": {"open": {"commit_draft": "open", "done": "open"}}}}}
+    assert not [i for i in validate_domain(Domain.model_validate(raw)) if i.code == "missing-input"]
+    raw["actions"]["commit_draft"]["effects"][0]["with"]["evidence"] = "params.evidence"
+    assert not [i for i in validate_domain(Domain.model_validate(raw)) if i.code in ("missing-input", "unknown-input")]

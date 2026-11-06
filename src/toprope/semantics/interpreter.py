@@ -344,6 +344,8 @@ class Interpreter:
                 svc = CATALOG.get(eff.call)
                 for i, v in payload["inputs"].items():
                     want = svc.inputs.get(i) if svc else None
+                    if v is None and svc and i in svc.optional:
+                        continue
                     if want and not _of_type(v, want):
                         raise EvalError(f"input '{i}' must be a {want}, got {v!r}")
             except EvalError as e:
