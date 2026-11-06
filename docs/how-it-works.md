@@ -1,18 +1,18 @@
 # How Toprope works
 
-Link: ① ② ③ ④ ⑤ (what the design must deliver). Why it exists is in
-[`problem.md`](problem.md); the design principles, claims and hypotheses are in
-[`charter.md`](charter.md). This page walks through the pieces. Layers, ports and pipelines in
-detail: [`architecture.md`](architecture.md). Everything here describes the design. Where a
-part is not built yet, it says *planned* and names the milestone; the full picture is in
-[`STATUS.md`](STATUS.md).
+Link: ① ② ③ ④ ⑤ (the claims this design must deliver; [Terms](../README.md#terms) in the
+README). Why it exists is in [`problem.md`](problem.md); the design principles, claims and
+hypotheses are in [`charter.md`](charter.md). This page walks through the pieces. Layers, ports
+and pipelines in detail: [`architecture.md`](architecture.md). Everything here describes the
+design. Where a part is not built yet, it says *planned* and names the milestone; the full
+picture is in [`STATUS.md`](STATUS.md).
 
 ## The bet
 
 **Nobody can define a domain correctly in one go** (the premise, P0, taken as given). A domain
-is found by iterating. So
-the system must make each iteration cheap, safe and testable. Once the domain is declared
-precisely enough, writing the code is nearly free.
+is found by iterating. So the system must make each iteration cheap, safe and testable. We
+expect that once a domain is declared precisely enough, generated code becomes cheap to trust
+and writing it nearly free; this is hypothesis ③, untested until M2.
 
 That last sentence comes from the researcher's experience building with DDD and coding
 agents. With a well-defined domain, a transition matrix and invariants, generated code that
@@ -66,8 +66,8 @@ examples, the compiler generates:
   flows
 - the expert's own example flows.
 
-Today it runs against the model, the Execution gate and the MCP server, with parity between
-them. The UI and adapter levels are *planned* (M0b).
+Today it runs against the model, the Execution gate and the MCP server, and checks *parity*:
+the same test gives the same answer on each. The UI and adapter levels are *planned* (M0b).
 
 ### 4. Change safely, and fast ([`change-check.md`](change-check.md))
 Every edit first gets an **impact report** in domain terms, before anything runs. For
@@ -83,7 +83,7 @@ The edit gets a **preview** to try before deploying. Only affected artifacts and
 rebuilt, and everything else comes from a hash-keyed cache. The draft targets are an
 impact report in 2 s, an affected harness in 30 s, and a preview in 30 s.
 
-### Git and GitHub for the domain ([`commits.md`](commits.md))
+### 5. Git and GitHub for the domain ([`commits.md`](commits.md))
 Changes to a declaration are handled the way code is (ADR-0029, ADR-0032, ADR-0033):
 - a change is a **commit** on a branch, content-addressed, with a **semantic diff**: only
   elements that changed directly are reviewed again
@@ -92,19 +92,20 @@ Changes to a declaration are handled the way code is (ADR-0029, ADR-0032, ADR-00
   request** to the person who may decide (decided in ADR-0032; *planned*)
 - only a person **approves, by merging into `main`**, and only a commit whose checks passed;
   separate authors and approvers wait until a domain has more than one owner (ADR-0032)
-- **Delivery** points an environment at one approved commit on `main`, and the deploy floor
+- **Delivery** points an environment at one approved commit on `main`, and the *deploy floor*
+  (the kernel's rules for any deploy, which no declaration can weaken)
   requires a passing harness.
 
 Authoring and Delivery are themselves declared domains, so this whole loop is generated from
 their declarations (self-compile, ADR-0028, ADR-0037).
 
-### 5. Record everything, learn from it
+### 6. Record everything, learn from it
 Domain events are the system of record. Decisions (with inputs and rationale), **denied
 attempts**, exceptions and effect outcomes are recorded too (*built*). The plan is that agents
 query this history (query tools, *planned* M0b) to propose the next domain change (proposals,
 *planned* M4); a human decides, and the loop starts again.
 
-### 6. See the whole world: the world map ([`world-map.md`](world-map.md))
+### 7. See the whole world: the world map ([`world-map.md`](world-map.md))
 The compiler also emits a **world map**, a skill-tree view of the domain (ADR-0020).
 - *Built*: `world-map.json`, a Mermaid diagram like the one below, and MCP tools for agents
   (`world_map`, `how_to_reach`).
@@ -129,9 +130,12 @@ stateDiagram-v2
 
 ## Components and relations
 
-*Hand-drawn placeholder. If the M1 self domain declares Toprope's components as object types
-and links, this diagram is replaced by the structure layer of its generated world map
-(ADR-0020).*
+*Hand-drawn placeholder; it shows the design. Built today: the declaration, the domain
+compiler, the change check, the harness, the Execution gate, the event store, the world map and
+`toprope-server`. Planned: the representation compiler and `toprope-shell` (A2UI views rendered
+with React and CopilotKit), brownfield adapters and the greenfield backend (M0b), and an
+optional runtime such as Aegra for unattended proposals (M4). If the self domains come to
+declare Toprope's components, the generated world map replaces this diagram (ADR-0020).*
 
 ```mermaid
 flowchart TB
@@ -249,7 +253,7 @@ Our reading of the alternatives, in broad strokes:
 | Conflicts found | after deployment | in tests of the rule set | at build time, by engineers | at compile time, reported in domain terms |
 | Behavior verified | not mechanically | per rule set | per project | designed to check every matrix cell and invariant on every surface |
 | Cost of a change | a text edit, unchecked | a code change | an engineering project | an edit, an impact report, a preview |
-| Agents | read text and hope | call it as a decision service | integrate via APIs | first-class users via generated MCP |
+| Agents | read text; nothing checks it | call it as a decision service | integrate via APIs | first-class users via generated MCP |
 | Decisions | lost in chat | decision logs, varies | varies | event-sourced and queryable |
 
 Agent orchestration frameworks (LangGraph and others) are a different layer. In them you

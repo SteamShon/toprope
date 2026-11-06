@@ -1,8 +1,8 @@
 # The problem: decisions live in people's heads
 
-Link: P0, ⑥ (the problem Toprope starts from). The short version is in the
-[README](../README.md). This page is the long one. The design is in [`charter.md`](charter.md),
-and how it works is in [`how-it-works.md`](how-it-works.md).
+Link: P0, ⑥ (the premise and the claim this page motivates; [Terms](../README.md#terms)). The
+short version is in the [README](../README.md). This page is the long one. The design is in
+[`charter.md`](charter.md), and how it works is in [`how-it-works.md`](how-it-works.md).
 
 This page is the researcher's position, not a finding. Its examples are from the researcher's
 experience (observed, not measured; details changed). What Toprope tests is the claim chain in
@@ -53,7 +53,7 @@ right.
 
 ## Agents remove the half that was in people's heads
 
-In our view, every system's safety has two halves. One half is in the machine: permissions, input
+Every system's safety has two halves. One half is in the machine: permissions, input
 validation, payment processing. The other half was in people's heads: *"Don't do that today,
 you touched it yesterday."*
 
@@ -64,7 +64,7 @@ One case we saw: an agent could register a campaign on a large public ad platfor
 an in-house ad system with almost the same data structure. The model was the same. The
 platform had written its rules down; the in-house system had not.
 
-In our experience, execution logs are everywhere and decision records are not. A system can
+Execution logs are everywhere; decision records are not. A system can
 keep a perfect history
 of what ran and still not know whether the job it is about to rerun is allowed today.
 
@@ -81,7 +81,7 @@ Every rule in the middle column was said, not written. The rules existed; they w
 spoken. None of
 these is fixed by writing better code, because the code had nothing to check against.
 
-## Writing it down is not enough, we think
+## Writing it down is not enough
 
 The natural answer is a wiki page, or a few more lines in `AGENTS.md` or a skill. We expect three
 things to go wrong (the M1 pilot compares the last one with a natural-language skill).
@@ -91,13 +91,14 @@ things to go wrong (the M1 pilot compares the last one with a natural-language s
 - **Copies drift.** A rule copied into the payment server, the customer screen, the admin tool,
   settlement, the support script and the agent's prompt is six copies, and none of them is the
   original. Fix one and five stay silently wrong. Databases have had a name for this since the
-  early 1970s: the *update anomaly*. As an idealized count: with four rules and six places that
-  must follow them, that is 24 hand-maintained links; with the rules declared in one place that
-  the six ask, it is 4 + 6 = 10, and a change is made once. The six still need an adapter to ask.
+  early 1970s: the *update anomaly*. As an idealized count, take four rules and six places
+  that must follow them, and call each place that keeps its own copy of a rule a link: that is
+  4 × 6 = 24 copies to keep in step by hand. With the rules declared in one place that the six
+  ask, it is 4 declared rules and 6 places that ask, 4 + 6 = 10, and a change is made once. The six still need an adapter to ask.
 - **Prose cannot be checked.** Add a line to a skill and nothing tells you whether it conflicts
   with the lines already there. You find out after deployment, from the result.
 
-## Recording cannot be forced, in our experience; it has to be the path
+## Recording cannot be forced; it has to be the path
 
 We have not seen a good answer to "how do we make people record their decisions?". In our
 experience, recording that is separate from the work loses to urgent work, and meeting notes,
@@ -127,7 +128,7 @@ Business rules are rarely declared this way. Rules engines, BPMN and DMN, and po
 not the path the whole workflow runs through. Most business rules are still prose, and no loop
 can run on something that was never declared.
 
-## Better models make this matter more, we think
+## Better models make this matter more
 
 A stronger model can work out what is *right*. It cannot work out what *we decided*. Whether a
 refund on day 8 is allowed depends on whether we set the window at 7 days or 30, and if we
