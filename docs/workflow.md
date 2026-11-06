@@ -47,7 +47,8 @@ $R --member delivery verify authoring:<id>:local --verified true
 ```
 
 Each member's events go to its own append-only log, `domains/<domain>/events/`, which is
-committed with your change like the commit store (`--store memory` keeps nothing).
+committed with your change like the commit store. The declaration's example objects never go into
+it: `--seed` needs `--store memory` (which keeps nothing) or `--store-dir`.
 
 Every command runs from the repository root as `uv run <command>`. The domain commit store
 (`.toprope/commits/`) is part of the repository: commit it with your change so approvals are

@@ -436,8 +436,6 @@ actions:
     effects:
     - set:
         target.domain_id: params.domain
-        target.branch: params.branch
-        target.author: params.author
     source:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L26-L54
@@ -453,11 +451,14 @@ actions:
         domain: target.domain_id
         commit: target.id
       reply: record_check
+    preconditions:
+    - id: not-approved
+      check: target.approved != true
+      reason: An approved commit passed its check; check a new commit instead.
     source:
-      kind: interview
-      ref: interview:domains/authoring/interview.jsonl#L5
-      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: confirmed
+      kind: record
+      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L26-L54
+    status: proposed
   record_check:
     description: Record the change check's result on the commit.
     actor:

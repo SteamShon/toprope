@@ -55,8 +55,8 @@ A domain owner's workflow lives in people's heads; turning it into a declared do
 | `request_decision` | owner | creates **DecisionRequest**; params `element` (a Element), `subject` (string), `grounds` (string), `recommendation` (string) | — | — | — | `DecisionRequestCreated` |
 | `decide` 🔒 📝 | owner | **DecisionRequest**; params `choice` (string) | — | the stage (per the matrix); `target.choice` ← `params.choice` | — | `DecisionRequestDecide` |
 | `commit_draft` | owner | **Draft** | — | the stage (per the matrix) | kernel `commit` → `record_commit` | `DraftCommitDraft` |
-| `record_commit` | the kernel | creates **Commit**; params `seq` (integer), `content` (string), `interface` (string), `domain` (string), `branch` (string), `author` (string) | — | `target.domain_id` ← `params.domain`, `target.branch` ← `params.branch`, `target.author` ← `params.author` | — | `CommitCreated` |
-| `check_commit` | owner | **Commit** | — | the stage (per the matrix) | kernel `change_check` → `record_check` | `CommitCheckCommit` |
+| `record_commit` | the kernel | creates **Commit**; params `seq` (integer), `content` (string), `interface` (string), `domain` (string), `branch` (string), `author` (string) | — | `target.domain_id` ← `params.domain` | — | `CommitCreated` |
+| `check_commit` | owner | **Commit** | `not-approved`: An approved commit passed its check; check a new commit instead. | the stage (per the matrix) | kernel `change_check` → `record_check` | `CommitCheckCommit` |
 | `record_check` | the kernel | **Commit**; params `passed` (boolean), `summary` (string) | — | the stage (per the matrix); `target.checks_passed` ← `params.passed`, `target.failing` ← `params.summary` | — | `CommitRecordCheck` |
 | `approve_commit` 🔒 📝 | owner | **Commit** | `checks-pass`: Run the change check, and approve only a commit that passes it.; `not-approved`: Already approved; approve a newer commit. | the stage (per the matrix) | kernel `approve_commit` → `record_approval` | `CommitApproveCommit` |
 | `record_approval` | the kernel | **Commit**; params `approved` (boolean), `main` (string) | `approved-only-if-checked`: A commit is recorded as approved only if its change check passed. | the stage (per the matrix); `target.approved` ← `params.approved`, `target.main` ← `params.main` | — | `CommitRecordApproval` |
@@ -153,7 +153,7 @@ Generated from the actions, their actors, the matrix and the kernel calls: for e
 
 **In `recorded`:**
 
-- **check_commit** by `owner`. Then starts kernel `change_check`, answered by `record_check`. Run: `toprope-run --domain authoring.domain.yaml check_commit ID`
+- **check_commit** by `owner`. Needs: An approved commit passed its check; check a new commit instead. Then starts kernel `change_check`, answered by `record_check`. Run: `toprope-run --domain authoring.domain.yaml check_commit ID`
 - **record_check** by the kernel, automatically (a reply)
 - **approve_commit** by `owner` — **a person only** — recorded as a decision. Needs: Run the change check, and approve only a commit that passes it. Already approved; approve a newer commit. Then starts kernel `approve_commit`, answered by `record_approval`. Run: `toprope-run --domain authoring.domain.yaml approve_commit ID`
 - **record_approval** by the kernel, automatically (a reply). Needs: A commit is recorded as approved only if its change check passed

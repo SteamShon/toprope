@@ -144,6 +144,9 @@ def _execution(args: Any, d: Domain) -> Execution:
     return ex
 
 
+HANDOFF_STATUS = {"HandoffDelivered": "ok", "HandoffDenied": "denied", "HandoffFailed": "failed"}
+
+
 def followed(ex: Execution, d: Domain, target: str, before: int) -> list[dict[str, Any]]:
     """What the command set off: each kernel call with its reply (and the object a creating reply
     made, such as the new Commit), and each handoff, so you know what to do next."""
@@ -160,15 +163,22 @@ def followed(ex: Execution, d: Domain, target: str, before: int) -> list[dict[st
                 reply = d.actions.get(e.payload["reply"])
                 # the service's own failure first: a failed call still replies (ADR-0028)
                 entry["status"] = "failed" if result.get("ok") is False else res.payload.get("status") or res.type
-                entry["object"] = result.get("id") if reply is not None and reply.creates else res.payload.get("object")
+                if entry["status"] == "ok":       # a refused reply made nothing
+                    entry["object"] = result.get("id") if reply is not None and reply.creates \
+                        else res.payload.get("object")
                 if result.get("error") or res.payload.get("reason"):
                     entry["error"] = result.get("error") or res.payload.get("reason")
             out.append(entry)
         elif e.type == "HandoffRequested":
             res = Outbox(ex).resolution(handoff_id(e), "handoff")
             to = e.payload.get("to") or {}
-            out.append({"handoff": e.payload.get("handoff"), "to": f"{to.get('domain')}.{to.get('action')}",
-                        "object": e.payload.get("target"), "status": res.type if res else "pending"})
+            h = {"handoff": e.payload.get("handoff"), "to": f"{to.get('domain')}.{to.get('action')}",
+                 "status": HANDOFF_STATUS.get(res.type, res.type) if res else "pending"}
+            if h["status"] == "ok":
+                h["object"] = e.payload.get("target")
+            elif res is not None and (res.payload.get("reason") or res.payload.get("error")):
+                h["error"] = res.payload.get("reason") or res.payload.get("error")
+            out.append(h)
     return out
 
 

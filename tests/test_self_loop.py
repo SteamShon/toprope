@@ -48,17 +48,18 @@ def per_domain(tmp_path):
     return p
 
 
-def test_each_member_keeps_its_own_event_log_next_to_its_declaration(tmp_path):
+def test_each_member_keeps_its_own_event_log_and_examples_stay_out_of_it(tmp_path):
     p = per_domain(tmp_path)
     base = ["--composition", str(p), "--member", "authoring", "--identity", f"static:{tmp_path / 'ids.yaml'}"]
-    first = run(*base, "--seed", "approve_version", "V1", cwd=tmp_path)
-    assert first.returncode == 1 and json.loads(first.stdout)["code"] == "checked-clean"
-    again = run(*base, "history", "V1", cwd=tmp_path)                 # a new process reads the same log
-    assert "DomainVersionApproveVersion" not in again.stdout and json.loads(again.stdout)
-    assert (tmp_path / "authoring/events/events.jsonl").is_file()
-    assert not (tmp_path / "events").exists() and not (tmp_path / "delivery/events/events.jsonl").exists()
-    gone = run(*base, "--store", "memory", "get", "V1", cwd=tmp_path)
-    assert json.loads(gone.stdout) is None
+    seeded = run(*base, "--seed", "get", "V1", cwd=tmp_path)                        # examples are not records
+    assert seeded.returncode == 1 and "--seed loads example objects" in seeded.stderr
+    assert json.loads(run(*base, "get", "V1", cwd=tmp_path).stdout) is None
+    assert (tmp_path / "authoring/events").is_dir() and (tmp_path / "delivery/events").is_dir()
+    assert not (tmp_path / "events").exists()
+    other = run(*base, "--store", f"sqlite:{tmp_path / 'x.db'}", "get", "V1", cwd=tmp_path)
+    assert other.returncode == 1 and "give --store-dir DIR or --store memory" in other.stderr
+    mem = run(*base, "--store", "memory", "--seed", "get", "V1", cwd=tmp_path)
+    assert json.loads(mem.stdout)["id"] == "V1"
 
 
 def test_members_in_one_directory_are_refused_rather_than_mixed(tmp_path):
@@ -87,7 +88,7 @@ def test_the_whole_loop_runs_on_the_generated_command_line(tmp_path):
         r = run(*base, "--member", member, *a, cwd=tmp_path)
         assert r.returncode == 0, (a, r.stdout, r.stderr)
         out = json.loads(r.stdout)
-        assert all(t["status"] in ("ok", "HandoffDelivered") and "error" not in t for t in out.get("then", [])), out
+        assert all(t["status"] == "ok" and "error" not in t for t in out.get("then", [])), out
         return out
 
     def get(member, oid):
@@ -138,6 +139,7 @@ def test_the_command_line_shows_what_a_command_set_off(tmp_path):
     p = per_domain(tmp_path)
     base = ["--composition", str(p), "--member", "authoring", "--identity", f"static:{tmp_path / 'ids.yaml'}",
             "--kernel-root", str(tmp_path)]
+    base += ["--store-dir", str(tmp_path / "data")]
     ok = json.loads(run(*base, "--seed", "check_version", "V1", cwd=tmp_path).stdout)
     assert [(t["kernel"], t["status"], t["object"]) for t in ok["then"]] == [
         ("validate", "ok", "V1"), ("run_harness", "ok", "V1")]

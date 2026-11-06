@@ -164,16 +164,24 @@ def _member(args, identity, services):
         raise SystemExit(1)
     if args.member not in c.domains:
         raise SystemExit(f"error: no member {args.member!r} in {sorted(c.domains)}")
+    store = getattr(args, "store", None)
+    if store not in (None, "memory"):
+        raise SystemExit("error: with --composition, give --store-dir DIR or --store memory (or neither, "
+                         "for each member's own event log)")
     if args.store_dir:
         Path(args.store_dir).mkdir(parents=True, exist_ok=True)
         stores = {n: open_store(f"sqlite:{Path(args.store_dir) / (n + '.db')}") for n in c.domains}
-    elif getattr(args, "store", None) == "memory":
+    elif store == "memory":
         stores = {n: open_store("memory") for n in c.domains}
     else:   # each member's own event log, next to its declaration and kept in git (ADR-0037)
-        logs = {n: member_events(c, n) for n in c.domains}
+        logs = {n: member_events(c, n).resolve() for n in c.domains}
         if len(set(logs.values())) < len(logs):
             raise SystemExit("error: members share a directory, so their event logs would mix; keep each "
                              "member under its own directory (domains/<domain>/), or give --store-dir")
+        if not args.no_seed:   # the examples are not records: they never go into a log kept in git
+            if getattr(args, "seed", False):
+                raise SystemExit("error: --seed loads example objects; use it with --store memory or --store-dir")
+            args.no_seed = True
         stores = {n: open_store(f"jsonl:{p}") for n, p in logs.items()}
     exs = assemble(c, stores, identity, services=services)
     if not args.no_seed:
