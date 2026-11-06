@@ -1,3 +1,0 @@
-summary: Confirm the Authoring change that lets commit_draft cite evidence (ADR-0041, Resolved 3)
-steps:
-  - run: {member: authoring, action: confirm_all_proposed, target: authoring}

@@ -426,7 +426,7 @@ actions:
     source:
       kind: record
       ref: records:docs/commits.md#L24-L44
-    status: proposed
+    status: confirmed
   record_commit:
     description: Record the commit the kernel made.
     actor:
