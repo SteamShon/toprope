@@ -22,6 +22,9 @@ uv run toprope-commits log DOMAIN action:launch_experiment   # an element's hist
 ```
 
 ## Commits
+- **Evidence.** A commit may cite what the change rests on (ADR-0041): interview lines, events,
+  check records. The `commit` service takes it as an optional input, and the commit keeps it.
+  Committing content identical to the head makes no new commit, so its evidence is not kept.
 - **Content-addressed and append-only.** A commit's content is the hash of the canonical
   declaration without `version`, plus its representations: the `*.representation.yaml` files
   next to the declaration whose `targets.domain` is this domain. Its id is `<seq>-<content>`, and
