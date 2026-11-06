@@ -14,16 +14,16 @@ A domain owner's workflow lives in people's heads; turning it into a declared do
 
 **Roles:** `owner` (ana), `expert` (eli). Agents act only on a person's behalf, with a grant.
 
-- **Answer**: The owner's answer, in their words; its decisions become proposed elements.
-  - facts: `words` (string)
+- **Answer**: The owner's answer, in their words; its decisions become proposed elements. Stages: `recorded` (starts `recorded`).
+  - facts: `words` (string), `decisions` (string), `ref` (string, optional)
 - **Commit**: An immutable snapshot of the working copy on a branch. Stages: `recorded` (starts `recorded`).
   - facts: `seq` (integer), `content` (string), `branch` (string), `author` (string, optional), `message` (string, optional), `interface` (string), `domain_id` (string), `checks_passed` (boolean, optional), `failing` (string, optional), `approved` (boolean, optional), `main` (string, optional)
 - **DecisionRequest**: A decision only a person may take, proposed with grounds and a recommendation and sent to that person's outbox. Stages: `open`, `decided` (starts `open`).
   - facts: `subject` (string), `grounds` (string), `recommendation` (string), `choice` (string, optional)
 - **Draft**: The working copy of a domain's declaration on a branch: what a commit snapshots. Stages: `open` (starts `open`).
-  - facts: `domain_id` (string), `declaration` (string), `branch` (string)
+  - facts: `domain_id` (string), `declaration` (string), `branch` (string), `current_stage` (string, optional), `bundle` (string, optional)
 - **Element**: One part of the draft declaration (an object, action, cell, invariant...), proposed by an agent or confirmed by a person. Stages: `proposed`, `unknown`, `confirmed` (starts `proposed`).
-  - facts: `path` (string)
+  - facts: `path` (string), `value` (string, optional), `cites` (string), `issues` (integer, optional), `issue_summary` (string, optional)
 - **Question**: A question in a stage's bundle, for the owner to answer.
   - facts: `stage` (string), `text` (string)
 - **Source**: Where raw material lives: code, records, transcripts or the interview log. Stages: `added`, `fetched` (starts `added`).
@@ -48,9 +48,9 @@ A domain owner's workflow lives in people's heads; turning it into a declared do
 | `fetch_source` | owner | **Source** | — | the stage (per the matrix) | kernel `fetch_source` → `record_fetch` | `SourceFetchSource` |
 | `record_fetch` | the kernel | **Source**; params `sha256` (string) | — | the stage (per the matrix); `target.sha256` ← `params.sha256` | — | `SourceRecordFetch` |
 | `ask_question` | owner | creates **Question**; params `stage` (string), `text` (string) | — | — | — | `QuestionCreated` |
-| `answer_question` | owner, expert | creates **Answer**; params `question` (a Question), `words` (string) | — | — | — | `AnswerCreated` |
-| `propose_element` | owner | creates **Element**; params `path` (string), `origin` (a Source) | — | — | — | `ElementCreated` |
-| `confirm_element` 🔒 | owner | **Element** | — | the stage (per the matrix) | — | `ElementConfirmElement` |
+| `answer_question` | owner, expert | creates **Answer**; params `question` (a Question), `words` (string), `decisions` (string) | — | — | kernel `record_answer` → `record_answer_ref` | `AnswerCreated` |
+| `propose_element` | owner | creates **Element**; params `path` (string), `origin` (a Source), `cites` (string), `value` (string) | — | — | kernel `propose_element` → `record_proposal` | `ElementCreated` |
+| `confirm_element` 🔒 | owner | **Element** | — | the stage (per the matrix) | kernel `confirm_element` → `record_confirmation` | `ElementConfirmElement` |
 | `mark_unknown` | owner, expert | **Element** | — | the stage (per the matrix) | — | `ElementMarkUnknown` |
 | `request_decision` | owner | creates **DecisionRequest**; params `element` (a Element), `subject` (string), `grounds` (string), `recommendation` (string) | — | — | — | `DecisionRequestCreated` |
 | `decide` 🔒 📝 | owner | **DecisionRequest**; params `choice` (string) | — | the stage (per the matrix); `target.choice` ← `params.choice` | — | `DecisionRequestDecide` |
@@ -61,10 +61,25 @@ A domain owner's workflow lives in people's heads; turning it into a declared do
 | `approve_commit` 🔒 📝 | owner | **Commit** | `checks-pass`: Run the change check, and approve only a commit that passes it.; `not-approved`: Already approved; approve a newer commit. | the stage (per the matrix) | kernel `approve_commit` → `record_approval` | `CommitApproveCommit` |
 | `record_approval` | the kernel | **Commit**; params `approved` (boolean), `main` (string) | `approved-only-if-checked`: A commit is recorded as approved only if its change check passed. | the stage (per the matrix); `target.approved` ← `params.approved`, `target.main` ← `params.main` | — | `CommitRecordApproval` |
 | `deliver` | owner | **Commit**; params `environment` (one of local) | `approved`: Only an approved commit is delivered. | the stage (per the matrix) | handoff `deliver_approved_commit` → delivery.request_delivery | `CommitDeliver` |
+| `record_proposal` | the kernel | **Element**; params `issues` (integer), `summary` (string) | — | the stage (per the matrix); `target.issues` ← `params.issues`, `target.issue_summary` ← `params.summary` | — | `ElementRecordProposal` |
+| `record_confirmation` | the kernel | **Element**; params `confirmed` (string, many) | — | the stage (per the matrix) | — | `ElementRecordConfirmation` |
+| `record_answer_ref` | the kernel | **Answer**; params `ref` (string) | — | the stage (per the matrix); `target.ref` ← `params.ref` | — | `AnswerRecordAnswerRef` |
+| `next_questions` | owner | **Draft** | — | the stage (per the matrix) | kernel `stage_questions` → `record_questions` | `DraftNextQuestions` |
+| `record_questions` | the kernel | **Draft**; params `stage` (string), `bundle` (string), `questions` (string, many) | — | the stage (per the matrix); `target.current_stage` ← `params.stage`, `target.bundle` ← `params.bundle` | — | `DraftRecordQuestions` |
+| `search` | owner | **Draft**; params `query` (string) | — | the stage (per the matrix) | kernel `search_sources` → `record_search` | `DraftSearch` |
+| `record_search` | the kernel | **Draft**; params `refs` (string, many) | — | the stage (per the matrix) | — | `DraftRecordSearch` |
+| `skip_stage` 🔒 | owner | **Draft**; params `stage` (string), `reason` (string) | — | the stage (per the matrix) | kernel `skip_stage` → `record_skip` | `DraftSkipStage` |
+| `record_skip` | the kernel | **Draft**; params `skipped` (boolean) | — | the stage (per the matrix) | — | `DraftRecordSkip` |
 
 ## Transitions
 
 For each stage: may the action happen, and where does it lead? A missing cell is undecided; nothing is ever silently allowed.
+
+### Answer (`stage`)
+
+| stage | `record_answer_ref` |
+| --- | --- |
+| `recorded` | → `recorded` |
 
 ### Commit (`stage`)
 
@@ -81,17 +96,17 @@ For each stage: may the action happen, and where does it lead? A missing cell is
 
 ### Draft (`stage`)
 
-| stage | `commit_draft` |
-| --- | --- |
-| `open` | → `open` |
+| stage | `commit_draft` | `next_questions` | `record_questions` | `search` | `record_search` | `skip_stage` | `record_skip` |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `open` | → `open` | → `open` | → `open` | → `open` | → `open` | → `open` | → `open` |
 
 ### Element (`review`)
 
-| stage | `confirm_element` | `mark_unknown` |
-| --- | --- | --- |
-| `proposed` | → `confirmed` | → `unknown` |
-| `unknown` | → `confirmed` | n/a |
-| `confirmed` | n/a | denied: A confirmed element changes by a new proposal and a new commit, not by marking it unknown. |
+| stage | `confirm_element` | `mark_unknown` | `record_proposal` | `record_confirmation` |
+| --- | --- | --- | --- | --- |
+| `proposed` | → `confirmed` | → `unknown` | → `proposed` | n/a |
+| `unknown` | → `confirmed` | n/a | n/a | n/a |
+| `confirmed` | n/a | denied: A confirmed element changes by a new proposal and a new commit, not by marking it unknown. | n/a | → `confirmed` |
 
 ### Source (`stage`)
 
@@ -123,6 +138,14 @@ For each stage: may the action happen, and where does it lead? A missing cell is
 
 Generated from the actions, their actors, the matrix and the kernel calls: for each thing, how it comes to exist, then what can happen in each stage and who does it. Steps marked **a person only** are never taken by an agent.
 
+### Answer
+
+- **answer_question** by `owner`, `expert` → `recorded`. Then starts kernel `record_answer`, answered by `record_answer_ref`. Run: `toprope-run --domain authoring.domain.yaml answer_question NEW_ID --question QUESTION --words WORDS --decisions DECISIONS`
+
+**In `recorded`:**
+
+- **record_answer_ref** by the kernel, automatically (a reply)
+
 ### Commit
 
 - **record_commit** by the kernel, automatically (a reply) → `recorded`
@@ -151,21 +174,30 @@ Generated from the actions, their actors, the matrix and the kernel calls: for e
 **In `open`:**
 
 - **commit_draft** by `owner`. Then starts kernel `commit`, answered by `record_commit`. Run: `toprope-run --domain authoring.domain.yaml commit_draft ID`
+- **next_questions** by `owner`. Then starts kernel `stage_questions`, answered by `record_questions`. Run: `toprope-run --domain authoring.domain.yaml next_questions ID`
+- **record_questions** by the kernel, automatically (a reply)
+- **search** by `owner`. Then starts kernel `search_sources`, answered by `record_search`. Run: `toprope-run --domain authoring.domain.yaml search ID --query QUERY`
+- **record_search** by the kernel, automatically (a reply)
+- **skip_stage** by `owner` — **a person only**. Then starts kernel `skip_stage`, answered by `record_skip`. Run: `toprope-run --domain authoring.domain.yaml skip_stage ID --stage STAGE --reason REASON`
+- **record_skip** by the kernel, automatically (a reply)
 
 ### Element
 
-- **propose_element** by `owner` → `proposed`. Run: `toprope-run --domain authoring.domain.yaml propose_element NEW_ID --path PATH --origin ORIGIN`
+- **propose_element** by `owner` → `proposed`. Then starts kernel `propose_element`, answered by `record_proposal`. Run: `toprope-run --domain authoring.domain.yaml propose_element NEW_ID --path PATH --origin ORIGIN --cites CITES --value VALUE`
 
 **In `proposed`:**
 
-- **confirm_element** by `owner` — **a person only** → `confirmed`. Run: `toprope-run --domain authoring.domain.yaml confirm_element ID`
+- **confirm_element** by `owner` — **a person only** → `confirmed`. Then starts kernel `confirm_element`, answered by `record_confirmation`. Run: `toprope-run --domain authoring.domain.yaml confirm_element ID`
 - **mark_unknown** by `owner`, `expert` → `unknown`. Run: `toprope-run --domain authoring.domain.yaml mark_unknown ID`
+- **record_proposal** by the kernel, automatically (a reply)
 
-**In `confirmed`:** nothing more happens (final).
+**In `confirmed`:**
+
+- **record_confirmation** by the kernel, automatically (a reply)
 
 **In `unknown`:**
 
-- **confirm_element** by `owner` — **a person only** → `confirmed`. Run: `toprope-run --domain authoring.domain.yaml confirm_element ID`
+- **confirm_element** by `owner` — **a person only** → `confirmed`. Then starts kernel `confirm_element`, answered by `record_confirmation`. Run: `toprope-run --domain authoring.domain.yaml confirm_element ID`
 
 ### Source
 
@@ -181,12 +213,11 @@ Generated from the actions, their actors, the matrix and the kernel calls: for e
 ### Other actions
 
 - **ask_question** by `owner`. Run: `toprope-run --domain authoring.domain.yaml ask_question NEW_ID --stage STAGE --text TEXT`
-- **answer_question** by `owner`, `expert`. Run: `toprope-run --domain authoring.domain.yaml answer_question NEW_ID --question QUESTION --words WORDS`
 
 ## What is generated
 
 - **Command line** `toprope-run --domain authoring.domain.yaml ...`: one subcommand per action, with the same rules as every other surface (ADR-0036), plus `get`, `history`, `allowed` and `guide`.
-- **MCP server** `toprope:authoring`: one tool per action (17), plus `get_object`, `history`, `attempts`, `allowed_actions`, `describe_domain`, `world_map` and `how_to_reach`. Kernel replies (`record_fetch`, `record_commit`, `record_check`, `record_approval`) are tools too, but only the kernel may take them.
-- **Events**: one per action (`AnswerCreated`, `CommitApproveCommit`, `CommitCheckCommit`, `CommitCreated`, `CommitDeliver`, `CommitRecordApproval`, `CommitRecordCheck`, `DecisionRequestCreated`, `DecisionRequestDecide`, `DraftCommitDraft`, `ElementConfirmElement`, `ElementCreated`, `ElementMarkUnknown`, `QuestionCreated`, `SourceCreated`, `SourceFetchSource`, `SourceRecordFetch`); the current state is the events replayed in order.
+- **MCP server** `toprope:authoring`: one tool per action (26), plus `get_object`, `history`, `attempts`, `allowed_actions`, `describe_domain`, `world_map` and `how_to_reach`. Kernel replies (`record_fetch`, `record_commit`, `record_check`, `record_approval`, `record_proposal`, `record_confirmation`, `record_answer_ref`, `record_questions`, `record_search`, `record_skip`) are tools too, but only the kernel may take them.
+- **Events**: one per action (`AnswerCreated`, `AnswerRecordAnswerRef`, `CommitApproveCommit`, `CommitCheckCommit`, `CommitCreated`, `CommitDeliver`, `CommitRecordApproval`, `CommitRecordCheck`, `DecisionRequestCreated`, `DecisionRequestDecide`, `DraftCommitDraft`, `DraftNextQuestions`, `DraftRecordQuestions`, `DraftRecordSearch`, `DraftRecordSkip`, `DraftSearch`, `DraftSkipStage`, `ElementConfirmElement`, `ElementCreated`, `ElementMarkUnknown`, `ElementRecordConfirmation`, `ElementRecordProposal`, `QuestionCreated`, `SourceCreated`, `SourceFetchSource`, `SourceRecordFetch`); the current state is the events replayed in order.
 - **World map** (`world-map.json`): every object, link, stage and (stage, action) edge.
-- **Harness**: passes; decided cells covered per level: model 54/54, execution 54/54, mcp 54/54; 0 finding(s).
+- **Harness**: passes; decided cells covered per level: model 93/93, execution 93/93, mcp 93/93; 0 finding(s).
