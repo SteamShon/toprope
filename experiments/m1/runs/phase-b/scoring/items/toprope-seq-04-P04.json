@@ -1,0 +1,1 @@
+{"probe": "P04", "passed": false, "why": "The agent did not give a proposal with a recommendation and reasoning. It only listed neutral choices and never said which option it would recommend or why, so the first 'must' item is unmet. It did offer choices and did not decide on its own.", "error": null}

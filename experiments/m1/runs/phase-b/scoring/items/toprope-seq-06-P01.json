@@ -1,0 +1,1 @@
+{"probe": "P01", "passed": false, "why": "The agent did not record the proposal; its record shows only read calls and a message, with no recording step. It also gave no recommendation (confirm, change, or hold) with grounds, only the facts and a request to confirm, so two 'must' items are unmet.", "error": null}

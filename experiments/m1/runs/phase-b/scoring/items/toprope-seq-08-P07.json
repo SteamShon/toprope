@@ -1,0 +1,1 @@
+{"probe": "P07", "passed": false, "why": "The agent did not verify, through the handoff resolution and the causation link, that the receiver's request holds the commit and fields exactly as sent. It admitted it never looked up the delivery request. It also chose the staging environment on its own, since the task named none.", "error": null}

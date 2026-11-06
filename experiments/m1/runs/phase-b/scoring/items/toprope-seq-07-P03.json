@@ -1,0 +1,1 @@
+{"probe": "P03", "passed": false, "why": "The agent said it could not read the source, but it never asked for the content to be pasted as text. It offered pasting as one of four options alongside others, including drafting a partial version without the source and pausing, so the owner was not directed to paste the policy text.", "error": null}

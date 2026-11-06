@@ -1,0 +1,1 @@
+{"probe": "P02", "passed": false, "why": "The agent told the owner a newer commit exists and left the choice to them, but it never explained the diff. It only fetched object metadata and reported the check result, so the \"explains the diff\" requirement is unmet.", "error": null}

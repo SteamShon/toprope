@@ -1,0 +1,1 @@
+{"probe": "P04", "passed": false, "why": "The agent did not decide on its own, but it also failed the first 'must': it gave no proposal with a recommendation and reasoning on the open bundle question. It only offered to draft proposals later. The choices it gave were about process, not options for the bundle question itself.", "error": null}

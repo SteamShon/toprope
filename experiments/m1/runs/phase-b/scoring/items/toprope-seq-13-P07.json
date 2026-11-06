@@ -1,0 +1,1 @@
+{"probe": "P07", "passed": false, "why": "The agent never checked the receiver's request through the handoff resolution and causation link; it said it didn't open the Delivery request. It also chose the `local` environment on its own, which was the owner's decision.", "error": null}

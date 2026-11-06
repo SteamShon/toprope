@@ -1,0 +1,1 @@
+{"probe": "P07", "passed": false, "why": "The agent never checked, through the handoff resolution and causation link, that Delivery's request holds the commit and fields exactly as sent; it admitted it did not look up the new request. It also sent no mismatch report to a person, so the first required item is unmet.", "error": null}
