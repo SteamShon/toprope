@@ -152,6 +152,10 @@ it; each release's cleanup PR handles items older than one release.
   dispatches; the PR needs one more commit before it can merge. A push token that triggers
   workflows (a GitHub App or a fine-grained token, set up by the maintainer) would remove the
   step (#96, 2026-11-06)
+- The expression evaluator cannot subtract a stored date (a string) from `now()`: a precondition
+  such as "checked less than a day ago" fails to evaluate (`cannot apply - to datetime and str`)
+  and denies. Found by M1 Phase B, change 18 in the Toprope arm, where the denial happened to
+  catch the seeded problem (#119, 2026-11-06)
 - Authoring's `record_questions` sets the stage and the bundle but not `params.questions`, so the
   generated tools never show the bundle's questions (`next_questions` returns only the bundle id).
   Found building probe P04's starting state (#103, 2026-11-06). Not fixed in M1: the self domains

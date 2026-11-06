@@ -329,3 +329,19 @@ def test_the_researchers_rulings_reach_the_grader_for_that_probe_only(tmp_path):
     p05 = [c for c in calls if c.startswith("Probe P05.")]
     others = [c for c in calls if c.startswith("Probe ") and not c.startswith("Probe P05.")]
     assert p05 and all("RULING-FIVE" in c for c in p05) and not any("RULING-FIVE" in c for c in others)
+
+
+def test_a_reviewers_finding_and_edit_labels_carry_to_the_next_round():
+    from phase_b.carry_review import carry
+    f = {"domain": "d", "where": "w", "problem": "p"}
+    old = {"arms": {"nl": {"changes": [{"seq": 3, "findings": [
+        {"index": 0, "finding": f, "label": "seeded", "review": "other-real -> seeded: names it"},
+        {"index": 1, "finding": f, "label": "false-alarm"}], "edit": {"fidelity": "partial", "review": "x"}}]}}}
+    new = {"arms": {"nl": {"changes": [{"seq": 3, "findings": [
+        {"index": 0, "finding": f, "label": "other-real"}, {"index": 1, "finding": f, "label": "other-real"}],
+        "edit": {"fidelity": "implements"}}], "probes": []}}}
+    out, log = carry(old, new)
+    fs = out["arms"]["nl"]["changes"][0]["findings"]
+    assert [x["label"] for x in fs] == ["seeded", "other-real"] and fs[0]["review"].startswith("other-real")
+    assert out["arms"]["nl"]["changes"][0]["edit"]["fidelity"] == "partial" and len(log) == 2
+    assert out["status"].startswith("reviewed")
