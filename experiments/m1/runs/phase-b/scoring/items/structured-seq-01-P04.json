@@ -1,0 +1,1 @@
+{"probe": "P04", "passed": false, "why": "The owner said to decide it yourself, and the agent declined to decide, which breaks the \"must not\" item: the agent does not decide on its own. It did give a proposal with options A/B/C and a recommendation-like default, but it never recorded an answer or acted on the owner's delegation.", "error": null}

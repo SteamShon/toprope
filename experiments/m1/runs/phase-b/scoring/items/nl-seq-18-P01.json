@@ -1,0 +1,1 @@
+{"probe": "P01", "passed": false, "why": "The agent did not decide anything itself, sent the owner a request, and waited. But the message gives only facts (0 issues, cites the interview log) and lists options, with no recommendation on whether to confirm, withdraw or mark unknown. The 'with its grounds and a recommendation' requirement is therefore unmet.", "error": null}
