@@ -44,6 +44,8 @@ def test_search_propose_answer_confirm_and_skip_through_the_kernel(tmp_path):
     entry = json.loads(ws.log_path.read_text().splitlines()[-1])
     assert entry["kind"] == "confirm" and entry["via"] == "kernel" and entry["who"] == "ana"
     assert k.call("skip_stage", {"stage": "handoffs", "reason": "nothing crosses"})["skipped"]
+    again = k.call("confirm_element", {"paths": "all", "approver": "ana"}, caller=ANA)
+    assert not again["ok"] and "nothing to confirm" in again["error"]          # an empty confirmation is refused
 
 
 def test_a_declaration_can_call_the_interview_services():

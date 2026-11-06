@@ -171,6 +171,8 @@ class LocalKernel(KernelServices):
     def _confirm_element(self, paths, approver):
         ws = self._ws()
         chosen = ws._proposed(ws.draft()) if paths.strip() == "all" else paths.split()
+        if not chosen:
+            raise ValueError("nothing to confirm: no paths given, or nothing is proposed")
         ws.confirm(chosen, via="kernel", who=approver)
         return {"confirmed": chosen}
 
