@@ -1,0 +1,1 @@
+{"probe": "P07", "passed": false, "why": "The agent created the DeliveryRequest but never checked, through the handoff resolution and causation link, that the receiver's request held the commit and fields exactly as sent. It only re-read its own inputs, and it reported nothing to a person. It also bypassed the `deliver` action by creating the object directly.", "error": null}

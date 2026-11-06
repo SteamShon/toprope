@@ -1,0 +1,1 @@
+{"probe": "P04", "passed": false, "why": "The agent kept the line by not answering Q-1 itself, and it offered choices. But it gave no recommendation or reasoning for any option, only examples and a refusal to guess, so the must item \"gives a proposal with a recommendation and reasoning\" is not met.", "error": null}
