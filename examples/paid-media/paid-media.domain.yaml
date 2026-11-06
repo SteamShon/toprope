@@ -14,6 +14,7 @@ objects:
       change: {enum: [none, proposed]}
       proposed_budget: {type: integer, optional: true}
       proposed_by: {type: string, optional: true}
+      exception_approved: {type: boolean, optional: true}
 
 actions:
   propose_budget_change:
@@ -25,13 +26,13 @@ actions:
       reason: {type: string}
     preconditions:
       - id: not-a-holdout
-        check: target.holdout == false
-        reason: Holdout campaigns keep their budget; changing it would break the test.
+        check: target.holdout == false or target.exception_approved == true
+        reason: Holdout campaigns keep their budget; changing it would break the test. A media lead can grant a one-time exception.
       - id: step-limit
         check: params.daily_budget - target.daily_budget <= 500
         reason: Raise a daily budget by at most 500 at a time.
     effects:
-      - set: {target.proposed_budget: params.daily_budget, target.proposed_by: actor.id}
+      - set: {target.proposed_budget: params.daily_budget, target.proposed_by: actor.principal.id}
   approve_budget_change:
     description: Approve the proposed budget exactly as proposed.
     actor: [media_lead]
@@ -39,10 +40,18 @@ actions:
     requires: human
     preconditions:
       - id: not-the-proposer
-        check: target.proposed_by != actor.id
-        reason: Whoever proposed a change cannot approve it.
+        check: target.proposed_by != actor.principal.id
+        reason: Whoever proposed a change, or had their agent propose it, cannot approve it.
     effects:
-      - set: {target.daily_budget: target.proposed_budget}
+      - set: {target.daily_budget: target.proposed_budget, target.exception_approved: false}
+    records_decision: true
+  grant_exception:
+    description: Allow one budget change on a campaign the rules would otherwise refuse, such as a holdout.
+    actor: [media_lead]
+    target: Campaign
+    requires: human
+    effects:
+      - set: {target.exception_approved: true}
     records_decision: true
   reject_budget_change:
     description: Reject the proposed budget.
@@ -60,16 +69,18 @@ transitions:
         propose_budget_change: proposed
         approve_budget_change: {deny: "There is no proposed change to approve."}
         reject_budget_change: {deny: "There is no proposed change to reject."}
+        grant_exception: none
       proposed:
         propose_budget_change: {deny: "A change is already waiting for review."}
         approve_budget_change: none
         reject_budget_change: none
+        grant_exception: {deny: "Grant an exception before the change is proposed."}
 
 invariants:
   - id: holdouts-never-change
     on: Campaign
-    check: target.holdout == false or target.change == 'none'
-    reason: A holdout campaign never has a budget change pending.
+    check: target.holdout == false or target.change == 'none' or target.exception_approved == true
+    reason: A holdout campaign never has a budget change pending, unless a media lead granted an exception.
 
 world:
   fixtures:

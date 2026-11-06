@@ -22,9 +22,13 @@ KERNEL = "external:kernel"
 class Service:
     name: str
     description: str
-    inputs: dict[str, str]                  # input → type (all inputs are required)
+    inputs: dict[str, str]                  # input → type (required unless listed in `optional`)
     # field → type: boolean | integer | number | string | strings (a list of strings)
     result: dict[str, str] = field(default_factory=dict)   # field → type, besides ok and error
+    optional: frozenset[str] = frozenset()  # inputs a call may leave out, or pass as null
+
+    def required(self) -> list[str]:
+        return [i for i in self.inputs if i not in self.optional]
 
     def fields(self) -> dict[str, str]:
         return {"ok": "boolean", "error": "string", **self.result}
@@ -66,11 +70,12 @@ CATALOG: dict[str, Service] = {s.name: s for s in (
     Service("skip_stage", "Record that an optional stage has nothing, with the owner's reason.",
             {"stage": "string", "reason": "string"}, {"skipped": "boolean"}),
     # Commits (ADR-0029). `commit` returns an `id`, so a reply may create the Commit object.
-    Service("commit", "Snapshot a working copy as an immutable commit (no new commit if unchanged).",
-            {"declaration": "string"},
+    Service("commit", "Snapshot a working copy as an immutable commit (no new commit if unchanged); "
+            "`evidence` cites what the change rests on (ADR-0041).",
+            {"declaration": "string", "evidence": "strings"},
             {"id": "string", "seq": "integer", "content": "string", "created": "boolean", "parent": "string",
              "interface": "string", "to_review": "strings", "last_approved": "string", "domain": "string",
-             "branch": "string", "author": "string"}),
+             "branch": "string", "author": "string"}, optional=frozenset({"evidence"})),
     Service("diff", "The semantic diff between two commits: what changed directly.",
             {"domain": "string", "from": "string", "to": "string"},
             {"changed": "strings", "added": "strings", "removed": "strings", "to_review": "strings"}),
