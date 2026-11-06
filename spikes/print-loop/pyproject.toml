@@ -1,0 +1,12 @@
+[project]
+name = "print-loop"
+version = "0.1.0"
+description = "Spike: review signal -> parametric CAD -> slice -> cost, for a 3D-printed product loop"
+requires-python = ">=3.11"
+dependencies = [
+    "build123d>=0.9",
+    "pyyaml>=6",
+    "pillow>=10",
+    "numpy>=1.26",
+    "numpy-stl>=3.1",
+]

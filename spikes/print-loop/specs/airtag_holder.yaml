@@ -1,0 +1,62 @@
+# Spec: written by the agent from inputs/evidence.md.
+# This file is the contract between the agent (reads reviews, decides what to make)
+# and the pipeline (builds, checks, slices). Every number here is a parameter the
+# design script reads; nothing is hard-coded in the design.
+
+product: airtag_holder
+host_product:
+  name: Apple AirTag (1st and 2nd generation share the same body)
+  # Published dimensions of the tag. Measure a real one with calipers in step H3
+  # and overwrite these if they differ.
+  diameter_mm: 31.9
+  height_mm: 8.0
+
+requirements:
+  - id: R1
+    need: "The tag has no keyring hole; buyers must buy a separate holder."
+    evidence: inputs/evidence.md#airtag-no-hole
+    check: every variant has a way to attach (ring hole, strap tunnel, or bolt holes)
+  - id: R2
+    need: "The tag must not fall out, but must come out for battery changes."
+    check: lip_inner_diameter < tag diameter, and one side is open for sliding
+  - id: R3
+    need: "The speaker must stay audible (louder speaker is a selling point of gen 2)."
+    check: front window diameter >= 20 mm
+  - id: R4
+    need: "Customization: where it attaches and what it says."
+    check: variants below are generated from parameters only
+
+# Fit parameters. clearance_mm is the main unknown of the whole experiment:
+# step H4 prints the tolerance coupon and sets it from the result.
+fit:
+  clearance_mm: 0.4        # added to tag diameter for the pocket
+  clearance_z_mm: 0.4      # added to tag height
+  lip_overlap_mm: 1.5      # how far the front lip covers the tag edge
+  detent_mm: 0.5           # bumps at the slot mouth that hold the tag in
+
+print_rules:               # design rules for a 0.4 mm nozzle
+  min_wall_mm: 1.2         # 3 lines
+  layer_mm: 0.2
+
+variants:
+  - id: keyring-blank
+    mount: keyring
+    label: ""
+  - id: keyring-name
+    mount: keyring
+    label: "MINJI"
+  - id: collar-20mm
+    mount: collar
+    strap_width_mm: 20
+    strap_thickness_mm: 2.5
+    label: "BORI"
+  - id: collar-25mm
+    mount: collar
+    strap_width_mm: 25
+    strap_thickness_mm: 3.0
+    label: ""
+  - id: bike-cage-mount
+    mount: bike
+    bolt_spacing_mm: 64    # standard bottle-cage bosses
+    bolt_diameter_mm: 5.0  # M5
+    label: ""

@@ -1,0 +1,402 @@
+{
+  "spec": "specs/airtag_holder.yaml",
+  "economics": {
+    "filament_usd_per_kg": 20.0,
+    "machine_usd_per_hour": 0.3,
+    "failure_rate": 0.1
+  },
+  "items": [
+    {
+      "variant": {
+        "id": "keyring-blank",
+        "mount": "keyring",
+        "label": ""
+      },
+      "ok": true,
+      "checks": [
+        {
+          "id": "solid",
+          "ok": true,
+          "detail": "valid=True, solids=1"
+        },
+        {
+          "id": "fits Bambu Lab A1 (256 mm)",
+          "ok": true,
+          "detail": "size (36.3, 38.2, 11.6) mm"
+        },
+        {
+          "id": "fits Bambu Lab A1 mini (180 mm)",
+          "ok": true,
+          "detail": "size (36.3, 38.2, 11.6) mm"
+        },
+        {
+          "id": "min wall",
+          "ok": true,
+          "detail": "wall 2.0 mm, roof 1.2 mm >= 1.2 mm"
+        },
+        {
+          "id": "R2 tag sits free in pocket",
+          "ok": true,
+          "detail": "overlap with tag 0.000 mm3"
+        },
+        {
+          "id": "R2 lip stops tag falling out the front",
+          "ok": true,
+          "detail": "overlap after +0.5 mm z: 22.1 mm3"
+        },
+        {
+          "id": "R2 detents stop tag sliding out",
+          "ok": true,
+          "detail": "overlap after +7 mm y: 4.3 mm3"
+        },
+        {
+          "id": "R2 detent clicks (not too tight)",
+          "ok": true,
+          "detail": "interference 0.60 mm (0-1.0)"
+        },
+        {
+          "id": "R3 speaker window",
+          "ok": true,
+          "detail": "front window 29.3 mm"
+        },
+        {
+          "id": "R1 keyring hole",
+          "ok": true,
+          "detail": "5.5 mm hole"
+        },
+        {
+          "id": "slices",
+          "ok": true,
+          "detail": "8m 39s"
+        }
+      ],
+      "slice": {
+        "ok": true,
+        "time_text": "8m 39s",
+        "minutes": 8.7,
+        "grams": 3.31
+      },
+      "unit_cost_usd": 0.12
+    },
+    {
+      "variant": {
+        "id": "keyring-name",
+        "mount": "keyring",
+        "label": "MINJI"
+      },
+      "ok": true,
+      "checks": [
+        {
+          "id": "solid",
+          "ok": true,
+          "detail": "valid=True, solids=1"
+        },
+        {
+          "id": "fits Bambu Lab A1 (256 mm)",
+          "ok": true,
+          "detail": "size (36.3, 49.2, 11.6) mm"
+        },
+        {
+          "id": "fits Bambu Lab A1 mini (180 mm)",
+          "ok": true,
+          "detail": "size (36.3, 49.2, 11.6) mm"
+        },
+        {
+          "id": "min wall",
+          "ok": true,
+          "detail": "wall 2.0 mm, roof 1.2 mm >= 1.2 mm"
+        },
+        {
+          "id": "R2 tag sits free in pocket",
+          "ok": true,
+          "detail": "overlap with tag 0.000 mm3"
+        },
+        {
+          "id": "R2 lip stops tag falling out the front",
+          "ok": true,
+          "detail": "overlap after +0.5 mm z: 22.1 mm3"
+        },
+        {
+          "id": "R2 detents stop tag sliding out",
+          "ok": true,
+          "detail": "overlap after +7 mm y: 4.3 mm3"
+        },
+        {
+          "id": "R2 detent clicks (not too tight)",
+          "ok": true,
+          "detail": "interference 0.60 mm (0-1.0)"
+        },
+        {
+          "id": "R3 speaker window",
+          "ok": true,
+          "detail": "front window 29.3 mm"
+        },
+        {
+          "id": "R1 keyring hole",
+          "ok": true,
+          "detail": "5.5 mm hole"
+        },
+        {
+          "id": "slices",
+          "ok": true,
+          "detail": "11m 33s"
+        }
+      ],
+      "slice": {
+        "ok": true,
+        "time_text": "11m 33s",
+        "minutes": 11.6,
+        "grams": 5.1
+      },
+      "unit_cost_usd": 0.18
+    },
+    {
+      "variant": {
+        "id": "collar-20mm",
+        "mount": "collar",
+        "strap_width_mm": 20,
+        "strap_thickness_mm": 2.5,
+        "label": "BORI"
+      },
+      "ok": true,
+      "checks": [
+        {
+          "id": "solid",
+          "ok": true,
+          "detail": "valid=True, solids=1"
+        },
+        {
+          "id": "fits Bambu Lab A1 (256 mm)",
+          "ok": true,
+          "detail": "size (36.3, 47.3, 14.7) mm"
+        },
+        {
+          "id": "fits Bambu Lab A1 mini (180 mm)",
+          "ok": true,
+          "detail": "size (36.3, 47.3, 14.7) mm"
+        },
+        {
+          "id": "min wall",
+          "ok": true,
+          "detail": "wall 2.0 mm, roof 1.2 mm >= 1.2 mm"
+        },
+        {
+          "id": "R2 tag sits free in pocket",
+          "ok": true,
+          "detail": "overlap with tag 0.000 mm3"
+        },
+        {
+          "id": "R2 lip stops tag falling out the front",
+          "ok": true,
+          "detail": "overlap after +0.5 mm z: 22.1 mm3"
+        },
+        {
+          "id": "R2 detents stop tag sliding out",
+          "ok": true,
+          "detail": "overlap after +7 mm y: 4.3 mm3"
+        },
+        {
+          "id": "R2 detent clicks (not too tight)",
+          "ok": true,
+          "detail": "interference 0.60 mm (0-1.0)"
+        },
+        {
+          "id": "R3 speaker window",
+          "ok": true,
+          "detail": "front window 29.3 mm"
+        },
+        {
+          "id": "R1 strap fits",
+          "ok": true,
+          "detail": "tunnel 21.0 x 3.3 mm for 20 x 2.5 mm strap"
+        },
+        {
+          "id": "slices",
+          "ok": true,
+          "detail": "14m 47s"
+        }
+      ],
+      "slice": {
+        "ok": true,
+        "time_text": "14m 47s",
+        "minutes": 14.8,
+        "grams": 7.41
+      },
+      "unit_cost_usd": 0.24
+    },
+    {
+      "variant": {
+        "id": "collar-25mm",
+        "mount": "collar",
+        "strap_width_mm": 25,
+        "strap_thickness_mm": 3.0,
+        "label": ""
+      },
+      "ok": true,
+      "checks": [
+        {
+          "id": "solid",
+          "ok": true,
+          "detail": "valid=True, solids=1"
+        },
+        {
+          "id": "fits Bambu Lab A1 (256 mm)",
+          "ok": true,
+          "detail": "size (36.3, 36.3, 15.2) mm"
+        },
+        {
+          "id": "fits Bambu Lab A1 mini (180 mm)",
+          "ok": true,
+          "detail": "size (36.3, 36.3, 15.2) mm"
+        },
+        {
+          "id": "min wall",
+          "ok": true,
+          "detail": "wall 2.0 mm, roof 1.2 mm >= 1.2 mm"
+        },
+        {
+          "id": "R2 tag sits free in pocket",
+          "ok": true,
+          "detail": "overlap with tag 0.000 mm3"
+        },
+        {
+          "id": "R2 lip stops tag falling out the front",
+          "ok": true,
+          "detail": "overlap after +0.5 mm z: 22.1 mm3"
+        },
+        {
+          "id": "R2 detents stop tag sliding out",
+          "ok": true,
+          "detail": "overlap after +7 mm y: 4.3 mm3"
+        },
+        {
+          "id": "R2 detent clicks (not too tight)",
+          "ok": true,
+          "detail": "interference 0.60 mm (0-1.0)"
+        },
+        {
+          "id": "R3 speaker window",
+          "ok": true,
+          "detail": "front window 29.3 mm"
+        },
+        {
+          "id": "R1 strap fits",
+          "ok": true,
+          "detail": "tunnel 26.0 x 3.8 mm for 25 x 3.0 mm strap"
+        },
+        {
+          "id": "slices",
+          "ok": true,
+          "detail": "12m 20s"
+        }
+      ],
+      "slice": {
+        "ok": true,
+        "time_text": "12m 20s",
+        "minutes": 12.3,
+        "grams": 6.03
+      },
+      "unit_cost_usd": 0.2
+    },
+    {
+      "variant": {
+        "id": "bike-cage-mount",
+        "mount": "bike",
+        "bolt_spacing_mm": 64,
+        "bolt_diameter_mm": 5.0,
+        "label": ""
+      },
+      "ok": true,
+      "checks": [
+        {
+          "id": "solid",
+          "ok": true,
+          "detail": "valid=True, solids=1"
+        },
+        {
+          "id": "fits Bambu Lab A1 (256 mm)",
+          "ok": true,
+          "detail": "size (36.3, 78.0, 14.1) mm"
+        },
+        {
+          "id": "fits Bambu Lab A1 mini (180 mm)",
+          "ok": true,
+          "detail": "size (36.3, 78.0, 14.1) mm"
+        },
+        {
+          "id": "min wall",
+          "ok": true,
+          "detail": "wall 2.0 mm, roof 1.2 mm >= 1.2 mm"
+        },
+        {
+          "id": "R2 tag sits free in pocket",
+          "ok": true,
+          "detail": "overlap with tag 0.000 mm3"
+        },
+        {
+          "id": "R2 lip stops tag falling out the front",
+          "ok": true,
+          "detail": "overlap after +0.5 mm z: 22.1 mm3"
+        },
+        {
+          "id": "R2 detents stop tag sliding out",
+          "ok": true,
+          "detail": "overlap after +7 mm y: 4.3 mm3"
+        },
+        {
+          "id": "R2 detent clicks (not too tight)",
+          "ok": true,
+          "detail": "interference 0.60 mm (0-1.0)"
+        },
+        {
+          "id": "R3 speaker window",
+          "ok": true,
+          "detail": "front window 29.3 mm"
+        },
+        {
+          "id": "R1 bolt pattern",
+          "ok": true,
+          "detail": "64 mm spacing clears the pocket"
+        },
+        {
+          "id": "slices",
+          "ok": true,
+          "detail": "24m 26s"
+        }
+      ],
+      "slice": {
+        "ok": true,
+        "time_text": "24m 26s",
+        "minutes": 24.4,
+        "grams": 10.26
+      },
+      "unit_cost_usd": 0.36
+    },
+    {
+      "variant": {
+        "id": "tolerance-coupon",
+        "mount": "coupon"
+      },
+      "ok": true,
+      "checks": [
+        {
+          "id": "solid",
+          "ok": true,
+          "detail": "solids=1"
+        },
+        {
+          "id": "slices",
+          "ok": true,
+          "detail": "22m 56s"
+        }
+      ],
+      "slice": {
+        "ok": true,
+        "time_text": "22m 56s",
+        "minutes": 22.9,
+        "grams": 13.82
+      },
+      "unit_cost_usd": 0.43
+    }
+  ]
+}
