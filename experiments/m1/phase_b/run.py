@@ -298,6 +298,7 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     g.add_argument("--out", type=Path, default=DEFAULT_OUT)
     g.add_argument("--instruments", type=Path, default=INSTRUMENTS)
     g.add_argument("--partial", action="store_true", help="grade an incomplete run (tests; never for the report)")
+    g.add_argument("--jobs", type=int, default=4, help="grader conversations at once (default 4)")
     sc = sub.add_parser("score", help="the metrics and pilot verdicts, from scoring/confirmed.yaml")
     sc.add_argument("--out", type=Path, default=DEFAULT_OUT)
     sc.add_argument("--instruments", type=Path, default=INSTRUMENTS)
@@ -323,7 +324,8 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
         errs = verify_instruments(args.instruments)
         if errs:
             raise SystemExit("the instruments do not verify; nothing is graded:\n" + "\n".join(errs))
-        path = grade_run(args.out, args.instruments, backend, change_requests(args.instruments), args.partial)
+        path = grade_run(args.out, args.instruments, backend, change_requests(args.instruments), args.partial,
+                         jobs=args.jobs)
         print(json.dumps({"proposed": str(path), "usage": backend.report()}))
         return
     if args.cmd == "render":
