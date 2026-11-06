@@ -26,6 +26,8 @@ def proposed_elements(doc: dict[str, Any]) -> list[str]:
     for obj, tr in (doc.get("transitions") or {}).items():
         for state, cells in ((tr or {}).get("matrix") or {}).items():
             for name, c in (cells or {}).items():
-                if isinstance(c, dict) and c.get("status") == "proposed":
-                    out.append(f"transitions.{obj}.matrix.{state}.{name}")
+                if isinstance(c, dict) and (c.get("status") == "proposed" or any(
+                        isinstance(r, dict) and r.get("status") == "proposed"
+                        for r in (c.get("by_role") or {}).values())):
+                    out.append(f"transitions.{obj}.matrix.{state}.{name}")   # by_role parts: the cell
     return out

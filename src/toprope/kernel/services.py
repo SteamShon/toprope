@@ -209,8 +209,12 @@ class LocalKernel(KernelServices):
                 r = check_commit(self.commits, domain, commit, events=store, examples=self.examples, cache=rc)
         else:
             r = check_commit(self.commits, domain, commit, examples=self.examples, cache=rc)
-        return {"passed": r.ok, "errors": r.errors, "warnings": r.warnings,
-                "failing": [n for n, c in r.checks.items() if not c.ok], "summary": r.summary()}
+        from ..decl.provenance import proposed_elements
+        left = proposed_elements(self.commits.declaration(domain, commit))
+        failing = [n for n, c in r.checks.items() if not c.ok] + (["confirmed"] if left else [])
+        summary = r.summary() + (f"; {len(left)} proposed element(s) to confirm" if left else "")
+        return {"passed": r.ok and not left, "errors": r.errors, "warnings": r.warnings,   # ADR-0041
+                "failing": failing, "summary": summary}
 
     def _merge_main(self, domain, branch, declaration):
         from ..decl.yamlio import load_yaml

@@ -359,6 +359,9 @@ class Workspace:
             if not is_element(segs) or not isinstance(el, dict) or "source" not in el:
                 raise AuthoringError(f"{p} is not a drafted element with a source")
             el["status"] = "confirmed"
+            for part in (el.get("by_role") or {}).values():   # a cell's per-role parts are one element
+                if isinstance(part, dict) and part.get("status") == "proposed":
+                    part["status"] = "confirmed"
         issues = self._write(doc)
         self._append(self.log_path, {"at": _now(), "kind": "confirm", "paths": paths, "via": via, "who": who})
         return {"confirmed": paths, "issues": issues}

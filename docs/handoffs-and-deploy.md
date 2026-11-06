@@ -64,6 +64,8 @@ enforces the **fixed floor** (ADR-0022, ADR-0029), which no declaration can weak
 - the commit is approved and is what `main` points to (not superseded), and is not the deployed
   commit or one of its ancestors (not a downgrade; rollback comes in M2). ADR-0033. The move
   happens under a per-environment lock
+- the commit holds no element with `status: proposed` (ADR-0041): approval already refuses
+  them, and this catches a commit approved before it did
 - the build is untainted: the same declaration, and the same toolchain that ran the harness
 - the harness passed
 - a person approves
