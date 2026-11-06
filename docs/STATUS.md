@@ -6,7 +6,7 @@ this page); plans live in [`roadmap.md`](roadmap.md) and the milestone and exper
 Every PR into `develop` or an `umbrella/*` branch fixes any line here it makes untrue, or says
 why not; each release trims it ([`AGENTS.md`](../AGENTS.md), "Progress").
 
-Updated: 2026-11-06 · Cleaned for release: `v0.1.0`
+Updated: 2026-11-07 · Cleaned for release: `v0.1.0`
 
 Legend: ✅ done · 🟡 in part · ⬜ not started
 
@@ -109,6 +109,12 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    `commit_draft` passes it, changed through the self domains' own loop and approved and
    deployed by the researcher in GitHub (#118: commit `5-c8fd1b8fc98be17c`, deployed and
    verified).
+6. ADR-0042's follow-up work (accepted 2026-11-07): now, document that `domain_version` with
+   the deployment log gives the rule in force when an event was decided, and define read
+   visibility in the schema; in M0b, deadlines with timers, read visibility enforced by the
+   query and MCP read tools, an observed time on facts from adapters, identity mappings on
+   adapters; in M2, `confirmed_at` and `review_by` warnings; in the M4 spec, goals, expected
+   outcomes and the outcome-to-decision link.
 
 ## Left from reviews
 

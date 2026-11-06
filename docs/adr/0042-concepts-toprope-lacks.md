@@ -1,7 +1,7 @@
 # ADR-0042: The concepts Toprope lacks, and where each would go
 
-- Link: ① iterate safely, ② model is right, ③ works as built, ⑤ evolves · Status: **proposed** ·
-  2026-11-06 · decided by: (pending) SteamShon (drafted by the assistant)
+- Link: ① iterate safely, ② model is right, ③ works as built, ⑤ evolves · Status: accepted ·
+  2026-11-07 · decided by: SteamShon (the recommendation in each case; drafted by the assistant)
 - Builds on: ADR-0011 (correctness layer), ADR-0012 (event sourcing), ADR-0015 (timers,
   functions), ADR-0016 (authorization), ADR-0041 (world model and context graph)
 
@@ -27,9 +27,9 @@ block, an exception or a revision, and a `revises` link between decisions (the M
 spec); per-element owners (M2, ADR-0032); compacting logs (not needed at current volumes).
 
 This ADR decides, for each of the six, whether Toprope takes it on, in which part, and when. Each
-section gives the options and a recommendation; the researcher decides.
+section gives the options considered and the recommendation, which the researcher accepted.
 
-## Open, with recommendations
+## Resolved (researcher, 2026-11-07: the recommendation in each case)
 
 ### 1. Obligations
 - **Options.** (a) A new construct, `obligations`, beside rules. (b) Deadlines as timers, already
@@ -91,7 +91,7 @@ section gives the options and a recommendation; the researcher decides.
   graph, and refusing to guess follows the rule already used for effects (`UNKNOWN` until a
   read-back says otherwise).
 
-## Consequences (if the recommendations are accepted)
+## Consequences
 - No new kernel concept in M1. Obligations and two clocks need nothing new beyond what is defined
   (timers) and what is recorded (`domain_version`, deployments).
 - The schema gains, as *defined* constructs: read visibility (M0b), `review_by` on elements
@@ -99,3 +99,14 @@ section gives the options and a recommendation; the researcher decides.
 - The M4 decision-record spec owns goals, expected outcomes, re-review conditions, the link
   from outcome to decision, and the block / exception / revision classification.
 - `docs/concepts.md` lists each concept under the part it belongs to once it is built.
+
+## Follow-up work
+Each is its own PR, in the milestone named:
+- now: document in `docs/concepts.md` and `docs/semantics.md` that each event's `domain_version`,
+  with the deployment log, gives the rule in force when it was decided (5)
+- now: define read visibility in `docs/domain-schema.md` as a *defined* construct (3)
+- M0b: deadlines with timers, and an example of an obligation (1); read visibility enforced by
+  the query tools and the MCP read tools (3); an observed time on facts from adapters (5);
+  identity mappings on adapters (6)
+- M2: `confirmed_at` and `review_by` on elements, and change-check warnings past `review_by` (4)
+- M4 spec: goals, expected outcomes, re-review conditions and the outcome-to-decision link (2)

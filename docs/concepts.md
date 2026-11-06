@@ -77,8 +77,8 @@ flowchart LR
 Concepts that other work on agents and graphs relies on and Toprope does not have yet:
 obligations (what must happen by when), the link from a goal to a decision to its outcome,
 control of what an actor may read, whether a fact is still true, the time a fact held as
-distinct from the time it was recorded, and resolving the same thing across systems. They are
-taken up in ADR-0042.
+distinct from the time it was recorded, and resolving the same thing across systems. ADR-0042
+decides where each goes and when.
 
 ## Appendix: industry terms
 
