@@ -90,7 +90,7 @@ each into `umbrella/pstack-lessons`. Each sub-PR changes only its own item below
   `instruments.py verify --run`; a workspace source that matches no file is reported
   (`Workspace.stale_sources`, the mistake #91 fixed); `AGENTS.md` pairs each rule with what
   enforces it. Three rules stay text only (gold sets, real tests, model identifiers): no past
-  mistake to prove a check on (PR)
+  mistake to prove a check on (#122)
 
 - ⬜ 2. M1 Phase B run protocol (draft): blinding and run counts for the three arms
 
