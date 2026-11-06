@@ -58,3 +58,8 @@ or a scenario the owner gave.
 ## Implementation
 After M1 Phase A, as one PR on the harness. Already done during Phase A: every example is
 explored (not one per stage), and races pair only cases on the same example.
+
+> Implementation note (2026-11-06): a broken invariant on a generated start is reported as a
+> **warning** (`inductive`), not a failure: the generated start may be one no real history
+> reaches. Parity failures on generated objects fail as before. Whether to make
+> non-inductive invariants blocking is left to the researcher.

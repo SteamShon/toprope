@@ -40,6 +40,7 @@ from ..decl import (
 )
 
 Key = str
+MECH_SAMPLES = 3        # generated objects per cell in the mechanical layer (ADR-0035)
 
 
 def _h(obj: Any) -> str:
@@ -148,6 +149,14 @@ def tests_of(d: Domain, planner_cases: list[Any] | None = None, examples: int = 
         key = _h({"tc": tc, "test": c.id, "case": case, "actors": d.world.actors,
                   "deps": {k: body[k] for k in sorted(deps)}})
         out.append(Test(c.id, "case", c.action, deps, key))
+    for name in d.actions:                     # the mechanical layer, per action (ADR-0035)
+        if d.actions[name].target in d.transitions:
+            if name not in per_action:
+                per_action[name] = action_deps(d, name, keys)
+            deps = per_action[name]
+            out.append(Test(f"mechanical:{name}", "mechanical", name, deps,
+                            _h({"tc": tc, "mechanical": name, "samples": MECH_SAMPLES, "actors": d.world.actors,
+                                "deps": {k: body[k] for k in sorted(deps)}})))
     whole = shape(d)
     for sc in d.scenarios:
         out.append(Test(f"flow:{sc.id}", "flow", None, keys, _h({"tc": tc, "flow": sc.id, "shape": whole})))
@@ -242,6 +251,7 @@ class Run:
     undecided: list[str]              # every undecided cell, missing ones included
     stats: dict[str, Any]
     results: dict[str, list[dict[str, Any]]]   # test id → findings (for soundness)
+    warnings: list[Any] = field(default_factory=list)   # non-inductive invariants (ADR-0035)
 
 
 def run_tests(d: Domain, *, examples: int = 50, cache: ResultCache | None = None, harness: Any = None) -> Run:
@@ -285,6 +295,13 @@ def run_tests(d: Domain, *, examples: int = 50, cache: ResultCache | None = None
         new = h.findings[before:]
         for sc in missing:
             results[f"flow:{sc.id}"] = [asdict(f) for f in new if f.case.split("#")[0] == sc.id]
+    mech_todo = {t.action for t in tests.values() if t.kind == "mechanical" and not hit(t.id)}
+    if mech_todo:
+        before_f, before_w = len(h.findings), len(h.warnings)
+        h.mechanical(MECH_SAMPLES, actions=mech_todo)
+        new = h.findings[before_f:] + h.warnings[before_w:]
+        for a in mech_todo:
+            results[f"mechanical:{a}"] = [asdict(f) for f in new if f.case.rsplit(".", 2)[-2] == a]
     if examples and not hit("explore"):
         minimal = explore(h, examples=examples)
         results["explore"] = [asdict(Finding("exploration", "model", "explore", minimal))] if minimal else []
@@ -292,11 +309,14 @@ def run_tests(d: Domain, *, examples: int = 50, cache: ResultCache | None = None
     if cache is not None:
         for tid in ran:
             cache.put(tests[tid].key, tid, results[tid])
-    findings = [Finding(**f) for tid in results for f in results[tid]]
+    from ..harness.run import WARNING_KINDS
+    every = [Finding(**f) for tid in results for f in results[tid]]
+    findings = [f for f in every if f.kind not in WARNING_KINDS]
+    warnings = [f for f in every if f.kind in WARNING_KINDS]
     undecided = undecided_cells(d, h.world)
     stats = {"tests": len(results), "run": len(results) - cached, "cached": cached,
              "seconds": round(time.perf_counter() - t0, 3)}
-    return Run(findings, h.world, undecided, stats, results)
+    return Run(findings, h.world, undecided, stats, results, warnings)
 
 
 def selection_misses(d: Domain, *, examples: int = 50, cache: ResultCache, cases: list[Any] | None = None) -> list[str]:

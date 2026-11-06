@@ -27,13 +27,14 @@ from .surfaces import LEVELS, ExecutionSurface, ModelSurface, Surface
 from .world import Instance, SmallWorld, grow_world
 
 DEFAULT_LEVELS = ("model", "execution", "mcp")
+WARNING_KINDS = {"inductive"}   # kept apart from findings (ADR-0035): an invariant that is not inductive
 NOW = datetime(2026, 1, 1, tzinfo=timezone.utc)
 RANK = {"verified": 0, "uncovered": 1, "failed": 2}
 
 
 @dataclass
 class Finding:
-    kind: str        # expectation | invariant | parity | replay | race | exploration | flow
+    kind: str        # expectation | invariant | parity | replay | race | exploration | flow | inductive (a warning)
     level: str
     case: str
     detail: dict[str, Any] = field(default_factory=dict)
@@ -46,13 +47,16 @@ class Report:
     coverage: dict[str, Any]
     minimal_flows: list[dict[str, Any]]
 
+    warnings: list[Finding] = field(default_factory=list)   # reported, never failing (ADR-0035)
+
     @property
     def ok(self) -> bool:
         return not self.findings
 
     def to_json(self) -> dict[str, Any]:
         return {"ok": self.ok, "levels": list(self.levels), "findings": [asdict(f) for f in self.findings],
-                "coverage": self.coverage, "minimal_flows": self.minimal_flows}
+                "coverage": self.coverage, "minimal_flows": self.minimal_flows,
+                "warnings": [asdict(f) for f in self.warnings]}
 
     def summary(self) -> str:
         c = self.coverage["cells"]
@@ -64,11 +68,18 @@ class Report:
                  f"flows: " + ", ".join(f"{lv} {n}" for lv, n in self.coverage["flows"]["passed"].items()) +
                  f" of {self.coverage['flows']['total']}",
                  f"race tests: {self.coverage['races']}",
-                 f"unreachable states: {self.coverage['unreachable'] or 'none'}"]
+                 f"unreachable states (from the examples): {self.coverage['unreachable'] or 'none'}"]
+        mech = self.coverage.get("mechanical")
+        if mech:
+            lines.append(f"mechanical (ADR-0035): {mech['cells']} cells on {mech['samples']} generated objects; "
+                         f"{len(mech['no_sample'])} cells with no object satisfying the invariants; "
+                         f"unreachable from creation: {mech['unreachable_from_creation'] or 'none'}")
         for f in self.findings[:20]:
             lines.append(f"  [{f.kind}] {f.level} {f.case}: {json.dumps(f.detail, default=str)[:300]}")
         if len(self.findings) > 20:
             lines.append(f"  ... {len(self.findings) - 20} more")
+        for w in self.warnings[:10]:
+            lines.append(f"  warning [{w.kind}] {w.case}: {w.detail.get('reason')}")
         for mf in self.minimal_flows:
             lines.append(f"  minimal flow breaking {mf['invariant']}: " +
                          " → ".join(f"{s['actor']} {s['action']} {s['target']}" for s in mf["steps"]))
@@ -89,6 +100,7 @@ class Harness:
         self.world: SmallWorld = grow_world(d, self.clock)
         self.planner = Planner(self.world, self.clock)
         self.findings: list[Finding] = []
+        self.warnings: list[Finding] = []
         self._exercised: set[str] = set()
 
     # -- surfaces --------------------------------------------------------------------------
@@ -250,7 +262,22 @@ class Harness:
         return None
 
     # -- everything --------------------------------------------------------------------------
-    def run(self, *, explore_examples: int = 200, explore_depth: int = 5, races: bool = True) -> Report:
+    def mechanical(self, samples: int = 3, actions: set[str] | None = None) -> Any:
+        """The mechanical layer (ADR-0035): every cell on objects generated from the types, at
+        every level, with no examples needed."""
+        from .mechanical import run_mechanical
+        surfaces = {lv: self.surface(lv) for lv in self.levels}
+        try:
+            m = run_mechanical(self.d, surfaces, self.clock, samples=samples, actions=actions)
+        finally:
+            for s in surfaces.values():
+                s.close()
+        self.findings += [f for f in m.findings if f.kind not in WARNING_KINDS]
+        self.warnings += [f for f in m.findings if f.kind in WARNING_KINDS]
+        return m
+
+    def run(self, *, explore_examples: int = 200, explore_depth: int = 5, races: bool = True,
+            mechanical: int = 3) -> Report:
         cases = self.planner.cases()
         results = {lv: self.run_cases(lv, cases) for lv in self.levels}
         ref = self.levels[0]
@@ -270,8 +297,10 @@ class Harness:
         if minimal is not None:
             self.findings.append(Finding("exploration", "model", "explore", minimal))
 
-        return Report(self.levels, self.findings, self._coverage(cases, results, flows, n_races),
-                      [minimal] if minimal else [])
+        mech = self.mechanical(mechanical) if mechanical else None
+        coverage = self._coverage(cases, results, flows, n_races)
+        coverage["mechanical"] = mech.coverage() if mech else None
+        return Report(self.levels, self.findings, coverage, [minimal] if minimal else [], self.warnings)
 
     def _edge_verdicts(self, cases, results) -> dict[str, str]:
         """Per world-map edge (ADR-0020): failed if any of its cases has a finding at any level,
@@ -323,7 +352,7 @@ def _edge_of(c: Case) -> str:
 
 
 def run_harness(d: Domain, **kw: Any) -> Report:
-    run_kw = {k: kw.pop(k) for k in ("explore_examples", "explore_depth", "races") if k in kw}
+    run_kw = {k: kw.pop(k) for k in ("explore_examples", "explore_depth", "races", "mechanical") if k in kw}
     return Harness(d, **kw).run(**run_kw)
 
 

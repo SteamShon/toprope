@@ -55,3 +55,21 @@ and do not fail it: they are the interview's next questions (ADR-0010 §2).
   levels like any other flow.
 - Results are not cached yet. Incremental selection and the result cache come with
   sub-PR 9 (ADR-0013).
+
+## The mechanical layer (ADR-0035)
+Besides the examples, the harness generates objects from the declaration's types, enums and
+links, in every stage, keeping only those that satisfy every invariant, and runs every
+(stage, action, role) cell on them at every level. It needs no examples.
+- **Parity** across levels on generated objects: a failure.
+- **Not inductive**: from an object every invariant allows, a move the matrix allows breaks
+  an invariant. Reported as a **warning** (`kind: inductive`, in `Report.warnings`): the
+  start may be one no real history reaches, but nothing in the declaration rules it out.
+  Strengthen an invariant (rule out the start) or a precondition (refuse the move).
+- **Unreachable from creation**: stages no declared move reaches from the stage a created
+  object starts in (a static walk of the matrix), reported apart from "unreachable from the
+  examples".
+
+Generation is seeded (3 objects per cell), so runs are reproducible and cached per action
+by the incremental check (ADR-0013). The change check reports non-inductive invariants as
+`harness` warnings and unreachable-from-creation stages as `semantic` warnings.
+
