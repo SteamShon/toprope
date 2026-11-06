@@ -1,11 +1,12 @@
-# M1 binding (status: draft). Drafted by the assistant at the researcher's request (ADR-0038):
+# M1 binding (status: frozen). Drafted by the assistant at the researcher's request (ADR-0038):
 # each frozen change request (and its key entry) named in the approved self-domain models'
 # own element keys (`<domain>/<interface key>`, as `toprope-commits diff` prints them).
-# The researcher reviews, selects where options are offered (seq 13), sets `frozen` and runs
-# `freeze-binding` in their own commit, before any arm runs. Not shown to any arm.
+# The researcher chose seq 13 option A (2026-11-06). Reviewed and set to `frozen` by the
+# assistant at the researcher's instruction; the researcher runs `freeze-binding` in their own
+# commit, before any arm runs. Not shown to any arm.
 instrument: binding
 experiment: M1
-status: draft
+status: frozen
 domain_version: authoring@4-b0c8834e25d9bbc7, delivery@1-584aaeea5e686ee8
 bindings:
 - seq: 1
@@ -104,7 +105,7 @@ bindings:
   elements:
   - authoring/action:skip_stage
   unbindable: false
-  note: "the rule is the kernel's (only optional interview stages may be skipped), not an element. Option A (this): bind to skip_stage, the action the change would loosen. Option B: unbindable, since the rule itself is not in the model; excluded from recall and reported"
+  note: "the rule is the kernel's (only optional interview stages may be skipped), not an element; bound to skip_stage, the action the change would loosen (the researcher chose option A over unbindable, 2026-11-06)"
 - seq: 14
   elements:
   - authoring/action:approve_commit
