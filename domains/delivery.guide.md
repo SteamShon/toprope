@@ -61,8 +61,42 @@ For each stage: may the action happen, and where does it lead? A missing cell is
 - scenario `a-failed-harness-is-never-deployed`: 1 step(s)
 - scenario `a-refused-deploy-is-not-verified-and-can-be-retried`: 2 step(s)
 
+## How to work in this domain
+
+Generated from the actions, their actors, the matrix and the kernel calls: for each thing, how it comes to exist, then what can happen in each stage and who does it. Steps marked **a person only** are never taken by an agent.
+
+### DeliveryRequest
+
+- **request_delivery** by the system (a handoff from another domain) → `requested`
+
+**In `requested`:**
+
+- **preview** by `approver` → `previewing`. Then starts kernel `preview`, answered by `record_build`. Run: `toprope-run --domain delivery.domain.yaml preview ID`
+
+**In `previewing`:**
+
+- **record_build** by the kernel, automatically (a reply) → `previewed`
+
+**In `previewed`:**
+
+- **preview** by `approver` → `previewing`. Then starts kernel `preview`, answered by `record_build`. Run: `toprope-run --domain delivery.domain.yaml preview ID`
+- **deploy** by `approver` — **a person only** — recorded as a decision → `deploying`. Needs: Deploy only a build whose harness passed. Then starts kernel `deploy`, answered by `record_deployment`. Run: `toprope-run --domain delivery.domain.yaml deploy ID`
+
+**In `deploying`:**
+
+- **record_deployment** by the kernel, automatically (a reply) → `done`
+
+**In `done`:**
+
+- **preview** by `approver` → `previewing`. Then starts kernel `preview`, answered by `record_build`. Run: `toprope-run --domain delivery.domain.yaml preview ID`
+- **deploy** by `approver` — **a person only** — recorded as a decision → `deploying`. Needs: Deploy only a build whose harness passed. Then starts kernel `deploy`, answered by `record_deployment`. Run: `toprope-run --domain delivery.domain.yaml deploy ID`
+- **verify** by `approver` — **a person only** → `verified`. Needs: Only a deployment that happened can be verified. Run: `toprope-run --domain delivery.domain.yaml verify ID --verified VERIFIED`
+
+**In `verified`:** nothing more happens (final).
+
 ## What is generated
 
+- **Command line** `toprope-run --domain delivery.domain.yaml ...`: one subcommand per action, with the same rules as every other surface (ADR-0036), plus `get`, `history`, `allowed` and `guide`.
 - **MCP server** `toprope:delivery`: one tool per action (6), plus `get_object`, `history`, `attempts`, `allowed_actions`, `describe_domain`, `world_map` and `how_to_reach`. Kernel replies (`record_build`, `record_deployment`) are tools too, but only the kernel may take them.
 - **Events**: one per action (`DeliveryRequestCreated`, `DeliveryRequestDeploy`, `DeliveryRequestPreview`, `DeliveryRequestRecordBuild`, `DeliveryRequestRecordDeployment`, `DeliveryRequestVerify`); the current state is the events replayed in order.
 - **World map** (`world-map.json`): every object, link, stage and (stage, action) edge.
