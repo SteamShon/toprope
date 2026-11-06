@@ -19,8 +19,8 @@ These workflows are implicit:
   them to their inputs, so neither agents nor the organization can learn from them.
 
 In our view, agents make this sharper: a system's safety was half in the machine and half in
-people's heads, and an agent that replaces the person takes the second half with it. The long form, with
-examples: [`problem.md`](problem.md).
+people's heads, and an agent that replaces the person takes the second half with it. The long
+form, with examples: [`problem.md`](problem.md).
 
 ## 2. What Toprope is
 
@@ -189,7 +189,8 @@ without a real organization, and that limit is stated wherever ⑥ is discussed.
 - **Preregister** metrics and verdict rules before results. Freeze gold sets before drafting.
 - **Count human time and money**, not only tokens.
 - **Report negative results** and the claims we can no longer make.
-- **State the evidence level** of every claim: *measured*, *observed once*, or *hypothesis*.
+- **State the evidence level** of every claim: *measured*, *observed* (say once or how often,
+  when known), or *hypothesis*.
 - **Small, falsifiable milestones** on an evenings-and-weekends budget (~10h+/week).
 - **Reuse OSS** for everything that is not a link in the chain.
 

@@ -9,7 +9,8 @@ part is not built yet, it says *planned* and names the milestone; the full pictu
 
 ## The bet
 
-**Nobody can define a domain correctly in one go.** A domain is found by iterating. So
+**Nobody can define a domain correctly in one go** (the premise, P0, taken as given). A domain
+is found by iterating. So
 the system must make each iteration cheap, safe and testable. Once the domain is declared
 precisely enough, writing the code is nearly free.
 
@@ -49,8 +50,8 @@ One declaration compiles into:
 - an **MCP server** for agents, with typed actions whose descriptions and denial reasons
   come from the model
 - a **greenfield backend**: a domain API over an event store (*planned*, M0b)
-- a **UI** for people (*planned*, M0b), generated from a separately versioned *representation* layer that
-  hosts can override with their own components
+- a **UI** for people (*planned*, M0b), generated from a separately versioned
+  *representation* layer that hosts can override with their own components
 - **read-only query tools** over the event history (*planned*, M0b)
 - a **command line** (`toprope-run`) and a **guide** for people (built, ADR-0036)
 - a **harness** (below).
@@ -58,14 +59,15 @@ One declaration compiles into:
 ### 3. The harness checks the whole matrix ([`harness.md`](harness.md))
 From the transition matrix, the invariants and a **small world** grown from the expert's
 examples, the compiler generates:
-- a test for **every** (state × action × role) cell
+- a test for each (state × action × role) cell its small world can reach; cells it cannot
+  reach are reported
 - invariant checks after every step
 - bounded exploration that finds invariant-breaking sequences and reports them as minimal
   flows
 - the expert's own example flows.
 
-Today it runs against the model and the Execution gate. Running the same tests against the
-MCP server, the UI and the adapters, with the same answer on every surface, is *planned* (M0b).
+Today it runs against the model, the Execution gate and the MCP server, with parity between
+them. The UI and adapter levels are *planned* (M0b).
 
 ### 4. Change safely, and fast ([`change-check.md`](change-check.md))
 Every edit first gets an **impact report** in domain terms, before anything runs. For
@@ -88,7 +90,8 @@ Changes to a declaration are handled the way code is (ADR-0029, ADR-0032, ADR-00
 - the change check and the harness run on it, and their results are **recorded on the commit**
 - a review comment is to become an **interview question**, and a review request a **decision
   request** to the person who may decide (decided in ADR-0032; *planned*)
-- a person **approves by merging into `main`**; nobody approves their own change
+- only a person **approves, by merging into `main`**, and only a commit whose checks passed;
+  separate authors and approvers wait until a domain has more than one owner (ADR-0032)
 - **Delivery** points an environment at one approved commit on `main`, and the deploy floor
   requires a passing harness.
 
@@ -97,14 +100,17 @@ their declarations (self-compile, ADR-0028, ADR-0037).
 
 ### 5. Record everything, learn from it
 Domain events are the system of record. Decisions (with inputs and rationale), **denied
-attempts**, exceptions and effect outcomes are recorded too. Agents query this history to
-propose the next domain change. A human decides, and the loop starts again.
+attempts**, exceptions and effect outcomes are recorded too (*built*). The plan is that agents
+query this history (query tools, *planned* M0b) to propose the next domain change (proposals,
+*planned* M4); a human decides, and the loop starts again.
 
 ### 6. See the whole world: the world map ([`world-map.md`](world-map.md))
 The compiler also emits a **world map**, a skill-tree view of the domain (ADR-0020).
-- Pick an actor and where an object stands. Unlocked actions light up, locked ones show
-  exactly what would unlock them, and undecided cells sit in fog.
-- Agents get the same map through MCP (`world_map`, `how_to_reach`).
+- *Built*: `world-map.json`, a Mermaid diagram like the one below, and MCP tools for agents
+  (`world_map`, `how_to_reach`).
+- *Planned* (M0b, in `toprope-shell`): an interactive view. Pick an actor and where an object
+  stands; unlocked actions light up, locked ones show exactly what would unlock them, and
+  undecided cells sit in fog.
 - Every impact report is to include the map diff: what a change newly unlocks or locks, and
   for whom (*planned*, M0b).
 
@@ -114,7 +120,7 @@ stateDiagram-v2
     [*] --> draft
     draft --> approved: approve_experiment<br/>role approver · needs ≥1 guardrail
     approved --> running: launch_experiment<br/>role eng
-    running --> ended: end_experiment<br/>timer · after planned_days
+    running --> ended: end_experiment<br/>timer · after planned_days (timers: M0b)
     ended --> decided: decide<br/>role pm · needs readout
     note right of ended
         fog: relaunch from ended is undecided
@@ -191,16 +197,18 @@ flowchart TB
 ```
 
 How to read it:
-- The **declaration** is the only source of each domain's software: the MCP, backend,
-  views, harness and world map are generated per domain. Authoring and Delivery, the tools
+- The **declaration** is the only source of each domain's software: the MCP, the command
+  line, the guide, the harness and the world map are generated per domain (*built*), and the
+  backend and views will be too (*planned*, M0b). Authoring and Delivery, the tools
   that make and ship domains, are declared domains too (self-compile, ADR-0037), so only the
-  kernel in `toprope-core` is hand-built. Function ports are always hand- or agent-written.
+  kernel in `toprope-core` is hand-built. Function ports (*planned*, M0b) are always hand- or
+  agent-written.
 - Every action, from an agent or a person, passes the **Execution gate**, and it lands in
   the **event store**.
-- The **harness** verifies the gate and every surface against the same declaration before
-  a build can deploy.
-- The loop closes when agents read the event history, propose a change to the declaration,
-  and a person decides.
+- The **harness** verifies the gate and the MCP server against the same declaration before a
+  build can deploy (*built*); the UI and adapters join in M0b.
+- The loop is to close when agents read the event history, propose a change to the
+  declaration, and a person decides (*planned*, M4).
 
 ## A taste of the declaration
 

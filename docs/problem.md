@@ -21,7 +21,8 @@ corrected and learn without leaving that loop.
 Developers who use coding agents heavily end up designing that loop, and the graph of which
 step may follow which, on purpose; this is what is now called loop engineering and graph
 engineering. People whose work is not code have not had that experience, and have no way to
-guarantee such a loop if they build one. We think this loop is the part the rest of the work lacks. This is the motivation for
+guarantee such a loop if they build one. We think this loop is the part the rest of the work
+lacks. This is the motivation for
 Toprope, not one of its tested claims. The sections below show what its absence looks like.
 
 ## Code has a PR. Rules do not.
@@ -40,7 +41,7 @@ next to changing a rule that system follows:
 | What it changes | the current code (the base branch) | unknown: nobody can say what is decided now |
 | What says it is right | types, linters, tests | the approver's memory |
 | Machine checks first | CI | none: a person reviews everything from scratch |
-| Lands without approval | no | yes |
+| Lands without approval | no | often |
 | After it is accepted | it is the code; the next run reads it | nothing is left behind |
 
 The second row decides the rest. With no base there is no diff, so there is nothing to
@@ -52,7 +53,7 @@ right.
 
 ## Agents remove the half that was in people's heads
 
-Every system's safety has two halves. One half is in the machine: permissions, input
+In our view, every system's safety has two halves. One half is in the machine: permissions, input
 validation, payment processing. The other half was in people's heads: *"Don't do that today,
 you touched it yesterday."*
 
@@ -63,7 +64,8 @@ One case we saw: an agent could register a campaign on a large public ad platfor
 an in-house ad system with almost the same data structure. The model was the same. The
 platform had written its rules down; the in-house system had not.
 
-Execution logs are everywhere. Decision records are not. A system can keep a perfect history
+In our experience, execution logs are everywhere and decision records are not. A system can
+keep a perfect history
 of what ran and still not know whether the job it is about to rerun is allowed today.
 
 ## Rules that existed only as speech
@@ -75,13 +77,14 @@ of what ran and still not know whether the job it is about to rerun is allowed t
 | Experiments | "A device, once assigned, never changes group." | It had been broken for three weeks when someone noticed, after a decision was made on those numbers. |
 | Messaging | "No resend of the same campaign within 24 hours." | The same person got it three times. The button was pressed once. |
 
-Every rule in the middle column was said, not written. The rules existed; they were only spoken. None of
+Every rule in the middle column was said, not written. The rules existed; they were only
+spoken. None of
 these is fixed by writing better code, because the code had nothing to check against.
 
 ## Writing it down is not enough, we think
 
 The natural answer is a wiki page, or a few more lines in `AGENTS.md` or a skill. We expect three
-things to go wrong (the M1 pilot tests the last one against a natural-language skill).
+things to go wrong (the M1 pilot compares the last one with a natural-language skill).
 
 - **A document does not know whether it is still true.** A page written three months ago cannot
   tell you whether it still holds, and nothing breaks if nobody reads it.
@@ -98,7 +101,8 @@ things to go wrong (the M1 pilot tests the last one against a natural-language s
 
 We have not seen a good answer to "how do we make people record their decisions?". In our
 experience, recording that is separate from the work loses to urgent work, and meeting notes,
-wikis and policy documents decay that way. Nobody asks how to force people to submit receipts, though: without a receipt, no money
+wikis and policy documents decay that way. Nobody asks how to force people to submit receipts,
+though: without a receipt, no money
 comes out. The difference is not discipline. It is the path.
 
 So we look for designs where the work cannot proceed without the declaration:
@@ -141,7 +145,7 @@ The goal is not to remove people. It is to decide where they stay.
 | The system holds | People keep |
 |---|---|
 | the order of steps: none can be skipped | what this domain should mean |
-| no one approves their own change | which decisions to declare at all |
+| only a person approves, and only what passed its checks | which decisions to declare at all |
 | nothing closes without its evidence | whether partial coverage is acceptable |
 | what is unknown is not folded into what is known | what counts as a domain in the first place |
 
@@ -154,7 +158,7 @@ A declared domain can say whether an action was *allowed*. It cannot say whether
 
 | The problem asks for | Toprope (design; see [Claim status](../README.md#claim-status)) |
 |---|---|
-| a base to diff against | the domain is a declaration: objects, actions, a transition matrix, invariants |
+| a base to diff against | the domain is a declaration: an ontology (objects and links), actions and functions, with a transition matrix and invariants over them |
 | CI for rules | every change gets an impact report and checks for breakage and conflicts, plus a preview, before deploy ([`change-check.md`](change-check.md)) |
 | the declaration as the path, not a side record | agents and people act through MCP and a command line generated from the declaration (a UI is planned, M0b); anything not allowed is refused with a reason |
 | low cost to declare | an interview turns undecided cells into plain questions; the owner answers and confirms |
