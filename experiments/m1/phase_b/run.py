@@ -52,6 +52,8 @@ from .arms import PROMPTS, nl_arm, render_skill, structured_arm
 from .backend import ApiBackend, Backend, CliBackend, UsageLimit, user_memory
 from .model import AnthropicModel, Budget, BudgetExceeded
 from .probes import build_worlds, load_probes
+from .score import grade as grade_run
+from .score import score as score_run
 from .toprope_arm import build_sandbox, export_toolchain, toprope_arm
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -118,7 +120,7 @@ def run_arm(arm: Any, out: Path, requests: list[dict[str, Any]], backend: Backen
     out.mkdir(parents=True, exist_ok=True)
     mpath = out / "manifest.json"
     frozen = {f: m["sha256"] for f, m in json.loads((instruments / "FROZEN.json").read_text())["files"].items()}
-    prompts = _hashes(sorted(PROMPTS.glob("*.md")))
+    prompts = _hashes(sorted(p for p in PROMPTS.glob("*.md") if not p.name.startswith("grade_")))  # the run's
     extra = extra or {}
     if mpath.exists():
         manifest = json.loads(mpath.read_text())
@@ -135,6 +137,20 @@ def run_arm(arm: Any, out: Path, requests: list[dict[str, Any]], backend: Backen
     write = lambda: mpath.write_text(json.dumps(manifest, indent=2) + "\n")
     write()
     try:
+        if worlds is not None and not manifest.get("baseline_probes"):
+            # The probes before any change: a probe that passes here and fails after a change
+            # points at that change (the scorer's "found after deploy").
+            d0 = out / "seq-00"
+            shutil.rmtree(d0, ignore_errors=True)
+            backend.progress = lambda s: _line(f"{arm.name} · before any change · probes · {s}")
+            tp = time.monotonic()
+            probes0 = arm.probe({"seq": 0, "intent": "(before any change)"}, d0, worlds, load_probes(instruments))
+            d0.mkdir(parents=True, exist_ok=True)
+            (d0 / "record.json").write_text(json.dumps({"seq": 0, "probes": probes0,
+                                                        "seconds": {"probes": time.monotonic() - tp}},
+                                                       indent=2, ensure_ascii=False) + "\n")
+            manifest["baseline_probes"] = True
+            write()
         for i, req in enumerate(requests, 1):
             if req["seq"] in manifest["done"]:
                 continue
@@ -274,10 +290,21 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     sb.add_argument("--out", type=Path, default=M1 / "arms", help="writes OUT/structured and OUT/toprope")
     s = sub.add_parser("status", help="how far each arm got")
     s.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    g = sub.add_parser("grade", parents=[common], help="propose a label for every finding, edit and probe "
+                       "(opens the key: only once every arm has run every change)")
+    g.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    g.add_argument("--instruments", type=Path, default=INSTRUMENTS)
+    g.add_argument("--partial", action="store_true", help="grade an incomplete run (tests; never for the report)")
+    sc = sub.add_parser("score", help="the metrics and pilot verdicts, from scoring/confirmed.yaml")
+    sc.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    sc.add_argument("--instruments", type=Path, default=INSTRUMENTS)
     args = ap.parse_args(argv)
 
     if args.cmd == "status":
         print(json.dumps(status(args.out), indent=2))
+        return
+    if args.cmd == "score":
+        print(json.dumps(score_run(args.out, args.instruments), indent=2, ensure_ascii=False))
         return
     if args.cmd == "materials":
         print(json.dumps({"baseline": baseline(),
@@ -289,6 +316,13 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     mem = user_memory()
     extra: dict[str, Any] = {"backend": args.backend, "user_memory": hashlib.sha256(mem.read_bytes()).hexdigest()
                              if mem and args.allow_user_memory else None}
+    if args.cmd == "grade":
+        errs = verify_instruments(args.instruments)
+        if errs:
+            raise SystemExit("the instruments do not verify; nothing is graded:\n" + "\n".join(errs))
+        path = grade_run(args.out, args.instruments, backend, change_requests(args.instruments), args.partial)
+        print(json.dumps({"proposed": str(path), "usage": backend.report()}))
+        return
     if args.cmd == "render":
         args.out.parent.mkdir(parents=True, exist_ok=True)
         render_skill(args.declarations, args.out, backend, args.out.parent / f"{args.out.name}.render.jsonl")
