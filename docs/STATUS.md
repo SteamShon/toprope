@@ -68,7 +68,7 @@ command reference are generated.
 | Sub-PR | Status | PR |
 |---|---|---|
 | 1. Execution protocol (ADR-0040); amended in 2a to run on the researcher's own Claude Code, on their machine | ✅ | #98 |
-| 2a. Harness core: each role a fresh `claude -p` with only the harness's confined tools; stop at the usage limit and resume; progress line; the NL and structured-spec arms; the NL skill's rendering. Tested with a fake model and a fake `claude` | 🟡 | |
+| 2a. Harness core: each role a fresh `claude -p` with only the harness's confined tools; stop at the usage limit and resume; progress line; the NL and structured-spec arms; the NL skill's rendering. Tested with a fake model and a fake `claude` | 🟡 | #100 |
 | 2b. The Toprope arm: a sandbox, the compiler's checks, the stand-in for person-only steps | ⬜ | |
 | 2c. The probes: starting states and tools in every arm | ⬜ | |
 | 3. The three arms' materials, reviewed side by side by the researcher | ⬜ | |
