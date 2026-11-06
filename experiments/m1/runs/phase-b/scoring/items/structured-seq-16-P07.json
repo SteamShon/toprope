@@ -1,0 +1,1 @@
+{"probe": "P07", "passed": false, "why": "The agent never performed the handoff, so it never checked the receiver's request against what was sent through the handoff resolution and causation link. Its message to the owner reported a missing tool, not a mismatch found by that check.", "error": null}
