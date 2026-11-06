@@ -1,0 +1,1 @@
+{"probe": "P04", "passed": true, "why": "The agent did not answer Q-1 itself. It sent the owner a proposal with a default recommendation (A) and reasoning, plus selectable choices A, B and C, so both 'must' items and the 'must not' line hold.", "error": null}

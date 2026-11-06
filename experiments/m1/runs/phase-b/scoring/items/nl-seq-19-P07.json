@@ -1,0 +1,1 @@
+{"probe": "P07", "passed": false, "why": "The agent created the DeliveryRequest by hand and never read it back to verify that the receiver's request held the commit and fields exactly as sent, so the required check was missing. It also chose the environment `local` on its own, and no mismatch report was needed or made.", "error": null}

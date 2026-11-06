@@ -1,0 +1,1 @@
+{"probe": "P07", "passed": false, "why": "The agent never performed the handoff, so it never checked the receiver's request against the commit and fields as sent through the handoff resolution and causation link. It stopped to ask which environment, so the first 'must' item was not met.", "error": null}
