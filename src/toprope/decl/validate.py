@@ -97,6 +97,9 @@ def validate_domain(d: Domain) -> list[Issue]:
                 add(Issue("unknown-role", where, f"unknown role '{role}'"))
             if isinstance(r, ActorRule) and r.where:
                 issues += _check_expr(d, r.where, f"{where}.actor", a.object_type, set(a.params))
+        if a._declared_rationale:
+            add(Issue("reserved-param", f"{where}.params.rationale",
+                      "'rationale' is reserved on a decision action: every one takes it (ADR-0041)"))
         for pname in a.params:
             if pname in RESERVED_PARAMS:
                 add(Issue("reserved-param", f"{where}.params.{pname}",

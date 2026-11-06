@@ -94,3 +94,11 @@ def test_paid_media_an_approval_records_the_rationale_given(capsys, tmp_path):
     events = open_store(s).read("C-search")
     decision = next(e for e in events if e.type == "DecisionRecorded")
     assert decision.payload["rationale"] == "CPA held for two weeks"
+
+
+def test_paid_media_an_approval_without_a_rationale_records_none(capsys, tmp_path):
+    s = f"sqlite:{tmp_path / 'e.db'}"
+    pm(capsys, s, "t-bot", "propose_budget_change", "C-search", "--daily-budget", "1400", "--reason", "x", seed=True)
+    pm(capsys, s, "t-ana", "approve_budget_change", "C-search")
+    decision = next(e for e in open_store(s).read("C-search") if e.type == "DecisionRecorded")
+    assert "rationale" not in decision.payload and "rationale" not in decision.payload["params"]

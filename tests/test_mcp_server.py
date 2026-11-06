@@ -405,3 +405,13 @@ def test_static_token_file_is_type_checked(tmp_path, entry):
     f.write_text(yaml.safe_dump({"t": entry}))
     with pytest.raises(SystemExit):
         open_identity(f"static:{f}")
+
+
+def test_a_decision_actions_tool_takes_an_optional_rationale_and_others_do_not():
+    async def go():
+        async with Client(build_server(make_ex(), As())) as c:
+            tools = {t.name: t for t in (await c.list_tools()).tools}
+            approve, launch = tools["approve_experiment"].input_schema, tools["launch_experiment"].input_schema
+            assert "rationale" in approve["properties"] and "rationale" not in approve.get("required", [])
+            assert "rationale" not in launch["properties"]
+    run(go())

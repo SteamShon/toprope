@@ -189,5 +189,21 @@ def test_a_decision_action_takes_an_optional_rationale(raw):
 
 def test_a_decision_action_may_not_declare_its_own_rationale(raw):
     raw["actions"]["approve_experiment"]["params"]["rationale"] = {"type": "integer"}
-    with pytest.raises(ValueError, match="`rationale` is reserved"):
+    issues = [i for i in validate_domain(Domain.model_validate(raw)) if i.code == "reserved-param"]
+    assert [i.where for i in issues] == ["actions.approve_experiment.params.rationale"]
+
+
+def test_the_added_rationale_is_not_dumped_so_a_dump_validates_to_the_same_action(raw):
+    a = Domain.model_validate(raw).actions["approve_experiment"]
+    again = type(a).model_validate(a.model_dump())
+    assert list(again.params) == list(a.params) and not again._declared_rationale
+    assert "rationale" not in a.model_dump()["params"]
+
+
+def test_the_rationale_follows_records_decision_after_coercion(raw):
+    raw["actions"]["approve_experiment"]["records_decision"] = "false"
+    assert "rationale" not in Domain.model_validate(raw).actions["approve_experiment"].params
+    raw["actions"]["approve_experiment"]["records_decision"] = True
+    raw["actions"]["approve_experiment"]["params"] = 5
+    with pytest.raises(ValidationError):
         Domain.model_validate(raw)

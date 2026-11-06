@@ -6,6 +6,8 @@ it for machines. Run: uv run python tools/gen_schema.py
 import json
 from pathlib import Path
 
+from toprope.kernel import CATALOG as KERNEL_SERVICES
+
 EXPR = {"type": "string", "description": "check-language expression (docs/domain-schema.md)"}
 ID = {"type": "string", "pattern": r"^[A-Za-z_][A-Za-z0-9_-]*$"}
 SCALAR_TYPES = ["string", "integer", "number", "boolean", "datetime"]
@@ -44,9 +46,7 @@ actor_rule = {"oneOf": [{"type": "string"}, obj({"role": {"type": "string"}, "wh
 effect = {"oneOf": [  # `create` is not in v1
     obj({"set": {"type": "object", "additionalProperties": {"type": ["string", "number", "boolean", "null"]}}},
         ["set"]),
-    obj({"call": {"enum": ["validate", "compile", "check_composition", "run_harness", "world_map",
-                           "read_source", "fetch_source", "commit", "diff", "approve_commit",
-                           "preview", "deploy"]},       # kernel services (ADR-0028, ADR-0029)
+    obj({"call": {"enum": list(KERNEL_SERVICES)},   # kernel services (ADR-0028, ADR-0029), from the catalog
          "with": {"type": "object", "additionalProperties": EXPR},
          "reply": {"type": "string"}}, ["call", "reply"]),
 ]}
@@ -58,7 +58,8 @@ action = with_prov({
     "params": {"type": "object", "additionalProperties": param},
     "preconditions": {"type": "array", "items": precondition},
     "effects": {"type": "array", "items": effect},
-    "records_decision": {"type": "boolean"},
+    "records_decision": {"type": "boolean", "description": "a work decision; such an action also takes an "
+                         "optional `rationale` (string), which it may not declare (ADR-0041)"},
     "event": {"type": "string"},
     "applies_in": {"type": "array", "items": {"type": "string"}},
     "requires": {"enum": ["human"]},
