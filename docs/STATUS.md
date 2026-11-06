@@ -75,7 +75,8 @@ command reference are generated.
   object a creating reply made (for example the new commit's id), and each handoff.
 - From a cloud session, the researcher's own steps (freeze, confirm, approve, deploy) are
   committed as a human request and run after the researcher approves the run in GitHub
-  (ADR-0039, #95); the environment `researcher` must be set up once.
+  (ADR-0039, #95); first used for real in #96 (both self-domain Drafts opened, recorded as
+  the researcher, the approval run in the commit).
 - Approving a change is `commit_draft`, `check_commit`, `approve_commit` (there is no `ship`
   shortcut any more); `confirm_all_proposed` confirms every proposed element at once. Reads
   are `toprope-commits` (branches, log, diff, checks, deployed).
@@ -119,6 +120,11 @@ it; each release's cleanup PR handles items older than one release.
 - `identity/git.py` repeats the git lookup in `Workspace.identity`, and the two name a person
   differently (the identity file's name vs git `user.name`); only the workspace API's
   `confirm(via="cli")` still uses the latter (#85, 2026-11-06)
+- The `human-request` workflow pushes its result with the workflow token, so no `pull_request`
+  check runs on that head, and the ruleset does not accept the `status` run the workflow
+  dispatches; the PR needs one more commit before it can merge. A push token that triggers
+  workflows (a GitHub App or a fine-grained token, set up by the maintainer) would remove the
+  step (#96, 2026-11-06)
 - The mechanical layer computes `unreachable_from_creation` twice per run (#71, 2026-11-05)
 - `merge_main` writes the working copy and records the merge in progress in two steps; a
   commit from another process between them gets one parent, and the next commit a stale
