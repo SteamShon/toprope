@@ -67,7 +67,7 @@ command reference are generated.
 
 | Sub-PR | Status | PR |
 |---|---|---|
-| 1. Execution protocol (ADR-0040): a harness on the model API, run in Actions after approval; every change deploys; a stand-in takes the sandbox's person-only steps; only the scorer opens the key | 🟡 | |
+| 1. Execution protocol (ADR-0040): a harness on the model API, run in Actions after approval; every change deploys; a stand-in takes the sandbox's person-only steps; only the scorer opens the key | 🟡 | #98 |
 | 2. The three arms' materials (NL skill rendered blind; structured spec; Toprope sandbox), reviewed side by side by the researcher | ⬜ | |
 | 3. Runner and Toprope sandbox, tested with a fake model | ⬜ | |
 | 4. Scorer, tested with a synthetic key | ⬜ | |
