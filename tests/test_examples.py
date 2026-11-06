@@ -102,3 +102,11 @@ def test_paid_media_an_approval_without_a_rationale_records_none(capsys, tmp_pat
     pm(capsys, s, "t-ana", "approve_budget_change", "C-search")
     decision = next(e for e in open_store(s).read("C-search") if e.type == "DecisionRecorded")
     assert "rationale" not in decision.payload and "rationale" not in decision.payload["params"]
+
+
+def test_paid_media_a_person_cannot_approve_what_their_own_agent_proposed(capsys, tmp_path):
+    s = f"sqlite:{tmp_path / 'e.db'}"
+    out = pm(capsys, s, "t-bot", "propose_budget_change", "C-search", "--daily-budget", "1400", "--reason", "x", seed=True)
+    assert out["state"]["proposed_by"] == "eli"                    # the agent's principal, not the agent
+    out = pm(capsys, s, "t-eli", "approve_budget_change", "C-search")
+    assert (out["status"], out["code"]) == ("denied", "not-the-proposer")

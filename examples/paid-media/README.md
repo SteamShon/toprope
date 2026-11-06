@@ -39,9 +39,8 @@ $R --token t-ana approve_budget_change C-search
 A person who proposes a change and then tries to approve it gets *Whoever proposed a change
 cannot approve it.*
 
-**A gap this example shows**: a declaration cannot yet see whose agent acted. `bot` acts on
-behalf of `eli`, and `proposed_by` records `bot`, so `eli` could approve their own agent's
-proposal. See *Left from reviews* in [`docs/STATUS.md`](../../docs/STATUS.md).
+`bot` acts on behalf of `eli`. `proposed_by` records `actor.principal.id`, the person an agent
+answers for, so a proposal by `bot` is `eli`'s, and `eli` cannot approve it either (ADR-0041).
 
 ## Test it
 

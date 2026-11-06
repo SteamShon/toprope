@@ -31,7 +31,7 @@ actions:
         check: params.daily_budget - target.daily_budget <= 1000
         reason: Raise a daily budget by at most 1000 at a time.
     effects:
-      - set: {target.proposed_budget: params.daily_budget, target.proposed_by: actor.id}
+      - set: {target.proposed_budget: params.daily_budget, target.proposed_by: actor.principal.id}
   approve_budget_change:
     description: Approve the proposed budget exactly as proposed.
     actor: [media_lead]
@@ -39,8 +39,8 @@ actions:
     requires: human
     preconditions:
       - id: not-the-proposer
-        check: target.proposed_by != actor.id
-        reason: Whoever proposed a change cannot approve it.
+        check: target.proposed_by != actor.principal.id
+        reason: Whoever proposed a change, or had their agent propose it, cannot approve it.
     effects:
       - set: {target.daily_budget: target.proposed_budget}
     records_decision: true

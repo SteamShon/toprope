@@ -525,6 +525,9 @@ are reserved and are not roles: `system` (timers, handoffs and fixtures) and
 `on_behalf_of` a person with a **grant** (actions, targets, expiry), which is issued at
 runtime, not in the declaration. The declaration controls agents with `requires: human` and
 with actor rules: an agent must satisfy the rule both for itself and for its principal.
+A check or an effect can read `actor.principal` (`id`, `kind`, `roles`, `role`): the person an
+agent acts for, or the actor itself when it is not an agent. Record and compare
+`actor.principal.id` to say "not the proposer, nor the proposer's agent" (ADR-0041).
 
 ## Representation layer (ADR-0008)
 
