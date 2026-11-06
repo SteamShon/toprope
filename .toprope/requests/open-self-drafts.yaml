@@ -1,0 +1,12 @@
+summary: Open the working drafts of the Authoring and Delivery declarations
+steps:
+  - run:
+      member: authoring
+      action: open_draft
+      target: authoring
+      params: {domain_id: authoring, declaration: domains/authoring/authoring.domain.yaml, branch: work}
+  - run:
+      member: authoring
+      action: open_draft
+      target: delivery
+      params: {domain_id: delivery, declaration: domains/delivery/delivery.domain.yaml, branch: work}
