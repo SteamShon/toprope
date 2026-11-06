@@ -53,6 +53,33 @@ models make the gap matter more, not less: a model can work out what is *right*,
 *you decided*, and the longer it runs alone, the further a wrong premise goes. The long
 version: [`docs/problem.md`](docs/problem.md).
 
+## Where this comes from
+
+The researcher uses coding agents heavily, and over time that work turned into what is now
+called *loop engineering* and *graph engineering*: designing the cycle an agent proposes, gets
+checked and is corrected in, and fixing which steps may follow which. Developers can do this
+because code already has the parts. People whose work is not code have neither the experience
+nor a way to guarantee it. So Toprope asks them for something they can answer instead: an
+**ontology** of their work (objects and links), the **actions** that change it, and the
+**functions** that compute over it. It then generates the loop and the graph from that. This is
+one answer we are testing, not *the* answer.
+
+| What a loop or a graph needs | Where it is in Toprope | Status |
+|---|---|---|
+| a graph of the allowed moves | the transition matrix, roles and preconditions; the world map draws it | built |
+| a guarantee the graph is kept | the gate, and a harness that tries every cell | built (model and Execution levels) |
+| a loop on the spec | commit → change check → approve → deploy | built |
+| a loop from use | event log → proposals → a person decides | log built; proposals planned (M4) |
+| a graph between domains | composition and typed handoffs (ADR-0026) | built in part |
+| functions | typed function ports (ADR-0015) | planned (M0b) |
+
+The person designing the workflow does not have to know how to guarantee any of this. The
+guarantees sit in the kernel and the compiler: every cell is tested, nobody approves their own
+change, and nothing deploys without a passing harness. Two limits are worth saying plainly.
+People still cannot write an ontology by hand, so Toprope gets it through an interview, and
+whether that works is what links ① and ② test. And the matrix can say whether an action was
+*allowed*, not whether the decision was *good*; that stays with people.
+
 ## Agents drive existing systems; Toprope sits in between
 
 ```
@@ -74,12 +101,16 @@ there is nothing yet and Toprope generates the backend too. Both effect layers a
 
 ## What Toprope does
 
-1. **Declare the domain, DDD-style** (*built*). Objects, actions, a **transition matrix** (who
-   may do what, in which state) and **invariants** (what must always hold). An agent drafts it
+1. **Declare the domain, DDD-style** (*built*; functions *planned*, M0b). An ontology (objects
+   and links), the actions that change it and the functions that compute over it. Over them sit
+   the rules: a **transition matrix** (who may do what, in which state) and **invariants** (what
+   must always hold). The matrix is the graph of allowed moves. Because it is declared, it can
+   be drawn (the world map) and every cell of it can be tested. An agent drafts the declaration
    from your code, docs and an interview; the owner answers plain questions, such as *"Can
    someone approve an experiment that is already running?"*, and confirms.
-2. **Change it like code: git and GitHub for the domain** (*built*). Every change is a commit on
-   a branch with a semantic diff. The change check runs on it: an impact report in domain terms
+2. **Change it like code: git and GitHub for the domain** (*built*). Nobody declares a domain
+   right the first time (the premise, P0), so the spec itself needs a loop. Every change is a
+   commit on a branch with a semantic diff. The change check runs on it: an impact report in domain terms
    (*"changes 2 cells; affects 14 tests, 1 invariant"*), broken references, conflicting rules,
    regressions, and what past events would have done under the new rules. A person approves by
    merging into `main`, and Delivery deploys only approved commits whose harness passed
@@ -92,7 +123,7 @@ there is nothing yet and Toprope generates the backend too. Both effect layers a
    nearly free.
 4. **Refuse and record** (*built*). Every action goes through one gate that checks the
    declaration and refuses with the declared reason. Actions, denials and decisions land in an
-   event log, where the next change can be proposed from.
+   event log. Proposing the next change from that history is *planned* (M4).
 
 One declaration reads as two sentences (an illustration):
 

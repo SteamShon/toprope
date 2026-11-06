@@ -18,7 +18,10 @@ person looks; nothing lands without approval; a pipeline deploys only what was a
 logs show what happened, which feeds the next change. An agent can propose, be checked, be
 corrected and learn without leaving that loop.
 
-We think this loop is the part the rest of the work lacks. This is the motivation for
+Developers who use coding agents heavily end up designing that loop, and the graph of which
+step may follow which, on purpose; this is what is now called loop engineering and graph
+engineering. People whose work is not code have not had that experience, and have no way to
+guarantee such a loop if they build one. We think this loop is the part the rest of the work lacks. This is the motivation for
 Toprope, not one of its tested claims. The sections below show what its absence looks like.
 
 ## Code has a PR. Rules do not.
@@ -143,6 +146,9 @@ The goal is not to remove people. It is to decide where they stay.
 | what is unknown is not folded into what is known | what counts as a domain in the first place |
 
 An agent can do every step that proposes. It owns none of the steps that decide.
+
+A declared domain can say whether an action was *allowed*. It cannot say whether a decision was
+*good*. That judgment stays with people too.
 
 ## What this asks of a solution, and what Toprope does
 

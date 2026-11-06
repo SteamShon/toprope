@@ -244,6 +244,11 @@ Our reading of the alternatives, in broad strokes:
 | Agents | read text and hope | call it as a decision service | integrate via APIs | first-class users via generated MCP |
 | Decisions | lost in chat | decision logs, varies | varies | event-sourced and queryable |
 
+Agent orchestration frameworks (LangGraph and others) are a different layer. In them you
+engineer the **agent's** graph: which step the agent takes next. Toprope declares the
+**domain's** graph: which moves are allowed at all. Any agent's graph, hand-built or generated,
+runs inside it. An orchestration framework can be Toprope's optional runtime (from M4).
+
 ## Where it fits, and where it does not
 
 The work between people is the starting point, not the boundary. Toprope applies wherever
