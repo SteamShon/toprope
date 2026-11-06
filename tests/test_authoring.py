@@ -327,3 +327,25 @@ def test_a_workspace_may_be_named_by_its_file(tmp_path):
     assert one.root == two.root == tmp_path.resolve()
     assert one.domain_path.name == "one.domain.yaml" and two.log_path.parts[-2] == "two"
     assert one.chunks("docs")
+
+
+def test_a_cli_confirmation_records_the_git_identity(tmp_path):
+    """Who confirmed comes from the terminal's git identity, without anyone typing it."""
+    import json
+    import subprocess
+    from toprope.authoring import Workspace
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.name", "Ana Owner"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.email", "ana@example.org"], check=True)
+    (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump(
+        {"domain": "d.domain.yaml", "sources": [{"id": "docs", "kind": "records", "path": "docs"}]}))
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "a.md").write_text("# A\nrules\n")
+    (tmp_path / "d.domain.yaml").write_text(yaml.safe_dump(schema_doc_domain(), sort_keys=False))
+    ws = Workspace(tmp_path)
+    ws.propose("actions.approve_experiment", ws.draft()["actions"]["approve_experiment"], "docs:docs/a.md#L1-L2")
+    ws.confirm(["actions.approve_experiment"], via="cli")
+    entry = json.loads(ws.log_path.read_text().splitlines()[-1])
+    assert entry["who"] == "Ana Owner <ana@example.org>"
+    ws.confirm(["actions.approve_experiment"], via="cli", who="eli")              # an explicit name wins
+    assert json.loads(ws.log_path.read_text().splitlines()[-1])["who"] == "eli"

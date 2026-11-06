@@ -18,8 +18,8 @@
                                                       recorded on the commit; exits 1 when it fails
   toprope-author checkout COMMIT [--force]            load a commit into the working copy (a revert,
                                                       once committed)
-  toprope-author approve COMMIT --as NAME [--yes]     merge a commit into main and tag it (only you)
-  toprope-author confirm PATH... [--workspace DIR] [--yes]   only you confirm
+  toprope-author approve COMMIT [--as NAME] [--yes]     merge a commit into main and tag it (only you)
+  toprope-author confirm PATH... [--workspace DIR] [--yes] [--as NAME]   only you confirm (recorded as your git identity)
   toprope-author check [--workspace DIR]
 """
 
@@ -101,13 +101,14 @@ def main(argv: list[str] | None = None) -> None:
     df.add_argument("--workspace", default=".")
     ap_ = sub.add_parser("approve")
     ap_.add_argument("commit")
-    ap_.add_argument("--as", dest="who", required=True, help="your name: the approver")
+    ap_.add_argument("--as", dest="who", default=None, help="your name: the approver (default: your git identity)")
     ap_.add_argument("--workspace", default=".")
     ap_.add_argument("--yes", action="store_true")
     c = sub.add_parser("confirm")
     c.add_argument("paths", nargs="+")
     c.add_argument("--workspace", default=".")
     c.add_argument("--yes", action="store_true", help="do not prompt (you are confirming as the owner)")
+    c.add_argument("--as", dest="who", default=None, help="your name (default: your git user.name <user.email>)")
     args = ap.parse_args(argv)
 
     if args.cmd == "init":
@@ -157,6 +158,9 @@ def main(argv: list[str] | None = None) -> None:
             frm, to = (None, args.commits[0]) if len(args.commits) == 1 else args.commits[:2]
             print(json.dumps(ws.commits.diff(ws.draft()["domain"], frm, to), indent=2))
         elif args.cmd == "approve":
+            args.who = args.who or ws.identity()
+            if not args.who:
+                raise SystemExit("approve needs --as NAME: no git identity or login name found")
             if not args.yes:
                 if not sys.stdin.isatty():
                     raise SystemExit("approve needs your terminal (or --yes when you run it yourself)")
@@ -170,7 +174,7 @@ def main(argv: list[str] | None = None) -> None:
                 print("Confirm as right:\n" + "\n".join(f"  {p}" for p in args.paths))
                 if input("[y/N] ").strip().lower() != "y":
                     raise SystemExit("not confirmed")
-            print(json.dumps(ws.confirm(args.paths, via="cli"), indent=2))
+            print(json.dumps(ws.confirm(args.paths, via="cli", who=args.who), indent=2))
     except AuthoringError as e:
         raise SystemExit(f"error: {e}") from None
 
