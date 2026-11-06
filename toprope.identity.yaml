@@ -6,6 +6,7 @@
 people:
   steamshon@apache.org:
     name: steamshon
+    github: SteamShon            # approves human requests in GitHub (ADR-0039)
     roles: [owner, approver]
 
 # An agent's own git email, acting for a person under a grant. The grant lists what it may

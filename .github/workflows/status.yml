@@ -5,9 +5,15 @@ name: status
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
+  workflow_dispatch:          # human-request.yml runs it on the head it pushed (ADR-0039)
+    inputs:
+      pr:
+        description: the pull request number
+        required: true
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   status:
@@ -24,7 +30,14 @@ jobs:
           BASE: ${{ github.base_ref }}
           TITLE: ${{ github.event.pull_request.title }}
           BODY: ${{ github.event.pull_request.body }}
+          PR: ${{ inputs.pr }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          if [ -n "$PR" ]; then            # dispatched: read the pull request itself
+            BASE=$(gh pr view "$PR" --json baseRefName --jq .baseRefName)
+            TITLE=$(gh pr view "$PR" --json title --jq .title)
+            BODY=$(gh pr view "$PR" --json body --jq .body)
+          fi
           git diff --name-only "origin/${BASE}...HEAD" > "$RUNNER_TEMP/changed.txt"
           printf '%s' "$BODY" > "$RUNNER_TEMP/body.txt"
           python tools/status_check.py --base "$BASE" --title "$TITLE" \

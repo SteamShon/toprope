@@ -1,0 +1,161 @@
+"""Run a human request: steps only the researcher may take, approved in GitHub (ADR-0039).
+
+A request is a file `.toprope/requests/<id>.yaml` on a work branch:
+
+    summary: Freeze the M1 binding
+    steps:
+      - freeze-binding: experiments/m1/instruments
+      - run: {member: authoring, action: approve_commit, target: 5-ab12cd34ef56ab78}
+      - run: {member: authoring, action: confirm_all_proposed, target: authoring}
+
+Steps, from a fixed set:
+- `freeze: DIR`, `freeze-binding: DIR`: `experiments/tools/instruments.py`
+- `amend: {dir: DIR, file: FILE, reason: TEXT}`: the same, on the record
+- `run: {member, action, target, params}`: a self-domain action through `toprope-run`, as the
+  approver (`--identity github`)
+
+`.github/workflows/human-request.yml` calls `check` (and shows `render` on the run page) before
+it waits for the approval, and `run` after it.
+
+  python tools/human_request.py check REQUEST
+  python tools/human_request.py render REQUEST
+  python tools/human_request.py run REQUEST --approver LOGIN [--identity toprope.identity.yaml]
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+import yaml
+
+ROOT = Path(__file__).resolve().parents[1]
+REQUESTS = ".toprope/requests"
+INSTRUMENT_STEPS = ("freeze", "freeze-binding", "amend")
+COMPOSITION = "domains/toprope-self.composition.yaml"
+
+
+def load(path: str | Path) -> dict:
+    req = yaml.safe_load(Path(path).read_text())
+    errors = check(req)
+    if errors:
+        raise ValueError("; ".join(errors))
+    return req
+
+
+def check(req: object) -> list[str]:
+    """Errors in a request; empty means it may be shown for approval."""
+    if not isinstance(req, dict) or set(req) - {"summary", "steps"}:
+        return ["a request has `summary` and `steps`, nothing else"]
+    errors = []
+    if not isinstance(req.get("summary"), str) or not req["summary"].strip():
+        errors.append("summary: say in one line what you approve")
+    steps = req.get("steps")
+    if not isinstance(steps, list) or not steps:
+        return errors + ["steps: a non-empty list"]
+    for i, st in enumerate(steps, 1):
+        if not isinstance(st, dict) or len(st) != 1:
+            errors.append(f"step {i}: one of {', '.join(INSTRUMENT_STEPS)} or run")
+            continue
+        (kind, arg), = st.items()
+        if kind in ("freeze", "freeze-binding"):
+            if not isinstance(arg, str) or not arg:
+                errors.append(f"step {i}: {kind} takes the instruments directory")
+        elif kind == "amend":
+            if not isinstance(arg, dict) or set(arg) != {"dir", "file", "reason"} \
+                    or not all(isinstance(v, str) and v.strip() for v in arg.values()):
+                errors.append(f"step {i}: amend takes dir, file and reason")
+        elif kind == "run":
+            if not isinstance(arg, dict) or not {"member", "action", "target"} <= set(arg) \
+                    or set(arg) - {"member", "action", "target", "params"} \
+                    or not all(isinstance(arg[k], str) and arg[k] for k in ("member", "action", "target")) \
+                    or not isinstance(arg.get("params", {}), dict):
+                errors.append(f"step {i}: run takes member, action, target and optional params")
+        else:
+            errors.append(f"step {i}: {kind!r} is not a step (one of {', '.join(INSTRUMENT_STEPS)} or run)")
+    return errors
+
+
+def render(req: dict) -> str:
+    """What the researcher reads on the run page before approving."""
+    lines = [f"### Human request: {req['summary']}", "",
+             "Approving runs these steps as you, in this order:", ""]
+    for i, st in enumerate(req["steps"], 1):
+        (kind, arg), = st.items()
+        if kind == "run":
+            params = " ".join(f"--{k.replace('_', '-')} {json.dumps(v) if not isinstance(v, str) else v}"
+                              for k, v in (arg.get("params") or {}).items())
+            lines.append(f"{i}. `{arg['member']}`: **{arg['action']}** `{arg['target']}` {params}".rstrip())
+        elif kind == "amend":
+            lines.append(f"{i}. **amend** `{arg['file']}` in `{arg['dir']}`: {arg['reason']}")
+        else:
+            lines.append(f"{i}. **{kind}** `{arg}`")
+    return "\n".join(lines) + "\n"
+
+
+def commands(req: dict) -> list[list[str]]:
+    """The command for each step."""
+    tool = [sys.executable, str(ROOT / "experiments/tools/instruments.py")]
+    out = []
+    for st in req["steps"]:
+        (kind, arg), = st.items()
+        if kind in ("freeze", "freeze-binding"):
+            out.append(tool + [kind, arg])
+        elif kind == "amend":
+            out.append(tool + ["amend", arg["dir"], arg["file"], "--reason", arg["reason"]])
+        else:
+            cmd = ["toprope-run", "--composition", COMPOSITION, "--member", arg["member"],
+                   "--kernel-root", ".", "--workspace", f"toprope.{arg['member']}.workspace.yaml",
+                   "--env", ".toprope/env", "--identity", "github", arg["action"], arg["target"]]
+            for k, v in (arg.get("params") or {}).items():
+                cmd += [f"--{k.replace('_', '-')}", v if isinstance(v, str) else json.dumps(v)]
+            out.append(cmd)
+    return out
+
+
+def run(req: dict, approver: str, identity: str = "toprope.identity.yaml", cwd: str | Path = ".") -> list[dict]:
+    """Run every step as the approver; stop at the first that fails."""
+    sys.path.insert(0, str(ROOT / "src"))
+    from toprope.identity.github import ENV, github_logins
+    person = github_logins(Path(cwd) / identity).get(approver.lower())
+    if person is None:
+        raise SystemExit(f"GitHub user {approver} approved, but is not a person with `github:` in {identity}")
+    env = {**os.environ, ENV: approver}
+    done = []
+    for st, cmd in zip(req["steps"], commands(req), strict=True):
+        r = subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True, check=False)
+        done.append({"step": st, "returncode": r.returncode, "stdout": r.stdout[-4000:], "stderr": r.stderr[-4000:]})
+        if r.returncode != 0:
+            print(json.dumps(done, indent=2), file=sys.stderr)
+            raise SystemExit(f"step {len(done)} failed: {' '.join(cmd[:6])} ...\n{r.stderr[-2000:]}")
+    print(json.dumps({"approver": approver, "as": person.actor.id, "steps": len(done)}, indent=2))
+    return done
+
+
+def main(argv: list[str] | None = None) -> None:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("cmd", choices=["check", "render", "run"])
+    ap.add_argument("request")
+    ap.add_argument("--approver", help="the GitHub login that approved the run (for run)")
+    ap.add_argument("--identity", default="toprope.identity.yaml")
+    args = ap.parse_args(argv)
+    try:
+        req = load(args.request)
+    except (OSError, ValueError, yaml.YAMLError) as e:
+        raise SystemExit(f"{args.request}: {e}") from None
+    if args.cmd == "check":
+        print("ok")
+    elif args.cmd == "render":
+        print(render(req), end="")
+    else:
+        if not args.approver:
+            raise SystemExit("run needs --approver")
+        run(req, args.approver, args.identity)
+
+
+if __name__ == "__main__":
+    main()

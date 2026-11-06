@@ -30,6 +30,16 @@ processes on your machine; an `agents` entry applies to an agent with its own gi
 example in its own container). As a guard against mistakes, an action only a person may take
 also asks you to confirm on your terminal, which an agent's ordinary shell cannot do.
 
+**From a cloud session (ADR-0039).** What only you may do (freeze an instrument, confirm,
+approve, deploy) can be done without your terminal: the agent commits a *human request*,
+`.toprope/requests/<id>.yaml`, listing the steps; the `human-request` workflow shows them on
+its run page and waits; you press **Approve and deploy** (web or the GitHub mobile app); the
+steps then run as you, the person `toprope.identity.yaml` lists with your `github:` login,
+and the result is pushed to the branch with the approver and the run in the commit. The
+format is in `tools/human_request.py`. One-time setup (maintainer): Repository settings →
+Environments → `researcher` → Required reviewers: you ("Prevent self-review" off); Actions →
+Workflow permissions: read and write.
+
 Install `uv` first (`brew install uv`, or `curl -LsSf https://astral.sh/uv/install.sh | sh`),
 then `uv sync`. Every command runs from the repository root as `uv run <command>`.
 

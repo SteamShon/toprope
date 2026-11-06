@@ -129,7 +129,9 @@ state; they link here. The README claim-status table stays in the README, becaus
   runs. Everything that feeds a link verdict (M2 and later instruments, any gold set) stays
   human-only.
 - **Freezing and amending.** The researcher freezes an instrument, or tells an agent to, and
-  the commit records that instruction. A frozen file may change later only through
+  the commit records that instruction. From a cloud session, the agent writes the steps as a
+  human request (`.toprope/requests/<id>.yaml`) and the researcher approves its run in GitHub;
+  the commit records the approver and the run (ADR-0039). A frozen file may change later only through
   `instruments.py amend --reason`, which keeps the old hash and the reason in `FROZEN.json`;
   results report which version each run used. An agent amends only at the researcher's
   explicit instruction.

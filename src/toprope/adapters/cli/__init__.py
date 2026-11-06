@@ -45,7 +45,8 @@ def _base_parser(add_help: bool) -> argparse.ArgumentParser:
     ap.add_argument("--store-dir", help="with --composition: one SQLite store per member, <dir>/<member>.db "
                     "(default: each member's event log, <its directory>/events, kept in git)")
     ap.add_argument("--identity", help="git[:FILE] (your git email, looked up in FILE, default "
-                    "toprope.identity.yaml; the default when that file is here), static:FILE or jwt")
+                    "toprope.identity.yaml; the default when that file is here), github[:FILE] (the "
+                    "approver of a GitHub run, ADR-0039), static:FILE or jwt")
     ap.add_argument("--token", help="your credential (default: TOPROPE_TOKEN)")
     ap.add_argument("--kernel-root", help="run declared kernel-service effects on files under this directory")
     ap.add_argument("--workspace", help="authoring workspace, for the source services")
@@ -106,15 +107,20 @@ def _identity(spec: str | None, token: str | None = None) -> Identity:
             return GitIdentity(spec[4:] or FILE)
         except (OSError, ValueError) as e:
             raise SystemExit(f"identity file: {e}") from None
+    if spec == "github" or spec.startswith("github:"):      # the approver of a GitHub run (ADR-0039)
+        from ...identity.github import GitHubApprovalIdentity
+        try:
+            return GitHubApprovalIdentity(spec[7:] or FILE)
+        except (OSError, ValueError) as e:
+            raise SystemExit(f"identity file: {e}") from None
     return open_identity(spec)
 
 
 def _caller(identity: Identity, token: str | None) -> Caller:
-    from ...identity.git import GitIdentity
     caller = identity.resolve(token)
     if caller is None:
-        raise SystemExit(identity.explain() if isinstance(identity, GitIdentity)
-                         else "TOPROPE_TOKEN (or --token) does not resolve to a caller")
+        explain = getattr(identity, "explain", None)    # the local identities say why
+        raise SystemExit(explain() if explain else "TOPROPE_TOKEN (or --token) does not resolve to a caller")
     return caller
 
 
@@ -230,8 +236,9 @@ def main(argv: list[str] | None = None) -> None:
     params = {name: getattr(args, f"p_{name}") for name in d.actions[args.cmd].params
               if getattr(args, f"p_{name}", None) is not None}
     from ...identity.git import GitIdentity
-    if isinstance(ex.identity, GitIdentity):
-        caller = _caller(ex.identity, token)          # says why the git email is not listed
+    from ...identity.github import GitHubApprovalIdentity
+    if isinstance(ex.identity, (GitIdentity, GitHubApprovalIdentity)):
+        caller = _caller(ex.identity, token)          # says why the caller is not listed
         if d.actions[args.cmd].requires == "human":
             _confirm_on_terminal(ex.identity, caller, args.cmd, args.target)
     from ..mcp import outcome_json
