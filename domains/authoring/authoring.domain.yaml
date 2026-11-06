@@ -407,20 +407,26 @@ actions:
       ref: records:docs/adr/0032-domain-knowledge-as-git-and-github.md#L38-L63
     status: confirmed
   commit_draft:
-    description: Snapshot the working copy as an immutable commit.
+    description: Snapshot the working copy as an immutable commit, citing what the
+      change rests on.
     actor:
     - owner
     target: Draft
+    params:
+      evidence:
+        type: string
+        many: true
+        optional: true
     effects:
     - call: commit
       with:
         declaration: target.declaration
+        evidence: params.evidence
       reply: record_commit
     source:
-      kind: interview
-      ref: interview:domains/authoring/interview.jsonl#L5
-      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: confirmed
+      kind: record
+      ref: records:docs/commits.md#L24-L44
+    status: proposed
   record_commit:
     description: Record the commit the kernel made.
     actor:
