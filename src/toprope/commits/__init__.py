@@ -271,6 +271,17 @@ class CommitStore:
         """True if `a` is `b` or an ancestor of `b`."""
         return a in self.ancestors(domain, b)
 
+    def review_base(self, domain: str, commit_id: str) -> str | None:
+        """What a commit is reviewed and checked against (ADR-0033): its merge base with `main`;
+        its first parent when it is in `main` already or nothing is approved yet; None for a
+        commit without parents (a first version)."""
+        c = self.get(domain, commit_id)
+        main = self.main(domain)
+        base = self.merge_base(domain, c.id, main.id) if main else None
+        if base == c.id or main is None:
+            base = c.parents[0] if c.parents else None
+        return base
+
     def merge_base(self, domain: str, a: str, b: str) -> str | None:
         """The nearest common ancestor: a common ancestor no other common ancestor descends from.
         The log is read once."""

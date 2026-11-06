@@ -52,6 +52,7 @@ For each stage: may the action happen, and where does it lead? A missing cell is
 - **deployed-builds-passed-their-harness** on DeliveryRequest: Nothing reaches the environment unless its harness passed.
 - **verified-requests-were-deployed** on DeliveryRequest: Only a deployment that happened is verified.
 - **finished-deploys-record-the-outcome** on DeliveryRequest: A finished deploy records whether it happened.
+- **deploying-builds-passed-their-harness** on DeliveryRequest: A deploy starts only from a build whose harness passed.
 
 ## Examples and scenarios
 

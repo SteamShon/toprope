@@ -349,3 +349,45 @@ def test_a_cli_confirmation_records_the_git_identity(tmp_path):
     assert entry["who"] == "Ana Owner <ana@example.org>"
     ws.confirm(["actions.approve_experiment"], via="cli", who="eli")              # an explicit name wins
     assert json.loads(ws.log_path.read_text().splitlines()[-1])["who"] == "eli"
+
+
+def test_a_handoff_is_an_element_to_confirm(tmp_path):
+    """A handoff is a decision about what crosses into another domain: drafted, then confirmed."""
+    from toprope.authoring import Workspace
+    (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump(
+        {"domain": "d.domain.yaml", "sources": [{"id": "docs", "kind": "records", "path": "docs"}]}))
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "a.md").write_text("# A\nhand approved experiments to delivery\n")
+    (tmp_path / "d.domain.yaml").write_text(yaml.safe_dump(schema_doc_domain(), sort_keys=False))
+    ws = Workspace(tmp_path)
+    ws.propose("handoffs.deliver", {"when": {"action": "approve_experiment"},
+                                    "to": {"domain": "delivery", "interface": "1.x", "action": "request_delivery"},
+                                    "params": {}, "target": "target.id"}, "docs:docs/a.md#L1-L2")
+    assert "handoffs.deliver" in ws._proposed(ws.draft())
+    ws.confirm(["handoffs.deliver"], via="cli", who="ana")
+    assert ws.draft()["handoffs"]["deliver"]["status"] == "confirmed"
+
+
+def test_cli_confirms_every_proposed_element_at_once(tmp_path):
+    import json
+    import subprocess
+    (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump(
+        {"domain": "d.domain.yaml", "sources": [{"id": "docs", "kind": "records", "path": "docs"}]}))
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "a.md").write_text("# A\nrules\n")
+    (tmp_path / "d.domain.yaml").write_text(yaml.safe_dump(schema_doc_domain(), sort_keys=False))
+    from toprope.authoring import Workspace
+    ws = Workspace(tmp_path)
+    for a in ("approve_experiment", "launch_experiment"):
+        ws.propose(f"actions.{a}", ws.draft()["actions"][a], "docs:docs/a.md#L1-L2")
+    run = lambda *a: subprocess.run(["uv", "run", "--quiet", "toprope-author", "confirm", *a, "--workspace",  # noqa: E731
+                                     str(tmp_path)], capture_output=True, text=True, timeout=120, check=False)
+    assert "name the elements" in run("--yes").stderr
+    proposed = ws._proposed(ws.draft())
+    assert {"actions.approve_experiment", "actions.launch_experiment"} <= set(proposed)
+    out = run("--all-proposed", "--yes", "--as", "ana")
+    assert out.returncode == 0 and "actions.launch_experiment" in out.stderr
+    assert ws._proposed(ws.draft()) == []
+    entry = json.loads(ws.log_path.read_text().splitlines()[-1])
+    assert entry["paths"] == proposed and entry["who"] == "ana"
+    assert "nothing is proposed" in run("--all-proposed", "--yes").stderr

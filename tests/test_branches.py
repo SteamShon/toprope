@@ -333,3 +333,14 @@ def test_the_commit_service_reviews_from_the_merge_base_like_the_workspace(tmp_p
     write(tmp_path / "d.domain.yaml", raw)
     c2 = k.call("commit", {"declaration": "d.domain.yaml"})
     assert c2["to_review"] == ["action:launch_experiment", "term:a"]        # the branch, not its last step
+
+
+def test_before_any_approval_a_commit_is_reviewed_against_its_parent(tmp_path):
+    """The commit's to-review list and its change check use the same base (ADR-0033)."""
+    raw = schema_doc_domain()
+    ws = workspace(tmp_path, raw)
+    first = ws.commit()["commit"]
+    raw["actions"]["launch_experiment"]["description"] = "Start traffic."
+    write(tmp_path / "d.domain.yaml", raw)
+    out = ws.commit()
+    assert out["since"] == first and out["to_review"] == ["action:launch_experiment"]

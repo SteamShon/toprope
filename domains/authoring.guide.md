@@ -59,7 +59,7 @@ A domain owner's workflow lives in people's heads; turning it into a declared do
 | `check_commit` | owner | **Commit** | — | the stage (per the matrix) | kernel `change_check` → `record_check` | `CommitCheckCommit` |
 | `record_check` | the kernel | **Commit**; params `passed` (boolean), `summary` (string) | — | the stage (per the matrix); `target.checks_passed` ← `params.passed`, `target.failing` ← `params.summary` | — | `CommitRecordCheck` |
 | `approve_commit` 🔒 📝 | owner | **Commit** | `checks-pass`: Run the change check, and approve only a commit that passes it.; `not-approved`: Already approved; approve a newer commit. | the stage (per the matrix) | kernel `approve_commit` → `record_approval` | `CommitApproveCommit` |
-| `record_approval` | the kernel | **Commit**; params `approved` (boolean), `main` (string) | — | the stage (per the matrix); `target.approved` ← `params.approved`, `target.main` ← `params.main` | — | `CommitRecordApproval` |
+| `record_approval` | the kernel | **Commit**; params `approved` (boolean), `main` (string) | `approved-only-if-checked`: A commit is recorded as approved only if its change check passed. | the stage (per the matrix); `target.approved` ← `params.approved`, `target.main` ← `params.main` | — | `CommitRecordApproval` |
 | `deliver` | owner | **Commit**; params `environment` (one of local) | `approved`: Only an approved commit is delivered. | the stage (per the matrix) | handoff `deliver_approved_commit` → delivery.request_delivery | `CommitDeliver` |
 
 ## Transitions

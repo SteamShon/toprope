@@ -189,10 +189,7 @@ def check_commit(commits: Any, domain: str, commit_id: str, base: str | None = "
     commit without parents is checked as a first version."""
     c = commits.get(domain, commit_id)
     if base == "merge-base":
-        main = commits.main(domain)
-        base = commits.merge_base(domain, c.id, main.id) if main else None
-        if base == c.id or main is None:       # in main already, or nothing approved yet: its parent
-            base = c.parents[0] if c.parents else None
+        base = commits.review_base(domain, c.id)
     old = commits.domain(domain, base) if base else None
     report = change_check(commits.domain(domain, c.id), old, events=events, nl=nl, examples=examples,
                           cache=cache, full=full, roles_of=roles_of)

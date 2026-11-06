@@ -445,9 +445,19 @@ actions:
     - id: checks-pass
       check: target.checks_passed == true
       reason: Run the change check, and approve only a commit that passes it.
+      source:
+        kind: interview
+        ref: interview:interview/authoring/log.jsonl#L6
+        quote: 전부 다 추천한 거 동의.
+      status: proposed
     - id: not-approved
       check: target.approved != true
       reason: Already approved; approve a newer commit.
+      source:
+        kind: interview
+        ref: interview:interview/authoring/log.jsonl#L6
+        quote: 전부 다 추천한 거 동의.
+      status: proposed
   record_approval:
     description: Record the approval and what main points to.
     actor:
@@ -462,11 +472,20 @@ actions:
     - set:
         target.approved: params.approved
         target.main: params.main
+    preconditions:
+    - id: approved-only-if-checked
+      check: params.approved != true or target.checks_passed == true
+      reason: A commit is recorded as approved only if its change check passed.
+      source:
+        kind: interview
+        ref: interview:interview/authoring/log.jsonl#L11
+        quote: 25번은 A로 추천으로 해도 될 것 같고, 이십육 번도 A로.
+      status: proposed
     source:
       kind: interview
-      ref: interview:interview/authoring/log.jsonl#L5
-      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: confirmed
+      ref: interview:interview/authoring/log.jsonl#L11
+      quote: 25번은 A로 추천으로 해도 될 것 같고, 이십육 번도 A로.
+    status: proposed
   deliver:
     description: Ask Delivery to deliver an approved commit to an environment.
     actor:
@@ -480,6 +499,11 @@ actions:
     - id: approved
       check: target.approved == true
       reason: Only an approved commit is delivered.
+      source:
+        kind: interview
+        ref: interview:interview/authoring/log.jsonl#L8
+        quote: 20번, 21번 둘 다 추천대로 동의.
+      status: proposed
     source:
       kind: interview
       ref: interview:interview/authoring/log.jsonl#L8
@@ -491,70 +515,177 @@ transitions:
     initial: added
     matrix:
       added:
-        fetch_source: added
-        record_fetch: fetched
+        fetch_source:
+          to: added
+          source:
+            kind: interview
+            ref: interview:interview/authoring/log.jsonl#L6
+            quote: 전부 다 추천한 거 동의.
+          status: proposed
+        record_fetch:
+          to: fetched
+          source:
+            kind: interview
+            ref: interview:interview/authoring/log.jsonl#L6
+            quote: 전부 다 추천한 거 동의.
+          status: proposed
       fetched:
         fetch_source:
           deny: A link is fetched once into a snapshot; add a new source to read it
             again.
+          source:
+            kind: interview
+            ref: interview:interview/authoring/log.jsonl#L6
+            quote: 전부 다 추천한 거 동의.
+          status: proposed
         record_fetch: n/a
   Element:
     field: review
     initial: proposed
     matrix:
       proposed:
-        confirm_element: confirmed
-        mark_unknown: unknown
+        confirm_element:
+          to: confirmed
+          source:
+            kind: interview
+            ref: interview:interview/authoring/log.jsonl#L6
+            quote: 전부 다 추천한 거 동의.
+          status: proposed
+        mark_unknown:
+          to: unknown
+          source:
+            kind: interview
+            ref: interview:interview/authoring/log.jsonl#L6
+            quote: 전부 다 추천한 거 동의.
+          status: proposed
       unknown:
-        confirm_element: confirmed
+        confirm_element:
+          to: confirmed
+          source:
+            kind: interview
+            ref: interview:interview/authoring/log.jsonl#L6
+            quote: 전부 다 추천한 거 동의.
+          status: proposed
         mark_unknown: n/a
       confirmed:
         confirm_element: n/a
         mark_unknown:
           deny: A confirmed element changes by a new proposal and a new commit, not
             by marking it unknown.
+          source:
+            kind: interview
+            ref: interview:interview/authoring/log.jsonl#L6
+            quote: 전부 다 추천한 거 동의.
+          status: proposed
   DecisionRequest:
     field: stage
     initial: open
     matrix:
       open:
-        decide: decided
+        decide:
+          to: decided
+          source:
+            kind: interview
+            ref: interview:interview/authoring/log.jsonl#L6
+            quote: 전부 다 추천한 거 동의.
+          status: proposed
       decided:
         decide:
           deny: Already decided; a new decision needs a new request.
+          source:
+            kind: interview
+            ref: interview:interview/authoring/log.jsonl#L6
+            quote: 전부 다 추천한 거 동의.
+          status: proposed
   Draft:
     field: stage
     initial: open
     matrix:
       open:
-        commit_draft: open
+        commit_draft:
+          to: open
+          source:
+            kind: interview
+            ref: interview:interview/authoring/log.jsonl#L6
+            quote: 전부 다 추천한 거 동의.
+          status: proposed
   Commit:
     field: stage
     initial: recorded
     matrix:
       recorded:
-        check_commit: recorded
-        record_check: recorded
-        approve_commit: recorded
-        record_approval: recorded
-        deliver: recorded
+        check_commit:
+          to: recorded
+          source:
+            kind: interview
+            ref: interview:interview/authoring/log.jsonl#L6
+            quote: 전부 다 추천한 거 동의.
+          status: proposed
+        record_check:
+          to: recorded
+          source:
+            kind: interview
+            ref: interview:interview/authoring/log.jsonl#L6
+            quote: 전부 다 추천한 거 동의.
+          status: proposed
+        approve_commit:
+          to: recorded
+          source:
+            kind: interview
+            ref: interview:interview/authoring/log.jsonl#L6
+            quote: 전부 다 추천한 거 동의.
+          status: proposed
+        record_approval:
+          to: recorded
+          source:
+            kind: interview
+            ref: interview:interview/authoring/log.jsonl#L6
+            quote: 전부 다 추천한 거 동의.
+          status: proposed
+        deliver:
+          to: recorded
+          source:
+            kind: interview
+            ref: interview:interview/authoring/log.jsonl#L6
+            quote: 전부 다 추천한 거 동의.
+          status: proposed
 invariants:
 - id: approved-commits-passed-their-checks
   'on': Commit
   check: target.approved != true or target.checks_passed == true
   reason: An approved commit passed its change check.
+  source:
+    kind: interview
+    ref: interview:interview/authoring/log.jsonl#L7
+    quote: '19: a'
+  status: proposed
 - id: decided-requests-record-the-choice
   'on': DecisionRequest
   check: target.stage != 'decided' or exists(target.choice)
   reason: A decided request records what was chosen.
+  source:
+    kind: interview
+    ref: interview:interview/authoring/log.jsonl#L7
+    quote: '19: a'
+  status: proposed
 - id: fetched-sources-have-a-snapshot
   'on': Source
   check: target.stage != 'fetched' or exists(target.sha256)
   reason: A fetched source has the hash of its snapshot.
+  source:
+    kind: interview
+    ref: interview:interview/authoring/log.jsonl#L7
+    quote: '19: a'
+  status: proposed
 - id: elements-cite-a-source
   'on': Element
   check: exists(target.origin)
   reason: Every element cites where it came from.
+  source:
+    kind: interview
+    ref: interview:interview/authoring/log.jsonl#L7
+    quote: '19: a'
+  status: proposed
 world:
   actors:
     owner:
@@ -739,6 +870,11 @@ handoffs:
       environment: params.environment
       approver: actor.id
     target: target.domain_id + ':' + target.id + ':' + params.environment
+    source:
+      kind: interview
+      ref: interview:interview/authoring/log.jsonl#L8
+      quote: 20번, 21번 둘 다 추천대로 동의.
+    status: proposed
 glossary:
   commit: An immutable snapshot of the working copy. Every change is a new commit;
     nothing is edited in place.
