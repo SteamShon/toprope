@@ -20,7 +20,7 @@ plan) is in [`interview-guide.md`](interview-guide.md). It holds no content.
 | `change-requests.yaml` (about 20, written as **intents**, against the commit model of ADR-0029) | all arms | M0a | M0a |
 | `change-key.yaml` (seeded problems) | **sealed**: no arm, agent or reviewer during the experiment | M0a | M0a |
 | `verdict-rules.yaml` (start from the draft template) | everyone | M0a | M0a |
-| `binding.yaml` (intent → element names) | the harness | after Phase A, before any arm runs | then |
+| `binding.yaml` (intent → element names; may be drafted by an agent on request, ADR-0038) | the harness | after Phase A, before any arm runs | then |
 
 The order matters. Freeze everything except the binding **before the change-check pipeline
 is built**, so the seeded problems cannot be written around what the checks catch.
