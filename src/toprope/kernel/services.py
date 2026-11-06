@@ -76,7 +76,7 @@ class LocalKernel(KernelServices):
                  harness_examples: int = 50, commits: Any = None):
         from ..commits import CommitStore
         self.root = Path(root).resolve()
-        self.workspace = workspace          # toprope.authoring.Workspace, for sources
+        self.workspace = workspace          # toprope.workspace.Workspace: sources and the interview
         self.environment = environment      # toprope.deploy.LocalEnvironment, for preview and deploy
         self.examples = harness_examples
         self.commits = commits or CommitStore(self.root / ".toprope" / "commits")
@@ -143,6 +143,43 @@ class LocalKernel(KernelServices):
         (meta,) = self.workspace.fetch(source)
         return {"sha256": meta["sha256"]}
 
+    # -- the interview (ADR-0025, ADR-0037) ------------------------------------------------------
+    def _ws(self):
+        if self.workspace is None:
+            raise RuntimeError("no authoring workspace configured")
+        return self.workspace
+
+    def _search_sources(self, query):
+        return {"refs": [h["ref"] for h in self._ws().search_sources(query)]}
+
+    def _stage_questions(self):
+        q = self._ws().questions()
+        return {"stage": q.get("stage") or "", "bundle": q.get("bundle_id") or "",
+                "questions": [x["text"] for x in q.get("questions", [])]}
+
+    def _propose_element(self, path, value, source):
+        import json
+        out = self._ws().propose(path, json.loads(value), source)
+        errors = [i for i in out["issues"] if i.get("severity") == "error"]
+        return {"ok": not errors, "issues": len(errors), "summary": "; ".join(i["message"] for i in errors[:3])}
+
+    def _record_answer(self, question, answer, decisions):
+        import json
+        out = self._ws().answer(question, answer, json.loads(decisions or "[]"), question=question)
+        return {"ref": out["ref"]}
+
+    def _confirm_element(self, paths, approver):
+        ws = self._ws()
+        chosen = ws._proposed(ws.draft()) if paths.strip() == "all" else paths.split()
+        if not chosen:
+            raise ValueError("nothing to confirm: no paths given, or nothing is proposed")
+        ws.confirm(chosen, via="kernel", who=approver)
+        return {"confirmed": chosen}
+
+    def _skip_stage(self, stage, reason):
+        self._ws().skip_stage(stage, reason)
+        return {"skipped": True}
+
     # -- commits (ADR-0029) -----------------------------------------------------------------
     def _commit(self, declaration):
         c, created = self.commits.commit(self._path(declaration), author=str((self.caller or {}).get("id") or ""))
@@ -151,7 +188,8 @@ class LocalKernel(KernelServices):
         approved = self.commits.latest_approved(c.domain)
         return {"id": c.id, "seq": c.seq, "content": c.content, "created": created,
                 "parent": c.parents[0] if c.parents else "", "interface": c.interface, "to_review": review,
-                "last_approved": approved.id if approved else ""}
+                "last_approved": approved.id if approved else "", "domain": c.domain, "branch": c.branch,
+                "author": c.author}
 
     def run(self, service, inputs):
         if service == "diff":   # `from` is a Python keyword
@@ -173,6 +211,13 @@ class LocalKernel(KernelServices):
             r = check_commit(self.commits, domain, commit, examples=self.examples, cache=rc)
         return {"passed": r.ok, "errors": r.errors, "warnings": r.warnings,
                 "failing": [n for n, c in r.checks.items() if not c.ok], "summary": r.summary()}
+
+    def _merge_main(self, domain, branch, declaration):
+        from ..decl.yamlio import load_yaml
+        path = self._path(declaration)
+        out = self.commits.merge_main(domain, path, branch, (load_yaml(path.read_text()) or {}).get("version", 1))
+        return {"merge": out["merge"], "up_to_date": out["up_to_date"], "conflicts": len(out["conflicts"]),
+                "paths": [c["path"] for c in out["conflicts"]]}
 
     def _checkout(self, domain, commit, declaration):
         c = self.commits.checkout(domain, commit, self._path(declaration))

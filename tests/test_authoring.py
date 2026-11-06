@@ -1,17 +1,13 @@
 import asyncio
 import json
-import os
-import subprocess
 from pathlib import Path
 
 import pytest
 import yaml
-from mcp import Client, types
-from mcp.shared.exceptions import MCPError
+from mcp import Client
 
 from test_decl import schema_doc_domain
-from toprope.authoring import AuthoringError, Workspace
-from toprope.authoring.mcp import build_authoring_server
+from toprope.workspace import AuthoringError, Workspace
 from toprope.sources import SourceSpec, read, redact
 
 FAKE_GH = "ghp_" + "a" * 36
@@ -234,17 +230,6 @@ def test_only_a_human_channel_confirms(ws):
     assert log[-1] == {**log[-1], "kind": "confirm", "paths": ["objects.Readout"], "via": "cli"}
 
 
-def test_cli_confirm_needs_the_owners_terminal(ws):
-    _seed_example(ws)
-    ws.propose("objects.Readout", {"description": "Result."}, "docs:docs/process.md#L7-L8")
-    base = ["uv", "run", "--quiet", "toprope-author", "confirm", "objects.Readout", "--workspace", str(ws.root)]
-    r = subprocess.run(base, capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=60)
-    assert r.returncode != 0 and "terminal" in r.stderr
-    assert ws.draft()["objects"]["Readout"]["status"] == "proposed"
-    r = subprocess.run(base + ["--yes"], capture_output=True, text=True, timeout=60)
-    assert r.returncode == 0 and ws.draft()["objects"]["Readout"]["status"] == "confirmed"
-
-
 def test_check_runs_the_harness_on_the_draft(ws):
     _seed_example(ws)
     out = ws.check()
@@ -257,52 +242,57 @@ def _p(res):
     return sc.get("result", sc) if isinstance(sc, dict) and set(sc) == {"result"} else sc
 
 
-def test_authoring_mcp_flow_and_confirmation_by_elicitation(ws):
+def test_an_agent_drafts_through_the_generated_server_and_only_a_person_confirms(ws):
+    """The authoring tools an agent uses are generated from the Authoring declaration (ADR-0037):
+    it searches the sources (local-only ones are never served) and proposes elements with
+    provenance; confirming is an action only a person takes."""
+    from toprope.adapters.mcp import build_server
+    from toprope.compose import assemble, load_composition
+    from toprope.identity import Caller, StaticIdentity
+    from toprope.kernel.services import LocalKernel
+    from toprope.semantics import Actor, Grant
+    from toprope.store import MemoryEventStore
     _seed_example(ws)
-    ws.propose("objects.Readout", {"description": "Result."}, "docs:docs/process.md#L7-L8")
-    asked = []
-
-    async def owner_accepts(ctx, params):
-        asked.append(params.message)
-        return types.ElicitResult(action="accept", content={"confirm": True})
-
-    async def owner_declines(ctx, params):
-        return types.ElicitResult(action="decline")
+    owner = Actor("owen", "person", ("owner",))
+    ids = StaticIdentity({"t-owen": Caller(owner), "t-bot": Caller(
+        Actor("bot", "agent", ("owner",)), owner,
+        Grant("drafting", frozenset({"search", "propose_element", "confirm_all_proposed"}), None))})
+    c = load_composition(Path(__file__).resolve().parents[1] / "domains/toprope-self.composition.yaml")
+    a = assemble(c, {n: MemoryEventStore() for n in c.domains}, ids,
+                 services=LocalKernel(ws.root, workspace=ws))["authoring"]
+    decl = str(ws.domain_path.relative_to(ws.root))
+    for action, oid, params in (("open_draft", "d", {"domain_id": "example", "declaration": decl, "branch": "work"}),
+                                ("add_source", "S-docs", {"kind": "records", "path": "docs"})):
+        assert a.submit("t-owen", action, oid, params, action).ok
+    who = type("As", (), {"token": "t-bot", "__call__": lambda self: self.token})()
+    seen = {}
 
     async def go():
-        server = build_authoring_server(ws)
-        async with Client(server) as c:
-            srcs = {s["id"]: s for s in _p(await c.call_tool("list_sources", {}))}
-            assert srcs["sessions"]["local_only"]
-            r = await c.call_tool("read_source", {"source_id": "sessions"})
-            assert r.is_error and "local-only" in r.content[0].text
-            chunk = _p(await c.call_tool("read_source", {"source_id": "docs", "limit": 1}))["chunks"][0]
-            out = _p(await c.call_tool("propose", {"path": "links.readout_of", "value": {
-                "from": "Readout", "to": "Experiment", "cardinality": "many-to-one"}, "source_ref": chunk["ref"]}))
-            assert out["status"] == "proposed"
-            q = _p(await c.call_tool("questions", {"limit": 3}))
-            assert q["questions"][0]["kind"] == "purpose"
-            with pytest.raises(MCPError, match="elicitation"):              # the client cannot ask the owner
-                await c.call_tool("confirm", {"paths": ["objects.Readout"]})
-            tools = {t.name: t for t in (await c.list_tools()).tools}
-            assert "toprope-author confirm" in tools["confirm"].description
-        async with Client(server, elicitation_callback=owner_declines) as c:
-            assert _p(await c.call_tool("confirm", {"paths": ["objects.Readout"]}))["confirmed"] == []
-        assert ws.draft()["objects"]["Readout"]["status"] == "proposed"
-        async with Client(server, elicitation_callback=owner_accepts) as c:
-            assert _p(await c.call_tool("confirm", {"paths": ["objects.Readout"]}))["confirmed"] == ["objects.Readout"]
+        async with Client(build_server(a, who)) as cl:
+            def out(r):
+                sc = r.structured_content
+                return sc.get("result", sc) if isinstance(sc, dict) and set(sc) == {"result"} else sc
+            found = out(await cl.call_tool("search", {"target_id": "d", "query": "approve",
+                                                      "idempotency_key": "s1"}))
+            assert found["status"] == "ok"
+            refs = [e for e in a.history("d") if e.type == "DraftRecordSearch"][-1].payload["params"]["refs"]
+            assert refs and not any(r.startswith("sessions:") for r in refs)          # local-only: never served
+            ref = seen["ref"] = next(r for r in refs if r.startswith("docs:"))
+            value = json.dumps({"description": "Result."})
+            raw = await cl.call_tool("propose_element", {"new_id": "E-1", "path": "objects.Readout",
+                                                           "origin": "S-docs", "cites": ref, "value": value,
+                                                           "idempotency_key": "p1"})
+            r = out(raw)
+            assert r and r["status"] == "ok", raw
+            denied = out(await cl.call_tool("confirm_all_proposed", {"target_id": "d", "idempotency_key": "c1"}))
+            assert denied["status"] == "denied" and "Only a person" in denied["reason"]
     asyncio.run(go())
-    assert "objects.Readout" in asked[0]
+    assert ws.draft()["objects"]["Readout"]["status"] == "proposed"
+    assert ws.draft()["objects"]["Readout"]["source"]["ref"] == seen["ref"]
+    assert a.submit("t-owen", "confirm_all_proposed", "d", {}, "c2").ok
     assert ws.draft()["objects"]["Readout"]["status"] == "confirmed"
-    assert json.loads(ws.log_path.read_text().splitlines()[-1])["via"] == "elicitation"
-
-
-def test_cli_init_writes_a_starter_workspace(tmp_path):
-    r = subprocess.run(["uv", "run", "--quiet", "toprope-author", "init", str(tmp_path)],
-                       capture_output=True, text=True, timeout=60, env={**os.environ})
-    assert r.returncode == 0
-    Workspace(tmp_path)   # parses
-    assert "local_only" in Path(tmp_path / "toprope.workspace.yaml").read_text()
+    entry = json.loads(ws.log_path.read_text().splitlines()[-1])
+    assert entry["via"] == "kernel" and entry["who"] == "owen" and "objects.Readout" in entry["paths"]
 
 
 def test_bad_values_and_config_are_authoring_errors(ws):
@@ -316,7 +306,7 @@ def test_bad_values_and_config_are_authoring_errors(ws):
 
 def test_a_workspace_may_be_named_by_its_file(tmp_path):
     """Several domains' workspaces can share one directory (the self domains share the repo)."""
-    from toprope.authoring import Workspace
+    from toprope.workspace import Workspace
     (tmp_path / "docs").mkdir()
     (tmp_path / "docs" / "a.md").write_text("# A\nrules\n")
     for name in ("one", "two"):
@@ -333,7 +323,7 @@ def test_a_cli_confirmation_records_the_git_identity(tmp_path):
     """Who confirmed comes from the terminal's git identity, without anyone typing it."""
     import json
     import subprocess
-    from toprope.authoring import Workspace
+    from toprope.workspace import Workspace
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     subprocess.run(["git", "-C", str(tmp_path), "config", "user.name", "Ana Owner"], check=True)
     subprocess.run(["git", "-C", str(tmp_path), "config", "user.email", "ana@example.org"], check=True)
@@ -353,7 +343,7 @@ def test_a_cli_confirmation_records_the_git_identity(tmp_path):
 
 def test_a_handoff_is_an_element_to_confirm(tmp_path):
     """A handoff is a decision about what crosses into another domain: drafted, then confirmed."""
-    from toprope.authoring import Workspace
+    from toprope.workspace import Workspace
     (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump(
         {"domain": "d.domain.yaml", "sources": [{"id": "docs", "kind": "records", "path": "docs"}]}))
     (tmp_path / "docs").mkdir()
@@ -368,26 +358,27 @@ def test_a_handoff_is_an_element_to_confirm(tmp_path):
     assert ws.draft()["handoffs"]["deliver"]["status"] == "confirmed"
 
 
-def test_cli_confirms_every_proposed_element_at_once(tmp_path):
-    import json
-    import subprocess
+def test_the_kernel_confirms_every_proposed_element_at_once(tmp_path):
+    from toprope.kernel.services import LocalKernel
     (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump(
         {"domain": "d.domain.yaml", "sources": [{"id": "docs", "kind": "records", "path": "docs"}]}))
     (tmp_path / "docs").mkdir()
     (tmp_path / "docs" / "a.md").write_text("# A\nrules\n")
     (tmp_path / "d.domain.yaml").write_text(yaml.safe_dump(schema_doc_domain(), sort_keys=False))
-    from toprope.authoring import Workspace
     ws = Workspace(tmp_path)
     for a in ("approve_experiment", "launch_experiment"):
         ws.propose(f"actions.{a}", ws.draft()["actions"][a], "docs:docs/a.md#L1-L2")
-    run = lambda *a: subprocess.run(["uv", "run", "--quiet", "toprope-author", "confirm", *a, "--workspace",  # noqa: E731
-                                     str(tmp_path)], capture_output=True, text=True, timeout=120, check=False)
-    assert "name the elements" in run("--yes").stderr
+    k = LocalKernel(tmp_path, workspace=ws)
+    ana = {"id": "ana", "kind": "person"}
     proposed = ws._proposed(ws.draft())
     assert {"actions.approve_experiment", "actions.launch_experiment"} <= set(proposed)
-    out = run("--all-proposed", "--yes", "--as", "ana")
-    assert out.returncode == 0 and "actions.launch_experiment" in out.stderr
-    assert ws._proposed(ws.draft()) == []
+    agent = k.call("confirm_element", {"paths": "all", "approver": "ana"}, caller={"id": "bot", "kind": "agent"})
+    assert not agent["ok"] and ws._proposed(ws.draft()) == proposed                 # only the person, as themself
+    out = k.call("confirm_element", {"paths": "all", "approver": "ana"}, caller=ana)
+    assert out["ok"] and out["confirmed"] == proposed and ws._proposed(ws.draft()) == []
     entry = json.loads(ws.log_path.read_text().splitlines()[-1])
-    assert entry["paths"] == proposed and entry["who"] == "ana"
-    assert "nothing is proposed" in run("--all-proposed", "--yes").stderr
+    assert entry["paths"] == proposed and entry["who"] == "ana" and entry["via"] == "kernel"
+    again = k.call("confirm_element", {"paths": "all", "approver": "ana"}, caller=ana)
+    assert not again["ok"] and "nothing to confirm" in again["error"]
+
+

@@ -432,6 +432,12 @@ works. The catalog is the kernel itself (ADR-0027):
 | `world_map` | `declaration` | `undecided`, `unreachable`, `edges` |
 | `read_source` | `source` | `chunks`, `local_only` |
 | `fetch_source` | `source` | `sha256` |
+| `search_sources` | `query` | `refs` (redacted; local-only never served) |
+| `stage_questions` | — | `stage`, `bundle`, `questions` (the current stage's bundle, ADR-0025) |
+| `propose_element` | `path`, `value` (JSON), `source` | `issues`, `summary`: always `proposed`, citing a real chunk (ADR-0037) |
+| `record_answer` | `question`, `answer`, `decisions` (JSON) | `ref`: the owner's words; decisions become proposed elements citing it |
+| `confirm_element` | `paths` (or `all`), `approver` | `confirmed`: the calling person must be the approver |
+| `skip_stage` | `stage`, `reason` | `skipped` |
 | `commit` | `declaration` | `id`, `seq`, `content`, `created`, `parent`, `interface`, `to_review`, `last_approved` (ADR-0029) |
 | `diff` | `domain`, `from`, `to` | `changed`, `added`, `removed`, `to_review` |
 | `checkout` | `domain`, `commit`, `declaration` | `content` (loads a commit into a working copy, ADR-0032) |

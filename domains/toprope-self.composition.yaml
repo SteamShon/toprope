@@ -2,7 +2,7 @@
 composition: toprope-self
 version: 1
 members:
-  authoring: {declaration: authoring.domain.yaml, interface: 1}
-  delivery:  {declaration: delivery.domain.yaml,  interface: 1}
+  authoring: {declaration: authoring/authoring.domain.yaml, interface: 1}
+  delivery:  {declaration: delivery/delivery.domain.yaml,  interface: 1}
 wiring:
   - {from: authoring.deliver_approved_commit, to: delivery.request_delivery}

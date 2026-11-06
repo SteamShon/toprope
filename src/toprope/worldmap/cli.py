@@ -16,7 +16,7 @@ from ..decl import load_domain, validate_domain
 from . import build_world_map, to_mermaid
 
 
-def main(argv: list[str] | None = None) -> None:
+def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="toprope-worldmap", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--domain", help="one declaration (or use --composition)")
@@ -28,6 +28,11 @@ def main(argv: list[str] | None = None) -> None:
                                              "`toprope-harness --composition --json` writes)")
     ap.add_argument("--mermaid", help="also write structure.mmd and <Object>.states.mmd here")
     ap.add_argument("--guide", help="also write the domain guide (Markdown) to this path")
+    return ap
+
+
+def main(argv: list[str] | None = None) -> None:
+    ap = build_parser()
     args = ap.parse_args(argv)
 
     if bool(args.domain) == bool(args.composition):

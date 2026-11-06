@@ -49,11 +49,14 @@ In code:
   taken by `system`.
 
 ## Local deploy
+Delivery's actions, taken with `toprope-run` ([`workflow.md`](workflow.md)), call the kernel's
+`preview` and `deploy` services; `toprope-commits deployed` reads the environment:
+
 ```bash
-uv run toprope-deploy --env .toprope/envs/local --commits .toprope/commits preview example 2-cd34…
-uv run toprope-deploy --env .toprope/envs/local --commits .toprope/commits deploy example 2-cd34… --approver ana
-uv run toprope-deploy --env .toprope/envs/local status
-uv run toprope-server $(uv run toprope-deploy --env .toprope/envs/local server-args) --identity static:tokens.yaml
+$R --member delivery preview example:2-cd34…:local
+$R --member delivery deploy example:2-cd34…:local          # only a person
+uv run toprope-commits deployed --env .toprope/env        # what runs, its history, and server_args
+uv run toprope-server <server_args> --identity static:tokens.yaml
 ```
 
 An environment moves only to a **commit** (ADR-0029); there is no build-only path. `deploy`

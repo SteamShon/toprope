@@ -4,16 +4,21 @@ Link: ① ② ④ ⑥. ADR-0029, ADR-0033. Authoring is an immutable commit log 
 approval tags. Delivery points an environment at one commit on `main`. Only what changed
 directly is reviewed again.
 
+Changes are actions of the Authoring domain, taken with `toprope-run` (the commands are in
+[`workflow.md`](workflow.md) and the Authoring guide); reads are `toprope-commits`
+([`kernel-commands.md`](kernel-commands.md)). `$R` is the `toprope-run` prefix from `workflow.md`
+with `--member authoring`, and `D` the draft's id:
+
 ```bash
-uv run toprope-author commit -m "add launch rules"   # a commit on the `work` branch
-uv run toprope-author commit --branch launch-rules   # or on a branch of your own
-uv run toprope-author diff 1-ab12… 2-cd34…           # what changed directly
-uv run toprope-author approve 2-cd34… --as ana       # merge into main and tag; only you
-uv run toprope-author merge --branch launch-rules    # bring main in when approve reports conflicts
-uv run toprope-author commit --branch launch-rules --merge 3-ef56…   # record the resolution
-uv run toprope-author branches                       # every branch and its commit
-uv run toprope-author log action:launch_experiment   # an element's history
-uv run toprope-author checkout 1-ab12…               # load a commit; committing it reverts
+$R commit_draft D                    # a commit on the draft's branch (`work` by default)
+$R check_commit 2-cd34…              # the change check, recorded on the commit
+$R approve_commit 2-cd34…            # merge into main and tag; only a person
+$R merge_main D                      # bring main in when approve reports conflicts;
+$R commit_draft D                    #   the next commit records both parents
+$R checkout_commit D --commit 1-ab12…   # load a commit; committing it reverts
+uv run toprope-commits branches DOMAIN                       # every branch and its commit
+uv run toprope-commits diff DOMAIN 1-ab12… 2-cd34…           # what changed directly
+uv run toprope-commits log DOMAIN action:launch_experiment   # an element's history
 ```
 
 ## Commits
@@ -30,6 +35,9 @@ uv run toprope-author checkout 1-ab12…               # load a commit; committi
   git** (decided by the researcher, 2026-11-06): commits, branches, approvals and check records
   are decisions, so they are shared and audited like code. The rest of `.toprope/` (caches,
   snapshots, environments, reports) stays local. Writes take a per-domain file lock.
+- **Per-domain layout** (ADR-0037). Everything about one domain lives under
+  `domains/<domain>/`: its declaration, its generated guide, its interview log, and, when it
+  runs, its event log (`jsonl:domains/<domain>/events`, an append-only store kept in git).
 
 ## Author, history and checkout (ADR-0032)
 - **Author.** A commit records who compiled it: `commit --as NAME`, or the calling actor
@@ -101,7 +109,7 @@ refuses unless the calling person is the approver, and returns the commit `main`
 the last approved commit.
 
 ## Delivery
-`LocalEnvironment.deploy_commit` (or the `deploy` kernel service, or `toprope-deploy deploy`) is
+`LocalEnvironment.deploy_commit` (or the `deploy` kernel service, which Delivery's `deploy` action calls) is
 the only way to move an environment's ref to a commit, under a per-environment lock. Only
 commits on `main` are deployed (ADR-0033); ancestry, not sequence numbers, decides what is
 newer. Besides the build floor (untainted, the harness passed, a person approves, nothing

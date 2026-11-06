@@ -1,12 +1,13 @@
-"""The authoring workspace (ADR-0014, ADR-0017): draft a declaration from sources, interview
-its owner, and confirm.
+"""The workspace (ADR-0014, ADR-0017, ADR-0037): draft a declaration from sources, interview its
+owner, and confirm. Kernel: every domain's authoring uses it, through kernel services.
 
 Rules it enforces:
 - every drafted element cites a real source chunk (`source.ref`), so no rule is unsupported
 - agents write only `proposed`: `propose` and `answer` never set `confirmed`
 - only a person confirms: `confirm` is called with the channel the confirmation came
-  through (the CLI on the owner's terminal, or an MCP elicitation shown to the user), and
-  each confirmation is logged with that channel
+  through (the CLI on the owner's terminal, an MCP elicitation shown to the user, or a
+  declared action the kernel checked was taken by that person), and each confirmation is
+  logged with that channel and who
 - local-only sources are listed but their content is never served
 - the interview log records every question, answer quote and decision; the usage log
   records which source chunks were served (the drafter records which sources it used)
@@ -344,8 +345,11 @@ class Workspace:
     def confirm(self, paths: list[str], via: str, who: str | None = None) -> dict[str, Any]:
         """Mark elements confirmed. Call only with a human channel (`cli`, `elicitation`). On the
         CLI, `who` defaults to the terminal's git identity."""
-        if via not in ("cli", "elicitation"):
-            raise AuthoringError("only a person confirms, through the CLI or an MCP elicitation")
+        if via not in ("cli", "elicitation", "kernel"):
+            raise AuthoringError("only a person confirms, through the CLI, an MCP elicitation, or a declared "
+                                 "action the kernel checked was taken by that person")
+        if via == "kernel" and not who:
+            raise AuthoringError("a confirmation through the kernel names the person who took it")
         if who is None and via == "cli":
             who = self.identity()
         doc = self.draft()
@@ -643,21 +647,10 @@ class Workspace:
         if not isinstance(d, str) or not d:
             raise AuthoringError("the draft names no `domain`, so there is no commit log to merge in")
         from ..commits import CommitError
-        main, head = self.commits.main(d), self.commits.head(d, branch)
-        if main is None or head is None:
-            raise AuthoringError(f"nothing to merge: {'main' if main is None else branch} has no commits")
-        if self.commits.is_ancestor(d, main.id, head.id):
-            return {"merge": main.id, "branch": branch, "up_to_date": True, "conflicts": []}
         try:
-            current, present = self.commits.working_copy(d, self.domain_path)
-            if current != head.content:
-                raise AuthoringError(f"the working copy has changes not committed to {branch}: commit them first")
-            m = self.commits.merge3(d, head.id, main.id)
-            self.commits.write_working_copy(d, m.merged, self.domain_path, self.draft().get("version", 1), present)
+            return self.commits.merge_main(d, self.domain_path, branch, self.draft().get("version", 1))
         except CommitError as e:
             raise AuthoringError(str(e)) from None
-        return {"merge": main.id, "branch": branch, "up_to_date": False,
-                "conflicts": [{"path": c.path, "base": c.base, "ours": c.ours, "theirs": c.theirs} for c in m.conflicts]}
 
     def approve_commit(self, commit_id: str, via: str, who: str) -> dict[str, Any]:
         """Approve a commit: merge it into `main` and tag the result (ADR-0033). Only a person,
@@ -715,4 +708,4 @@ class Workspace:
         return out
 
 
-__all__ = ["AuthoringError", "CONFIG", "Question", "Workspace"]
+__all__ = ["CONFIG", "AuthoringError", "Question", "Workspace"]

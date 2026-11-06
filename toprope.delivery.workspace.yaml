@@ -1,9 +1,9 @@
 # M1 Phase A: the Domain Delivery self domain (ADR-0022, ADR-0025, ADR-0031).
 # Sources are drafted from in this order: the system (code), then records (docs), then the interview.
 # `experiments/**` is never read (DEFAULT_EXCLUDE).
-domain: domains/delivery.domain.yaml
-interview_log: interview/delivery/log.jsonl
-usage_log: interview/delivery/sources-used.jsonl
+domain: domains/delivery/delivery.domain.yaml
+interview_log: domains/delivery/interview.jsonl
+usage_log: domains/delivery/sources-used.jsonl
 sources:
   - id: system
     kind: repository
@@ -17,4 +17,4 @@ sources:
             "adr/0018-*", "adr/0022-*", "adr/0024-*", "adr/0026-*", "adr/0028-*", "adr/0029-*", "adr/0033-*"]
   - id: interview
     kind: interview-log
-    path: interview/delivery/log.jsonl
+    path: domains/delivery/interview.jsonl

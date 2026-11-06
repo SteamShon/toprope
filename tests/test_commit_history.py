@@ -93,21 +93,21 @@ def test_checkout_loads_a_commit_and_a_revert_is_a_new_commit(tmp_path):
     assert yaml.safe_load(wc.read_text())["glossary"]["x"] == "X." and ui.exists()
 
 
-def test_the_checkout_service_and_the_cli(tmp_path):
+def test_the_checkout_service_and_the_history_command(tmp_path):
+    from toprope.workspace import Workspace
     (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump({"domain": "d.domain.yaml", "sources": []}))
     raw = schema_doc_domain()
     write(tmp_path / "d.domain.yaml", raw)
-
-    def run(*a):
-        return subprocess.run(["uv", "run", "--quiet", "toprope-author", *a, "--workspace", str(tmp_path)],
-                              capture_output=True, text=True, timeout=120, check=False)
-    c1 = json.loads(run("commit", "--as", "ana").stdout)["commit"]
+    ws = Workspace(tmp_path)
+    c1 = ws.commit(author="ana")["commit"]
     raw["actions"]["launch_experiment"]["description"] = "Start traffic."
     write(tmp_path / "d.domain.yaml", raw)
-    c2 = json.loads(run("commit", "--as", "eli").stdout)["commit"]
-    log = json.loads(run("log", "action:launch_experiment").stdout)
+    c2 = ws.commit(author="eli")["commit"]
+    r = subprocess.run(["uv", "run", "--quiet", "toprope-commits", "--commits", str(tmp_path / ".toprope/commits"),
+                        "log", "example", "action:launch_experiment"], capture_output=True, text=True, timeout=120)
+    log = json.loads(r.stdout)
     assert [(e["commit"], e["change"], e["author"]) for e in log] == [(c1, "added", "ana"), (c2, "changed", "eli")]
-    assert json.loads(run("checkout", c1).stdout)["commit"] == c1
+    assert ws.checkout(c1)["commit"] == c1
     assert yaml.safe_load((tmp_path / "d.domain.yaml").read_text())["actions"]["launch_experiment"]["description"] \
         != "Start traffic."
     k = LocalKernel(tmp_path)
@@ -140,7 +140,7 @@ def test_checkout_never_drops_an_uncommitted_ui_next_to_a_missing_declaration(tm
 
 
 def test_a_forced_checkout_recovers_an_unreadable_working_copy(tmp_path):
-    from toprope.authoring import AuthoringError, Workspace
+    from toprope.workspace import AuthoringError, Workspace
     (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump({"domain": "d.domain.yaml", "sources": []}))
     write(tmp_path / "d.domain.yaml", schema_doc_domain())
     ws = Workspace(tmp_path)
@@ -178,7 +178,7 @@ def test_a_caller_without_an_id_authors_nothing(tmp_path):
 
 
 def test_a_merge_resolution_is_not_credited_with_mains_changes(tmp_path):
-    from toprope.authoring import Workspace
+    from toprope.workspace import Workspace
     (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump({"domain": "d.domain.yaml", "sources": []}))
     raw = schema_doc_domain()
     write(tmp_path / "d.domain.yaml", raw)

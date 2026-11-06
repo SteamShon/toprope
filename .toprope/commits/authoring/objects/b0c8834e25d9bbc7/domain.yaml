@@ -1,5 +1,4 @@
 domain: authoring
-version: 1
 purpose:
   problem: A domain owner's workflow lives in people's heads; turning it into a declared
     domain, and changing it safely, takes code.
@@ -36,7 +35,7 @@ objects:
         - fetched
     source:
       kind: interview
-      ref: interview:interview/authoring/log.jsonl#L5
+      ref: interview:domains/authoring/interview.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: confirmed
   Question:
@@ -48,7 +47,7 @@ objects:
         type: string
     source:
       kind: interview
-      ref: interview:interview/authoring/log.jsonl#L5
+      ref: interview:domains/authoring/interview.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: confirmed
   Answer:
@@ -57,10 +56,17 @@ objects:
     properties:
       words:
         type: string
+      decisions:
+        type: string
+      ref:
+        type: string
+        optional: true
+      stage:
+        enum:
+        - recorded
     source:
-      kind: interview
-      ref: interview:interview/authoring/log.jsonl#L5
-      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+      kind: record
+      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
     status: confirmed
   Element:
     description: One part of the draft declaration (an object, action, cell, invariant...),
@@ -73,10 +79,20 @@ objects:
         - proposed
         - confirmed
         - unknown
+      value:
+        type: string
+        optional: true
+      cites:
+        type: string
+      issues:
+        type: integer
+        optional: true
+      issue_summary:
+        type: string
+        optional: true
     source:
-      kind: interview
-      ref: interview:interview/authoring/log.jsonl#L5
-      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+      kind: record
+      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
     status: confirmed
   DecisionRequest:
     description: A decision only a person may take, proposed with grounds and a recommendation
@@ -97,7 +113,7 @@ objects:
         optional: true
     source:
       kind: interview
-      ref: interview:interview/authoring/log.jsonl#L5
+      ref: interview:domains/authoring/interview.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: confirmed
   Commit:
@@ -136,7 +152,7 @@ objects:
         - recorded
     source:
       kind: interview
-      ref: interview:interview/authoring/log.jsonl#L5
+      ref: interview:domains/authoring/interview.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: confirmed
   Draft:
@@ -152,10 +168,21 @@ objects:
       stage:
         enum:
         - open
+      current_stage:
+        type: string
+        optional: true
+      bundle:
+        type: string
+        optional: true
+      merging:
+        type: string
+        optional: true
+      conflicts:
+        type: integer
+        optional: true
     source:
-      kind: interview
-      ref: interview:interview/authoring/log.jsonl#L5
-      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+      kind: record
+      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
     status: confirmed
 links:
   question:
@@ -165,7 +192,7 @@ links:
     required: true
     source:
       kind: interview
-      ref: interview:interview/authoring/log.jsonl#L5
+      ref: interview:domains/authoring/interview.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: confirmed
   element:
@@ -174,7 +201,7 @@ links:
     cardinality: many-to-one
     source:
       kind: interview
-      ref: interview:interview/authoring/log.jsonl#L5
+      ref: interview:domains/authoring/interview.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: confirmed
   parents:
@@ -183,7 +210,7 @@ links:
     cardinality: many-to-many
     source:
       kind: interview
-      ref: interview:interview/authoring/log.jsonl#L5
+      ref: interview:domains/authoring/interview.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: confirmed
   origin:
@@ -192,7 +219,7 @@ links:
     cardinality: many-to-one
     source:
       kind: interview
-      ref: interview:interview/authoring/log.jsonl#L5
+      ref: interview:domains/authoring/interview.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: confirmed
 actions:
@@ -216,7 +243,7 @@ actions:
         optional: true
     source:
       kind: interview
-      ref: interview:interview/authoring/log.jsonl#L5
+      ref: interview:domains/authoring/interview.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: confirmed
   fetch_source:
@@ -231,7 +258,7 @@ actions:
       reply: record_fetch
     source:
       kind: interview
-      ref: interview:interview/authoring/log.jsonl#L5
+      ref: interview:domains/authoring/interview.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: confirmed
   record_fetch:
@@ -247,7 +274,7 @@ actions:
         target.sha256: params.sha256
     source:
       kind: interview
-      ref: interview:interview/authoring/log.jsonl#L5
+      ref: interview:domains/authoring/interview.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: confirmed
   ask_question:
@@ -262,7 +289,7 @@ actions:
         type: string
     source:
       kind: interview
-      ref: interview:interview/authoring/log.jsonl#L5
+      ref: interview:domains/authoring/interview.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: confirmed
   answer_question:
@@ -276,10 +303,18 @@ actions:
         ref: Question
       words:
         type: string
+      decisions:
+        type: string
+    effects:
+    - call: record_answer
+      with:
+        question: target.question.text
+        answer: target.words
+        decisions: target.decisions
+      reply: record_answer_ref
     source:
-      kind: interview
-      ref: interview:interview/authoring/log.jsonl#L5
-      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+      kind: record
+      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
     status: confirmed
   propose_element:
     description: Propose a draft element that cites where it came from.
@@ -291,10 +326,20 @@ actions:
         type: string
       origin:
         ref: Source
+      cites:
+        type: string
+      value:
+        type: string
+    effects:
+    - call: propose_element
+      with:
+        path: target.path
+        value: target.value
+        source: target.cites
+      reply: record_proposal
     source:
-      kind: interview
-      ref: interview:interview/authoring/log.jsonl#L5
-      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+      kind: record
+      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
     status: confirmed
   confirm_element:
     description: Confirm a drafted element. Only a person confirms.
@@ -302,10 +347,15 @@ actions:
     - owner
     target: Element
     requires: human
+    effects:
+    - call: confirm_element
+      with:
+        paths: target.path
+        approver: actor.id
+      reply: record_confirmation
     source:
-      kind: interview
-      ref: interview:interview/authoring/log.jsonl#L5
-      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+      kind: record
+      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
     status: confirmed
   mark_unknown:
     description: Mark an element as not known yet, instead of guessing.
@@ -315,7 +365,7 @@ actions:
     target: Element
     source:
       kind: interview
-      ref: interview:interview/authoring/log.jsonl#L5
+      ref: interview:domains/authoring/interview.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: confirmed
   request_decision:
@@ -335,7 +385,7 @@ actions:
         type: string
     source:
       kind: interview
-      ref: interview:interview/authoring/log.jsonl#L5
+      ref: interview:domains/authoring/interview.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: confirmed
   decide:
@@ -367,7 +417,7 @@ actions:
       reply: record_commit
     source:
       kind: interview
-      ref: interview:interview/authoring/log.jsonl#L5
+      ref: interview:domains/authoring/interview.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: confirmed
   record_commit:
@@ -382,10 +432,18 @@ actions:
         type: string
       interface:
         type: string
+      domain:
+        type: string
+      branch:
+        type: string
+      author:
+        type: string
+    effects:
+    - set:
+        target.domain_id: params.domain
     source:
-      kind: interview
-      ref: interview:interview/authoring/log.jsonl#L5
-      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+      kind: record
+      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L26-L54
     status: confirmed
   check_commit:
     description: Run the change check on a commit.
@@ -398,10 +456,13 @@ actions:
         domain: target.domain_id
         commit: target.id
       reply: record_check
+    preconditions:
+    - id: not-approved
+      check: target.approved != true
+      reason: An approved commit passed its check; check a new commit instead.
     source:
-      kind: interview
-      ref: interview:interview/authoring/log.jsonl#L5
-      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+      kind: record
+      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L26-L54
     status: confirmed
   record_check:
     description: Record the change check's result on the commit.
@@ -419,7 +480,7 @@ actions:
         target.failing: params.summary
     source:
       kind: interview
-      ref: interview:interview/authoring/log.jsonl#L5
+      ref: interview:domains/authoring/interview.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: confirmed
   approve_commit:
@@ -438,7 +499,7 @@ actions:
       reply: record_approval
     source:
       kind: interview
-      ref: interview:interview/authoring/log.jsonl#L5
+      ref: interview:domains/authoring/interview.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: confirmed
     preconditions:
@@ -447,7 +508,7 @@ actions:
       reason: Run the change check, and approve only a commit that passes it.
       source:
         kind: interview
-        ref: interview:interview/authoring/log.jsonl#L6
+        ref: interview:domains/authoring/interview.jsonl#L6
         quote: 전부 다 추천한 거 동의.
       status: confirmed
     - id: not-approved
@@ -455,7 +516,7 @@ actions:
       reason: Already approved; approve a newer commit.
       source:
         kind: interview
-        ref: interview:interview/authoring/log.jsonl#L6
+        ref: interview:domains/authoring/interview.jsonl#L6
         quote: 전부 다 추천한 거 동의.
       status: confirmed
   record_approval:
@@ -478,12 +539,12 @@ actions:
       reason: A commit is recorded as approved only if its change check passed.
       source:
         kind: interview
-        ref: interview:interview/authoring/log.jsonl#L11
+        ref: interview:domains/authoring/interview.jsonl#L11
         quote: 25번은 A로 추천으로 해도 될 것 같고, 이십육 번도 A로.
       status: confirmed
     source:
       kind: interview
-      ref: interview:interview/authoring/log.jsonl#L11
+      ref: interview:domains/authoring/interview.jsonl#L11
       quote: 25번은 A로 추천으로 해도 될 것 같고, 이십육 번도 A로.
     status: confirmed
   deliver:
@@ -501,13 +562,274 @@ actions:
       reason: Only an approved commit is delivered.
       source:
         kind: interview
-        ref: interview:interview/authoring/log.jsonl#L8
+        ref: interview:domains/authoring/interview.jsonl#L8
         quote: 20번, 21번 둘 다 추천대로 동의.
       status: confirmed
     source:
       kind: interview
-      ref: interview:interview/authoring/log.jsonl#L8
+      ref: interview:domains/authoring/interview.jsonl#L8
       quote: 20번, 21번 둘 다 추천대로 동의.
+    status: confirmed
+  record_proposal:
+    description: Record whether the drafted element was written into the working copy.
+    actor:
+    - external:kernel
+    target: Element
+    params:
+      issues:
+        type: integer
+      summary:
+        type: string
+    effects:
+    - set:
+        target.issues: params.issues
+        target.issue_summary: params.summary
+    source:
+      kind: record
+      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+    status: confirmed
+  record_confirmation:
+    description: Record that the working copy holds the element as confirmed.
+    actor:
+    - external:kernel
+    target: Element
+    params:
+      confirmed:
+        type: string
+        many: true
+    source:
+      kind: record
+      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+    status: confirmed
+  record_answer_ref:
+    description: Record where the answer is in the interview log, so elements can
+      cite it.
+    actor:
+    - external:kernel
+    target: Answer
+    params:
+      ref:
+        type: string
+    effects:
+    - set:
+        target.ref: params.ref
+    source:
+      kind: record
+      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+    status: confirmed
+  next_questions:
+    description: Ask for the current stage's bundle of questions.
+    actor:
+    - owner
+    target: Draft
+    effects:
+    - call: stage_questions
+      with: {}
+      reply: record_questions
+    source:
+      kind: record
+      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+    status: confirmed
+  record_questions:
+    description: Record the current stage and its bundle.
+    actor:
+    - external:kernel
+    target: Draft
+    params:
+      stage:
+        type: string
+      bundle:
+        type: string
+      questions:
+        type: string
+        many: true
+    effects:
+    - set:
+        target.current_stage: params.stage
+        target.bundle: params.bundle
+    source:
+      kind: record
+      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+    status: confirmed
+  search:
+    description: Search the sources (redacted; local-only never served); the result
+      is on record.
+    actor:
+    - owner
+    target: Draft
+    params:
+      query:
+        type: string
+    effects:
+    - call: search_sources
+      with:
+        query: params.query
+      reply: record_search
+    source:
+      kind: record
+      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+    status: confirmed
+  record_search:
+    description: Record which source chunks a search returned.
+    actor:
+    - external:kernel
+    target: Draft
+    params:
+      refs:
+        type: string
+        many: true
+    source:
+      kind: record
+      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+    status: confirmed
+  skip_stage:
+    description: Say an optional stage has nothing, in the owner's words.
+    actor:
+    - owner
+    target: Draft
+    requires: human
+    params:
+      stage:
+        type: string
+      reason:
+        type: string
+    effects:
+    - call: skip_stage
+      with:
+        stage: params.stage
+        reason: params.reason
+      reply: record_skip
+    source:
+      kind: record
+      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+    status: confirmed
+  record_skip:
+    description: Record that the stage was skipped.
+    actor:
+    - external:kernel
+    target: Draft
+    params:
+      skipped:
+        type: boolean
+    source:
+      kind: record
+      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+    status: confirmed
+  open_draft:
+    description: Open a working copy of a domain's declaration on a branch, so it
+      can be interviewed, committed and checked.
+    actor:
+    - owner
+    creates: Draft
+    params:
+      domain_id:
+        type: string
+      declaration:
+        type: string
+      branch:
+        type: string
+    source:
+      kind: record
+      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L26-L54
+    status: confirmed
+  merge_main:
+    description: Bring main into the branch's working copy and list the conflicts
+      to resolve; the next commit records both parents.
+    actor:
+    - owner
+    target: Draft
+    effects:
+    - call: merge_main
+      with:
+        domain: target.domain_id
+        branch: target.branch
+        declaration: target.declaration
+      reply: record_merge
+    source:
+      kind: record
+      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+    status: confirmed
+  checkout_commit:
+    description: Load a commit into the working copy, to revert to it or build on
+      it; committing it makes a new commit.
+    actor:
+    - owner
+    target: Draft
+    params:
+      commit:
+        type: string
+    effects:
+    - call: checkout
+      with:
+        domain: target.domain_id
+        commit: params.commit
+        declaration: target.declaration
+      reply: record_checkout
+    source:
+      kind: record
+      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+    status: confirmed
+  confirm_all_proposed:
+    description: Confirm every element still proposed in the working copy, as right.
+    actor:
+    - owner
+    target: Draft
+    requires: human
+    effects:
+    - call: confirm_element
+      with:
+        paths: '''all'''
+        approver: actor.id
+      reply: record_confirm_all
+    source:
+      kind: record
+      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+    status: confirmed
+  record_merge:
+    description: Record the merge in progress and how many conflicts it left.
+    actor:
+    - external:kernel
+    target: Draft
+    params:
+      merge:
+        type: string
+      conflicts:
+        type: integer
+      paths:
+        type: string
+        many: true
+    effects:
+    - set:
+        target.merging: params.merge
+        target.conflicts: params.conflicts
+    source:
+      kind: record
+      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+    status: confirmed
+  record_checkout:
+    description: Record that the working copy holds the commit's content.
+    actor:
+    - external:kernel
+    target: Draft
+    params:
+      content:
+        type: string
+    source:
+      kind: record
+      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+    status: confirmed
+  record_confirm_all:
+    description: Record which elements were confirmed.
+    actor:
+    - external:kernel
+    target: Draft
+    params:
+      confirmed:
+        type: string
+        many: true
+    source:
+      kind: record
+      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
     status: confirmed
 transitions:
   Source:
@@ -519,14 +841,14 @@ transitions:
           to: added
           source:
             kind: interview
-            ref: interview:interview/authoring/log.jsonl#L6
+            ref: interview:domains/authoring/interview.jsonl#L6
             quote: 전부 다 추천한 거 동의.
           status: confirmed
         record_fetch:
           to: fetched
           source:
             kind: interview
-            ref: interview:interview/authoring/log.jsonl#L6
+            ref: interview:domains/authoring/interview.jsonl#L6
             quote: 전부 다 추천한 거 동의.
           status: confirmed
       fetched:
@@ -535,7 +857,7 @@ transitions:
             again.
           source:
             kind: interview
-            ref: interview:interview/authoring/log.jsonl#L6
+            ref: interview:domains/authoring/interview.jsonl#L6
             quote: 전부 다 추천한 거 동의.
           status: confirmed
         record_fetch: n/a
@@ -548,25 +870,34 @@ transitions:
           to: confirmed
           source:
             kind: interview
-            ref: interview:interview/authoring/log.jsonl#L6
+            ref: interview:domains/authoring/interview.jsonl#L6
             quote: 전부 다 추천한 거 동의.
           status: confirmed
         mark_unknown:
           to: unknown
           source:
             kind: interview
-            ref: interview:interview/authoring/log.jsonl#L6
+            ref: interview:domains/authoring/interview.jsonl#L6
             quote: 전부 다 추천한 거 동의.
           status: confirmed
+        record_proposal:
+          to: proposed
+          source:
+            kind: record
+            ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+          status: confirmed
+        record_confirmation: n/a
       unknown:
         confirm_element:
           to: confirmed
           source:
             kind: interview
-            ref: interview:interview/authoring/log.jsonl#L6
+            ref: interview:domains/authoring/interview.jsonl#L6
             quote: 전부 다 추천한 거 동의.
           status: confirmed
         mark_unknown: n/a
+        record_proposal: n/a
+        record_confirmation: n/a
       confirmed:
         confirm_element: n/a
         mark_unknown:
@@ -574,8 +905,15 @@ transitions:
             by marking it unknown.
           source:
             kind: interview
-            ref: interview:interview/authoring/log.jsonl#L6
+            ref: interview:domains/authoring/interview.jsonl#L6
             quote: 전부 다 추천한 거 동의.
+          status: confirmed
+        record_proposal: n/a
+        record_confirmation:
+          to: confirmed
+          source:
+            kind: record
+            ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
           status: confirmed
   DecisionRequest:
     field: stage
@@ -586,7 +924,7 @@ transitions:
           to: decided
           source:
             kind: interview
-            ref: interview:interview/authoring/log.jsonl#L6
+            ref: interview:domains/authoring/interview.jsonl#L6
             quote: 전부 다 추천한 거 동의.
           status: confirmed
       decided:
@@ -594,7 +932,7 @@ transitions:
           deny: Already decided; a new decision needs a new request.
           source:
             kind: interview
-            ref: interview:interview/authoring/log.jsonl#L6
+            ref: interview:domains/authoring/interview.jsonl#L6
             quote: 전부 다 추천한 거 동의.
           status: confirmed
   Draft:
@@ -606,8 +944,80 @@ transitions:
           to: open
           source:
             kind: interview
-            ref: interview:interview/authoring/log.jsonl#L6
+            ref: interview:domains/authoring/interview.jsonl#L6
             quote: 전부 다 추천한 거 동의.
+          status: confirmed
+        next_questions:
+          to: open
+          source:
+            kind: record
+            ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+          status: confirmed
+        record_questions:
+          to: open
+          source:
+            kind: record
+            ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+          status: confirmed
+        search:
+          to: open
+          source:
+            kind: record
+            ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+          status: confirmed
+        record_search:
+          to: open
+          source:
+            kind: record
+            ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+          status: confirmed
+        skip_stage:
+          to: open
+          source:
+            kind: record
+            ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+          status: confirmed
+        record_skip:
+          to: open
+          source:
+            kind: record
+            ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+          status: confirmed
+        merge_main:
+          to: open
+          source:
+            kind: record
+            ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+          status: confirmed
+        record_merge:
+          to: open
+          source:
+            kind: record
+            ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+          status: confirmed
+        checkout_commit:
+          to: open
+          source:
+            kind: record
+            ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+          status: confirmed
+        record_checkout:
+          to: open
+          source:
+            kind: record
+            ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+          status: confirmed
+        confirm_all_proposed:
+          to: open
+          source:
+            kind: record
+            ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+          status: confirmed
+        record_confirm_all:
+          to: open
+          source:
+            kind: record
+            ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
           status: confirmed
   Commit:
     field: stage
@@ -618,37 +1028,43 @@ transitions:
           to: recorded
           source:
             kind: interview
-            ref: interview:interview/authoring/log.jsonl#L6
+            ref: interview:domains/authoring/interview.jsonl#L6
             quote: 전부 다 추천한 거 동의.
           status: confirmed
         record_check:
           to: recorded
           source:
             kind: interview
-            ref: interview:interview/authoring/log.jsonl#L6
+            ref: interview:domains/authoring/interview.jsonl#L6
             quote: 전부 다 추천한 거 동의.
           status: confirmed
         approve_commit:
           to: recorded
           source:
             kind: interview
-            ref: interview:interview/authoring/log.jsonl#L6
+            ref: interview:domains/authoring/interview.jsonl#L6
             quote: 전부 다 추천한 거 동의.
           status: confirmed
         record_approval:
           to: recorded
           source:
             kind: interview
-            ref: interview:interview/authoring/log.jsonl#L6
+            ref: interview:domains/authoring/interview.jsonl#L6
             quote: 전부 다 추천한 거 동의.
           status: confirmed
         deliver:
           to: recorded
           source:
             kind: interview
-            ref: interview:interview/authoring/log.jsonl#L6
+            ref: interview:domains/authoring/interview.jsonl#L6
             quote: 전부 다 추천한 거 동의.
           status: confirmed
+  Answer:
+    field: stage
+    initial: recorded
+    matrix:
+      recorded:
+        record_answer_ref: recorded
 invariants:
 - id: approved-commits-passed-their-checks
   'on': Commit
@@ -656,7 +1072,7 @@ invariants:
   reason: An approved commit passed its change check.
   source:
     kind: interview
-    ref: interview:interview/authoring/log.jsonl#L7
+    ref: interview:domains/authoring/interview.jsonl#L7
     quote: '19: a'
   status: confirmed
 - id: decided-requests-record-the-choice
@@ -665,7 +1081,7 @@ invariants:
   reason: A decided request records what was chosen.
   source:
     kind: interview
-    ref: interview:interview/authoring/log.jsonl#L7
+    ref: interview:domains/authoring/interview.jsonl#L7
     quote: '19: a'
   status: confirmed
 - id: fetched-sources-have-a-snapshot
@@ -674,7 +1090,7 @@ invariants:
   reason: A fetched source has the hash of its snapshot.
   source:
     kind: interview
-    ref: interview:interview/authoring/log.jsonl#L7
+    ref: interview:domains/authoring/interview.jsonl#L7
     quote: '19: a'
   status: confirmed
 - id: elements-cite-a-source
@@ -683,7 +1099,7 @@ invariants:
   reason: Every element cites where it came from.
   source:
     kind: interview
-    ref: interview:interview/authoring/log.jsonl#L7
+    ref: interview:domains/authoring/interview.jsonl#L7
     quote: '19: a'
   status: confirmed
 world:
@@ -737,7 +1153,7 @@ world:
   - Draft:
       id: D1
       domain_id: authoring
-      declaration: domains/authoring.domain.yaml
+      declaration: domains/authoring/authoring.domain.yaml
       branch: work
       stage: open
   - Commit:
@@ -760,6 +1176,15 @@ world:
       domain_id: authoring
       stage: recorded
       checks_passed: false
+  - Commit:
+      id: C3
+      seq: 3
+      content: e5f6
+      branch: work
+      interface: 1.2.0
+      domain_id: authoring
+      stage: recorded
+      checks_passed: true
 scenarios:
 - id: approve-only-after-a-passing-check
   given:
@@ -872,7 +1297,7 @@ handoffs:
     target: target.domain_id + ':' + target.id + ':' + params.environment
     source:
       kind: interview
-      ref: interview:interview/authoring/log.jsonl#L8
+      ref: interview:domains/authoring/interview.jsonl#L8
       quote: 20번, 21번 둘 다 추천대로 동의.
     status: confirmed
 glossary:

@@ -49,11 +49,28 @@ CATALOG: dict[str, Service] = {s.name: s for s in (
             {"chunks": "integer", "local_only": "boolean"}),
     Service("fetch_source", "Fetch a workspace link source into its snapshot.", {"source": "string"},
             {"sha256": "string"}),
+    # The interview (ADR-0025, ADR-0037): generic operations on a workspace's working copy.
+    Service("search_sources", "Search the workspace's sources (redacted; local-only never served).",
+            {"query": "string"}, {"refs": "strings"}),
+    Service("stage_questions", "The current stage of the working copy and its bundle of questions.", {},
+            {"stage": "string", "bundle": "string", "questions": "strings"}),
+    Service("propose_element", "Write a drafted element into the working copy, citing a source chunk; "
+            "always `proposed`. `value` is JSON.", {"path": "string", "value": "string", "source": "string"},
+            {"issues": "integer", "summary": "string"}),
+    Service("record_answer", "Record the owner's answer in their words; its decisions (JSON list of "
+            "{path, value}) become proposed elements citing it.",
+            {"question": "string", "answer": "string", "decisions": "string"}, {"ref": "string"}),
+    Service("confirm_element", "Confirm drafted elements (space-separated paths, or `all` for every "
+            "proposed one). The calling person must be the approver.",
+            {"paths": "string", "approver": "string"}, {"confirmed": "strings"}),
+    Service("skip_stage", "Record that an optional stage has nothing, with the owner's reason.",
+            {"stage": "string", "reason": "string"}, {"skipped": "boolean"}),
     # Commits (ADR-0029). `commit` returns an `id`, so a reply may create the Commit object.
     Service("commit", "Snapshot a working copy as an immutable commit (no new commit if unchanged).",
             {"declaration": "string"},
             {"id": "string", "seq": "integer", "content": "string", "created": "boolean", "parent": "string",
-             "interface": "string", "to_review": "strings", "last_approved": "string"}),
+             "interface": "string", "to_review": "strings", "last_approved": "string", "domain": "string",
+             "branch": "string", "author": "string"}),
     Service("diff", "The semantic diff between two commits: what changed directly.",
             {"domain": "string", "from": "string", "to": "string"},
             {"changed": "strings", "added": "strings", "removed": "strings", "to_review": "strings"}),
@@ -61,6 +78,10 @@ CATALOG: dict[str, Service] = {s.name: s for s in (
             "refused when the working copy has uncommitted changes. Committing it makes a new commit.",
             {"domain": "string", "commit": "string", "declaration": "string"},
             {"content": "string"}),
+    Service("merge_main", "Bring main into a branch's working copy (a semantic 3-way merge) and list the "
+            "conflicts for the person to resolve; the next commit on the branch records both parents.",
+            {"domain": "string", "branch": "string", "declaration": "string"},
+            {"merge": "string", "up_to_date": "boolean", "conflicts": "integer", "paths": "strings"}),
     Service("change_check", "Run the change check on a commit against its merge base with main, and "
             "record it on the commit (ADR-0009, ADR-0032).",
             {"domain": "string", "commit": "string"},

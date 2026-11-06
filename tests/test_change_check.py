@@ -158,25 +158,23 @@ def test_a_check_is_recorded_on_the_commit_against_its_merge_base(tmp_path, base
     assert check_commit(st, "example", c0.id, examples=10).diff["from"] is None   # main's first commit
 
 
-def test_the_change_check_service_and_the_cli(tmp_path, base):
+def test_the_change_check_service_and_the_workspace(tmp_path, base):
     from toprope.deploy import LocalEnvironment
     from toprope.kernel.services import LocalKernel
+    from toprope.workspace import Workspace
     (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump({"domain": "d.domain.yaml", "sources": []}))
     write(tmp_path / "d.domain.yaml", base)
-
-    def run(*a):
-        return subprocess.run(["uv", "run", "--quiet", "toprope-author", *a, "--workspace", str(tmp_path)],
-                              capture_output=True, text=True, timeout=180, check=False)
-    c0 = json.loads(run("commit").stdout)["commit"]
-    ok = run("change-check", "--examples", "10")
-    assert ok.returncode == 0 and json.loads(ok.stdout)["ok"] is True
+    ws = Workspace(tmp_path)
+    c0 = ws.commit()["commit"]
+    ok = ws.change_check(examples=10)
+    assert ok["ok"] is True
     assert (tmp_path / ".toprope" / "checks" / f"{c0}.json").exists()
     raw = copy.deepcopy(base)
     raw["transitions"]["Experiment"]["matrix"]["approved"]["launch_experiment"] = {"deny": "Not any more."}
     write(tmp_path / "d.domain.yaml", raw)
-    c1 = json.loads(run("commit").stdout)["commit"]
-    bad = run("change-check", "--since", c0, "--examples", "10")
-    assert bad.returncode == 1 and "semantic" in json.loads(bad.stdout)["summary"]
+    c1 = ws.commit()["commit"]
+    bad = ws.change_check(since=c0, examples=10)
+    assert bad["ok"] is False and "semantic" in bad["summary"]
     env = LocalEnvironment(tmp_path / "env")
     k = LocalKernel(tmp_path, environment=env, harness_examples=10)
     out = k.call("change_check", {"domain": "example", "commit": c1})   # nothing approved: against its parent
@@ -229,7 +227,7 @@ def test_an_environment_of_another_domain_is_not_replayed(tmp_path, base):
 
 
 def test_a_mistyped_environment_or_branch_is_an_error(tmp_path, base):
-    from toprope.authoring import AuthoringError, Workspace
+    from toprope.workspace import AuthoringError, Workspace
     (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump({"domain": "d.domain.yaml", "sources": []}))
     write(tmp_path / "d.domain.yaml", base)
     ws = Workspace(tmp_path)

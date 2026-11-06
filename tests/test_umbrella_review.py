@@ -11,7 +11,7 @@ from toprope.semantics import Actor, Event, Grant
 
 # 1. an agent can never write provenance directly ---------------------------------------------------
 def test_status_and_source_paths_cannot_be_written(tmp_path):
-    from toprope.authoring import AuthoringError, Workspace
+    from toprope.workspace import AuthoringError, Workspace
     (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump(
         {"domain": "d.domain.yaml", "sources": [{"id": "docs", "kind": "records", "path": "docs"}]}))
     (tmp_path / "docs").mkdir()
