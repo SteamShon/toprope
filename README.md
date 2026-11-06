@@ -1,44 +1,40 @@
 # Toprope
 
-**Declare what your team decided, who may do what and in which state, and every action by an
-agent or a person is checked against it. Changes to those rules are checked and approved the
-way code changes are.**
+**Your agent knows how to call Stripe. It doesn't know your refund policy.**
 
-For teams that let agents act on systems with state: ad budgets, refunds, incidents, releases,
-experiments.
+- It knows Meta Ads. It doesn't know that new creatives go to a test campaign first.
+- It knows GitHub. It doesn't know who may approve a release.
+- It knows your admin console's API. It doesn't know which steps come in which order.
+
+Toprope turns what your team decided into tools and rules your agent follows. It checks every
+action, by an agent or a person, against those rules, and it reviews changes to the rules the
+way code changes are reviewed.
 
 > Status: **a research prototype.** *Built* below means it runs today; *planned* names the
-> milestone ([Terms](#terms)). No claim is measured yet. What is done and what is left:
-> [`docs/STATUS.md`](docs/STATUS.md).
+> milestone ([Terms](#terms)). What is done and what is left: [`docs/STATUS.md`](docs/STATUS.md).
 
 ---
 
-## The situation
+## Who it is for
 
-**An agent that changes ad budgets.** LangChain's open-source
-[Paid Media Agent](https://github.com/langchain-ai/paid-media-agent) analyses campaigns across ad
-platforms and drafts budget changes for a person to approve. To make those writes safe, its
-authors built by hand a typed proposal, an approval bound to that exact proposal, one attempt
-and a readback, a reviewed list of allowed operations, a kill switch, and tests that edited
-payloads, replays and foreign users are refused. That is careful work, and it is code written
-for one domain. The team's own rules, such as "never touch a holdout campaign", would be one
-more layer on top.
+**Teams connecting agents to the tools they work in.** The agent can call the API, but your
+policies live in a wiki, a prompt or someone's head, so nothing stops it from skipping one.
+With Toprope the policies are a declaration the agent acts through: what it may not do is refused
+with the reason, and what only a person may do, it cannot do.
 
-**An agent in an incident.** A summary of a Netflix talk reports that an average incident
-involves nine teams and more than 30 engineers over hours, and describes an operational ontology
-(services, devices, users and how they connect) built so that agents can triage and suggest fixes
-([summary](https://www.sysdesai.com/news/ZASM29wJUJdp),
-[talk](https://www.infoq.com/presentations/netflix-observability-aiops-ontology-scale/)). An
-ontology tells an agent what is connected. It does not say which fixes the agent may apply, in
-which incident state, and with whose approval.
+**Teams building an agent product.** Every support ticket means another prompt fix, and every fix
+breaks something that used to work. With Toprope each case you fix becomes a scenario in the
+declaration, and a change to the rules shows which scenarios it breaks before it ships.
 
-In both cases the hard part is not calling an API. It is the rules around the call, which today
-live in code written for one agent, in prompts, or in people's heads.
+**Teams running operations with agents: marketing, support, finance.** You work out a policy by
+looking at the numbers, and a week later someone, or some agent, does it the old way. With
+Toprope the policy you found stays written down where it is enforced, and changing it goes
+through review, with a record of why.
 
-## The same rules, declared
+## Try it
 
-Here is the ad-budget case as a Toprope declaration ([`examples/paid-media/`](examples/paid-media/),
-runnable and checked by a test):
+An agent proposes ad budget changes; a person approves them
+([`examples/paid-media/`](examples/paid-media/), runs locally with no keys):
 
 ```yaml
 actions:
@@ -60,8 +56,6 @@ actions:
         reason: Whoever proposed a change cannot approve it.
 ```
 
-Then the agent tries:
-
 | Who | Asks | Result |
 |---|---|---|
 | the agent | raise the holdout campaign to 1200 | denied: *Holdout campaigns keep their budget; changing it would break the test.* |
@@ -70,73 +64,78 @@ Then the agent tries:
 | the agent | approve it | denied: *Only a person can approve_budget_change.* |
 | the media lead | approve it | approved: the daily budget is 1400 |
 
-Every attempt, allowed or refused, is recorded. The same declaration also gives the agent its
-MCP tools, gives people a command line and a guide, and gives a harness that tries every state ×
-action × role combination:
+From the same file you also get MCP tools for the agent, a command line, a guide, and tests that
+try every state × action × role combination:
 
 ```
 harness: PASS (model, execution, mcp)
 cells: 12 decided, covered model 12, execution 12, mcp 12; 0 undecided; 0 without an instance
 ```
 
-When someone proposes raising the step limit to 1000, the change is compared with the current
-rules before it ships, and a person approves it:
+Raise the step limit to 1000, and before it ships you see what the change touches:
 
 ```
 changes 1 precondition(s); affects 4 cell test(s), 1 precondition test(s), exploration; replays past propose_budget_change
 passes; 0 error(s), 0 warning(s)
 ```
 
-Not built yet: the call to the ad platform and the readback (an adapter, planned M0b). Today
-approving updates Toprope's own record. A smaller example: [`examples/refunds/`](examples/refunds/).
+In this example, approving updates Toprope's own record. Calling the ad platform needs an adapter
+(*planned*, M0b). A smaller example: [`examples/refunds/`](examples/refunds/).
 
-## The idea
+## Why Toprope
 
-Code changes run through a loop: a diff against `main`, tests before review, a person approves,
-only approved commits deploy, and logs show what happened. Most other work has no such loop.
-Toprope gives a workflow the same one:
+- **Works with the agent you already use.** Agents reach it over MCP: Claude Code, Codex, Cursor
+  or your own.
+- **Rules your agent cannot skip.** Every action passes one check that refuses what is not allowed,
+  gives the reason, and records the attempt.
+- **Rules reviewed like code.** A change is a commit, checked before review, approved by a person
+  merging it into `main`, and deployed only if its tests pass. Why we think every workflow needs
+  this loop: [`docs/problem.md`](docs/problem.md).
+- **Tests you do not write.** The harness is generated from the declaration and tries every
+  state × action × role combination.
+- **You do not write the rules either.** An agent drafts them from your systems and your answers to
+  plain questions, such as *"Can someone approve an experiment that is already running?"*, and a
+  person confirms each one.
+- **Small and local.** A Python library and a server you run yourself, with no hosted service.
 
-| | Code | A team workflow today | With Toprope |
-|---|---|---|---|
-| What is true now | `main` | in people's heads | the declaration on `main` |
-| A change | a diff against `main` | applying it is the change | a commit, with a diff in domain terms |
-| Checked before merge | tests, types, CI | rarely | the change check and the generated harness |
-| Review | a reviewer approves | an approval, if someone asks | only a person approves, by merging into `main` |
-| Deploy | only reviewed commits | nothing to deploy | only approved commits whose harness passed |
-| Afterwards | logs | lost in chat | every action, refusal and decision in an event log |
+## How to adopt it
 
-Why we think this is missing, and why stronger models make it matter more:
-[`docs/problem.md`](docs/problem.md).
+1. Run an example (above).
+2. Declare one workflow: let your agent interview you about it, and confirm what it drafts.
+3. Serve it over MCP to the agent that does the work.
+4. Put one write action behind it: the one that would hurt most if the agent got it wrong.
+5. Connect it to the system that action changes (adapters: *planned*, M0b).
 
-## What one declaration gives you
+## What it gives you
 
-1. **The domain** (*built*): objects and links, the actions that change them, a **transition
-   matrix** (for each state and action: the next state, or a refusal with its reason) and
-   **invariants** (rules that must always hold). An agent drafts it from your systems and your
-   answers to plain questions; a person confirms each part. *Functions* that compute over the
-   domain are *planned* (M0b).
-2. **A gate** (*built*): every action passes one check that refuses anything not allowed and
-   records what happened.
-3. **Generated surfaces** (*built in part*): MCP tools for agents, a command line, a guide, and
-   the harness. A UI, a backend for systems that do not exist yet, and query tools over the
-   history are *planned* (M0b).
-4. **A review loop for the rules** (*built*): commits, the change check, approval by merging into
-   `main`, and deploys of approved commits only ([`docs/commits.md`](docs/commits.md)).
+| | Status |
+|---|---|
+| a declaration: objects and links, actions, a transition matrix (next state or a refusal, per state and action) and invariants (rules that always hold) | built |
+| functions that compute over the domain | planned (M0b) |
+| the gate every action passes through, and an event log of actions, refusals and decisions | built |
+| MCP tools, a command line, a guide, a generated harness | built |
+| a UI, a backend for systems that do not exist yet, query tools over the history | planned (M0b) |
+| commits, the change check, approval by merge, deploys of approved commits only ([`docs/commits.md`](docs/commits.md)) | built |
+| adapters to existing systems, with read-back | planned (M0b) |
+| proposals for the next change, from the history | planned (M4) |
 
 Toprope's own workflows, making a domain and delivering it, are declared the same way, and their
 tools are generated from those declarations; only a small kernel is hand-built. More:
 [`docs/how-it-works.md`](docs/how-it-works.md).
 
+## Use cases, supported by Toprope
+
+Domains declared with Toprope and used for real, each with its declaration and what it governs.
+None yet: the first is milestone M2. To add yours, open a PR with the declaration and a short
+description of the workflow.
+
 ## Limits
 
-- It covers only actions that go through it. Sitting in front of your existing systems needs
-  adapters (planned, M0b).
+- It covers only actions that go through it.
 - A declaration cannot yet see whose agent acted, so a person could approve a change their own
   agent proposed ([`docs/STATUS.md`](docs/STATUS.md), *Left from reviews*).
-- It can say whether an action was *allowed*, not whether the rules are right or a decision was
-  good.
-- Whether this works better than rules in prompts or skills, and whether people can get their
-  rules into it through an interview, is untested. That is what the milestones measure.
+- It says whether an action was *allowed*, not whether the rules are right or a decision was good.
+- None of the claims below is tested yet.
 
 ## Claim status
 
