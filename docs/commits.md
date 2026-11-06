@@ -26,8 +26,10 @@ uv run toprope-author checkout 1-ab12…               # load a commit; committi
 - **Parents are a list**: one parent, or two for a merge commit.
 - **Interface version.** Each commit records its derived interface version (ADR-0008):
   removed or changed elements bump major, added elements minor, text-only changes patch.
-- **Storage.** The store lives under `<workspace>/.toprope/commits/<domain>/`. Keep
-  `.toprope/` out of version control. Writes take a per-domain file lock.
+- **Storage.** The store lives under `<workspace>/.toprope/commits/<domain>/` and **is kept in
+  git** (decided by the researcher, 2026-11-06): commits, branches, approvals and check records
+  are decisions, so they are shared and audited like code. The rest of `.toprope/` (caches,
+  snapshots, environments, reports) stays local. Writes take a per-domain file lock.
 
 ## Author, history and checkout (ADR-0032)
 - **Author.** A commit records who compiled it: `commit --as NAME`, or the calling actor

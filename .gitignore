@@ -3,4 +3,10 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .hypothesis/
-.toprope/
+# Toprope's working state stays local, except the domain commit store: commits, branches,
+# approvals and check records are decisions, shared and audited through git (decided 2026-11-06).
+.toprope/*
+!.toprope/commits/
+.toprope/commits/**/.lock
+.toprope/commits/**/.obj-*
+.toprope/commits/**/.refs-*
