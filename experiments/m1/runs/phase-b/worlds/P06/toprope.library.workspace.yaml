@@ -1,0 +1,13 @@
+domain: library/library.domain.yaml
+interview_log: library/interview.jsonl
+usage_log: library/sources-used.jsonl
+sources:
+- id: interview
+  kind: interview-log
+  path: library/interview.jsonl
+- id: notes
+  kind: records
+  path: notes
+- id: rules
+  kind: records
+  url: https://lending-rules.library.invalid/policy
