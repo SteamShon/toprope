@@ -148,6 +148,11 @@ actions:
     - id: harness-passed
       check: target.harness_ok == true
       reason: Deploy only a build whose harness passed.
+      source:
+        kind: interview
+        ref: interview:interview/delivery/log.jsonl#L5
+        quote: 전부 다 추천한 거 동의.
+      status: proposed
   record_deployment:
     description: Record whether the deploy happened, or which floor rule refused it.
     actor:
@@ -188,46 +193,124 @@ actions:
     - id: deployed
       check: target.deployed == true
       reason: Only a deployment that happened can be verified.
+      source:
+        kind: interview
+        ref: interview:interview/delivery/log.jsonl#L5
+        quote: 전부 다 추천한 거 동의.
+      status: proposed
 transitions:
   DeliveryRequest:
     field: stage
     initial: requested
     matrix:
       requested:
-        preview: previewing
+        preview:
+          to: previewing
+          source:
+            kind: interview
+            ref: interview:interview/delivery/log.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: proposed
         record_build: n/a
         deploy:
           deny: Preview it first.
+          source:
+            kind: interview
+            ref: interview:interview/delivery/log.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: proposed
         record_deployment: n/a
         verify: n/a
       previewing:
         preview:
           deny: A preview is running.
-        record_build: previewed
+          source:
+            kind: interview
+            ref: interview:interview/delivery/log.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: proposed
+        record_build:
+          to: previewed
+          source:
+            kind: interview
+            ref: interview:interview/delivery/log.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: proposed
         deploy:
           deny: The preview has not finished.
+          source:
+            kind: interview
+            ref: interview:interview/delivery/log.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: proposed
         record_deployment: n/a
         verify: n/a
       previewed:
-        preview: previewing
+        preview:
+          to: previewing
+          source:
+            kind: interview
+            ref: interview:interview/delivery/log.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: proposed
         record_build: n/a
-        deploy: deploying
+        deploy:
+          to: deploying
+          source:
+            kind: interview
+            ref: interview:interview/delivery/log.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: proposed
         record_deployment: n/a
         verify: n/a
       deploying:
         preview:
           deny: A deploy is running.
+          source:
+            kind: interview
+            ref: interview:interview/delivery/log.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: proposed
         record_build: n/a
         deploy:
           deny: A deploy is running.
-        record_deployment: done
+          source:
+            kind: interview
+            ref: interview:interview/delivery/log.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: proposed
+        record_deployment:
+          to: done
+          source:
+            kind: interview
+            ref: interview:interview/delivery/log.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: proposed
         verify: n/a
       done:
-        preview: previewing
+        preview:
+          to: previewing
+          source:
+            kind: interview
+            ref: interview:interview/delivery/log.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: proposed
         record_build: n/a
-        deploy: deploying
+        deploy:
+          to: deploying
+          source:
+            kind: interview
+            ref: interview:interview/delivery/log.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: proposed
         record_deployment: n/a
-        verify: verified
+        verify:
+          to: verified
+          source:
+            kind: interview
+            ref: interview:interview/delivery/log.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: proposed
       verified:
         preview: n/a
         record_build: n/a
@@ -235,23 +318,48 @@ transitions:
         record_deployment: n/a
         verify:
           deny: Already verified.
+          source:
+            kind: interview
+            ref: interview:interview/delivery/log.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: proposed
 invariants:
 - id: deployed-builds-passed-their-harness
   'on': DeliveryRequest
   check: target.deployed != true or target.harness_ok == true
   reason: Nothing reaches the environment unless its harness passed.
+  source:
+    kind: interview
+    ref: interview:interview/delivery/log.jsonl#L6
+    quote: '19: a'
+  status: proposed
 - id: verified-requests-were-deployed
   'on': DeliveryRequest
   check: target.stage != 'verified' or target.deployed == true
   reason: Only a deployment that happened is verified.
+  source:
+    kind: interview
+    ref: interview:interview/delivery/log.jsonl#L6
+    quote: '19: a'
+  status: proposed
 - id: finished-deploys-record-the-outcome
   'on': DeliveryRequest
   check: target.stage not in ['done', 'verified'] or exists(target.deployed)
   reason: A finished deploy records whether it happened.
+  source:
+    kind: interview
+    ref: interview:interview/delivery/log.jsonl#L6
+    quote: '19: a'
+  status: proposed
 - id: deploying-builds-passed-their-harness
   'on': DeliveryRequest
   check: target.stage != 'deploying' or target.harness_ok == true
   reason: A deploy starts only from a build whose harness passed.
+  source:
+    kind: interview
+    ref: interview:interview/delivery/log.jsonl#L11
+    quote: 25번은 A로 추천으로 해도 될 것 같고, 이십육 번도 A로.
+  status: proposed
 world:
   actors:
     approver:

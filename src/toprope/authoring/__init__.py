@@ -73,7 +73,7 @@ def element_path(path: str) -> list[str]:
 
 def is_element(segs: list[str]) -> bool:
     """Paths whose value carries `source` and `status` (Provenance in decl/models.py)."""
-    return ((len(segs) == 2 and segs[0] in ("objects", "links", "actions", "invariants"))
+    return ((len(segs) == 2 and segs[0] in ("objects", "links", "actions", "invariants", "handoffs"))
             or (len(segs) == 4 and segs[0] == "actions" and segs[2] == "preconditions")
             or (len(segs) == 5 and segs[0] == "transitions" and segs[2] == "matrix"))
 
@@ -499,6 +499,9 @@ class Workspace:
                     for p in el.get("preconditions") or []:
                         if isinstance(p, dict) and p.get("status") == "proposed":
                             out.append(f"actions.{name}.preconditions.{p.get('id')}")
+        for name, h in (doc.get("handoffs") or {}).items():
+            if isinstance(h, dict) and h.get("status") == "proposed":
+                out.append(f"handoffs.{name}")
         for inv in doc.get("invariants") or []:
             if isinstance(inv, dict) and inv.get("status") == "proposed":
                 out.append(f"invariants.{inv.get('id')}")
