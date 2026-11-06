@@ -73,8 +73,8 @@ command reference are generated.
 | 2c. The probes: eight starting states built once per run with the approved tools (a small `library` domain), the same generic tools in every arm, the deployed domains' generated MCP in the Toprope arm; the probe agent never sees what a probe checks | ✅ | #103 |
 | 3. The three arms' materials (`experiments/m1/arms/`): structured and Toprope built from the approved commits, the NL skill rendered blind; reviewed side by side by the researcher | 🟡 | #105 |
 | 4. Scorer (`grade` proposes labels with a grader, `score` computes the metrics and pilot verdicts from the researcher's confirmed labels; the key opens only here and only after every arm ran every change), tested with a synthetic key; the probes now also run once before any change | 🟡 | #106 |
-| 5. Dry run (changes 1–2), run by the researcher: time and usage per change | 🟡 | #109 |
-| 6. Full run, scoring confirmed by the researcher, M1 report | ⬜ | |
+| 5. Dry run (changes 1–2), run by the researcher: time and usage per change | ✅ | #109 |
+| 6. Full run, scoring confirmed by the researcher, M1 report | 🟡 | #112 |
 
 How a run works: the researcher runs `python -m phase_b arm ARM --model M` (from
 `experiments/m1`) in an ordinary terminal. Each conversation is written as it happens, and
