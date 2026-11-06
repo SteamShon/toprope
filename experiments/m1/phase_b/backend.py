@@ -110,7 +110,8 @@ class CliBackend(Backend):
         return cmd
 
     def converse(self, system, user, tools, transcript, max_turns=40):
-        with tempfile.TemporaryDirectory(prefix="m1-role-") as tmp:
+        # stderr goes to a file, not a pipe: a full pipe would block claude while we read stdout
+        with tempfile.TemporaryDirectory(prefix="m1-role-") as tmp, tempfile.TemporaryFile(mode="w+") as errfile:
             cwd = Path(tmp)
             cfg = None
             if tools is not None:
@@ -122,14 +123,13 @@ class CliBackend(Backend):
             transcript.write("start", system=system, user=user, tools=tools.kind if tools else None,
                              backend="claude-cli")
             try:
-                return self._run(self.command(system, cfg, max_turns), user, cwd, env, tools, transcript)
+                return self._run(self.command(system, cfg, max_turns), user, cwd, env, tools, transcript, errfile)
             finally:
                 if cfg is not None:
                     cfg.unlink(missing_ok=True)
 
-    def _run(self, cmd, user, cwd, env, tools, transcript) -> str:
+    def _run(self, cmd, user, cwd, env, tools, transcript, errfile) -> str:
         allowed = {f"mcp__{SERVER}__{n}" for n in (tools.names() if tools else [])}
-        errfile = tempfile.TemporaryFile(mode="w+")             # not a pipe: a full one would block claude
         p = subprocess.Popen(cmd, cwd=cwd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                              stderr=errfile, text=True)
         assert p.stdin and p.stdout
@@ -166,7 +166,6 @@ class CliBackend(Backend):
             p.wait()
             errfile.seek(0)
             err = errfile.read()
-            errfile.close()
         if result is None:
             text = err.strip()[-2000:]
             if any(w in text.lower() for w in LIMIT_WORDS):
