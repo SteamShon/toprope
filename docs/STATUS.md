@@ -95,7 +95,11 @@ each into `umbrella/pstack-lessons`. Each sub-PR changes only its own item below
 
 - ⬜ 4. World map state charts mark where the harness found a break, and draw minimal flows
 
-- ⬜ 5. Harness mutants: the harness must catch a seeded break in each level
+- ✅ 5. Harness mutants (`toprope-harness --mutants`, `docs/harness.md`): each seeded break given to
+  the execution level must be caught. Three survived in the examples (paid-media's `step-limit`
+  and `not-the-proposer`, refunds' `within-window`), so precondition tests now make a boundary
+  instance when the world has none, including for preconditions that read `params`. Every
+  mutant of the examples and both self domains is caught (Authoring 61, Delivery 29) (PR)
 
 ## M0b, M2 to M5
 

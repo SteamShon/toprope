@@ -87,7 +87,7 @@ cells: 12 decided, covered model 12, execution 12, mcp 12; 0 undecided; 0 withou
 Raise the step limit to 1000, and before it ships you see what the change touches:
 
 ```
-changes 1 precondition(s); affects 4 cell test(s), 1 precondition test(s), exploration; replays past propose_budget_change
+changes 1 precondition(s); affects 4 cell test(s), 2 precondition test(s), exploration; replays past propose_budget_change
 passes; 0 error(s), 0 warning(s)
 ```
 

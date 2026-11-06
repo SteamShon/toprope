@@ -92,8 +92,13 @@ class Harness:
     def __init__(self, d: Domain, *, levels: tuple[str, ...] = DEFAULT_LEVELS,
                  clock: Callable[[], datetime] | None = None,
                  store_factory: Callable[[], EventStore] | None = None,
-                 build_server: Callable[..., Any] | None = None):
+                 build_server: Callable[..., Any] | None = None,
+                 implementation: Domain | None = None):
+        """`implementation` is the declaration the execution and MCP levels are built from;
+        by default `d`. The model level and every expectation always read `d`. A different one
+        stands for an implementation that drifted from the declaration (harness mutants)."""
         self.d = d
+        self.implementation = implementation or d
         self.levels = tuple(levels)
         self.clock = clock or (lambda: NOW)
         self.store_factory = store_factory
@@ -110,7 +115,8 @@ class Harness:
         cls = LEVELS[level]
         # The model level is the reference: always the plain in-memory store.
         store = self.store_factory() if self.store_factory and level != "model" else None
-        s = cls(self.d, self.clock, store, build=self.build_server) if level == "mcp" else cls(self.d, self.clock, store)
+        d = self.d if level == "model" else self.implementation
+        s = cls(d, self.clock, store, build=self.build_server) if level == "mcp" else cls(d, self.clock, store)
         for obj, data in self.world.fixtures:
             s.seed(obj, copy.deepcopy(data))
         return s

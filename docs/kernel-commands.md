@@ -60,6 +60,7 @@ Its subcommands are the domain's actions, one per action, plus `get`, `history`,
 | `--depth` `DEPTH` | exploration depth (default `5`) |
 | `--json` `JSON` | write the full report as JSON to this path |
 | `--regen-check` | with --composition: the regeneration check (ADR-0028): serve from declarations, run, regenerate, compare, and run every kernel call end to end |
+| `--mutants` | with --domain: check that the harness catches each seeded break (exit 1 if one survives) |
 | `--receiver` `FILE[@MAJOR]` | a receiving domain's declaration, with its published interface major (default 1): checks this domain's handoffs against it (ADR-0024) (default `[]`) |
 
 ## `toprope-worldmap`
