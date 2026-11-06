@@ -1,0 +1,31 @@
+name: status
+
+# Keeps docs/STATUS.md current (AGENTS.md, "Progress"). Runs on pull_request, so it uses the
+# workflow file from the PR itself, whatever the default branch is.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check docs/STATUS.md
+        env:
+          BASE: ${{ github.base_ref }}
+          TITLE: ${{ github.event.pull_request.title }}
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          git diff --name-only "origin/${BASE}...HEAD" > "$RUNNER_TEMP/changed.txt"
+          printf '%s' "$BODY" > "$RUNNER_TEMP/body.txt"
+          python tools/status_check.py --base "$BASE" --title "$TITLE" \
+            --body-file "$RUNNER_TEMP/body.txt" --changed-files "$RUNNER_TEMP/changed.txt"
