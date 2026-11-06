@@ -4,6 +4,18 @@ Link: P0, ⑥ (the problem Toprope starts from). The short version is in the
 [README](../README.md). This page is the long one. The design is in [`charter.md`](charter.md),
 and how it works is in [`how-it-works.md`](how-it-works.md).
 
+## Why coding agents work
+
+Coding is where agents work best, and not only because models are good at code. Code is the one
+kind of work that already runs through a loop a machine can drive: what is true now is on
+`main`; a change is a diff against it; tests, types and static analysis check it before a
+person looks; nothing lands without approval; a pipeline deploys only what was approved; and
+logs show what happened, which feeds the next change. An agent can propose, be checked, be
+corrected and learn without leaving that loop.
+
+Toprope's claim is that this loop, not the model, is what is missing from the rest of the
+work. The sections below show what its absence looks like.
+
 ## Code has a PR. Rules do not.
 
 Nobody changes production code by editing it in place. You open a proposal, someone reviews it,
@@ -134,6 +146,8 @@ An agent can do every step that proposes. It owns none of the steps that decide.
 | CI for rules | every change gets an impact report and checks for breakage and conflicts, plus a preview, before deploy ([`change-check.md`](change-check.md)) |
 | the declaration as the path, not a side record | agents and people act through MCP, a command line and UI generated from the declaration; anything not allowed is refused with a reason |
 | low cost to declare | an interview turns undecided cells into plain questions; the owner answers and confirms |
-| no silent overwrite, a record of who accepted what | an event log of every action, denial and decision; changes are commits that a person approves |
+| no silent overwrite, a record of who accepted what | git and GitHub for the domain: changes are commits on branches with a semantic diff, checks are recorded on them, a person approves by merging into `main`, and only approved commits deploy ([`commits.md`](commits.md)) |
+| logs that feed the next change | an event log of every action, denial and decision |
+| existing systems kept | agents drive the systems you have through the gate; brownfield adapters come in M0b |
 
 Whether this works is what the milestones test. Nothing here is measured yet.

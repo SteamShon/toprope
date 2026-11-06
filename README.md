@@ -1,30 +1,40 @@
 # Toprope
 
-**Code changes go through a PR, CI and review. The rules your systems and agents act on do not.
-Toprope gives those rules the same path: declared, checked before they change, and enforced
-whenever anyone acts.**
+**Coding agents work because code gives them a loop: a PR to propose in, tests and static
+analysis to check before merge, a review, a deploy, and logs to learn from. Team workflows have
+no such loop. Toprope gives a workflow one: git and GitHub for the domain, and a software
+factory on top.**
 
-A correctness layer and software factory for any stateful domain where people and agents act.
+A correctness layer between agents and the systems they drive, for any stateful domain where
+people and agents act.
 
 > Status: **M1 in progress**, and no claim is measured yet. What is done and what is left:
 > [`docs/STATUS.md`](docs/STATUS.md). Verdicts: [Claim status](#claim-status).
 
 ---
 
-## The problem you have probably hit
+## Why coding agents work, and why the rest of the work does not
 
-You hand an agent a task that touches a real workflow: refund an order, launch an experiment,
-change a campaign. It has the APIs. What it does not have is what your team **decided**: who
-may approve, what must be true first, what is not allowed today. That lived in people's heads.
+Of everything agents do, coding works best, and not only because models are good at code.
+Code is the one place where the work already runs through a loop that a machine can drive: what is true now is on `main`, a change is a diff against it, tests and static
+analysis check it before a person looks, nothing lands without approval, a pipeline deploys
+only what was approved, and logs show what happened. An agent can propose, be checked, be
+corrected and learn, all inside that loop.
 
-- **Agents remove the half of safety that was in people's heads.** Permissions and validation
-  are in the machine. *"Don't do that today, you touched it yesterday"* was a person. Replace
-  the person with an agent, and that half leaves too.
-- **Writing it down does not fix it.** Add a line to `AGENTS.md` or a skill, and nothing tells
-  you whether it conflicts with the lines already there; you find out after deployment. Copy a
-  rule into the server, the admin tool, the support script and the prompt, and the copies drift.
-- **Rules have no PR.** Changing a rule is applying it. There is no base to diff against, no CI,
-  and nothing left behind once it is accepted.
+The work between people has none of it.
+
+| | Code | A team workflow today | With Toprope |
+|---|---|---|---|
+| What is true now | `main` | in people's heads | the declared domain on `main` |
+| A change | a PR, a diff against `main` | applying it is the change | a commit on a branch, with a semantic diff |
+| Checked before merge | tests, types, static analysis, CI | not at all | the change check and a harness over every state × action × role, recorded on the commit |
+| Review | a reviewer approves | the approver's memory, if anyone asks | a person approves: a merge into `main` |
+| Deploy | only reviewed commits | there is nothing to deploy | only approved commits, and only if the harness passes |
+| Afterwards | logs feed the next PR | lost in chat | every action, denial and decision in an event log, feeding the next change |
+
+So an agent asked to refund an order, launch an experiment or change a campaign has the APIs
+but not what the team **decided**: who may approve, what must be true first, what is not
+allowed today.
 
 | What was decided | What happened |
 |---|---|
@@ -32,31 +42,50 @@ may approve, what must be true first, what is not allowed today. That lived in p
 | "This campaign is a holdout: don't touch its budget." | Another team raised the budget. The money was already spent. |
 | "A device, once assigned, never changes group." | It had been broken for three weeks when someone noticed, after a decision was made on those numbers. |
 
-The rules existed. They were only spoken, so nothing could check them.
+The rules existed. They were only spoken, so nothing could check them. Writing them into
+`AGENTS.md` or a wiki does not help: nothing tells you whether a new line conflicts with the
+old ones, and every copy drifts. And stronger models make it worse: a model can work out what
+is *right*, not what *you decided*, and the longer it runs alone, the further a wrong premise
+goes. The long version: [`docs/problem.md`](docs/problem.md).
 
-**Better models make this worse, not better.** A stronger model can work out what is *right*.
-It cannot work out what *you decided*, and the longer it runs on its own, the further one
-wrong premise goes before anyone notices.
+## Agents drive existing systems; Toprope sits in between
 
-The long version, with more examples and what stays with people:
-[`docs/problem.md`](docs/problem.md).
+```
+ Intelligence   agents (Claude Code, Codex, any MCP client) and people
+       │        propose actions through surfaces generated from the domain
+       ▼
+ Toprope        the declared domain, the gate that checks every action, the event log
+       │        only allowed actions pass
+       ▼
+ Effects        brownfield: the servers, APIs and databases you already have, behind adapters
+                greenfield: a backend Toprope generates, when there is none
+```
+
+Most work runs on systems that already exist, so **brownfield is the first-class case**:
+Toprope does not replace your systems. It holds what was decided about them and refuses what
+the decision does not allow, before the call reaches them. Greenfield is the case where there
+is nothing yet, and Toprope generates the backend too. (The first brownfield adapter is
+planned for M0b; see [`docs/roadmap.md`](docs/roadmap.md).)
 
 ## What Toprope does
 
-1. **Declare the domain.** Objects, actions, who may do what in which state (a transition
-   matrix), and rules that must always hold (invariants). An agent drafts it from your code,
-   docs and an interview; the owner answers plain questions such as *"Can someone approve an
-   experiment that is already running?"* and confirms. Agents propose; people decide.
-2. **Check every change before it ships.** A change to the declaration is a commit with an
-   impact report in domain terms (*"changes 2 cells; affects 14 tests, 1 invariant"*), checks
-   for broken references, conflicting rules and regressions, what past events would have done
-   under the new rules, and a preview to try. A person approves it. This is CI for rules.
-3. **Generate what people and agents use.** MCP tools, a command line, a guide and a harness
-   come from the same declaration, so everyone acts on the same meaning. The harness tests
-   every state × action × role cell, not just a call graph.
-4. **Refuse what is not allowed, and record everything.** Every action goes through one gate
-   that checks the declaration and refuses with the declared reason. Actions, denials and
-   decisions land in an event log, so the next change can be proposed from evidence.
+1. **Declare the domain, DDD-style.** Objects, actions, a **transition matrix** (who may do
+   what, in which state) and **invariants** (what must always hold). An agent drafts it from
+   your code, docs and an interview; the owner only answers plain questions, such as *"Can
+   someone approve an experiment that is already running?"*, and confirms.
+2. **Change it like code: git and GitHub for the domain.** Every change is a commit on a branch
+   with a semantic diff. The change check runs on it: an impact report in domain terms
+   (*"changes 2 cells; affects 14 tests, 1 invariant"*), conflicting rules, regressions, and what
+   past events would have done under the new rules. Review comments become interview questions.
+   A person approves by merging into `main`, and Delivery deploys only approved commits
+   ([`docs/commits.md`](docs/commits.md)).
+3. **A software factory.** From the declaration it generates what people and agents use: MCP
+   tools, a command line, a guide, a backend for greenfield, and a harness that tests **every**
+   cell of the matrix and every invariant, not a sample of call paths. When the harness passes,
+   the code is trusted because the model is, so writing it is nearly free.
+4. **Refuse and record.** Every action goes through one gate that checks the declaration and
+   refuses with the declared reason. Actions, denials and decisions land in an event log, which
+   is where the next change is proposed from.
 
 One declaration reads as two sentences:
 
@@ -80,20 +109,26 @@ invariants:
     reason: Nothing runs without someone having approved it.
 ```
 
-The bet underneath: nobody defines a domain correctly in one go, so changing it must be cheap
-and safe; and once it is declared precisely, writing the code is nearly free. How the pieces
-fit: [`docs/how-it-works.md`](docs/how-it-works.md).
+## Toprope runs on itself
+
+Making a domain and delivering it are workflows too. Toprope's own **Authoring** (draft,
+interview, commit, check, approve) and **Delivery** (preview, deploy, verify) are declared
+domains, and the git-and-GitHub loop above is generated from those declarations. Only the
+kernel is hand-built. This is also why your process is not fixed: who reviews, how many
+approve, what must pass before a deploy are lines in a declaration you can change. The kernel
+keeps the rules no declaration can weaken.
 
 **It is not** an agent framework (use the agent you have), a guardrail product (enforcement
 follows from the model; it is not the goal), or a hosted service. It fits where there is state,
-allowed actions and rules, and poorly where there is little to declare.
+allowed actions and rules, and poorly where there is little to declare. How the pieces fit:
+[`docs/how-it-works.md`](docs/how-it-works.md).
 
 ## What is proven so far
 
 Toprope is built as a chain of claims, each tested by a milestone with a preregistered verdict
-([`docs/charter.md`](docs/charter.md)). Toprope's own authoring and delivery workflows are
-already declared domains, and their tools are generated from those declarations; only the
-kernel is hand-built. That shows the approach can be built. It does not yet show it is better.
+([`docs/charter.md`](docs/charter.md)). Running on itself shows the approach can be built. It
+does not yet show that it is better than a natural-language skill or that it makes a team
+faster. That is what the milestones measure.
 
 ## Claim status
 
@@ -114,7 +149,7 @@ changes only in a PR that reports a preregistered experiment verdict.
 | To | Read |
 |---|---|
 | feel the problem | [`docs/problem.md`](docs/problem.md) |
-| see how it works | [`docs/how-it-works.md`](docs/how-it-works.md), then [`docs/domain-model.md`](docs/domain-model.md) |
+| see how it works | [`docs/how-it-works.md`](docs/how-it-works.md), [`docs/domain-model.md`](docs/domain-model.md), [`docs/commits.md`](docs/commits.md) |
 | understand the design and its claims | [`docs/charter.md`](docs/charter.md) (problem, claim chain, hypotheses, principles), [`docs/architecture.md`](docs/architecture.md) |
 | use it | [`docs/workflow.md`](docs/workflow.md) (who runs what, when), [`docs/kernel-commands.md`](docs/kernel-commands.md), [`docs/server.md`](docs/server.md) |
 | write a declaration | [`docs/domain-schema.md`](docs/domain-schema.md), [`docs/semantics.md`](docs/semantics.md) |

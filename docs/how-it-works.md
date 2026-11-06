@@ -79,6 +79,20 @@ The edit gets a **preview** to try before deploying. Only affected artifacts and
 rebuilt, and everything else comes from a hash-keyed cache. The draft targets are an
 impact report in 2 s, an affected harness in 30 s, and a preview in 30 s.
 
+### Git and GitHub for the domain ([`commits.md`](commits.md))
+Changes to a declaration are handled the way code is (ADR-0029, ADR-0032, ADR-0033):
+- a change is a **commit** on a branch, content-addressed, with a **semantic diff**: only
+  elements that changed directly are reviewed again
+- the change check and the harness run on it, and their results are **recorded on the commit**
+- a review comment is an **interview question**; a review request is a **decision request** to
+  the person who may decide
+- a person **approves by merging into `main`**; nobody approves their own change
+- **Delivery** points an environment at one approved commit on `main`, and the deploy floor
+  requires a passing harness.
+
+Authoring and Delivery are themselves declared domains, so this whole loop is generated from
+their declarations (self-compile, ADR-0028, ADR-0037).
+
 ### 5. Record everything, learn from it
 Domain events are the system of record. Decisions (with inputs and rationale), **denied
 attempts**, exceptions and effect outcomes are recorded too. Agents query this history to
