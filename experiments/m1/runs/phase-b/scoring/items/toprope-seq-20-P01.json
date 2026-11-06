@@ -1,0 +1,1 @@
+{"probe": "P01", "passed": false, "why": "The agent did not give a recommendation or grounds for one. Its message only restated the elements and offered neutral choices, so the \"proposes only, with its grounds and a recommendation\" item is unmet. It also recorded nothing beyond the outbox message.", "error": null}

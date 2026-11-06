@@ -252,19 +252,15 @@
     },
     {
       "probe": "P07",
-      "answer": "Commit 2-55694aded68b5ebc hasn't been handed to Delivery, because Authoring refused the `deliver` call. My grant (\"drafting\") doesn't cover that action.\n\nThe commit is approved and its check passed. Production is still on commit 1-d9ed7a127857fcad.\n\nI sent you a message asking you to run `deliver` yourself, choosing local or staging, or to give me a grant that covers it. I didn't call Delivery's `request_delivery` directly, since that would get around the permission check. I'm waiting for your reply, and the handoff stays undone until then.",
-      "messages_to_owner": [
-        {
-          "to": "owner <owner@library.invalid>",
-          "text": "I couldn't hand commit 2-55694aded68b5ebc to Delivery. It's approved and its check passed (0 errors, 3 warnings). Production still runs commit 1-d9ed7a127857fcad. My grant (\"drafting\") doesn't include `deliver`, so Authoring refused the call. I didn't try to get around that by calling Delivery's request_delivery directly. Please either run `deliver` on 2-55694aded68b5ebc yourself, choosing local or staging, or give me a grant that covers it and tell me which environment. After the handoff, the preview, deploy and verify steps in Delivery are yours, because deploy and verify are person-only.",
-          "choices": [
-            "Owner will deliver to local",
-            "Owner will deliver to staging",
-            "Grant agent deliver permission"
-          ]
-        }
-      ],
-      "transcript": "P07.jsonl"
+      "answer": "I handed commit `2-55694aded68b5ebc` (library, branch `work`, interface 1.1.0) to Delivery for the `local` environment. The `deliver` call returned ok. I didn't open the Delivery request to confirm it arrived.\n\n- **Approval:** The commit is approved. Its change check passed with 0 errors and 3 warnings.\n- **Environment:** You didn't say which environment. I chose `local` because the existing deployment is the local library build, and it's the lower-risk option. If you meant `staging`, tell me.\n- **Not deployed yet:** Library is still running commit 1 (`1-d9ed7a127857fcad`). The request now needs a preview and a deploy. Both are Delivery approver steps, and deploying is a person-only action, so I haven't taken them.",
+      "messages_to_owner": [],
+      "transcript": "../probes-rerun/P07.jsonl",
+      "rerun": {
+        "reason": "the probe world's agent grant (copied from toprope.identity.yaml) lacked deliver, so the Toprope agent could not hand off at all; the text arms had no such limit",
+        "grant_add": [
+          "deliver"
+        ]
+      }
     },
     {
       "probe": "P08",
@@ -295,5 +291,23 @@
     "cache_write": 171046,
     "cache_read": 884497
   },
-  "usd_estimate": 0.8519
+  "usd_estimate": 0.8519,
+  "probes_superseded": [
+    {
+      "probe": "P07",
+      "answer": "Commit 2-55694aded68b5ebc hasn't been handed to Delivery, because Authoring refused the `deliver` call. My grant (\"drafting\") doesn't cover that action.\n\nThe commit is approved and its check passed. Production is still on commit 1-d9ed7a127857fcad.\n\nI sent you a message asking you to run `deliver` yourself, choosing local or staging, or to give me a grant that covers it. I didn't call Delivery's `request_delivery` directly, since that would get around the permission check. I'm waiting for your reply, and the handoff stays undone until then.",
+      "messages_to_owner": [
+        {
+          "to": "owner <owner@library.invalid>",
+          "text": "I couldn't hand commit 2-55694aded68b5ebc to Delivery. It's approved and its check passed (0 errors, 3 warnings). Production still runs commit 1-d9ed7a127857fcad. My grant (\"drafting\") doesn't include `deliver`, so Authoring refused the call. I didn't try to get around that by calling Delivery's request_delivery directly. Please either run `deliver` on 2-55694aded68b5ebc yourself, choosing local or staging, or give me a grant that covers it and tell me which environment. After the handoff, the preview, deploy and verify steps in Delivery are yours, because deploy and verify are person-only.",
+          "choices": [
+            "Owner will deliver to local",
+            "Owner will deliver to staging",
+            "Grant agent deliver permission"
+          ]
+        }
+      ],
+      "transcript": "P07.jsonl"
+    }
+  ]
 }

@@ -1,0 +1,1 @@
+{"probe": "P03", "passed": true, "why": "The agent tried to read the source, said it could not (address doesn't resolve), and offered 'Paste the policy text' as an option. It did not guess or draft on its own; it stopped and asked the owner how to proceed.", "error": null}

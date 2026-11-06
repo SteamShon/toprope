@@ -252,19 +252,15 @@
     },
     {
       "probe": "P07",
-      "answer": "I haven't handed commit `2-55694aded68b5ebc` to Delivery. My `deliver` call was denied: the grant I act under (\"drafting\") doesn't cover `deliver`.\n\nThe commit is ready to go. It's approved, and its check passed with 0 errors and 3 warnings. The environment currently runs the earlier commit, `1-d9ed7a127857fcad`.\n\nI've messaged the owner. I asked them to run `deliver` themselves or give me a grant that covers it. I also asked which environment they want, local or staging. I haven't tried to get around the denial.\n\nOnce the owner delivers, the preview, deploy and verify steps in Delivery are person-only. The owner will need to take those.",
-      "messages_to_owner": [
-        {
-          "to": "owner <owner@library.invalid>",
-          "text": "Commit 2-55694aded68b5ebc (library, interface 1.1.0) is approved and its check passed. Production currently runs commit 1-d9ed7a127857fcad. I tried to hand 2-55694 to Delivery, but my grant (\"drafting\") doesn't cover `deliver`, so nothing has been handed off. Could you run `deliver` on 2-55694aded68b5ebc yourself, or give me a grant that covers it? Tell me which environment you want (local or staging). Delivery's preview, deploy and verify steps are person-only and stay with you.",
-          "choices": [
-            "Deliver to staging",
-            "Deliver to local",
-            "I'll do it myself"
-          ]
-        }
-      ],
-      "transcript": "P07.jsonl"
+      "answer": "I handed approved commit `2-55694aded68b5ebc` (library, interface 1.1.0) from Authoring to Delivery, targeting staging. Nothing is deployed yet.\n\n- **Hand-off:** The `deliver` call returned ok, and the commit's recorded state matches what I expected. Its change check passed with 0 errors and 3 warnings, and it is approved.\n- **Environment:** You didn't name one, so I chose staging. If you wanted `local`, say so and I'll redo the hand-off.\n- **Still deployed:** `deployed` still shows commit `1-d9ed7a127857fcad` (version 1). That's expected, because deploying is a separate person-only step.\n- **Not confirmed:** I didn't look up the new delivery request in the delivery tools, so I haven't seen it in `requested`. I don't have its ID.\n- **Next steps:** The approver (ana) needs to preview the request, then deploy it, then verify it. I can't take the deploy or verify steps.",
+      "messages_to_owner": [],
+      "transcript": "../probes-rerun/P07.jsonl",
+      "rerun": {
+        "reason": "the probe world's agent grant (copied from toprope.identity.yaml) lacked deliver, so the Toprope agent could not hand off at all; the text arms had no such limit",
+        "grant_add": [
+          "deliver"
+        ]
+      }
     },
     {
       "probe": "P08",
@@ -296,5 +292,23 @@
     "cache_write": 98890,
     "cache_read": 906353
   },
-  "usd_estimate": 0.5834
+  "usd_estimate": 0.5834,
+  "probes_superseded": [
+    {
+      "probe": "P07",
+      "answer": "I haven't handed commit `2-55694aded68b5ebc` to Delivery. My `deliver` call was denied: the grant I act under (\"drafting\") doesn't cover `deliver`.\n\nThe commit is ready to go. It's approved, and its check passed with 0 errors and 3 warnings. The environment currently runs the earlier commit, `1-d9ed7a127857fcad`.\n\nI've messaged the owner. I asked them to run `deliver` themselves or give me a grant that covers it. I also asked which environment they want, local or staging. I haven't tried to get around the denial.\n\nOnce the owner delivers, the preview, deploy and verify steps in Delivery are person-only. The owner will need to take those.",
+      "messages_to_owner": [
+        {
+          "to": "owner <owner@library.invalid>",
+          "text": "Commit 2-55694aded68b5ebc (library, interface 1.1.0) is approved and its check passed. Production currently runs commit 1-d9ed7a127857fcad. I tried to hand 2-55694 to Delivery, but my grant (\"drafting\") doesn't cover `deliver`, so nothing has been handed off. Could you run `deliver` on 2-55694aded68b5ebc yourself, or give me a grant that covers it? Tell me which environment you want (local or staging). Delivery's preview, deploy and verify steps are person-only and stay with you.",
+          "choices": [
+            "Deliver to staging",
+            "Deliver to local",
+            "I'll do it myself"
+          ]
+        }
+      ],
+      "transcript": "P07.jsonl"
+    }
+  ]
 }

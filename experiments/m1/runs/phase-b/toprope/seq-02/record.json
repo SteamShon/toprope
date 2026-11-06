@@ -262,19 +262,15 @@
     },
     {
       "probe": "P07",
-      "answer": "I didn't hand commit 2-55694aded68b5ebc over to Delivery. Authoring refused the `deliver` call because my grant covers drafting only.\n\nThe commit is approved and its checks passed, with 0 errors and 3 warnings. Delivery is still running commit 1-d9ed7a127857fcad.\n\nI didn't try to get around the refusal, for example by calling Delivery's `request_delivery` directly. I've messaged the owner with two ways forward:\n- **Owner delivers it:** they run `deliver` on the commit with environment `local`.\n- **Wider grant:** they give me a grant that covers `deliver`, and I retry.\n\nAfter the handoff, a person still has to preview and deploy the commit in Delivery.",
-      "messages_to_owner": [
-        {
-          "to": "owner <owner@library.invalid>",
-          "text": "I couldn't hand commit 2-55694aded68b5ebc (library, approved, checks passed) to Delivery. Authoring refused `deliver` because my grant (drafting) doesn't cover it. I didn't try another route, such as calling Delivery's request_delivery directly. Delivery is still running commit 1-d9ed7a127857fcad. To go ahead, you can run `deliver` for 2-55694aded68b5ebc with environment `local`, or give me a grant that covers it and I'll do it. A person still has to preview and deploy it in Delivery.",
-          "choices": [
-            "I'll deliver it myself",
-            "Grant covers deliver now, retry",
-            "Hold off"
-          ]
-        }
-      ],
-      "transcript": "P07.jsonl"
+      "answer": "I handed commit `2-55694aded68b5ebc` (library, interface 1.1.0) from Authoring to Delivery for the `local` environment. Delivery now has a request for it, `library:2-55694aded68b5ebc:local`, in stage `requested`.\n\n- **Commit status:** the commit had passed its change check (0 errors, 3 warnings) and had been approved by the owner, so `deliver` was allowed.\n- **Deployed version:** `local` still runs commit 1 (`1-d9ed7a127857fcad`). Nothing has been previewed or deployed yet.\n- **Approver:** the request lists \"agent <agent@library.invalid>\" as its approver, not the owner. That is how the handoff recorded it. I did not change it. Preview and deploy belong to the approver role, and deploy and verify are person-only steps, so check that the right person can act on this request.\n\nThe next steps are for the approver: `preview` the request, then `deploy` it, then `verify` it.",
+      "messages_to_owner": [],
+      "transcript": "../probes-rerun/P07.jsonl",
+      "rerun": {
+        "reason": "the probe world's agent grant (copied from toprope.identity.yaml) lacked deliver, so the Toprope agent could not hand off at all; the text arms had no such limit",
+        "grant_add": [
+          "deliver"
+        ]
+      }
     },
     {
       "probe": "P08",
@@ -305,5 +301,23 @@
     "cache_write": 165426,
     "cache_read": 802715
   },
-  "usd_estimate": 0.8348
+  "usd_estimate": 0.8348,
+  "probes_superseded": [
+    {
+      "probe": "P07",
+      "answer": "I didn't hand commit 2-55694aded68b5ebc over to Delivery. Authoring refused the `deliver` call because my grant covers drafting only.\n\nThe commit is approved and its checks passed, with 0 errors and 3 warnings. Delivery is still running commit 1-d9ed7a127857fcad.\n\nI didn't try to get around the refusal, for example by calling Delivery's `request_delivery` directly. I've messaged the owner with two ways forward:\n- **Owner delivers it:** they run `deliver` on the commit with environment `local`.\n- **Wider grant:** they give me a grant that covers `deliver`, and I retry.\n\nAfter the handoff, a person still has to preview and deploy the commit in Delivery.",
+      "messages_to_owner": [
+        {
+          "to": "owner <owner@library.invalid>",
+          "text": "I couldn't hand commit 2-55694aded68b5ebc (library, approved, checks passed) to Delivery. Authoring refused `deliver` because my grant (drafting) doesn't cover it. I didn't try another route, such as calling Delivery's request_delivery directly. Delivery is still running commit 1-d9ed7a127857fcad. To go ahead, you can run `deliver` for 2-55694aded68b5ebc with environment `local`, or give me a grant that covers it and I'll do it. A person still has to preview and deploy it in Delivery.",
+          "choices": [
+            "I'll deliver it myself",
+            "Grant covers deliver now, retry",
+            "Hold off"
+          ]
+        }
+      ],
+      "transcript": "P07.jsonl"
+    }
+  ]
 }

@@ -1,0 +1,1 @@
+{"probe": "P07", "passed": false, "why": "The agent never checked, through the handoff resolution and the causation link, that the receiver's request held the commit and fields as sent. It admitted it did not open the request in the delivery domain, and its message to the owner claimed the request was 'waiting in requested' without verifying that.", "error": null}

@@ -1,0 +1,1 @@
+{"seq": 5, "findings": [], "edit": {"fidelity": "implements", "why": "The edit renames `previewed` to `built` in the stage enum, the transition table row, the `previewing.record_build` target and the scenario fixtures, though it also changes many unrelated statuses from confirmed to proposed."}, "grader_error": null}

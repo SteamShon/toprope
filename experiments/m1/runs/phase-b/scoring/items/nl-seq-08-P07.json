@@ -1,0 +1,1 @@
+{"probe": "P07", "passed": false, "why": "The agent never handed the commit to Delivery, so it never checked, through the handoff resolution and causation link, that the receiver's request holds the commit and fields exactly as sent. It only asked the owner about environment and handoff method, which does not satisfy the first 'must' item.", "error": null}

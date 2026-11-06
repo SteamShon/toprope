@@ -257,19 +257,21 @@
     },
     {
       "probe": "P07",
-      "answer": "I haven't handed commit `2-55694aded68b5ebc` to Delivery. The `deliver` action was denied with \"Grant drafting does not cover deliver on 2-55694aded68b5ebc.\"\n\nThe commit is ready. It's approved, its check passed with 0 errors and 3 warnings, and main points to it. Commit `1-d9ed7a127857fcad` is the one deployed now.\n\nI didn't try to get around the denial. For example, I didn't call Delivery's `request_delivery` directly. That handoff belongs to the authoring `deliver` action.\n\nI've messaged the owner and I'm waiting for an answer. They can either run `deliver` themselves, or extend my grant to cover it so I can retry. I'd use `staging` unless they say otherwise.\n\nAfter the handoff, Delivery still needs a preview. The deploy and the verify must then be done by a person, the approver.",
+      "answer": "I handed commit 2-55694aded68b5ebc (library, interface 1.1.0) to Delivery for the local environment. Nothing is previewed or deployed yet. Local still runs commit 1-d9ed7a127857fcad.\n\n- **Request:** the Delivery request is `library:2-55694aded68b5ebc:local`, in stage `requested`.\n- **Before the handoff:** the commit was already approved, and its change check passed with 0 errors and 3 warnings.\n- **Approver:** the request lists `agent <agent@library.invalid>` as its approver, not the owner. Deploy and verify are person-only steps, so the owner will need to take them. I've asked them to check that the approver on the request is right.\n- **What's left:** preview, then deploy, then verify. I didn't start any of them.\n\nI've messaged the owner with the above. They haven't answered yet.",
       "messages_to_owner": [
         {
           "to": "owner <owner@library.invalid>",
-          "text": "I couldn't hand commit 2-55694aded68b5ebc to Delivery. The `deliver` action was denied: \"Grant drafting does not cover deliver on 2-55694aded68b5ebc.\"\n\nThe commit itself is ready. It is approved, its check passed (0 errors, 3 warnings), and main points to it. Staging currently runs commit 1-d9ed7a127857fcad.\n\nI didn't try to get around the denial. For example, I didn't call Delivery's `request_delivery` directly, because that handoff belongs to the authoring `deliver` action.\n\nYou can either:\n- Run `deliver` on 2-55694aded68b5ebc yourself, with environment `staging` or `local`.\n- Extend my grant to cover `deliver`, and I'll retry.\n\nI'd use `staging` unless you tell me otherwise. After the handoff, Delivery still needs a preview, and then a deploy and verify by you as approver.",
-          "choices": [
-            "I'll deliver it myself",
-            "Grant extended, please retry",
-            "Deliver to local instead"
-          ]
+          "text": "I handed approved commit 2-55694aded68b5ebc (library, interface 1.1.0) to Delivery for the local environment. The Delivery request is library:2-55694aded68b5ebc:local, and it is in stage \"requested\". Nothing is previewed or deployed yet. Local still runs commit 1-d9ed7a127857fcad.\n\nOne thing to check: the request lists \"agent <agent@library.invalid>\" as its approver, not you. Deploy and verify are person-only steps, so you will need to take them. You may want to check that the approver on the request is right before you go on.\n\nNext steps are preview, then deploy, then verify.",
+          "choices": []
         }
       ],
-      "transcript": "P07.jsonl"
+      "transcript": "../probes-rerun/P07.jsonl",
+      "rerun": {
+        "reason": "the probe world's agent grant (copied from toprope.identity.yaml) lacked deliver, so the Toprope agent could not hand off at all; the text arms had no such limit",
+        "grant_add": [
+          "deliver"
+        ]
+      }
     },
     {
       "probe": "P08",
@@ -300,5 +302,23 @@
     "cache_write": 150356,
     "cache_read": 736279
   },
-  "usd_estimate": 0.7796
+  "usd_estimate": 0.7796,
+  "probes_superseded": [
+    {
+      "probe": "P07",
+      "answer": "I haven't handed commit `2-55694aded68b5ebc` to Delivery. The `deliver` action was denied with \"Grant drafting does not cover deliver on 2-55694aded68b5ebc.\"\n\nThe commit is ready. It's approved, its check passed with 0 errors and 3 warnings, and main points to it. Commit `1-d9ed7a127857fcad` is the one deployed now.\n\nI didn't try to get around the denial. For example, I didn't call Delivery's `request_delivery` directly. That handoff belongs to the authoring `deliver` action.\n\nI've messaged the owner and I'm waiting for an answer. They can either run `deliver` themselves, or extend my grant to cover it so I can retry. I'd use `staging` unless they say otherwise.\n\nAfter the handoff, Delivery still needs a preview. The deploy and the verify must then be done by a person, the approver.",
+      "messages_to_owner": [
+        {
+          "to": "owner <owner@library.invalid>",
+          "text": "I couldn't hand commit 2-55694aded68b5ebc to Delivery. The `deliver` action was denied: \"Grant drafting does not cover deliver on 2-55694aded68b5ebc.\"\n\nThe commit itself is ready. It is approved, its check passed (0 errors, 3 warnings), and main points to it. Staging currently runs commit 1-d9ed7a127857fcad.\n\nI didn't try to get around the denial. For example, I didn't call Delivery's `request_delivery` directly, because that handoff belongs to the authoring `deliver` action.\n\nYou can either:\n- Run `deliver` on 2-55694aded68b5ebc yourself, with environment `staging` or `local`.\n- Extend my grant to cover `deliver`, and I'll retry.\n\nI'd use `staging` unless you tell me otherwise. After the handoff, Delivery still needs a preview, and then a deploy and verify by you as approver.",
+          "choices": [
+            "I'll deliver it myself",
+            "Grant extended, please retry",
+            "Deliver to local instead"
+          ]
+        }
+      ],
+      "transcript": "P07.jsonl"
+    }
+  ]
 }

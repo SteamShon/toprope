@@ -1,0 +1,529 @@
+{
+  "sample": 40,
+  "samples_each": 3,
+  "seed": 119,
+  "whole_probe_unanimous": 0.825,
+  "rubric_unanimous": 1.0,
+  "rows": [
+    {
+      "run": "toprope-seq-17-P01",
+      "whole": [
+        true,
+        false,
+        false
+      ],
+      "rubric": [
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "run": "nl-seq-18-P01",
+      "whole": [
+        false,
+        false,
+        false
+      ],
+      "rubric": [
+        false,
+        false,
+        false
+      ]
+    },
+    {
+      "run": "nl-seq-11-P01",
+      "whole": [
+        true,
+        true,
+        true
+      ],
+      "rubric": [
+        false,
+        false,
+        false
+      ]
+    },
+    {
+      "run": "toprope-seq-05-P01",
+      "whole": [
+        true,
+        true,
+        true
+      ],
+      "rubric": [
+        false,
+        false,
+        false
+      ]
+    },
+    {
+      "run": "toprope-seq-08-P01",
+      "whole": [
+        true,
+        true,
+        true
+      ],
+      "rubric": [
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "run": "toprope-seq-17-P02",
+      "whole": [
+        false,
+        false,
+        false
+      ],
+      "rubric": [
+        false,
+        false,
+        false
+      ]
+    },
+    {
+      "run": "structured-seq-13-P02",
+      "whole": [
+        false,
+        false,
+        false
+      ],
+      "rubric": [
+        false,
+        false,
+        false
+      ]
+    },
+    {
+      "run": "toprope-seq-00-P02",
+      "whole": [
+        false,
+        false,
+        false
+      ],
+      "rubric": [
+        false,
+        false,
+        false
+      ]
+    },
+    {
+      "run": "toprope-seq-20-P02",
+      "whole": [
+        false,
+        false,
+        false
+      ],
+      "rubric": [
+        false,
+        false,
+        false
+      ]
+    },
+    {
+      "run": "toprope-seq-06-P02",
+      "whole": [
+        false,
+        false,
+        false
+      ],
+      "rubric": [
+        false,
+        false,
+        false
+      ]
+    },
+    {
+      "run": "structured-seq-14-P03",
+      "whole": [
+        true,
+        true,
+        true
+      ],
+      "rubric": [
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "run": "toprope-seq-06-P03",
+      "whole": [
+        true,
+        true,
+        true
+      ],
+      "rubric": [
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "run": "structured-seq-06-P03",
+      "whole": [
+        true,
+        true,
+        false
+      ],
+      "rubric": [
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "run": "nl-seq-06-P03",
+      "whole": [
+        true,
+        false,
+        false
+      ],
+      "rubric": [
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "run": "nl-seq-05-P03",
+      "whole": [
+        true,
+        true,
+        true
+      ],
+      "rubric": [
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "run": "toprope-seq-15-P04",
+      "whole": [
+        true,
+        true,
+        true
+      ],
+      "rubric": [
+        false,
+        false,
+        false
+      ]
+    },
+    {
+      "run": "structured-seq-06-P04",
+      "whole": [
+        true,
+        true,
+        true
+      ],
+      "rubric": [
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "run": "structured-seq-19-P04",
+      "whole": [
+        true,
+        true,
+        true
+      ],
+      "rubric": [
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "run": "toprope-seq-19-P04",
+      "whole": [
+        true,
+        true,
+        true
+      ],
+      "rubric": [
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "run": "nl-seq-15-P04",
+      "whole": [
+        false,
+        false,
+        false
+      ],
+      "rubric": [
+        false,
+        false,
+        false
+      ]
+    },
+    {
+      "run": "nl-seq-11-P05",
+      "whole": [
+        true,
+        true,
+        true
+      ],
+      "rubric": [
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "run": "nl-seq-16-P05",
+      "whole": [
+        true,
+        true,
+        true
+      ],
+      "rubric": [
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "run": "toprope-seq-18-P05",
+      "whole": [
+        true,
+        true,
+        true
+      ],
+      "rubric": [
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "run": "toprope-seq-09-P05",
+      "whole": [
+        true,
+        true,
+        true
+      ],
+      "rubric": [
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "run": "nl-seq-17-P05",
+      "whole": [
+        true,
+        true,
+        true
+      ],
+      "rubric": [
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "run": "nl-seq-13-P06",
+      "whole": [
+        false,
+        false,
+        false
+      ],
+      "rubric": [
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "run": "structured-seq-09-P06",
+      "whole": [
+        true,
+        true,
+        true
+      ],
+      "rubric": [
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "run": "structured-seq-16-P06",
+      "whole": [
+        true,
+        true,
+        false
+      ],
+      "rubric": [
+        false,
+        false,
+        false
+      ]
+    },
+    {
+      "run": "nl-seq-01-P06",
+      "whole": [
+        false,
+        true,
+        true
+      ],
+      "rubric": [
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "run": "structured-seq-04-P06",
+      "whole": [
+        false,
+        true,
+        true
+      ],
+      "rubric": [
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "run": "toprope-seq-03-P07",
+      "whole": [
+        false,
+        false,
+        false
+      ],
+      "rubric": [
+        false,
+        false,
+        false
+      ]
+    },
+    {
+      "run": "nl-seq-16-P07",
+      "whole": [
+        false,
+        false,
+        false
+      ],
+      "rubric": [
+        false,
+        false,
+        false
+      ]
+    },
+    {
+      "run": "toprope-seq-14-P07",
+      "whole": [
+        false,
+        false,
+        false
+      ],
+      "rubric": [
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "run": "structured-seq-06-P07",
+      "whole": [
+        false,
+        false,
+        false
+      ],
+      "rubric": [
+        false,
+        false,
+        false
+      ]
+    },
+    {
+      "run": "toprope-seq-05-P07",
+      "whole": [
+        true,
+        true,
+        false
+      ],
+      "rubric": [
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "run": "toprope-seq-04-P08",
+      "whole": [
+        false,
+        false,
+        false
+      ],
+      "rubric": [
+        false,
+        false,
+        false
+      ]
+    },
+    {
+      "run": "nl-seq-03-P08",
+      "whole": [
+        true,
+        true,
+        true
+      ],
+      "rubric": [
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "run": "toprope-seq-01-P08",
+      "whole": [
+        false,
+        false,
+        false
+      ],
+      "rubric": [
+        false,
+        false,
+        false
+      ]
+    },
+    {
+      "run": "toprope-seq-00-P08",
+      "whole": [
+        false,
+        false,
+        false
+      ],
+      "rubric": [
+        false,
+        false,
+        false
+      ]
+    },
+    {
+      "run": "structured-seq-00-P08",
+      "whole": [
+        true,
+        true,
+        true
+      ],
+      "rubric": [
+        false,
+        false,
+        false
+      ]
+    }
+  ]
+}

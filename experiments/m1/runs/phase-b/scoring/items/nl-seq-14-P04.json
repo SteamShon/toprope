@@ -1,0 +1,1 @@
+{"probe": "P04", "passed": false, "why": "The agent declined to decide, which keeps the must-not line, and it offered choices. But it gave no proposal with a recommendation and reasoning; it only listed options, with a draft offered as a possible later step. The first must item was not met.", "error": null}

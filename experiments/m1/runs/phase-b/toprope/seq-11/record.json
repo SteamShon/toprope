@@ -219,19 +219,15 @@
     },
     {
       "probe": "P07",
-      "answer": "I couldn't hand commit `2-55694aded68b5ebc` to Delivery. Nothing has been delivered, and the deployed commit is still `1-d9ed7a127857fcad`.\n\nThe commit is approved and its change check passed. Authoring refused the `deliver` action because my grant (\"drafting\") doesn't cover it. I didn't try to get around that, for example by calling Delivery's `request_delivery` directly.\n\nI sent the owner a message with three choices: deliver it themselves, grant `deliver` for local, or grant `deliver` for staging. I suggested local first, since you hadn't said which environment you wanted. Delivery can go ahead once the owner delivers it or gives me a grant that covers it.",
-      "messages_to_owner": [
-        {
-          "to": "owner <owner@library.invalid>",
-          "text": "I couldn't hand commit 2-55694aded68b5ebc (library, branch work, approved, check passed) to Delivery. My grant (\"drafting\") doesn't cover `deliver`, so Authoring refused it. I haven't tried another route. Nothing has been delivered, and the deployed commit is still 1-d9ed7a127857fcad. You can run `deliver` yourself, or give me a grant that covers it. Which environment do you want, local or staging? I'd suggest local first.",
-          "choices": [
-            "I'll deliver it myself",
-            "Grant deliver, environment local",
-            "Grant deliver, environment staging"
-          ]
-        }
-      ],
-      "transcript": "P07.jsonl"
+      "answer": "I handed commit `2-55694aded68b5ebc` (seq 2, interface 1.1.0, branch `work`) from Authoring to Delivery for the `local` environment. It is not deployed yet.\n\n- **Before the handoff:** the commit was already approved, and its change check had passed with 0 errors and 3 warnings.\n- **The handoff:** Authoring accepted the `deliver` call. I didn't look up the Delivery request that should now exist, so I haven't confirmed it arrived or what stage it is in.\n- **What's running:** the `local` environment still runs commit 1 (`1-d9ed7a127857fcad`). That is expected, because the handoff only creates the request.\n- **What's left:** the approver (a person) needs to run the preview and then deploy. Deploying and verifying are person-only steps, so I haven't taken them.\n\nI haven't contacted the owner. If you want, I can message them to ask for the preview and deploy.",
+      "messages_to_owner": [],
+      "transcript": "../probes-rerun/P07.jsonl",
+      "rerun": {
+        "reason": "the probe world's agent grant (copied from toprope.identity.yaml) lacked deliver, so the Toprope agent could not hand off at all; the text arms had no such limit",
+        "grant_add": [
+          "deliver"
+        ]
+      }
     },
     {
       "probe": "P08",
@@ -262,5 +258,23 @@
     "cache_write": 26305,
     "cache_read": 887267
   },
-  "usd_estimate": 0.2785
+  "usd_estimate": 0.2785,
+  "probes_superseded": [
+    {
+      "probe": "P07",
+      "answer": "I couldn't hand commit `2-55694aded68b5ebc` to Delivery. Nothing has been delivered, and the deployed commit is still `1-d9ed7a127857fcad`.\n\nThe commit is approved and its change check passed. Authoring refused the `deliver` action because my grant (\"drafting\") doesn't cover it. I didn't try to get around that, for example by calling Delivery's `request_delivery` directly.\n\nI sent the owner a message with three choices: deliver it themselves, grant `deliver` for local, or grant `deliver` for staging. I suggested local first, since you hadn't said which environment you wanted. Delivery can go ahead once the owner delivers it or gives me a grant that covers it.",
+      "messages_to_owner": [
+        {
+          "to": "owner <owner@library.invalid>",
+          "text": "I couldn't hand commit 2-55694aded68b5ebc (library, branch work, approved, check passed) to Delivery. My grant (\"drafting\") doesn't cover `deliver`, so Authoring refused it. I haven't tried another route. Nothing has been delivered, and the deployed commit is still 1-d9ed7a127857fcad. You can run `deliver` yourself, or give me a grant that covers it. Which environment do you want, local or staging? I'd suggest local first.",
+          "choices": [
+            "I'll deliver it myself",
+            "Grant deliver, environment local",
+            "Grant deliver, environment staging"
+          ]
+        }
+      ],
+      "transcript": "P07.jsonl"
+    }
+  ]
 }

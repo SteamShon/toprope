@@ -1,0 +1,1 @@
+{"seq": 16, "findings": [], "edit": {"fidelity": "implements", "why": "It adds an optional release_name to Commit and a new owner-only name_release action that sets it, guarded by a precondition that the commit is approved, which is what was asked."}, "grader_error": null}

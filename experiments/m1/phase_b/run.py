@@ -298,6 +298,26 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     g.add_argument("--out", type=Path, default=DEFAULT_OUT)
     g.add_argument("--instruments", type=Path, default=INSTRUMENTS)
     g.add_argument("--partial", action="store_true", help="grade an incomplete run (tests; never for the report)")
+    g.add_argument("--jobs", type=int, default=4, help="grader conversations at once (default 4)")
+    g.add_argument("--whole-probe", action="store_true", help="grade each probe in one verdict (no rubric)")
+    st = sub.add_parser("stability", parents=[common], help="grade a sample of probe runs several times, the "
+                        "whole-probe way and by the rubric, and compare how often each agrees with itself")
+    st.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    st.add_argument("--instruments", type=Path, default=INSTRUMENTS)
+    st.add_argument("--per-probe", type=int, default=5)
+    st.add_argument("--samples", type=int, default=3)
+    st.add_argument("--jobs", type=int, default=4)
+    st.add_argument("--against-review", action="store_true",
+                    help="instead: the rubric on every probe run a reviewer judged, against their verdicts")
+    rp = sub.add_parser("reprobe", parents=[common], help="run probes again on a finished Toprope run "
+                        "(a probe world set up wrong); the old results are kept")
+    rp.add_argument("arm", choices=["toprope"])
+    rp.add_argument("--probes", required=True, help="e.g. P07")
+    rp.add_argument("--grant-add", default="", help="actions to add to the probe agent's grant, e.g. deliver")
+    rp.add_argument("--reason", required=True)
+    rp.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    rp.add_argument("--instruments", type=Path, default=INSTRUMENTS)
+    rp.add_argument("--jobs", type=int, default=4)
     sc = sub.add_parser("score", help="the metrics and pilot verdicts, from scoring/confirmed.yaml")
     sc.add_argument("--out", type=Path, default=DEFAULT_OUT)
     sc.add_argument("--instruments", type=Path, default=INSTRUMENTS)
@@ -319,11 +339,25 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     mem = user_memory()
     extra: dict[str, Any] = {"backend": args.backend, "user_memory": hashlib.sha256(mem.read_bytes()).hexdigest()
                              if mem and args.allow_user_memory else None}
+    if args.cmd == "reprobe":
+        from .probes import reprobe
+        rs = reprobe(backend, args.out, args.arm, args.probes.split(","), args.instruments, args.reason,
+                     [x for x in args.grant_add.split(",") if x], args.jobs)
+        print(json.dumps({"rerun": len(rs), "errors": sum(1 for r in rs if r.get("error")),
+                          "usage": backend.report()}))
+        return
+    if args.cmd == "stability":
+        from .score import agreement, stability
+        s = (agreement(args.out, args.instruments, backend, jobs=args.jobs) if args.against_review else
+             stability(args.out, args.instruments, backend, args.per_probe, args.samples, jobs=args.jobs))
+        print(json.dumps({k: v for k, v in s.items() if k != "rows"} | {"usage": backend.report()}))
+        return
     if args.cmd == "grade":
         errs = verify_instruments(args.instruments)
         if errs:
             raise SystemExit("the instruments do not verify; nothing is graded:\n" + "\n".join(errs))
-        path = grade_run(args.out, args.instruments, backend, change_requests(args.instruments), args.partial)
+        path = grade_run(args.out, args.instruments, backend, change_requests(args.instruments), args.partial,
+                         jobs=args.jobs, use_rubric=not args.whole_probe)
         print(json.dumps({"proposed": str(path), "usage": backend.report()}))
         return
     if args.cmd == "render":

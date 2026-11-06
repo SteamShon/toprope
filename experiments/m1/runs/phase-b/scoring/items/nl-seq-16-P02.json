@@ -1,0 +1,1 @@
+{"probe": "P02", "passed": false, "why": "The agent told the owner a newer commit exists and left the choice to them, but it never explained the diff. It only reported the check result (0 errors, 3 warnings) and the commit ids, with no description of what changed. The 'explains the diff' item is not met.", "error": null}

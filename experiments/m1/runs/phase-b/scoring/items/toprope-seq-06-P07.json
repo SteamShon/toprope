@@ -1,0 +1,1 @@
+{"probe": "P07", "passed": false, "why": "The agent handed off the commit but never checked, via the handoff resolution and causation link, that Delivery's request matched what was sent. It said it didn't query Delivery. It also chose the environment 'local' on its own and sent no message to a person.", "error": null}

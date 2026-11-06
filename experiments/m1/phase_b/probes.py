@@ -432,4 +432,56 @@ def run_probes(backend: Any, worlds: Path, probes: list[dict[str, Any]], out: Pa
     return results
 
 
+def reprobe(backend: Any, run: Path, arm: str, probe_ids: list[str], instruments: Path, reason: str,
+            grant_add: list[str] | None = None, jobs: int = 1) -> list[dict[str, Any]]:
+    """Run some probes again, after every change of a finished Toprope run, with the deployed tools
+    each change left (kept in `seq-NN/deployed-toolchain`). For a probe whose world was set up
+    wrong; `grant_add` widens the probe agent's grant. The new result replaces the probe's entry in
+    each record; the old one is kept under `probes_superseded`, with the reason."""
+    from concurrent.futures import ThreadPoolExecutor
+    from datetime import UTC, datetime
+
+    from .toprope_arm import _guides
+    if arm != "toprope":
+        raise SystemExit("reprobe re-runs the Toprope arm's probes (the others have no deployed tools to keep)")
+    probes = [p for p in load_probes(instruments) if p["id"] in probe_ids]
+    worlds = run / "worlds-rerun"
+    for p in probes:
+        shutil.rmtree(worlds / p["id"], ignore_errors=True)
+        shutil.copytree(run / "worlds" / p["id"], worlds / p["id"])
+        ids = yaml.safe_load((worlds / p["id"] / "ids.yaml").read_text())
+        for c in ids.values():
+            if c.get("kind") == "agent":
+                c["grant"]["actions"] = sorted(set(c["grant"]["actions"]) | set(grant_add or []))
+        (worlds / p["id"] / "ids.yaml").write_text(yaml.safe_dump(ids, sort_keys=False))
+    seq_dirs = sorted((run / arm).glob("seq-*"))
+
+    def one(d: Path) -> tuple[Path, list[dict[str, Any]]]:
+        toolchain = d / "deployed-toolchain"
+        out = d / "probes-rerun"
+        shutil.rmtree(out, ignore_errors=True)
+        rs = [run_probe(backend, worlds, p, out, "the Toprope tools generated from these domains (their MCP tools)",
+                        _guides(toolchain), toolchain) for p in probes]
+        for r in rs:
+            r["transcript"] = f"../probes-rerun/{r['transcript']}"
+            r["rerun"] = {"reason": reason, "grant_add": grant_add or []}
+        return d, rs
+
+    with ThreadPoolExecutor(max_workers=max(1, jobs)) as pool:
+        done = list(pool.map(one, seq_dirs))
+    for d, rs in done:
+        rec_path = d / "record.json"
+        rec = json.loads(rec_path.read_text())
+        new = {r["probe"]: r for r in rs}
+        rec.setdefault("probes_superseded", []).extend(p for p in rec["probes"] if p["probe"] in new)
+        rec["probes"] = [new.get(p["probe"], p) for p in rec["probes"]]
+        rec_path.write_text(json.dumps(rec, indent=2, ensure_ascii=False) + "\n")
+    man_path = run / arm / "manifest.json"
+    man = json.loads(man_path.read_text())
+    man.setdefault("reprobes", []).append({"probes": probe_ids, "grant_add": grant_add or [], "reason": reason,
+                                           "at": datetime.now(UTC).isoformat()})
+    man_path.write_text(json.dumps(man, indent=2) + "\n")
+    return [r for _, rs in done for r in rs]
+
+
 __all__ = ["PROBES", "build_worlds", "generic_tools", "load_probes", "probe_tools", "run_probe", "run_probes"]

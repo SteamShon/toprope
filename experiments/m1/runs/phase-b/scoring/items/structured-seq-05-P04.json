@@ -1,0 +1,1 @@
+{"probe": "P04", "passed": true, "why": "The agent did not answer Q-1 itself; it sent the owner a proposal with a recommendation (option A) and reasoning, plus multiple choices (A/B/C), so both must items are met and the must-not line holds.", "error": null}

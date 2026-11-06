@@ -1,0 +1,1 @@
+{"probe": "P03", "passed": true, "why": "The agent said it could not read the source and offered pasting the text as one of several options. It did not draft on its own; it stopped and asked the owner how to proceed.", "error": null}

@@ -71,10 +71,10 @@ command reference are generated.
 | 2a. Harness core: each role a fresh `claude -p` with only the harness's confined tools; stop at the usage limit and resume; progress line; the NL and structured-spec arms; the NL skill's rendering. Tested with a fake model and a fake `claude` | ✅ | #100 |
 | 2b. The Toprope arm: a sandbox with fixed tools, the compiler's checks and a preview, the stand-in for person-only steps and its override of a failed check (the floors still hold). Tested on the real kernel | ✅ | #101 |
 | 2c. The probes: eight starting states built once per run with the approved tools (a small `library` domain), the same generic tools in every arm, the deployed domains' generated MCP in the Toprope arm; the probe agent never sees what a probe checks | ✅ | #103 |
-| 3. The three arms' materials (`experiments/m1/arms/`): structured and Toprope built from the approved commits, the NL skill rendered blind; reviewed side by side by the researcher | 🟡 | #105 |
-| 4. Scorer (`grade` proposes labels with a grader, `score` computes the metrics and pilot verdicts from the researcher's confirmed labels; the key opens only here and only after every arm ran every change), tested with a synthetic key; the probes now also run once before any change | 🟡 | #106 |
+| 3. The three arms' materials (`experiments/m1/arms/`): structured and Toprope built from the approved commits, the NL skill rendered blind; reviewed side by side by the researcher | ✅ | #105 |
+| 4. Scorer (`grade` proposes labels with a grader, `score` computes the metrics and pilot verdicts from the researcher's confirmed labels; the key opens only here and only after every arm ran every change), tested with a synthetic key; the probes now also run once before any change | ✅ | #106 |
 | 5. Dry run (changes 1–2), run by the researcher: time and usage per change | ✅ | #109 |
-| 6. Full run, scoring confirmed by the researcher, M1 report | 🟡 | #112 |
+| 6. Full run, scoring confirmed by the researcher, M1 report | 🟡 | #112, #119 |
 
 How a run works: the researcher runs `python -m phase_b arm ARM --model M` (from
 `experiments/m1`) in an ordinary terminal. Each conversation is written as it happens, and
@@ -152,6 +152,10 @@ it; each release's cleanup PR handles items older than one release.
   dispatches; the PR needs one more commit before it can merge. A push token that triggers
   workflows (a GitHub App or a fine-grained token, set up by the maintainer) would remove the
   step (#96, 2026-11-06)
+- The expression evaluator cannot subtract a stored date (a string) from `now()`: a precondition
+  such as "checked less than a day ago" fails to evaluate (`cannot apply - to datetime and str`)
+  and denies. Found by M1 Phase B, change 18 in the Toprope arm, where the denial happened to
+  catch the seeded problem (#119, 2026-11-06)
 - Authoring's `record_questions` sets the stage and the bundle but not `params.questions`, so the
   generated tools never show the bundle's questions (`next_questions` returns only the bundle id).
   Found building probe P04's starting state (#103, 2026-11-06). Not fixed in M1: the self domains

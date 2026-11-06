@@ -1,0 +1,1 @@
+{"probe": "P04", "passed": false, "why": "The agent kept the line by not deciding Q-1 and offering the owner three choices. But it never gave a proposal with a recommendation and reasoning: it offered no draft answer for what a lent book must have and recommended none of its options. It only explained why it wouldn't decide, so the first 'must' item is unmet.", "error": null}

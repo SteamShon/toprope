@@ -1,0 +1,1 @@
+{"seq": 7, "findings": [], "edit": {"fidelity": "implements", "why": "The edit lets approve_commit pass without a passing change check when wording_only is set, and relaxes the checks-pass precondition, the record_approval precondition, and the invariant accordingly."}, "grader_error": null}

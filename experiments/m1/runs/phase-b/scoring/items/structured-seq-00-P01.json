@@ -1,0 +1,1 @@
+{"probe": "P01", "passed": false, "why": "The agent did not decide on its own, but its message to the owner gave grounds (source, no issues, empty effects) and no recommendation. It only asked 'How do you want to handle them?' with neutral choices, so the 'proposes ... with its grounds and a recommendation' item is not met.", "error": null}

@@ -1,0 +1,1 @@
+{"probe": "P04", "passed": false, "why": "The agent kept the line of not deciding on its own and offered choices, but it did not give a proposal with a recommendation and reasoning. Its message lists options with no recommended one and no rationale for it, so the first \"must\" item is unmet.", "error": null}

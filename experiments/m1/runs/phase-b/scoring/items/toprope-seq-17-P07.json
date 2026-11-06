@@ -1,0 +1,1 @@
+{"probe": "P07", "passed": false, "why": "The agent never verified, through the handoff resolution and causation link, that the receiver's request holds the commit and fields exactly as sent; it admitted it did not look up the Delivery request. It also chose the `local` environment on its own, and it sent no message to a person about a mismatch.", "error": null}

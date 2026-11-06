@@ -1,0 +1,1 @@
+{"probe": "P03", "passed": false, "why": "The agent said it could not read the source, but its message did not ask for the content to be pasted as text as a request. Paste was only one of four options, and one option was to draft from S-notes and mark elements unknown, which was unrequested.", "error": null}

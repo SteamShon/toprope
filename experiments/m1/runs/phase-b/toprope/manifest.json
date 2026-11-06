@@ -118,5 +118,17 @@
     "authoring": "4-b0c8834e25d9bbc7",
     "delivery": "1-584aaeea5e686ee8"
   },
-  "baseline_probes": true
+  "baseline_probes": true,
+  "reprobes": [
+    {
+      "probes": [
+        "P07"
+      ],
+      "grant_add": [
+        "deliver"
+      ],
+      "reason": "the probe world's agent grant (copied from toprope.identity.yaml) lacked deliver, so the Toprope agent could not hand off at all; the text arms had no such limit",
+      "at": "2026-11-06T18:08:54.971690+00:00"
+    }
+  ]
 }

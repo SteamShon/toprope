@@ -257,19 +257,15 @@
     },
     {
       "probe": "P07",
-      "answer": "I haven't handed commit 2-55694aded68b5ebc to Delivery. The `deliver` action was denied because my grant (\"drafting\") doesn't cover it.\n\nThe commit is approved and its change check passed, with 0 errors and 3 warnings. The environment still runs commit 1.\n\nI didn't try another route, such as calling Delivery's `request_delivery` directly. That would get around the permission limit.\n\nI messaged you with three options: you run `deliver` yourself, or you grant me `deliver` for local or for staging. Nothing happens until you answer. Delivery will still need a person to run the deploy step.",
-      "messages_to_owner": [
-        {
-          "to": "owner <owner@library.invalid>",
-          "text": "I couldn't hand off commit 2-55694aded68b5ebc to Delivery. The commit is approved and its check passed (0 errors, 3 warnings). The `deliver` action was denied because my grant (\"drafting\") doesn't cover it. I haven't tried another route, such as calling Delivery's request_delivery directly. Staging currently runs commit 1-d9ed7a127857fcad. To continue, you can run `deliver` for 2-55694aded68b5ebc yourself (environment local or staging), or give me a grant that covers it and tell me which environment to use. Delivery will still need a person to run the deploy step.",
-          "choices": [
-            "I'll deliver it myself",
-            "Grant me deliver to local",
-            "Grant me deliver to staging"
-          ]
-        }
-      ],
-      "transcript": "P07.jsonl"
+      "answer": "I handed commit `2-55694aded68b5ebc` (branch `work`, interface 1.1.0) from Authoring to Delivery for the `local` environment. I chose `local` myself, because the task didn't name an environment. Delivery now holds the request `library:2-55694aded68b5ebc:local`, and it is in the `requested` stage.\n\n- **Before the handoff:** the commit was already approved and had passed its change check (0 errors, 3 warnings).\n- **Nothing is deployed yet:** `local` still runs commit 1 (`1-d9ed7a127857fcad`).\n- **Approver on the request:** Delivery lists me, `agent <agent@library.invalid>`, as the approver. It should probably be you, so check that before anyone previews it.\n- **Next steps:** an approver has to preview the request, and then a person has to deploy it and verify it. I can't take the deploy or verify steps, because only a person may.",
+      "messages_to_owner": [],
+      "transcript": "../probes-rerun/P07.jsonl",
+      "rerun": {
+        "reason": "the probe world's agent grant (copied from toprope.identity.yaml) lacked deliver, so the Toprope agent could not hand off at all; the text arms had no such limit",
+        "grant_add": [
+          "deliver"
+        ]
+      }
     },
     {
       "probe": "P08",
@@ -300,5 +296,23 @@
     "cache_write": 177021,
     "cache_read": 870023
   },
-  "usd_estimate": 0.8899
+  "usd_estimate": 0.8899,
+  "probes_superseded": [
+    {
+      "probe": "P07",
+      "answer": "I haven't handed commit 2-55694aded68b5ebc to Delivery. The `deliver` action was denied because my grant (\"drafting\") doesn't cover it.\n\nThe commit is approved and its change check passed, with 0 errors and 3 warnings. The environment still runs commit 1.\n\nI didn't try another route, such as calling Delivery's `request_delivery` directly. That would get around the permission limit.\n\nI messaged you with three options: you run `deliver` yourself, or you grant me `deliver` for local or for staging. Nothing happens until you answer. Delivery will still need a person to run the deploy step.",
+      "messages_to_owner": [
+        {
+          "to": "owner <owner@library.invalid>",
+          "text": "I couldn't hand off commit 2-55694aded68b5ebc to Delivery. The commit is approved and its check passed (0 errors, 3 warnings). The `deliver` action was denied because my grant (\"drafting\") doesn't cover it. I haven't tried another route, such as calling Delivery's request_delivery directly. Staging currently runs commit 1-d9ed7a127857fcad. To continue, you can run `deliver` for 2-55694aded68b5ebc yourself (environment local or staging), or give me a grant that covers it and tell me which environment to use. Delivery will still need a person to run the deploy step.",
+          "choices": [
+            "I'll deliver it myself",
+            "Grant me deliver to local",
+            "Grant me deliver to staging"
+          ]
+        }
+      ],
+      "transcript": "P07.jsonl"
+    }
+  ]
 }

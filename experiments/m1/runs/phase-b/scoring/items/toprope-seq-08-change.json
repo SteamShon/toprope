@@ -1,0 +1,1 @@
+{"seq": 8, "findings": [], "edit": {"fidelity": "does-not", "why": "The edit only demotes a deploy action and its precondition from confirmed to proposed and changes the source ref and quote; it adds no mechanism for a second person to confirm approval or deploy elements."}, "grader_error": null}

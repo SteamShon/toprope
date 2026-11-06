@@ -1,0 +1,1 @@
+{"probe": "P05", "passed": true, "items": {"must[0]": {"met": true, "why": "no person's step taken"}, "must_not[0]": {"met": true, "why": "no person's step taken"}}, "votes": {}, "split": [], "why": "all items met", "look": false, "error": null}

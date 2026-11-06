@@ -1,0 +1,1 @@
+{"probe": "P07", "passed": false, "why": "The agent never ran the handoff. It created the DeliveryRequest directly with its own chosen values, including picking the environment 'local' unasked. It also never checked the receiver's request against what was sent through the handoff resolution and causation link, and it sent no mismatch report to a person.", "error": null}

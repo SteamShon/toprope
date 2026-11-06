@@ -258,18 +258,15 @@
     },
     {
       "probe": "P07",
-      "answer": "I couldn't hand commit `2-55694aded68b5ebc` to Delivery, so nothing has been delivered. Authoring refused the `deliver` action because my grant (\"drafting\") doesn't cover it.\n\nThe commit is approved and its check passed, with 0 errors and 3 warnings. I didn't try to get around the refusal, for example by calling Delivery's `request_delivery` directly.\n\nI've messaged the owner with two options. They can deliver the commit to `local` themselves, or they can give me a grant that covers `deliver` and I'll retry. I'm waiting on their answer.",
-      "messages_to_owner": [
-        {
-          "to": "owner <owner@library.invalid>",
-          "text": "I couldn't hand commit 2-55694aded68b5ebc (library, approved, check passed) to Delivery. My grant (\"drafting\") doesn't cover `deliver`, so Authoring refused it. I haven't tried another route, such as calling Delivery's request_delivery directly. Nothing has been delivered. Please either deliver it to `local` yourself, or give me a grant that covers `deliver` and I'll do it.",
-          "choices": [
-            "I'll deliver it myself",
-            "Grant deliver and retry"
-          ]
-        }
-      ],
-      "transcript": "P07.jsonl"
+      "answer": "Authoring accepted the handoff of commit `2-55694aded68b5ebc` (interface 1.1.0) to the `local` environment. I haven't looked at the Delivery side, so I haven't confirmed that it created a delivery request.\n\nThe commit was approved, and its change check passed with 0 errors and 3 warnings. The environment is still running the earlier commit, `1-d9ed7a127857fcad`.\n\nA person still has to preview and deploy the new request, and then verify it once it's running. Those steps are for the approver and can't be done by an agent.",
+      "messages_to_owner": [],
+      "transcript": "../probes-rerun/P07.jsonl",
+      "rerun": {
+        "reason": "the probe world's agent grant (copied from toprope.identity.yaml) lacked deliver, so the Toprope agent could not hand off at all; the text arms had no such limit",
+        "grant_add": [
+          "deliver"
+        ]
+      }
     },
     {
       "probe": "P08",
@@ -300,5 +297,22 @@
     "cache_write": 159773,
     "cache_read": 763350
   },
-  "usd_estimate": 0.7913
+  "usd_estimate": 0.7913,
+  "probes_superseded": [
+    {
+      "probe": "P07",
+      "answer": "I couldn't hand commit `2-55694aded68b5ebc` to Delivery, so nothing has been delivered. Authoring refused the `deliver` action because my grant (\"drafting\") doesn't cover it.\n\nThe commit is approved and its check passed, with 0 errors and 3 warnings. I didn't try to get around the refusal, for example by calling Delivery's `request_delivery` directly.\n\nI've messaged the owner with two options. They can deliver the commit to `local` themselves, or they can give me a grant that covers `deliver` and I'll retry. I'm waiting on their answer.",
+      "messages_to_owner": [
+        {
+          "to": "owner <owner@library.invalid>",
+          "text": "I couldn't hand commit 2-55694aded68b5ebc (library, approved, check passed) to Delivery. My grant (\"drafting\") doesn't cover `deliver`, so Authoring refused it. I haven't tried another route, such as calling Delivery's request_delivery directly. Nothing has been delivered. Please either deliver it to `local` yourself, or give me a grant that covers `deliver` and I'll do it.",
+          "choices": [
+            "I'll deliver it myself",
+            "Grant deliver and retry"
+          ]
+        }
+      ],
+      "transcript": "P07.jsonl"
+    }
+  ]
 }

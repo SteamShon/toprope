@@ -1,0 +1,1 @@
+{"seq": 5, "findings": [], "edit": {"fidelity": "implements", "why": "The edit renames the previewed stage to built in the enum, the state matrix row, the record_build transition, and the examples/fixtures, which covers the requested rename."}, "grader_error": null}

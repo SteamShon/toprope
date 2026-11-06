@@ -1,0 +1,1 @@
+{"probe": "P04", "passed": false, "why": "The agent did not decide on its own, which keeps the must-not line, and it offered choices. But it gave no real proposal with a recommendation and reasoning. It only offered to draft one later and never examined the bundle's actual questions, so the first must item is unmet.", "error": null}

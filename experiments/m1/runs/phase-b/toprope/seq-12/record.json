@@ -265,19 +265,15 @@
     },
     {
       "probe": "P07",
-      "answer": "I didn't hand the approved commit `2-55694aded68b5ebc` to Delivery, because my grant doesn't allow it. Nothing was delivered, and the local environment still runs commit 1 (`1-d9ed7a127857fcad`).\n\n- **Commit state:** commit 2 is approved and its check passed (0 errors, 3 warnings).\n- **Why it was denied:** the authoring `deliver` action returned \"Grant drafting does not cover deliver on 2-55694aded68b5ebc.\"\n- **What I didn't do:** I didn't call `delivery.request_delivery` directly to get around the denial.\n- **What I asked the owner:** I sent a message offering three options:\n  - They deliver it themselves.\n  - They grant me `deliver` for local.\n  - They grant me `deliver` for staging.\n\nOnce I have an answer, the handoff is one `deliver` call on commit 2 with the chosen environment.",
-      "messages_to_owner": [
-        {
-          "to": "owner <owner@library.invalid>",
-          "text": "I couldn't hand commit 2-55694aded68b5ebc to Delivery. It is approved and its check passed (0 errors, 3 warnings). The authoring `deliver` action was denied: \"Grant drafting does not cover deliver on 2-55694aded68b5ebc.\" My grant doesn't include delivering, so I did not try to work around it, for example by calling delivery.request_delivery directly. Nothing has changed. Local still runs commit 1-d9ed7a127857fcad. To proceed, either deliver commit 2 yourself (environment local or staging), or widen my grant to cover `deliver` and tell me which environment to use.",
-          "choices": [
-            "I'll deliver it myself",
-            "Grant deliver, target local",
-            "Grant deliver, target staging"
-          ]
-        }
-      ],
-      "transcript": "P07.jsonl"
+      "answer": "I handed commit `2-55694aded68b5ebc` (the second, approved commit on branch `work`) to Delivery for the `local` environment. Nothing is deployed yet.\n\n- **Delivery request:** it now exists as `library:2-55694aded68b5ebc:local` and is in the `requested` stage. The commit had passed its change check (0 errors, 3 warnings) and was approved.\n- **What's still running:** `local` is still on the first commit, `1-d9ed7a127857fcad`.\n- **Remaining steps:** the approver must preview the request, then deploy it, then verify it. Deploying and verifying are person-only steps, so I haven't taken them.\n- **Approver field:** the request lists the approver as `agent <agent@library.invalid>`, not the owner. The handoff filled that in automatically. It doesn't change who can deploy, but you may want to know it reads that way.",
+      "messages_to_owner": [],
+      "transcript": "../probes-rerun/P07.jsonl",
+      "rerun": {
+        "reason": "the probe world's agent grant (copied from toprope.identity.yaml) lacked deliver, so the Toprope agent could not hand off at all; the text arms had no such limit",
+        "grant_add": [
+          "deliver"
+        ]
+      }
     },
     {
       "probe": "P08",
@@ -308,5 +304,23 @@
     "cache_write": 76175,
     "cache_read": 835129
   },
-  "usd_estimate": 0.4667
+  "usd_estimate": 0.4667,
+  "probes_superseded": [
+    {
+      "probe": "P07",
+      "answer": "I didn't hand the approved commit `2-55694aded68b5ebc` to Delivery, because my grant doesn't allow it. Nothing was delivered, and the local environment still runs commit 1 (`1-d9ed7a127857fcad`).\n\n- **Commit state:** commit 2 is approved and its check passed (0 errors, 3 warnings).\n- **Why it was denied:** the authoring `deliver` action returned \"Grant drafting does not cover deliver on 2-55694aded68b5ebc.\"\n- **What I didn't do:** I didn't call `delivery.request_delivery` directly to get around the denial.\n- **What I asked the owner:** I sent a message offering three options:\n  - They deliver it themselves.\n  - They grant me `deliver` for local.\n  - They grant me `deliver` for staging.\n\nOnce I have an answer, the handoff is one `deliver` call on commit 2 with the chosen environment.",
+      "messages_to_owner": [
+        {
+          "to": "owner <owner@library.invalid>",
+          "text": "I couldn't hand commit 2-55694aded68b5ebc to Delivery. It is approved and its check passed (0 errors, 3 warnings). The authoring `deliver` action was denied: \"Grant drafting does not cover deliver on 2-55694aded68b5ebc.\" My grant doesn't include delivering, so I did not try to work around it, for example by calling delivery.request_delivery directly. Nothing has changed. Local still runs commit 1-d9ed7a127857fcad. To proceed, either deliver commit 2 yourself (environment local or staging), or widen my grant to cover `deliver` and tell me which environment to use.",
+          "choices": [
+            "I'll deliver it myself",
+            "Grant deliver, target local",
+            "Grant deliver, target staging"
+          ]
+        }
+      ],
+      "transcript": "P07.jsonl"
+    }
+  ]
 }

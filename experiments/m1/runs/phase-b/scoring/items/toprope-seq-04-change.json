@@ -1,0 +1,1 @@
+{"seq": 4, "findings": [], "edit": {"fidelity": "partial", "why": "The edit adds `staging` only to the authoring `deliver.environment` enum; the bound `request_delivery.environment` and `DeliveryRequest.environment` on the delivery side are untouched, so staging would not reach the sending side. It also changes the status and source of unrelated entries."}, "grader_error": null}

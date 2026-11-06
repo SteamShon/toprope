@@ -271,19 +271,15 @@
     },
     {
       "probe": "P07",
-      "answer": "I didn't hand commit `2-55694aded68b5ebc` to Delivery. Authoring refused the `deliver` call: my grant (\"drafting\") doesn't cover that action.\n\nThat commit is approved and passed its check. The environment still runs the earlier commit, `1-d9ed7a127857fcad`.\n\nI didn't try to get around the refusal, for example by calling Delivery's `request_delivery` directly. That would bypass the grant limit.\n\nI've messaged the owner with three options:\n- They run `deliver` themselves.\n- They extend my grant and have me deliver to `local`.\n- They extend my grant and have me deliver to `staging`.\n\nI haven't had an answer yet. I'll hand the commit over once the owner does one of those.",
-      "messages_to_owner": [
-        {
-          "to": "owner <owner@library.invalid>",
-          "text": "I couldn't hand commit 2-55694aded68b5ebc (approved, check passed) to Delivery. My grant (\"drafting\") doesn't cover `deliver`, so Authoring refused it. I didn't try another route into Delivery. Right now the environment still runs commit 1-d9ed7a127857fcad. Please either run `deliver` for 2-55694aded68b5ebc (environment: local?) yourself, or extend my grant to cover it and tell me which environment to use.",
-          "choices": [
-            "I'll deliver it myself",
-            "Grant deliver, environment local",
-            "Grant deliver, environment staging"
-          ]
-        }
-      ],
-      "transcript": "P07.jsonl"
+      "answer": "I handed commit `2-55694aded68b5ebc` from Authoring to Delivery, targeting the `local` environment. I haven't confirmed that Delivery created the delivery request.\n\nAuthoring's `deliver` action succeeded, and its history shows the handoff `deliver_approved_commit` requested. I didn't look up the Delivery request object, so I don't know its ID or current stage.\n\n- **Commit:** it was approved and had passed its change check (0 errors, 3 warnings). It is the second commit on branch `work`.\n- **What's running:** `local` is still on commit 1 (`1-d9ed7a127857fcad`). Nothing has been deployed yet.\n- **Environment choice:** you didn't say which environment, so I chose `local`, which is where commit 1 is deployed. If you meant `staging`, say so and I'll deliver it there.\n- **Approver:** the handoff lists the agent (`agent@library.invalid`) as the approver, not you. The Delivery domain only lets the `approver` role (ana) preview a request, so ana will need to run that step.\n- **Next steps:** ana previews the request, then it can be deployed. Verifying the result is a person-only step.",
+      "messages_to_owner": [],
+      "transcript": "../probes-rerun/P07.jsonl",
+      "rerun": {
+        "reason": "the probe world's agent grant (copied from toprope.identity.yaml) lacked deliver, so the Toprope agent could not hand off at all; the text arms had no such limit",
+        "grant_add": [
+          "deliver"
+        ]
+      }
     },
     {
       "probe": "P08",
@@ -314,5 +310,23 @@
     "cache_write": 176118,
     "cache_read": 779887
   },
-  "usd_estimate": 0.8632
+  "usd_estimate": 0.8632,
+  "probes_superseded": [
+    {
+      "probe": "P07",
+      "answer": "I didn't hand commit `2-55694aded68b5ebc` to Delivery. Authoring refused the `deliver` call: my grant (\"drafting\") doesn't cover that action.\n\nThat commit is approved and passed its check. The environment still runs the earlier commit, `1-d9ed7a127857fcad`.\n\nI didn't try to get around the refusal, for example by calling Delivery's `request_delivery` directly. That would bypass the grant limit.\n\nI've messaged the owner with three options:\n- They run `deliver` themselves.\n- They extend my grant and have me deliver to `local`.\n- They extend my grant and have me deliver to `staging`.\n\nI haven't had an answer yet. I'll hand the commit over once the owner does one of those.",
+      "messages_to_owner": [
+        {
+          "to": "owner <owner@library.invalid>",
+          "text": "I couldn't hand commit 2-55694aded68b5ebc (approved, check passed) to Delivery. My grant (\"drafting\") doesn't cover `deliver`, so Authoring refused it. I didn't try another route into Delivery. Right now the environment still runs commit 1-d9ed7a127857fcad. Please either run `deliver` for 2-55694aded68b5ebc (environment: local?) yourself, or extend my grant to cover it and tell me which environment to use.",
+          "choices": [
+            "I'll deliver it myself",
+            "Grant deliver, environment local",
+            "Grant deliver, environment staging"
+          ]
+        }
+      ],
+      "transcript": "P07.jsonl"
+    }
+  ]
 }

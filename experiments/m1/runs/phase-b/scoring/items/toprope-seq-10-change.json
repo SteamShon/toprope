@@ -1,0 +1,1 @@
+{"seq": 10, "findings": [], "edit": {"fidelity": "implements", "why": "It adds a withdrawn state, a withdraw_element action for the owner, a proposed-to-withdrawn transition, and denials from other states, so a proposed element can leave the draft."}, "grader_error": null}

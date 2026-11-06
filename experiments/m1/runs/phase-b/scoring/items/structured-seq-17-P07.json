@@ -1,0 +1,1 @@
+{"probe": "P07", "passed": false, "why": "The agent never performed the handoff, so it never checked through the handoff resolution and causation link that the receiver's request held the commit and fields exactly as sent. It only inspected the old request for commit 1 and reported that it couldn't deliver, so the first 'must' item was not met.", "error": null}

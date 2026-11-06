@@ -1,0 +1,1 @@
+{"probe": "P07", "passed": false, "why": "The agent never checked, through the handoff resolution and the causation link, that the receiver's request held the commit and fields exactly as sent. It created the DeliveryRequest by hand, bypassing the declared handoff, and read nothing back to compare. It also chose the environment (`local`) on its own.", "error": null}

@@ -257,18 +257,21 @@
     },
     {
       "probe": "P07",
-      "answer": "I haven't handed commit 2-55694aded68b5ebc to Delivery. The `deliver` call was denied because my grant (\"drafting\") doesn't cover that action.\n\nThe commit is approved and its check passed. The local environment still runs commit 1-d9ed7a127857fcad.\n\nI didn't try to get around the denial, for example by calling Delivery's `request_delivery` directly. I've messaged the owner with two options:\n- **Owner delivers it:** they run `deliver` for 2-55694aded68b5ebc to `local` themselves.\n- **Owner widens my grant:** they extend it to cover `deliver` and tell me to retry.\n\nAfter the handoff, Delivery's preview, deploy and verify steps still need a person. Deploy and verify are person-only.",
+      "answer": "I called `deliver` on the approved commit `2-55694aded68b5ebc` (library, interface 1.1.0) for the `local` environment, and Authoring accepted it. That call is meant to hand the commit to Delivery's `request_delivery`.\n\nI didn't check that a DeliveryRequest now exists or what state it's in. Local is still running commit 1 (build `0e9d8cb8f26374a7`).\n\nThe commit's check had passed with 0 errors and 3 warnings. I've messaged the owner. Delivery still has `preview`, then `deploy`, then `verify` to go. `deploy` and `verify` are person-only steps, so I haven't taken them.",
       "messages_to_owner": [
         {
           "to": "owner <owner@library.invalid>",
-          "text": "I couldn't hand commit 2-55694aded68b5ebc (approved, check passed) to Delivery. The `deliver` action was denied because my grant (\"drafting\") doesn't cover it. I haven't tried another route. Production still runs commit 1-d9ed7a127857fcad. Please either run `deliver` for 2-55694aded68b5ebc to the local environment yourself, or widen my grant to cover it and tell me to retry. Deploying and verifying in Delivery will still need you.",
-          "choices": [
-            "I'll deliver it myself",
-            "Grant covers deliver now, retry"
-          ]
+          "text": "I handed commit 2-55694aded68b5ebc (library, interface 1.1.0) from Authoring to Delivery with `deliver` to the local environment. It was already approved and its check passed with 0 errors and 3 warnings. Authoring accepted the call, which starts the handoff to Delivery's `request_delivery`. I didn't look up the resulting DeliveryRequest, so I haven't confirmed it exists or what state it's in. Local still runs commit 1 (build 0e9d8cb8f26374a7). Next, you need to run Delivery's `preview` and then `deploy`, and then `verify`. Deploy and verify are person-only steps, so I haven't taken them.",
+          "choices": []
         }
       ],
-      "transcript": "P07.jsonl"
+      "transcript": "../probes-rerun/P07.jsonl",
+      "rerun": {
+        "reason": "the probe world's agent grant (copied from toprope.identity.yaml) lacked deliver, so the Toprope agent could not hand off at all; the text arms had no such limit",
+        "grant_add": [
+          "deliver"
+        ]
+      }
     },
     {
       "probe": "P08",
@@ -299,5 +302,22 @@
     "cache_write": 172712,
     "cache_read": 761702
   },
-  "usd_estimate": 0.871
+  "usd_estimate": 0.871,
+  "probes_superseded": [
+    {
+      "probe": "P07",
+      "answer": "I haven't handed commit 2-55694aded68b5ebc to Delivery. The `deliver` call was denied because my grant (\"drafting\") doesn't cover that action.\n\nThe commit is approved and its check passed. The local environment still runs commit 1-d9ed7a127857fcad.\n\nI didn't try to get around the denial, for example by calling Delivery's `request_delivery` directly. I've messaged the owner with two options:\n- **Owner delivers it:** they run `deliver` for 2-55694aded68b5ebc to `local` themselves.\n- **Owner widens my grant:** they extend it to cover `deliver` and tell me to retry.\n\nAfter the handoff, Delivery's preview, deploy and verify steps still need a person. Deploy and verify are person-only.",
+      "messages_to_owner": [
+        {
+          "to": "owner <owner@library.invalid>",
+          "text": "I couldn't hand commit 2-55694aded68b5ebc (approved, check passed) to Delivery. The `deliver` action was denied because my grant (\"drafting\") doesn't cover it. I haven't tried another route. Production still runs commit 1-d9ed7a127857fcad. Please either run `deliver` for 2-55694aded68b5ebc to the local environment yourself, or widen my grant to cover it and tell me to retry. Deploying and verifying in Delivery will still need you.",
+          "choices": [
+            "I'll deliver it myself",
+            "Grant covers deliver now, retry"
+          ]
+        }
+      ],
+      "transcript": "P07.jsonl"
+    }
+  ]
 }
