@@ -259,7 +259,7 @@ def test_authoring_cli_commit_diff_approve(tmp_path):
 
 
 def test_approving_without_a_domain_or_an_unknown_commit_is_an_authoring_error(tmp_path):
-    from toprope.authoring import AuthoringError, Workspace
+    from toprope.workspace import AuthoringError, Workspace
     (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump({"domain": "d.domain.yaml", "sources": []}))
     (tmp_path / "d.domain.yaml").write_text("version: 1\n")
     ws = Workspace(tmp_path)

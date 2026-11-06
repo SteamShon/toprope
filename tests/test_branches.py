@@ -105,7 +105,7 @@ def test_an_indirect_conflict_fails_the_merge_check(st, tmp_path):
 
 
 def test_conflicts_are_resolved_in_the_working_copy_then_approved(tmp_path):
-    from toprope.authoring import AuthoringError, Workspace
+    from toprope.workspace import AuthoringError, Workspace
     (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump({"domain": "d.domain.yaml", "sources": []}))
     raw = schema_doc_domain()
     write(tmp_path / "d.domain.yaml", raw)
@@ -183,7 +183,7 @@ def test_cli_branches_merge_and_approve(tmp_path):
 
 # -- review findings -----------------------------------------------------------------------------
 def workspace(tmp_path, raw):
-    from toprope.authoring import Workspace
+    from toprope.workspace import Workspace
     (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump({"domain": "d.domain.yaml", "sources": []}))
     write(tmp_path / "d.domain.yaml", raw)
     return Workspace(tmp_path)
@@ -199,7 +199,7 @@ def land_on_main(ws, tmp_path, raw, name="other"):
 
 def test_a_resolved_merge_is_checked_before_main_takes_it(tmp_path):
     """The `merge`, `commit --merge`, approve route fast-forwards, and is validated all the same."""
-    from toprope.authoring import AuthoringError
+    from toprope.workspace import AuthoringError
     raw = schema_doc_domain()
     ws = workspace(tmp_path, raw)
     ws.approve_commit(ws.commit()["commit"], via="cli", who="ana")
@@ -294,7 +294,7 @@ def test_merging_main_removes_a_ui_that_main_removed(tmp_path):
 
 
 def test_merge_reports_an_unreadable_ui_as_an_authoring_error(tmp_path):
-    from toprope.authoring import AuthoringError
+    from toprope.workspace import AuthoringError
     raw = schema_doc_domain()
     ws = workspace(tmp_path, raw)
     ws.approve_commit(ws.commit()["commit"], via="cli", who="ana")

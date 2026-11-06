@@ -229,7 +229,7 @@ def test_an_environment_of_another_domain_is_not_replayed(tmp_path, base):
 
 
 def test_a_mistyped_environment_or_branch_is_an_error(tmp_path, base):
-    from toprope.authoring import AuthoringError, Workspace
+    from toprope.workspace import AuthoringError, Workspace
     (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump({"domain": "d.domain.yaml", "sources": []}))
     write(tmp_path / "d.domain.yaml", base)
     ws = Workspace(tmp_path)
