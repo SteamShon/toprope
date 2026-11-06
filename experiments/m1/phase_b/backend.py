@@ -27,6 +27,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -59,6 +60,7 @@ class Backend:
     usage: Usage = field(default_factory=Usage)
     usd: float = 0.0                                         # an estimate; not a bill for a subscription
     progress: Progress | None = None
+    _lock: Any = field(default_factory=threading.Lock, repr=False, compare=False)
 
     def converse(self, system: str, user: str, tools: ToolSpec | None, transcript: Transcript,
                  max_turns: int = 40) -> str:
@@ -85,7 +87,8 @@ class ApiBackend(Backend):
         out = converse(self.model, system, user, build_tools(tools) if tools else [], transcript, max_turns,
                        progress=self._say)
         if self.budget:
-            self.usage, self.usd = self.budget.used, self.budget.cost()
+            with self._lock:
+                self.usage, self.usd = self.budget.used, self.budget.cost()
         return out
 
 
@@ -187,8 +190,9 @@ class CliBackend(Backend):
         transcript.write("result", subtype=result.get("subtype"), is_error=result.get("is_error"),
                          result=result.get("result"), usage=result.get("usage"),
                          usd_estimate=result.get("total_cost_usd"), turns=result.get("num_turns"))
-        self.usage = self.usage + Usage.of(result.get("usage") or {})
-        self.usd += float(result.get("total_cost_usd") or 0)
+        with self._lock:                                  # probes run in parallel threads
+            self.usage = self.usage + Usage.of(result.get("usage") or {})
+            self.usd += float(result.get("total_cost_usd") or 0)
         text = str(result.get("result") or "")
         if result.get("is_error"):
             if any(w in text.lower() for w in LIMIT_WORDS):

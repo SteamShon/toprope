@@ -234,6 +234,7 @@ def test_a_run_probes_after_every_change(worlds, tmp_path):
     assert [p["probe"] for p in before["probes"]] == PROBES
     man = json.loads((out / "nl/manifest.json").read_text())
     assert man["probes"] and man["sessions"][-1]["probes"] == man["probes"]
+    assert man["sessions"][-1]["jobs"] == 4                                  # probes four at a time by default
     assert man["baseline"] == runner.baseline() and set(man["baseline"]) == {"authoring", "delivery"}
     with pytest.raises(SystemExit, match="probes differs"):                 # a run does not switch them off
         runner.main(["arm", "nl", "--model", "m", "--materials", str(materials(tmp_path)), "--out", str(out),
@@ -249,3 +250,71 @@ def test_transcripts_name_each_probe(worlds, tmp_path):
     (p02,) = [p for p in load_probes(INSTRUMENTS) if p["id"] == "P02"]
     out = run_probe(ApiBackend(FakeModel(["ok"])), worlds[0], p02, tmp_path, "a skill", "")
     assert out["transcript"] == "P02.jsonl" and Transcript(tmp_path / "P02.jsonl").path.exists()
+
+
+# -- probes in parallel -------------------------------------------------------------------------------
+
+class Slow(ApiBackend):
+    """Takes a while per conversation and counts how many run at once."""
+
+    def __init__(self, fail_on=None):
+        super().__init__(FakeModel([]))
+        import threading
+        self.now = self.peak = 0
+        self.lock, self.fail_on = threading.Lock(), fail_on
+
+    def converse(self, system, user, tools, transcript, max_turns=40):
+        import time
+        with self.lock:
+            self.now += 1
+            self.peak = max(self.peak, self.now)
+        time.sleep(0.4)
+        with self.lock:
+            self.now -= 1
+        if self.fail_on and self.fail_on in user:
+            from phase_b.backend import UsageLimit
+            raise UsageLimit("hit your limit")
+        transcript.write("result", result=user[:20])
+        return "done"
+
+
+def test_probes_run_at_once_and_keep_their_order(worlds, tmp_path):
+    import time
+
+    from phase_b.probes import run_probes
+    b = Slow()
+    t = time.monotonic()
+    out = run_probes(b, worlds[0], load_probes(INSTRUMENTS), tmp_path, "a skill", "", jobs=4)
+    assert [r["probe"] for r in out] == PROBES and all(r["answer"] == "done" for r in out)
+    assert b.peak == 4 and time.monotonic() - t < 8 * 0.4                  # not one after another
+
+
+def test_a_usage_limit_in_one_probe_stops_after_the_others_finish(worlds, tmp_path):
+    from phase_b.backend import UsageLimit
+    from phase_b.probes import run_probes
+    probes = load_probes(INSTRUMENTS)
+    with pytest.raises(UsageLimit):
+        run_probes(Slow(fail_on=probes[2]["task"]), worlds[0], probes, tmp_path, "a skill", "", jobs=4)
+    ran = sorted(x.stem for x in tmp_path.glob("P0*.jsonl"))                 # every other probe ran to its end
+    assert ran == [p["id"] for p in probes if p is not probes[2]]
+
+
+def test_token_counts_add_up_when_conversations_run_at_once(tmp_path, monkeypatch):
+    import threading
+    exe = tmp_path / "bin/claude"
+    exe.parent.mkdir()
+    exe.write_text(FAKE.format(python=sys.executable).replace('"usage": {}', '"usage": {"input_tokens": 50}')
+                   .replace('os.environ.get("FAKE_TOOLS", "").split(",")',
+                            '[t for t in os.environ.get("FAKE_TOOLS", "").split(",") if t]'))
+    exe.chmod(exe.stat().st_mode | stat.S_IEXEC)
+    monkeypatch.setenv("PATH", f"{exe.parent}{os.pathsep}{os.environ['PATH']}")
+    monkeypatch.setenv("FAKE_LOG", str(tmp_path / "log.json"))
+    monkeypatch.setenv("FAKE_TOOLS", "")
+    b = CliBackend("m")
+    threads = [threading.Thread(target=b.converse, args=("r", "m", None, Transcript(tmp_path / f"t{i}.jsonl")))
+               for i in range(8)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
+    assert b.report()["tokens"]["input"] == 8 * 50

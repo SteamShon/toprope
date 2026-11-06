@@ -78,7 +78,9 @@ command reference are generated.
 
 How a run works: the researcher runs `python -m phase_b arm ARM --model M` (from
 `experiments/m1`) in an ordinary terminal. Each conversation is written as it happens, and
-running the same command again continues a stopped run (ADR-0040 §1–2).
+running the same command again continues a stopped run (ADR-0040 §1–2). The probes after each
+change run four at a time (`--jobs`); they are independent, each on its own copy of its starting
+state.
 
 ### How the self domains run
 

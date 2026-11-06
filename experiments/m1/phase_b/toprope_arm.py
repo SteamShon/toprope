@@ -371,13 +371,14 @@ class TopropeArm:
             return {"deployed": False, "path": "override", "refused": f"{type(e).__name__}: {e}"}
         return {"deployed": True, "path": "override", "commit": target}
 
-    def probe(self, req: dict[str, Any], out: Path, worlds: Path, probes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def probe(self, req: dict[str, Any], out: Path, worlds: Path, probes: list[dict[str, Any]],
+              jobs: int = 1) -> list[dict[str, Any]]:
         """The probes after this change, through the tools generated from what is deployed."""
-        from .probes import run_probe
+        from .probes import run_probes
         toolchain = _deployed(self.sb, out / "deployed-toolchain")
         guides = _guides(toolchain)
-        return [run_probe(self.backend, worlds, p, out / "probes", "the Toprope tools generated from these "
-                          "domains (their MCP tools)", guides, toolchain) for p in probes]
+        return run_probes(self.backend, worlds, probes, out / "probes", "the Toprope tools generated from these "
+                          "domains (their MCP tools)", guides, toolchain, jobs=jobs)
 
 
 def _deployed(sb: Sandbox, out: Path) -> Path:
