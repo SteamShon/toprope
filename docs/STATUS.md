@@ -103,11 +103,10 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 5. ADR-0041's follow-up work, one PR each (decided 2026-11-06), in
    `umbrella/adr-0041-follow-ups` from the third on. Done: approval refuses commits with
    proposed elements, and the change check records how many are left; every decision action
-   takes an optional `rationale`, stored with the decision; a check can read `actor.principal`.
-   Left: events for issued grants and role changes; the exception pattern in
-   `examples/paid-media/`; an optional evidence field on commits (it changes the Authoring
-   declaration, so it goes through the self domains' own loop and needs the researcher's
-   approval).
+   takes an optional `rationale`, stored with the decision; a check can read `actor.principal`;
+   `examples/paid-media/` shows the exception pattern. Left: events for issued grants and role
+   changes; an optional evidence field on commits (it changes the Authoring declaration, so it
+   goes through the self domains' own loop and needs the researcher's approval).
 
 ## Left from reviews
 
