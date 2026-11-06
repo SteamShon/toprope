@@ -441,3 +441,16 @@ def test_status_counts_the_runs_own_requests(tmp_path, capsys):
 def test_findings_are_found_among_other_braces():
     text = 'Note {previewed} is renamed.\n{"findings": [{"problem": "p"}]}\nSee {built}.'
     assert parse_findings(text) == ([{"problem": "p"}], None)
+
+
+def test_a_tool_spec_names_its_root_absolutely(tmp_path, monkeypatch):
+    """The CLI backend's tool server runs in another directory: a relative root would be empty there."""
+    (tmp_path / "ws").mkdir()
+    (tmp_path / "ws/f.md").write_text("x")
+    monkeypatch.chdir(tmp_path)
+    spec = ToolSpec("files", "ws")
+    monkeypatch.chdir(ROOT)
+    assert Path(spec.root).is_absolute()
+    from phase_b.toolserver import build_tools
+    (listing,) = [t for t in build_tools(ToolSpec.loads(spec.dumps())) if t.name == "list_files"]
+    assert listing.fn() == ["f.md"]

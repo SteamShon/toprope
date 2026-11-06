@@ -182,3 +182,17 @@ def test_toprope_materials_from_another_baseline_are_refused(materials, tmp_path
         runner.main(["arm", "toprope", "--model", "m", "--materials", str(old), "--out", str(tmp_path / "run"),
                      "--seqs", "1", "--instruments", str(instruments(tmp_path)), "--no-probes"],
                     backend=Editor(lambda a: None))
+
+
+def test_the_materials_command_builds_both_arms_from_the_approved_commits(tmp_path):
+    from phase_b import run as runner
+
+    from toprope.commits import CommitStore
+    runner.main(["materials", "--out", str(tmp_path / "arms")])
+    store = CommitStore(ROOT / ".toprope/commits")
+    for d in ("authoring", "delivery"):
+        approved = store.declaration(d, store.main(d).id)
+        assert yaml.safe_load((tmp_path / f"arms/structured/{d}/{d}.domain.yaml").read_text()) == approved
+        assert yaml.safe_load((tmp_path / f"arms/toprope/domains/{d}/{d}.domain.yaml").read_text()) == approved
+    assert (tmp_path / "arms/structured/toprope-self.composition.yaml").exists()
+    assert not list((tmp_path / "arms").rglob(".lock"))

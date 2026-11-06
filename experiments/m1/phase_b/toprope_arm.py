@@ -86,7 +86,7 @@ def build_sandbox(root: Path, out: Path) -> Path:
         shutil.copy(approved, out / "domains" / d / f"{d}.domain.yaml")
         shutil.copy(src / "interview.jsonl", out / "domains" / d / "interview.jsonl")
         shutil.copytree(root / ".toprope/commits" / d, out / ".toprope/commits" / d,
-                        ignore=shutil.ignore_patterns("merging.json"))
+                        ignore=shutil.ignore_patterns("merging.json", ".lock", ".obj-*", ".refs-*"))
         (out / f"toprope.{d}.workspace.yaml").write_text(yaml.safe_dump(_workspace(d), sort_keys=False))
     (out / "ids.yaml").write_text(yaml.safe_dump(_ids(), sort_keys=False))
     return out
