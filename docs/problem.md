@@ -155,6 +155,28 @@ An agent can do every step that proposes. It owns none of the steps that decide.
 A declared domain can say whether an action was *allowed*. It cannot say whether a decision was
 *good*. That judgment stays with people too.
 
+## Others building agents meet the same gap
+
+**An agent that changes ad budgets.** LangChain's open-source
+[Paid Media Agent](https://github.com/langchain-ai/paid-media-agent) analyses campaigns across ad
+platforms and drafts budget changes for a person to approve. To make those writes safe, its
+authors built by hand a typed proposal, an approval bound to that exact proposal, one attempt and
+a readback, a reviewed list of allowed operations, a kill switch, and tests that edited payloads,
+replays and foreign users are refused (its `docs/architecture/writes-and-approvals.md`). That is
+careful work, and it is code written for one domain. The team's own rules, such as "never touch a
+holdout campaign", would be one more layer on top. [`examples/paid-media/`](../examples/paid-media/)
+shows the decision part of it as a declaration.
+
+**An agent in an incident.** A summary of a Netflix talk reports that an average incident
+involves nine teams and more than 30 engineers over hours, and describes an operational ontology
+(services, devices, users and how they connect) built so that agents can triage and suggest fixes
+([summary](https://www.sysdesai.com/news/ZASM29wJUJdp),
+[talk](https://www.infoq.com/presentations/netflix-observability-aiops-ontology-scale/)). An
+ontology tells an agent what is connected. It does not say which fixes the agent may apply, in
+which incident state, and with whose approval.
+
+In both cases the hard part is not calling an API. It is the rules around the call.
+
 ## What this asks of a solution, and what Toprope does
 
 | The problem asks for | Toprope (design; see [Claim status](../README.md#claim-status)) |

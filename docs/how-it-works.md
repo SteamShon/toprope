@@ -20,6 +20,39 @@ passes a harness checking **every allowed state transition**, not just a call gr
 had almost no problems in production. This is *observed* in the researcher's own projects,
 *not measured*. It is link ③, a hypothesis until M2, and Toprope exists to measure it.
 
+## Two graphs
+
+A domain keeps two kinds of knowledge apart (ADR-0041): the **world model** says what exists and what may
+happen, and is enforced; the **context graph** says why it is so and what happened, and is not.
+The split follows kinds of knowledge that must not be mixed: an observation (what happened), a
+memory (its record), an interpretation or hypothesis (what it may mean), a preference (a
+tendency that depends on conditions), a rule (a condition accepted as binding) and a permission
+(what one actor may do). Only the last two are enforced.
+
+| Kind | Graph | Where it is in Toprope | Status |
+|---|---|---|---|
+| objects, links, actions, states | world model | the declaration | built |
+| functions | world model | function ports (ADR-0015) | planned (M0b) |
+| rules | world model | matrix cells (an `undecided` cell refuses), invariants, preconditions | built |
+| permissions, declared | world model | roles, actor rules, `requires: human` | built |
+| permissions, at runtime | outside the declaration | role holders and grants from the Identity port (ADR-0016) | built |
+| instances and current state | derived from the event log; what the gate checks | projections | built |
+| observations, memory | context graph | domain events, refused attempts, effect outcomes; the interview log | built; read-back from external systems M0b |
+| interpretations, hypotheses | context graph | elements with `status: proposed` (agents can write nothing else); still compiled and enforced, as `status` is provenance only | built |
+| decisions | context graph | `DecisionRecorded` events: who, when, the params and the prior state | built; rationale only if a param carries one; no expected outcome or re-review condition |
+| evidence | context graph | `world` fixtures and `scenarios`, which the harness also runs | built |
+| sources and history | context graph | `source` and `status` on every element; commits, approvals, check records | built |
+| open questions | context graph | the question behind each `undecided` cell; `status: unknown` | built |
+| preferences, exceptions | context graph | — | not modeled |
+| one queryable graph | context graph | query tools over the event log | planned (M0b); joining the rest has no plan |
+
+**The one rule between them:** a declared rule or permission changes only through a reviewed
+change, a commit on the domain's protected `main` that `approve_commit` merges, which only a
+person may take and which requires passing checks (ADR-0029, ADR-0033). Knowing a method, having
+adopted something as a default, and approving this one action are different things. Role holders
+and grants are issued at runtime, outside this rule. Approval will refuse proposed elements, and author ≠ approver
+becomes declarable (ADR-0041, Resolved 1 and 4; not built yet).
+
 ## The three layers
 
 ```

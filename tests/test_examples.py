@@ -42,3 +42,46 @@ def test_changing_the_window_gets_the_impact_report_the_readme_shows(capsys, tmp
     assert report.impact["summary"] == ("changes 1 precondition(s); affects 4 cell test(s), "
                                         "1 precondition test(s), exploration; replays past refund_order")
     assert report.checks["log_replay"].ran
+
+
+# -- examples/paid-media: an agent proposes ad budget changes; a person approves -------------
+PM = Path(__file__).resolve().parents[1] / "examples/paid-media"
+
+
+def pm(capsys, store, token, *args, seed=False):
+    argv = ["--domain", str(PM / "paid-media.domain.yaml"), "--store", store,
+            "--identity", f"static:{PM / 'tokens.yaml'}", "--token", token, *(["--seed"] if seed else []), *args]
+    try:
+        main(argv)
+    except SystemExit:
+        pass
+    return json.loads(capsys.readouterr().out)
+
+
+def test_paid_media_walkthrough_gives_the_readme_output(capsys, tmp_path):
+    s = f"sqlite:{tmp_path / 'e.db'}"
+    out = pm(capsys, s, "t-bot", "propose_budget_change", "C-holdout", "--daily-budget", "1200",
+             "--reason", "best CPA", seed=True)
+    assert (out["status"], out["code"]) == ("denied", "not-a-holdout")
+    out = pm(capsys, s, "t-bot", "propose_budget_change", "C-search", "--daily-budget", "2500", "--reason", "best CPA")
+    assert (out["status"], out["code"]) == ("denied", "step-limit")
+    out = pm(capsys, s, "t-bot", "propose_budget_change", "C-search", "--daily-budget", "1400", "--reason", "best CPA")
+    assert out["status"] == "ok" and out["state"]["change"] == "proposed"
+    out = pm(capsys, s, "t-bot", "approve_budget_change", "C-search")
+    assert out["status"] == "denied" and out["reason"] == "Only a person can approve_budget_change."
+    out = pm(capsys, s, "t-ana", "approve_budget_change", "C-search")
+    assert out["status"] == "ok" and out["state"]["daily_budget"] == 1400
+
+
+def test_paid_media_a_person_cannot_approve_their_own_proposal(capsys, tmp_path):
+    s = f"sqlite:{tmp_path / 'e.db'}"
+    pm(capsys, s, "t-eli", "propose_budget_change", "C-search", "--daily-budget", "1200", "--reason", "x", seed=True)
+    out = pm(capsys, s, "t-eli", "approve_budget_change", "C-search")
+    assert (out["status"], out["code"]) == ("denied", "not-the-proposer")
+
+
+def test_paid_media_raising_the_step_limit_gets_an_impact_report():
+    r = change_check(load_domain(PM / "paid-media.step-1000.domain.yaml"), load_domain(PM / "paid-media.domain.yaml"))
+    assert r.ok and r.diff["to_review"] == ["precondition:propose_budget_change.step-limit"]
+    assert r.impact["summary"] == ("changes 1 precondition(s); affects 4 cell test(s), "
+                                   "1 precondition test(s), exploration; replays past propose_budget_change")

@@ -1,0 +1,77 @@
+domain: paid-media
+version: 1
+glossary:
+  holdout: "A campaign kept unchanged as the control for a test."
+roles: [analyst, media_lead]
+
+objects:
+  Campaign:
+    description: An ad campaign on one platform.
+    properties:
+      name: {type: string}
+      holdout: {type: boolean}
+      daily_budget: {type: integer}
+      change: {enum: [none, proposed]}
+      proposed_budget: {type: integer, optional: true}
+      proposed_by: {type: string, optional: true}
+
+actions:
+  propose_budget_change:
+    description: Propose a new daily budget for review.
+    actor: [analyst]
+    target: Campaign
+    params:
+      daily_budget: {type: integer}
+      reason: {type: string}
+    preconditions:
+      - id: not-a-holdout
+        check: target.holdout == false
+        reason: Holdout campaigns keep their budget; changing it would break the test.
+      - id: step-limit
+        check: params.daily_budget - target.daily_budget <= 500
+        reason: Raise a daily budget by at most 500 at a time.
+    effects:
+      - set: {target.proposed_budget: params.daily_budget, target.proposed_by: actor.id}
+  approve_budget_change:
+    description: Approve the proposed budget exactly as proposed.
+    actor: [media_lead]
+    target: Campaign
+    requires: human
+    preconditions:
+      - id: not-the-proposer
+        check: target.proposed_by != actor.id
+        reason: Whoever proposed a change cannot approve it.
+    effects:
+      - set: {target.daily_budget: target.proposed_budget}
+    records_decision: true
+  reject_budget_change:
+    description: Reject the proposed budget.
+    actor: [media_lead]
+    target: Campaign
+    requires: human
+    records_decision: true
+
+transitions:
+  Campaign:
+    field: change
+    initial: none
+    matrix:
+      none:
+        propose_budget_change: proposed
+        approve_budget_change: {deny: "There is no proposed change to approve."}
+        reject_budget_change: {deny: "There is no proposed change to reject."}
+      proposed:
+        propose_budget_change: {deny: "A change is already waiting for review."}
+        approve_budget_change: none
+        reject_budget_change: none
+
+invariants:
+  - id: holdouts-never-change
+    on: Campaign
+    check: target.holdout == false or target.change == 'none'
+    reason: A holdout campaign never has a budget change pending.
+
+world:
+  fixtures:
+    - Campaign: {id: C-search, name: "Search, brand", holdout: false, daily_budget: 1000, change: none}
+    - Campaign: {id: C-holdout, name: "Search, holdout", holdout: true, daily_budget: 800, change: none}
