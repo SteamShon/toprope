@@ -153,7 +153,7 @@ def test_the_toprope_arm_runs_from_the_command_line(materials, tmp_path):
     from test_phase_b import instruments
     inst = instruments(tmp_path)
     runner.main(["arm", "toprope", "--model", "m", "--materials", str(materials), "--out", str(tmp_path / "run"),
-                 "--seqs", "1", "--instruments", str(inst)],
+                 "--seqs", "1", "--instruments", str(inst), "--no-probes"],
                 backend=Editor(lambda a: a.update(description="Verify it in use.")))
     rec = json.loads((tmp_path / "run/toprope/seq-01/record.json").read_text())
     assert rec["deploy"]["deployed"] and rec["check"]["changed_domains"] == ["delivery"]
