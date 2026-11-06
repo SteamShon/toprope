@@ -1,0 +1,1 @@
+{"test": "explore", "findings": [{"kind": "exploration", "level": "model", "case": "explore", "detail": {"invariant": "verified-requests-were-deployed", "steps": [{"actor": "approver ana", "action": "verify", "target": "R2", "from": "built", "path": [], "outcome": "invariant-guard"}]}}]}

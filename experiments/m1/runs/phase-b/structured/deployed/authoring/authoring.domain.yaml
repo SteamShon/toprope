@@ -11,7 +11,18 @@ purpose:
 roles:
 - owner
 - expert
+- deputy
 objects:
+  Delegation:
+    description: The owner's naming of a deputy who may approve commits while the
+      owner is away.
+    properties:
+      deputy:
+        type: string
+      active:
+        type: boolean
+        optional: true
+    status: proposed
   Source:
     description: 'Where raw material lives: code, records, transcripts or the interview
       log.'
@@ -79,6 +90,7 @@ objects:
         - proposed
         - confirmed
         - unknown
+        - withdrawn
       value:
         type: string
         optional: true
@@ -88,6 +100,24 @@ objects:
         type: integer
         optional: true
       issue_summary:
+        type: string
+        optional: true
+      wording_only:
+        type: boolean
+        optional: true
+      confirmation_reason:
+        type: string
+        optional: true
+      permission_rule:
+        type: boolean
+        optional: true
+      drafted_by:
+        type: string
+        optional: true
+      first_confirmed_by:
+        type: string
+        optional: true
+      second_confirmed_by:
         type: string
         optional: true
     source:
@@ -109,6 +139,9 @@ objects:
         - open
         - decided
       choice:
+        type: string
+        optional: true
+      chat_words:
         type: string
         optional: true
       deadline:
@@ -141,13 +174,22 @@ objects:
       checks_passed:
         type: boolean
         optional: true
+      checked_at:
+        type: integer
+        optional: true
       failing:
         type: string
         optional: true
       approved:
         type: boolean
         optional: true
+      wording_only:
+        type: boolean
+        optional: true
       main:
+        type: string
+        optional: true
+      release_name:
         type: string
         optional: true
       stage:
@@ -334,7 +376,12 @@ actions:
         type: string
       value:
         type: string
+      wording_only:
+        type: boolean
+        optional: true
     effects:
+    - set:
+        target.drafted_by: actor.id
     - call: propose_element
       with:
         path: target.path
@@ -351,7 +398,13 @@ actions:
     - owner
     target: Element
     requires: human
+    params:
+      reason:
+        type: string
     effects:
+    - set:
+        target.confirmation_reason: params.reason
+        target.first_confirmed_by: actor.id
     - call: confirm_element
       with:
         paths: target.path
@@ -361,6 +414,59 @@ actions:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
     status: confirmed
+  second_confirm_element:
+    description: A second person confirms an element that says who may approve or
+      deploy (permission_rule). It must be a different person from the first confirmer.
+    actor:
+    - owner
+    - expert
+    target: Element
+    requires: human
+    effects:
+    - set:
+        target.second_confirmed_by: actor.id
+    preconditions:
+    - id: permission-element
+      check: target.permission_rule == true
+      reason: Only an element about who may approve or deploy needs a second confirmation.
+      status: proposed
+    - id: first-confirmed
+      check: target.review == 'confirmed'
+      reason: A second person confirms after the first has confirmed.
+      status: proposed
+    - id: different-person
+      check: target.first_confirmed_by != actor.id
+      reason: The second confirmation must come from a different person than the first.
+      status: proposed
+    - id: not-yet-second-confirmed
+      check: target.second_confirmed_by == null
+      reason: Already confirmed by a second person.
+      status: proposed
+    status: proposed
+  confirm_wording_element:
+    description: Confirm a drafted element that only fixes wording. An agent may do
+      this; any element that changes substance still needs a person (confirm_element).
+    actor:
+    - external:agent
+    target: Element
+    effects:
+    - call: confirm_element
+      with:
+        paths: target.path
+        approver: actor.id
+      reply: record_confirmation
+    preconditions:
+    - id: wording-only
+      check: target.wording_only == true
+      reason: An agent confirms only an element that fixes wording; substance needs
+        a person.
+      status: proposed
+    - id: not-permission-rule
+      check: target.permission_rule != true
+      reason: An element about who may approve or deploy needs two people, not an
+        agent.
+      status: proposed
+    status: proposed
   mark_unknown:
     description: Mark an element as not known yet, instead of guessing.
     actor:
@@ -372,6 +478,13 @@ actions:
       ref: interview:domains/authoring/interview.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: confirmed
+  withdraw_element:
+    description: Withdraw a proposed element that is simply wrong, so it leaves the
+      draft instead of being marked unknown.
+    actor:
+    - owner
+    target: Element
+    status: proposed
   request_decision:
     description: Ask the owner for a decision only a person may take, with grounds
       and a recommendation.
@@ -412,6 +525,29 @@ actions:
       kind: record
       ref: records:docs/adr/0032-domain-knowledge-as-git-and-github.md#L38-L63
     status: confirmed
+  decide_from_chat:
+    description: Settle a requested decision on the owner's word in chat. An agent
+      may do this only with the owner's own words quoted; the owner need not be asked
+      again on the terminal.
+    actor:
+    - external:agent
+    target: DecisionRequest
+    params:
+      choice:
+        type: string
+      chat_words:
+        type: string
+    records_decision: true
+    effects:
+    - set:
+        target.choice: params.choice
+        target.chat_words: params.chat_words
+    preconditions:
+    - id: owner-said-so-in-chat
+      check: params.chat_words != null and params.chat_words != ''
+      reason: An agent settles a decision only by quoting the owner's words in chat.
+      status: proposed
+    status: proposed
   commit_draft:
     description: Snapshot the working copy as an immutable commit.
     actor:
@@ -445,9 +581,13 @@ actions:
         type: string
       author:
         type: string
+      wording_only:
+        type: boolean
+        optional: true
     effects:
     - set:
         target.domain_id: params.domain
+        target.wording_only: params.wording_only
     source:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L26-L54
@@ -484,16 +624,33 @@ actions:
     effects:
     - set:
         target.checks_passed: params.passed
+        target.checked_at: now
         target.failing: params.summary
     source:
       kind: interview
       ref: interview:domains/authoring/interview.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: confirmed
-  approve_commit:
-    description: 'Approve a commit: merge it into main and tag it. Only a person approves.'
+  name_deputy:
+    description: Name a deputy who may approve commits while the owner is away. Only
+      the owner names one, and only a person does.
     actor:
     - owner
+    creates: Delegation
+    requires: human
+    params:
+      deputy:
+        type: string
+      active:
+        type: boolean
+        optional: true
+    status: proposed
+  approve_commit:
+    description: 'Approve a commit: merge it into main and tag it. Only a person approves;
+      the owner, or the deputy the owner named while away.'
+    actor:
+    - owner
+    - deputy
     target: Commit
     requires: human
     records_decision: true
@@ -504,20 +661,14 @@ actions:
         commit: target.id
         approver: actor.id
       reply: record_approval
-    source:
-      kind: interview
-      ref: interview:domains/authoring/interview.jsonl#L5
-      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: confirmed
+    status: proposed
     preconditions:
     - id: checks-pass
-      check: target.checks_passed == true
-      reason: Run the change check, and approve only a commit that passes it.
-      source:
-        kind: interview
-        ref: interview:domains/authoring/interview.jsonl#L6
-        quote: 전부 다 추천한 거 동의.
-      status: confirmed
+      check: (target.checks_passed == true and target.checked_at != null and now
+        - target.checked_at < 86400) or target.wording_only == true
+      reason: Run the change check, and approve only a commit that passed it less
+        than a day ago, unless the commit only changed wording.
+      status: proposed
     - id: not-approved
       check: target.approved != true
       reason: Already approved; approve a newer commit.
@@ -526,6 +677,28 @@ actions:
         ref: interview:domains/authoring/interview.jsonl#L6
         quote: 전부 다 추천한 거 동의.
       status: confirmed
+  name_release:
+    description: Give an approved commit a release name, so people can refer to the
+      release instead of the commit id.
+    actor:
+    - owner
+    target: Commit
+    params:
+      release_name:
+        type: string
+    effects:
+    - set:
+        target.release_name: params.release_name
+    preconditions:
+    - id: approved-to-name
+      check: target.approved == true
+      reason: Only an approved commit is given a release name.
+      status: proposed
+    - id: release-name-stated
+      check: params.release_name != null and params.release_name != ''
+      reason: A release name cannot be empty.
+      status: proposed
+    status: proposed
   record_approval:
     description: Record the approval and what main points to.
     actor:
@@ -542,13 +715,11 @@ actions:
         target.main: params.main
     preconditions:
     - id: approved-only-if-checked
-      check: params.approved != true or target.checks_passed == true
-      reason: A commit is recorded as approved only if its change check passed.
-      source:
-        kind: interview
-        ref: interview:domains/authoring/interview.jsonl#L11
-        quote: 25번은 A로 추천으로 해도 될 것 같고, 이십육 번도 A로.
-      status: confirmed
+      check: params.approved != true or (target.checks_passed == true and target.checked_at
+        != null and now - target.checked_at < 86400) or target.wording_only == true
+      reason: A commit is recorded as approved only if its change check passed less
+        than a day ago, or it only changed wording.
+      status: proposed
     source:
       kind: interview
       ref: interview:domains/authoring/interview.jsonl#L11
@@ -563,6 +734,7 @@ actions:
       environment:
         enum:
         - local
+        - staging
     preconditions:
     - id: approved
       check: target.approved == true
@@ -690,7 +862,8 @@ actions:
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
     status: confirmed
   skip_stage:
-    description: Say an optional stage has nothing, in the owner's words.
+    description: Say a stage, optional or required, has nothing, in the owner's words.
+      The owner must write why (reason).
     actor:
     - owner
     target: Draft
@@ -706,10 +879,12 @@ actions:
         stage: params.stage
         reason: params.reason
       reply: record_skip
-    source:
-      kind: record
-      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-    status: confirmed
+    preconditions:
+    - id: reason-stated
+      check: params.reason != null and params.reason != ''
+      reason: A stage is skipped only with the owner's written reason why.
+      status: proposed
+    status: proposed
   record_skip:
     description: Record that the stage was skipped.
     actor:
@@ -880,6 +1055,10 @@ transitions:
             ref: interview:domains/authoring/interview.jsonl#L6
             quote: 전부 다 추천한 거 동의.
           status: confirmed
+        confirm_wording_element:
+          to: confirmed
+          status: proposed
+        second_confirm_element: n/a
         mark_unknown:
           to: unknown
           source:
@@ -894,6 +1073,9 @@ transitions:
             ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
           status: confirmed
         record_confirmation: n/a
+        withdraw_element:
+          to: withdrawn
+          status: proposed
       unknown:
         confirm_element:
           to: confirmed
@@ -902,11 +1084,22 @@ transitions:
             ref: interview:domains/authoring/interview.jsonl#L6
             quote: 전부 다 추천한 거 동의.
           status: confirmed
+        confirm_wording_element:
+          to: confirmed
+          status: proposed
+        second_confirm_element: n/a
         mark_unknown: n/a
         record_proposal: n/a
         record_confirmation: n/a
+        withdraw_element:
+          deny: Only a proposed element is withdrawn.
+          status: proposed
       confirmed:
         confirm_element: n/a
+        confirm_wording_element: n/a
+        second_confirm_element:
+          to: confirmed
+          status: proposed
         mark_unknown:
           deny: A confirmed element changes by a new proposal and a new commit, not
             by marking it unknown.
@@ -922,6 +1115,20 @@ transitions:
             kind: record
             ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
           status: confirmed
+        withdraw_element:
+          deny: Only a proposed element is withdrawn; a confirmed element changes
+            by a new proposal and a new commit.
+          status: proposed
+      withdrawn:
+        confirm_element: n/a
+        confirm_wording_element: n/a
+        second_confirm_element: n/a
+        mark_unknown: n/a
+        record_proposal: n/a
+        record_confirmation: n/a
+        withdraw_element:
+          deny: Already withdrawn.
+          status: proposed
   DecisionRequest:
     field: stage
     initial: open
@@ -934,6 +1141,9 @@ transitions:
             ref: interview:domains/authoring/interview.jsonl#L6
             quote: 전부 다 추천한 거 동의.
           status: confirmed
+        decide_from_chat:
+          to: decided
+          status: proposed
       decided:
         decide:
           deny: Already decided; a new decision needs a new request.
@@ -942,6 +1152,9 @@ transitions:
             ref: interview:domains/authoring/interview.jsonl#L6
             quote: 전부 다 추천한 거 동의.
           status: confirmed
+        decide_from_chat:
+          deny: Already decided; a new decision needs a new request.
+          status: proposed
   Draft:
     field: stage
     initial: open
@@ -1059,6 +1272,9 @@ transitions:
             ref: interview:domains/authoring/interview.jsonl#L6
             quote: 전부 다 추천한 거 동의.
           status: confirmed
+        name_release:
+          to: recorded
+          status: proposed
         deliver:
           to: recorded
           source:
@@ -1075,13 +1291,10 @@ transitions:
 invariants:
 - id: approved-commits-passed-their-checks
   'on': Commit
-  check: target.approved != true or target.checks_passed == true
-  reason: An approved commit passed its change check.
-  source:
-    kind: interview
-    ref: interview:domains/authoring/interview.jsonl#L7
-    quote: '19: a'
-  status: confirmed
+  check: target.approved != true or target.checks_passed == true or target.wording_only
+    == true
+  reason: An approved commit passed its change check, or only changed wording.
+  status: proposed
 - id: decided-requests-record-the-choice
   'on': DecisionRequest
   check: target.stage != 'decided' or exists(target.choice)
@@ -1244,9 +1457,12 @@ scenarios:
       role: owner
     do: confirm_element
     target: E1
+    params:
+      reason: Matches what the owner described in the interview.
     expect:
       state:
         E1.review: confirmed
+        E1.confirmation_reason: Matches what the owner described in the interview.
   - actor:
       role: expert
     do: mark_unknown
@@ -1299,6 +1515,7 @@ handoffs:
       domain_id: target.domain_id
       commit: target.id
       interface: target.interface
+      branch: target.branch
       environment: params.environment
       approver: actor.id
     target: target.domain_id + ':' + target.id + ':' + params.environment
@@ -1322,4 +1539,4 @@ glossary:
     harness, past actions, stranded objects.'
   unknown: An element marked as not known yet, instead of guessed. It stays visible
     until someone answers it.
-version: 4
+version: 6
