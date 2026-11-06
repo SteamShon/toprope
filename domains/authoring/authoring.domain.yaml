@@ -151,6 +151,12 @@ objects:
       stage:
         enum:
         - recorded
+      last_evidence:
+        type: string
+        optional: true
+      evidence_error:
+        type: string
+        optional: true
     source:
       kind: interview
       ref: interview:domains/authoring/interview.jsonl#L5
@@ -832,6 +838,55 @@ actions:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
     status: confirmed
+  record_evidence:
+    description: Record how strong the cited evidence is, or why it was refused.
+    actor:
+    - external:kernel
+    target: Commit
+    params:
+      strength:
+        type: string
+      error:
+        type: string
+    effects:
+    - set:
+        target.last_evidence: params.strength
+        target.evidence_error: params.error
+    source:
+      kind: record
+      ref: records:docs/commits.md#L103-L119
+    status: proposed
+  cite_evidence:
+    description: 'Cite evidence for a commit''s change: an interview line, a source
+      chunk, a check recorded on the commit, or a stored event. The ref must resolve.'
+    actor:
+    - owner
+    target: Commit
+    params:
+      kind:
+        enum:
+        - interview
+        - source
+        - check
+        - event
+      ref:
+        type: string
+    preconditions:
+    - id: not-approved
+      check: target.approved != true
+      reason: An approved commit is settled; cite evidence before approving it.
+    effects:
+    - call: cite_evidence
+      with:
+        domain: target.domain_id
+        commit: target.id
+        kind: params.kind
+        ref: params.ref
+      reply: record_evidence
+    source:
+      kind: record
+      ref: records:docs/commits.md#L103-L119
+    status: proposed
 transitions:
   Source:
     field: stage
@@ -1060,6 +1115,18 @@ transitions:
             ref: interview:domains/authoring/interview.jsonl#L6
             quote: 전부 다 추천한 거 동의.
           status: confirmed
+        record_evidence:
+          to: recorded
+          source:
+            kind: record
+            ref: records:docs/commits.md#L103-L119
+          status: proposed
+        cite_evidence:
+          to: recorded
+          source:
+            kind: record
+            ref: records:docs/commits.md#L103-L119
+          status: proposed
   Answer:
     field: stage
     initial: recorded

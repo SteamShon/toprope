@@ -94,8 +94,11 @@ each into `umbrella/pstack-lessons`. Each sub-PR changes only its own item below
 - 🟡 3. Commits cite evidence, with how strong it is (ADR-0041 follow-up). Done: the kernel's
   `cite_evidence` refuses a ref that does not resolve (an interview line, a source chunk, a
   check recorded on the commit, or a stored event) and records its strength
-  (pointed, ran or observed); `toprope-commits evidence` lists it (`docs/commits.md`). Left: an
-  Authoring action that calls it, proposed through the loop for the owner to confirm (#124)
+  (pointed, ran or observed); `toprope-commits evidence` lists it (`docs/commits.md`). The Authoring
+  declaration calls it: `cite_evidence` and its reply `record_evidence` were proposed through
+  `toprope-run` by the agent (commit `5-cde15830b0c0d6a7`, every check passes but `confirmed`),
+  and the agent's grant includes `cite_evidence`. Left: the researcher confirms them (human
+  request `confirm-cite-evidence`), then approves the confirmed commit (#124)
 
 - ⬜ 4. World map state charts mark where the harness found a break, and draw minimal flows
 
@@ -147,6 +150,10 @@ it; each release's cleanup PR handles items older than one release.
 - Neither the validator nor the harness catches a creating action that leaves a required
   property unset (`record_commit` made Commits without `domain_id`; found running the loop)
   (#86, 2026-11-06)
+- `propose_element` writes an element even when it makes the declaration invalid (an action
+  whose `reply` is not declared yet); `toprope-run` then cannot load the composition at all, so
+  no further action can fix it. Propose in dependency order until the proposal is refused
+  instead (#124, 2026-11-06)
 - `propose_element` on a path that is not an element (for example `glossary.<term>`) writes the
   value without provenance instead of failing (#86, 2026-11-06)
 - `toprope-run` reads `git config` twice per command (once to check the caller, once in

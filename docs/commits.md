@@ -114,8 +114,10 @@ pointer is refused. Each kind has a strength, which says how far the evidence go
 
 Citations are appended to `evidence.jsonl` next to the commit log, with who cited and when,
 and are never rewritten. `toprope-commits evidence DOMAIN COMMIT` lists them. Nothing requires
-evidence yet. The Authoring declaration can call `cite_evidence` once the owner confirms an
-action for it, and a rule such as "approve only with evidence that ran" is a later decision.
+evidence yet. In the Authoring domain, the owner or their agent cites with the action
+`cite_evidence` on a commit that is not approved yet. Its reply `record_evidence` keeps the
+last strength, or why the ref was refused, on the Commit. A rule such as "approve only with
+evidence that ran" is a later decision.
 
 ## Approval
 An approval is an immutable tag on a commit `main` points to. Tagging again is a no-op. A
