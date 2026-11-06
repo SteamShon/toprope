@@ -191,6 +191,25 @@ class LocalKernel(KernelServices):
                 "last_approved": approved.id if approved else "", "domain": c.domain, "branch": c.branch,
                 "author": c.author}
 
+    def _cite_evidence(self, domain, commit, kind, ref):
+        if kind in ("interview", "source"):
+            spec = self._ws().sources.get(ref.split(":", 1)[0])
+            if spec is not None and (spec.kind == "interview-log") != (kind == "interview"):
+                raise ValueError(f"{ref} is {'an interview line' if spec.kind == 'interview-log' else 'a source chunk'}:"
+                                 f" cite it as {'interview' if spec.kind == 'interview-log' else 'source'}")
+            self._ws().source_of(ref)                        # an unknown chunk is refused
+        elif kind == "event":
+            stream, _, version = ref.rpartition("@")
+            if self.environment is None:
+                raise RuntimeError("no deploy environment configured: no events to cite")
+            with self.environment.events(domain) as store:
+                if store is None:
+                    raise RuntimeError(f"{domain} is not deployed here: no events to cite")
+                if not stream or not version.isdigit() or not 1 <= int(version) <= store.version(stream):
+                    raise ValueError(f"no event {ref!r}: give <stream>@<version> of a stored event")
+        e = self.commits.cite(domain, commit, kind, ref, by=str((self.caller or {}).get("id") or ""))
+        return {"strength": e["strength"]}
+
     def run(self, service, inputs):
         if service == "diff":   # `from` is a Python keyword
             return self.commits.diff(inputs["domain"], inputs["from"] or None, inputs["to"])

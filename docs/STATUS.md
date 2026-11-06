@@ -91,7 +91,11 @@ each into `umbrella/pstack-lessons`. Each sub-PR changes only its own item below
 
 - ⬜ 2. M1 Phase B run protocol (draft): blinding and run counts for the three arms
 
-- ⬜ 3. Commits cite evidence, with how strong it is (ADR-0041 follow-up)
+- 🟡 3. Commits cite evidence, with how strong it is (ADR-0041 follow-up). Done: the kernel's
+  `cite_evidence` refuses a ref that does not resolve (an interview line, a source chunk, a
+  check recorded on the commit, or a stored event) and records its strength
+  (pointed, ran or observed); `toprope-commits evidence` lists it (`docs/commits.md`). Left: an
+  Authoring action that calls it, proposed through the loop for the owner to confirm (PR)
 
 - ⬜ 4. World map state charts mark where the harness found a break, and draw minimal flows
 
@@ -118,8 +122,8 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    git (`domains/<domain>/events/`).
 5. ADR-0041's follow-up work, one PR each (decided 2026-11-06). Done: approval refuses commits
    with proposed elements, and the change check records how many are left; every decision
-   action takes an optional `rationale`, stored with the decision. Left: an optional evidence
-   field on commits; `actor.principal` in checks; events for issued grants and role changes;
+   action takes an optional `rationale`, stored with the decision; commits cite evidence
+   (pstack umbrella, item 3). Left: `actor.principal` in checks; events for issued grants and role changes;
    the exception pattern in `examples/paid-media/`. `actor.principal` closes the matching *Left
    from reviews* item.
 
