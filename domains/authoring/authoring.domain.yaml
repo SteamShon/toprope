@@ -439,7 +439,7 @@ actions:
     source:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L26-L54
-    status: proposed
+    status: confirmed
   check_commit:
     description: Run the change check on a commit.
     actor:
@@ -458,7 +458,7 @@ actions:
     source:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L26-L54
-    status: proposed
+    status: confirmed
   record_check:
     description: Record the change check's result on the commit.
     actor:
@@ -726,7 +726,7 @@ actions:
     source:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L26-L54
-    status: proposed
+    status: confirmed
 transitions:
   Source:
     field: stage
