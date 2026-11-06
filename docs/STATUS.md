@@ -101,7 +101,7 @@ each into `umbrella/pstack-lessons`. Each sub-PR changes only its own item below
   `cite_evidence` refuses a ref that does not resolve (an interview line, a source chunk, a
   check recorded on the commit, or a stored event) and records its strength
   (pointed, ran or observed); `toprope-commits evidence` lists it (`docs/commits.md`). Left: an
-  Authoring action that calls it, proposed through the loop for the owner to confirm (PR)
+  Authoring action that calls it, proposed through the loop for the owner to confirm (#124)
 
 - ⬜ 4. World map state charts mark where the harness found a break, and draw minimal flows
 
