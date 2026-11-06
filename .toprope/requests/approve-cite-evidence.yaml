@@ -1,3 +1,0 @@
-summary: Approve Authoring commit 6-7a576971f3e73bb4 (citing evidence on a commit), whose change check passed
-steps:
-  - run: {member: authoring, action: approve_commit, target: 6-7a576971f3e73bb4}
