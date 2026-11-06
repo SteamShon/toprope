@@ -221,3 +221,23 @@ def test_running_an_arm_never_opens_the_key(tmp_path, monkeypatch):
     monkeypatch.setattr(score, "load_sealed", lambda *a: (_ for _ in ()).throw(AssertionError("key opened")))
     runner.main(arm_args(tmp_path, inst_for_arm(tmp_path), "nl", "--seqs", "1"),
                 backend=ApiBackend(FakeModel(scripted_arm())))
+
+
+def test_a_probe_that_did_not_complete_is_left_for_the_researcher(tmp_path):
+    from phase_b.score import grade_probe
+    script, calls = grader({})
+    out = grade_probe(ApiBackend(FakeModel(script)), {"id": "P03", "task": "t", "starting_state": "s"}, tmp_path,
+                      {"probe": "P03", "error": "BackendError: claude exited"}, tmp_path / "t.jsonl")
+    assert out["passed"] is None and "did not complete" in out["why"] and calls == []
+
+
+def test_a_problem_that_surfaces_a_change_later_is_found_after_deploy(tmp_path):
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    write_run(run, "nl", {}, {1: 1, 2: 1, 3: 1}, failing={3: ("P06",)})        # missed at 2, surfaces at 3
+    write_run(run, "structured", {}, {1: 1, 2: 1, 3: 1})
+    write_run(run, "toprope", {}, {1: 1, 2: 1, 3: 1})
+    runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m"],
+                backend=ApiBackend(FakeModel(grader({})[0])))
+    confirmed(run)
+    nl = score.score(run, inst)["metrics"]["nl"]
+    assert nl["found_after_deploy"] == {1: ["P06"], 2: ["P06"]} and nl["silent"] == []

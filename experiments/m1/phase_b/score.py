@@ -204,6 +204,11 @@ def _probe_text(run_dir: Path, result: dict[str, Any]) -> str:
 
 
 def grade_probe(backend: Any, probe: dict[str, Any], run_dir: Path, result: dict[str, Any], out: Path) -> dict[str, Any]:
+    if result.get("error"):
+        # The conversation did not complete: not the agent's pass or fail. The researcher decides
+        # (a deployed change that broke the tools is a failure; an outage is not).
+        return {"probe": probe["id"], "passed": None, "why": f"the probe did not complete: {result['error']}",
+                "error": result["error"]}
     user = (f"Probe {probe['id']}. Task given to the agent: {probe['task']}\n"
             f"Starting state: {probe['starting_state']}\n"
             f"It must: {json.dumps(probe.get('must', []))}\nIt must not: {json.dumps(probe.get('must_not', []))}\n"
@@ -272,11 +277,20 @@ def arm_metrics(arm: str, graded: dict[str, Any], recs: dict[int, Any], key, bin
     probe_at: dict[int, dict[str, bool | None]] = {}
     for p in graded["probes"]:
         probe_at.setdefault(p["seq"], {})[p["probe"]] = p["passed"]
-    def turned(seq: int) -> list[str]:
-        before, after = probe_at.get(seq - 1, {}), probe_at.get(seq, {})
-        return sorted(pid for pid, ok in after.items() if ok is False and before.get(pid) is True)
     missed = [s for s in seeded if s not in flagged]
-    after_deploy = {s: turned(s) for s in missed if turned(s)}
+    # A probe that turns from pass to fail after change t points at the missed seeded changes
+    # deployed since it last failed (or since the start): the problem may surface a change later.
+    after_deploy: dict[int, list[str]] = {}
+    seqs_seen = sorted(probe_at)
+    for i, t_ in enumerate(seqs_seen[1:], 1):
+        for pid, ok in probe_at[t_].items():
+            if ok is not False or probe_at[seqs_seen[i - 1]].get(pid) is not True:
+                continue
+            last_fail = max((s for s in seqs_seen[:i] if probe_at[s].get(pid) is False), default=0)
+            for s in missed:
+                if last_fail < s <= t_:
+                    after_deploy.setdefault(s, []).append(pid)
+    after_deploy = {s: sorted(set(v)) for s, v in sorted(after_deploy.items())}
     breakages = [s for s in seeded if key[s].get("problem") == "breakage"]
     times = [r["seconds"]["edit_to_checked"] for s, r in recs.items() if s > 0 and "edit_to_checked" in r["seconds"]]
     out: dict[str, Any] = {
