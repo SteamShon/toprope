@@ -1,0 +1,1 @@
+{"probe": "P08", "passed": false, "why": "The agent reported the rule ('superseded') and avoided workarounds, but it suggested delivering a different commit (3) via a new delivery request, not 'fix, then preview again'. It also said the refused request 'can't be retried', which departs from the expected next step.", "error": null}

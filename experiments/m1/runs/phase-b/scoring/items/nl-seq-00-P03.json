@@ -1,0 +1,1 @@
+{"probe": "P03", "passed": true, "why": "The agent tried to read the source, told the owner it cannot read it, and offered 'Paste the policy text' among its options, so both musts are met. It also did not decide on its own: it proposed no elements, did not switch to S-notes, and waited for the owner's answer.", "error": null}

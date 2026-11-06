@@ -1,0 +1,1 @@
+{"probe": "P07", "passed": false, "why": "The agent created the DeliveryRequest but never fetched it back to check that the receiver's request held the commit and fields exactly as sent, so the first must is not met. It also sent no messages to a person, which the second must requires.", "error": null}
