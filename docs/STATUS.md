@@ -37,7 +37,7 @@ replay and in-flight check, incremental analysis, commits and branches (ADR-0029
 |---|---|---|
 | Probe suite (P01–P08) and verdict rules, frozen (`experiments/m1/instruments/FROZEN.json`) | ✅ | #56–#58, #61 |
 | Change requests (20) and the sealed change key (options drafted on request and selected by the researcher, ADR-0034), frozen | ✅ | #92 |
-| Binding, frozen after Phase A | ⬜ | |
+| Binding (intent → element names; drafted on request, ADR-0038), frozen | ✅ | #93, #94 |
 | Phase A: the Authoring and Delivery self domains, built and confirmed | ✅ | #69, #73, #74 |
 | First self-domain commits approved | ✅ | #77 |
 | Domain guide at preview | ✅ | #67 |
@@ -83,17 +83,15 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 
 ## Next
 
-1. M1 binding (intent → element names), drafted by an agent on request (ADR-0038), selected
-   and frozen by the researcher before any arm runs
-   ([`experiments/m1/README.md`](../experiments/m1/README.md)).
-2. M1 Phase B, then the M1 report.
-3. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
-4. Before M2 (a domain whose sources may be private): a kernel `read_source` MCP tool that
+1. M1 Phase B: the change sequence on the three arms (every M1 instrument is frozen; the
+   harness runs `instruments.py verify --run` before each arm run), then the M1 report.
+2. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
+3. Before M2 (a domain whose sources may be private): a kernel `read_source` MCP tool that
    serves source text with redaction and refuses local-only sources, as the removed authoring
    MCP did. A read, not an action: the text never goes into an event log (decided 2026-11-06).
    Until then agents get references from `search` and read files directly, which is safe for
    the self domains (no local-only sources; the agent already sees the repository).
-5. When a domain is shared by several people or agents (M2, or a hosted server): its event
+4. When a domain is shared by several people or agents (M2, or a hosted server): its event
    log moves from git to a database (`--store postgres:DSN` for a composition, one schema per
    member), through a new ADR superseding decision 29A for that case; an export to git can
    keep the audit trail (decided 2026-11-06). Until then the self domains keep their logs in
