@@ -27,6 +27,29 @@ example in its own container). As a guard against mistakes, an action only a per
 (`requires: human`) also asks you to confirm on your terminal, which an agent's ordinary shell
 cannot do.
 
+**The self domains on the generated tools (ADR-0037 §3.4).** The whole loop runs from the
+declarations alone:
+
+```
+R="uv run toprope-run --composition domains/toprope-self.composition.yaml --kernel-root . \
+   --workspace toprope.authoring.workspace.yaml --env .toprope/env"
+$R --member authoring open_draft authoring --domain-id authoring \
+   --declaration domains/authoring/authoring.domain.yaml --branch work
+$R --member authoring next_questions authoring          # then ask_question, answer_question,
+                                                        # propose_element, confirm_element ...
+$R --member authoring commit_draft authoring            # the kernel commits; Commit <id> appears
+$R --member authoring check_commit <id>
+$R --member authoring approve_commit <id>               # you, on your terminal
+$R --member authoring deliver <id> --environment local  # hands off to Delivery
+$R --member delivery preview authoring:<id>:local
+$R --member delivery deploy authoring:<id>:local        # you, on your terminal
+$R --member delivery verify authoring:<id>:local --verified true
+```
+
+Each member's events go to its own append-only log, `domains/<domain>/events/`, which is
+committed with your change like the commit store. The declaration's example objects never go into
+it: `--seed` needs `--store memory` (which keeps nothing) or `--store-dir`.
+
 Every command runs from the repository root as `uv run <command>`. The domain commit store
 (`.toprope/commits/`) is part of the repository: commit it with your change so approvals are
 shared. Install `uv` first

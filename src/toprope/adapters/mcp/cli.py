@@ -76,12 +76,14 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--composition", help="a *.composition.yaml (ADR-0026): every member runs in this process, "
                                           "wired; --member is the one served")
     ap.add_argument("--member", help="with --composition: the member domain to serve")
-    ap.add_argument("--store-dir", help="with --composition: one SQLite store per member, <dir>/<member>.db")
+    ap.add_argument("--store-dir", help="with --composition: one SQLite store per member, <dir>/<member>.db "
+                                        "(default: each member's event log, <its directory>/events)")
     ap.add_argument("--kernel-root", help="run declared kernel-service effects (ADR-0028) on files under this "
                                           "directory; without it, kernel calls stay pending")
     ap.add_argument("--workspace", help="authoring workspace, for the read_source and fetch_source services")
     ap.add_argument("--env", help="local deploy environment, for the preview and deploy services")
-    ap.add_argument("--store", default="memory")
+    ap.add_argument("--store", default=None, help="with --domain: memory (default), sqlite:FILE, postgres:DSN or "
+                                               "jsonl:DIR; with --composition, memory keeps nothing")
     ap.add_argument("--identity", required=True)
     ap.add_argument("--transport", choices=["stdio", "http"], default="stdio")
     ap.add_argument("--host", default="127.0.0.1")
@@ -104,7 +106,7 @@ def main(argv: list[str] | None = None) -> None:
             for i in errors:
                 print(f"error {i.code} at {i.where}: {i.message}", file=sys.stderr)
             raise SystemExit(1)
-        ex = Execution(domain, open_store(args.store), identity, services=services)
+        ex = Execution(domain, open_store(args.store or "memory"), identity, services=services)
         if not args.no_seed:
             ex.seed_world()
 
@@ -140,6 +142,11 @@ def _kernel(args):
     return LocalKernel(args.kernel_root, workspace=ws, environment=env)
 
 
+def member_events(c, name: str):
+    """A member's event log: `<the member declaration's directory>/events` (ADR-0037)."""
+    return (c.root / c.spec.members[name].declaration).parent / "events"
+
+
 def _member(args, identity, services):
     """Every member of the composition, wired in this process; one store per member, so
     several processes (one per served member) share state through the same files."""
@@ -157,11 +164,25 @@ def _member(args, identity, services):
         raise SystemExit(1)
     if args.member not in c.domains:
         raise SystemExit(f"error: no member {args.member!r} in {sorted(c.domains)}")
+    store = getattr(args, "store", None)
+    if store not in (None, "memory"):
+        raise SystemExit("error: with --composition, give --store-dir DIR or --store memory (or neither, "
+                         "for each member's own event log)")
     if args.store_dir:
         Path(args.store_dir).mkdir(parents=True, exist_ok=True)
         stores = {n: open_store(f"sqlite:{Path(args.store_dir) / (n + '.db')}") for n in c.domains}
-    else:
+    elif store == "memory":
         stores = {n: open_store("memory") for n in c.domains}
+    else:   # each member's own event log, next to its declaration and kept in git (ADR-0037)
+        logs = {n: member_events(c, n).resolve() for n in c.domains}
+        if len(set(logs.values())) < len(logs):
+            raise SystemExit("error: members share a directory, so their event logs would mix; keep each "
+                             "member under its own directory (domains/<domain>/), or give --store-dir")
+        if not args.no_seed:   # the examples are not records: they never go into a log kept in git
+            if getattr(args, "seed", False):
+                raise SystemExit("error: --seed loads example objects; use it with --store memory or --store-dir")
+            args.no_seed = True
+        stores = {n: open_store(f"jsonl:{p}") for n, p in logs.items()}
     exs = assemble(c, stores, identity, services=services)
     if not args.no_seed:
         for ex in exs.values():

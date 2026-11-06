@@ -188,7 +188,8 @@ class LocalKernel(KernelServices):
         approved = self.commits.latest_approved(c.domain)
         return {"id": c.id, "seq": c.seq, "content": c.content, "created": created,
                 "parent": c.parents[0] if c.parents else "", "interface": c.interface, "to_review": review,
-                "last_approved": approved.id if approved else ""}
+                "last_approved": approved.id if approved else "", "domain": c.domain, "branch": c.branch,
+                "author": c.author}
 
     def run(self, service, inputs):
         if service == "diff":   # `from` is a Python keyword

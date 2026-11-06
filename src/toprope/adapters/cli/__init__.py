@@ -40,8 +40,10 @@ def _base_parser(add_help: bool) -> argparse.ArgumentParser:
     ap.add_argument("--domain", help="one declaration (or --composition with --member)")
     ap.add_argument("--composition", help="a *.composition.yaml: every member wired in this process")
     ap.add_argument("--member", help="with --composition: the member whose actions these are")
-    ap.add_argument("--store", default="memory", help="with --domain: the event store (sqlite:FILE, postgres:DSN)")
-    ap.add_argument("--store-dir", help="with --composition: one SQLite store per member, <dir>/<member>.db")
+    ap.add_argument("--store", default=None, help="with --domain: the event store (memory, the default; sqlite:FILE, "
+                    "postgres:DSN, jsonl:DIR); with --composition, memory keeps nothing")
+    ap.add_argument("--store-dir", help="with --composition: one SQLite store per member, <dir>/<member>.db "
+                    "(default: each member's event log, <its directory>/events, kept in git)")
     ap.add_argument("--identity", help="git[:FILE] (your git email, looked up in FILE, default "
                     "toprope.identity.yaml; the default when that file is here), static:FILE or jwt")
     ap.add_argument("--token", help="your credential (default: TOPROPE_TOKEN)")
@@ -136,10 +138,48 @@ def _execution(args: Any, d: Domain) -> Execution:
     if args.composition:
         args.no_seed = not args.seed
         return _member(args, identity, services)
-    ex = Execution(d, open_store(args.store), identity, services=services)
+    ex = Execution(d, open_store(args.store or "memory"), identity, services=services)
     if args.seed:
         ex.seed_world()
     return ex
+
+
+HANDOFF_STATUS = {"HandoffDelivered": "ok", "HandoffDenied": "denied", "HandoffFailed": "failed"}
+
+
+def followed(ex: Execution, d: Domain, target: str, before: int) -> list[dict[str, Any]]:
+    """What the command set off: each kernel call with its reply (and the object a creating reply
+    made, such as the new Commit), and each handoff, so you know what to do next."""
+    from ...handoff import Outbox, effect_id, handoff_id
+    out: list[dict[str, Any]] = []
+    for e in ex.store.read(target)[before:]:
+        if e.type == "EffectRequested":
+            res = Outbox(ex).resolution(effect_id(e), "effect")
+            entry: dict[str, Any] = {"kernel": e.payload["service"], "reply": e.payload["reply"]}
+            if res is None:
+                entry["status"] = "pending"
+            else:
+                result = res.payload.get("result") or {}
+                reply = d.actions.get(e.payload["reply"])
+                # the service's own failure first: a failed call still replies (ADR-0028)
+                entry["status"] = "failed" if result.get("ok") is False else res.payload.get("status") or res.type
+                if entry["status"] == "ok":       # a refused reply made nothing
+                    entry["object"] = result.get("id") if reply is not None and reply.creates \
+                        else res.payload.get("object")
+                if result.get("error") or res.payload.get("reason"):
+                    entry["error"] = result.get("error") or res.payload.get("reason")
+            out.append(entry)
+        elif e.type == "HandoffRequested":
+            res = Outbox(ex).resolution(handoff_id(e), "handoff")
+            to = e.payload.get("to") or {}
+            h = {"handoff": e.payload.get("handoff"), "to": f"{to.get('domain')}.{to.get('action')}",
+                 "status": HANDOFF_STATUS.get(res.type, res.type) if res else "pending"}
+            if h["status"] == "ok":
+                h["object"] = e.payload.get("target")
+            elif res is not None and (res.payload.get("reason") or res.payload.get("error")):
+                h["error"] = res.payload.get("reason") or res.payload.get("error")
+            out.append(h)
+    return out
 
 
 def _domain(args: Any) -> Domain:
@@ -195,8 +235,12 @@ def main(argv: list[str] | None = None) -> None:
         if d.actions[args.cmd].requires == "human":
             _confirm_on_terminal(ex.identity, caller, args.cmd, args.target)
     from ..mcp import outcome_json
+    before = ex.store.version(args.target)
     o = ex.submit(token, args.cmd, args.target, params, idempotency_key=args.key or str(uuid.uuid4()))
-    print(json.dumps(outcome_json(o), indent=2, ensure_ascii=False, default=str))
+    out = outcome_json(o)
+    if o.ok and (follow := followed(ex, d, args.target, before)):
+        out["then"] = follow
+    print(json.dumps(out, indent=2, ensure_ascii=False, default=str))
     if not o.ok:
         raise SystemExit(1)
 
