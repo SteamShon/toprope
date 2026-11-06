@@ -6,8 +6,8 @@ commands are how Authoring and Delivery are done; afterwards the same steps are 
 generated Authoring and Delivery domains (`domains/*.guide.md`).
 
 **Generated for every domain (ADR-0036).** Each domain's guide (`domain-guide.md` at preview;
-for the self domains, [`domains/authoring.guide.md`](../domains/authoring.guide.md) and
-[`domains/delivery.guide.md`](../domains/delivery.guide.md)) has a generated *How to work in
+for the self domains, [`domains/authoring/guide.md`](../domains/authoring/guide.md) and
+[`domains/delivery/guide.md`](../domains/delivery/guide.md)) has a generated *How to work in
 this domain* section: every stage, who acts, what only a person may do, and the
 `toprope-run` command for each action. This page keeps the kernel's commands, and, until the
 M1 switch-over, the bootstrap commands for Authoring and Delivery (§1–§3).

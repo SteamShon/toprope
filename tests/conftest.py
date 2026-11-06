@@ -6,7 +6,7 @@ import pytest
 from toprope.store import MemoryEventStore
 
 PG_DSN = os.environ.get("TOPROPE_PG_DSN")
-KINDS = ["memory", "sqlite"] + (["postgres"] if PG_DSN else [])
+KINDS = ["memory", "sqlite", "jsonl"] + (["postgres"] if PG_DSN else [])
 
 
 @pytest.fixture(params=KINDS)
@@ -28,6 +28,9 @@ def open_store(store_kind, tmp_path):
         if store_kind == "sqlite":
             from toprope.store.sqlite import SQLiteEventStore
             s = SQLiteEventStore(str(tmp_path / "events.db"))
+        elif store_kind == "jsonl":
+            from toprope.store.jsonl import JSONLEventStore
+            s = JSONLEventStore(tmp_path / "events")
         else:
             from toprope.store.postgres import PostgresEventStore
             s = PostgresEventStore(PG_DSN, schema=schema)
