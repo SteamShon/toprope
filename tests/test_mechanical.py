@@ -76,3 +76,64 @@ def test_the_change_check_reports_non_inductive_invariants_as_warnings(tmp_path)
     text = copy.deepcopy(no_examples())
     text["glossary"]["readout"] = "A first look."
     assert run_tests(Domain.model_validate(text), examples=5, cache=cache).stats["run"] == 0
+
+
+# -- review findings -----------------------------------------------------------------------------
+def _mech(raw, actions=None):
+    from toprope.harness.mechanical import run_mechanical
+    from toprope.harness.run import NOW
+    from toprope.harness.surfaces import ModelSurface
+    d = Domain.model_validate(raw)
+    return run_mechanical(d, {"model": ModelSurface(d, lambda: NOW)}, lambda: NOW, samples=3, actions=actions)
+
+
+def test_a_cell_s_objects_do_not_depend_on_which_cells_ran():
+    raw = no_examples()
+    whole = {(f.case, str(f.detail.get("start"))) for f in _mech(raw).findings if ".launch_experiment." in f.case}
+    alone = {(f.case, str(f.detail.get("start"))) for f in _mech(raw, {"launch_experiment"}).findings}
+    assert whole and whole == alone
+
+
+def test_selection_misses_ignore_warnings(tmp_path):
+    from toprope.incremental import ResultCache, run_tests, selection_misses, tests_of
+    d = Domain.model_validate(no_examples())
+    cache = ResultCache(tmp_path / "c")
+    run_tests(d, examples=0, cache=cache)
+    t = next(t for t in tests_of(d, examples=0) if t.id == "mechanical:launch_experiment")
+    assert cache.get(t.key)                                                 # it holds a warning
+    cache.put(t.key, t.id, [])                                              # a cached run that missed it
+    assert selection_misses(d, examples=0, cache=cache) == []
+
+
+def test_ref_params_name_a_generated_object():
+    """A `ref` param must name an object that exists, or the cell tests a dangling reference."""
+    raw = no_examples()
+    raw["actions"]["switch_metric"] = {"description": "Switch the primary metric.", "actor": ["pm"],
+                                       "target": "Experiment", "params": {"metric": {"ref": "Metric"}},
+                                       "effects": [{"set": {"target.primary_metric": "params.metric"}}]}
+    for state, row in raw["transitions"]["Experiment"]["matrix"].items():
+        row["switch_metric"] = state if state == "draft" else "n/a"
+    raw["invariants"].append({"id": "metric-exists", "on": "Experiment", "check": "exists(target.primary_metric.name)",
+                              "reason": "The primary metric is a real metric."})
+    r = run_harness(Domain.model_validate(raw), levels=("model",), explore_examples=0, races=False)
+    assert not [w for w in r.warnings if ".switch_metric." in w.case]
+
+
+def test_a_cell_no_object_can_test_is_a_warning():
+    raw = no_examples()
+    raw["invariants"].append({"id": "approved-never", "on": "Experiment",
+                              "check": "target.status != 'approved' or target.name == 'never generated'",
+                              "reason": "Unsatisfiable by the generator."})
+    r = run_harness(Domain.model_validate(raw), levels=("model",), explore_examples=0, races=False)
+    assert r.ok and any(w.kind == "no-sample" and ".approved." in w.case for w in r.warnings)
+
+
+def test_linked_objects_fill_their_required_links():
+    import random
+
+    from toprope.harness.mechanical import Generator
+    raw = no_examples()
+    raw["links"]["metric_owner"] = {"from": "Hypothesis", "to": "Metric", "cardinality": "many-to-one", "required": True}
+    _, extras = Generator(Domain.model_validate(raw), random.Random(0)).make("Experiment", "draft")
+    hyp = next(x for o, x in extras if o == "Hypothesis")
+    assert "metric_owner" in hyp

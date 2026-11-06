@@ -57,14 +57,15 @@ def _value(spec: Any, rng: random.Random) -> Any:
 
 
 class Generator:
-    """Objects from the declaration's types; linked objects are generated alongside."""
+    """Objects from the declaration's types; linked objects are generated alongside. `tag`
+    keeps ids apart between cells that share a surface."""
 
-    def __init__(self, d: Domain, rng: random.Random):
-        self.d, self.rng, self.n = d, rng, 0
+    def __init__(self, d: Domain, rng: random.Random, tag: str = ""):
+        self.d, self.rng, self.n, self.tag = d, rng, 0, tag
 
     def make(self, obj: str, state: str | None, depth: int = 1) -> tuple[dict[str, Any], list[tuple[str, dict[str, Any]]]]:
         self.n += 1
-        oid = f"{obj}~m{self.n}"
+        oid = f"{obj}~m{self.tag}{self.n}"
         tr = self.d.transitions.get(obj)
         data: dict[str, Any] = {"id": oid}
         extras: list[tuple[str, dict[str, Any]]] = []
@@ -79,7 +80,8 @@ class Generator:
         for lname, link in self.d.links.items():
             if link.from_ != obj:
                 continue
-            if depth <= 0 or (not link.required and self.rng.random() < 0.3):
+            # Required links are always filled, two levels deep; optional ones only at the top.
+            if (link.required and depth <= -2) or (not link.required and (depth <= 0 or self.rng.random() < 0.3)):
                 continue
             ttr = self.d.transitions.get(link.to)
             tstate = self.rng.choice(list(ttr.matrix)) if ttr else None
@@ -87,6 +89,20 @@ class Generator:
             extras += more + [(link.to, tdata)]
             data[lname] = [tdata["id"]] if link.cardinality.endswith("many") else tdata["id"]
         return data, extras
+
+
+def _params(d: Domain, a: Any, gen: Generator, clock: Callable[[], datetime]) -> tuple[dict[str, Any], list]:
+    """The action's required params; a `ref` param names a generated object of that type."""
+    params = default_params(d, a, [], clock)
+    extras: list[tuple[str, dict[str, Any]]] = []
+    for name, spec in a.params.items():
+        if spec.optional or not spec.ref or spec.ref not in d.objects:
+            continue
+        ttr = d.transitions.get(spec.ref)
+        tdata, more = gen.make(spec.ref, ttr.initial if ttr else None)
+        extras += more + [(spec.ref, tdata)]
+        params[name] = [tdata["id"]] if spec.many else tdata["id"]
+    return params, extras
 
 
 def _allows(cell: Any) -> list[str]:
@@ -120,15 +136,16 @@ def unreachable_from_creation(d: Domain) -> dict[str, list[str]]:
 
 
 def run_mechanical(d: Domain, surfaces: dict[str, Any], clock: Callable[[], datetime], *,
-                   samples: int = 3, seed: int = 0, actions: set[str] | None = None) -> Mechanical:
+                   samples: int = 3, seed: int = 0, actions: set[str] | None = None,
+                   actors: dict[str, Any] | None = None) -> Mechanical:
     """Run every cell of `d` (or of `actions`) on generated objects, on each surface; the first
-    surface is the reference for parity. `surfaces` maps a level to a fresh Surface."""
+    surface is the reference for parity. `surfaces` maps a level to a fresh Surface. Each cell
+    has its own seeded generator, so a cell's objects never depend on which other cells ran."""
+    import hashlib
     from .run import Finding
     res = Mechanical(unreachable_from_creation=unreachable_from_creation(d))
-    rng = random.Random(seed)
-    gen = Generator(d, rng)
     interp = Interpreter(d, clock)
-    actors = world_actors(d)
+    actors = actors or world_actors(d)
     levels = list(surfaces)
     ref = levels[0]
     k = 0
@@ -139,6 +156,8 @@ def run_mechanical(d: Domain, surfaces: dict[str, Any], clock: Callable[[], date
                     continue
                 for role, actor in actors.items():
                     cell = f"{obj}.{state}.{name}.{role}"
+                    tag = hashlib.sha256(f"{seed}|{cell}".encode()).hexdigest()[:8]
+                    gen = Generator(d, random.Random(tag), tag)
                     found = []
                     for _ in range(ATTEMPTS):
                         data, extras = gen.make(obj, state)
@@ -153,9 +172,13 @@ def run_mechanical(d: Domain, surfaces: dict[str, Any], clock: Callable[[], date
                     res.cells += 1
                     if not found:
                         res.no_sample.append(cell)
+                        res.findings.append(Finding("no-sample", ref, f"mechanical:{cell}", {
+                            "reason": "no generated object satisfies the invariants in this stage",
+                            "why": "the cell is not tested mechanically; give an example in this stage"}))
                         continue
-                    params = default_params(d, a, [], clock)
                     for data, extras in found:
+                        params, refs = _params(d, a, gen, clock)
+                        extras = extras + refs
                         k += 1
                         res.samples += 1
                         got = {}

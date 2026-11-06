@@ -322,12 +322,16 @@ def run_tests(d: Domain, *, examples: int = 50, cache: ResultCache | None = None
 def selection_misses(d: Domain, *, examples: int = 50, cache: ResultCache, cases: list[Any] | None = None) -> list[str]:
     """The background soundness check: tests that fail on an uncached run but pass from the
     cache. Each one is a bug in impact analysis."""
+    from ..harness.run import WARNING_KINDS
     fresh = run_tests(d, examples=examples, cache=None).results
     tests = tests_of(d, cases, examples)
+
+    def failing(fs: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+        return [f for f in fs or [] if f.get("kind") not in WARNING_KINDS]     # warnings never fail
     out = []
     for t in tests:
         was = cache.get(t.key)
-        if was is not None and not was and fresh.get(t.id):
+        if was is not None and not failing(was) and failing(fresh.get(t.id)):
             out.append(t.id)
     return sorted(out)
 

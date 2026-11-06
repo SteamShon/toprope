@@ -285,7 +285,7 @@ def _model_checks(tested: Domain, carried: list[Any], baseline: Domain | None, e
             scenarios.add("error", f"scenario:{f.case}", f"{origin} fails: {f.detail.get('why')}")
         else:
             harness.add("error", f"{f.kind}:{f.case}", _short(f.detail))
-    for w in run.warnings:                     # ADR-0035: not inductive, reported but never failing
+    for w in run.warnings:                     # ADR-0035: not inductive / untested, reported, never failing
         harness.add("warning", f"{w.kind}:{w.case}", f"{w.detail.get('reason')}: {w.detail.get('why')}")
     total = len(tested.scenarios)
     scenarios.note = f"{total - len(failed)}/{total} scenarios pass"

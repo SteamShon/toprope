@@ -27,7 +27,9 @@ from .surfaces import LEVELS, ExecutionSurface, ModelSurface, Surface
 from .world import Instance, SmallWorld, grow_world
 
 DEFAULT_LEVELS = ("model", "execution", "mcp")
-WARNING_KINDS = {"inductive"}   # kept apart from findings (ADR-0035): an invariant that is not inductive
+# Kept apart from findings (ADR-0035): an invariant that is not inductive, a cell no generated
+# object could test.
+WARNING_KINDS = {"inductive", "no-sample"}
 NOW = datetime(2026, 1, 1, tzinfo=timezone.utc)
 RANK = {"verified": 0, "uncovered": 1, "failed": 2}
 
@@ -268,7 +270,8 @@ class Harness:
         from .mechanical import run_mechanical
         surfaces = {lv: self.surface(lv) for lv in self.levels}
         try:
-            m = run_mechanical(self.d, surfaces, self.clock, samples=samples, actions=actions)
+            m = run_mechanical(self.d, surfaces, self.clock, samples=samples, actions=actions,
+                               actors=self.world.actors)
         finally:
             for s in surfaces.values():
                 s.close()
