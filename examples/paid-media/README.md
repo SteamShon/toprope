@@ -3,7 +3,8 @@
 Link: none (an example for the README). An agent analyses campaigns and proposes budget
 changes; a person approves them. The rules are the team's: holdout campaigns are never
 touched unless a media lead grants a one-time exception, a budget rises by at most 500 a day at
-a time, and whoever proposed a change cannot approve it. `tests/test_examples.py` checks that it gives the output below.
+a time, and whoever proposed a change cannot approve it. `tests/test_examples.py` checks that it
+gives the output below.
 
 The situation is the one LangChain's open-source
 [Paid Media Agent](https://github.com/langchain-ai/paid-media-agent) handles. That project's
@@ -36,8 +37,8 @@ $R --token t-ana approve_budget_change C-search
 | the agent | approve it | denied: *Only a person can approve_budget_change.* |
 | `ana` (media lead) | approve it | approved: the daily budget is 1400 |
 
-A person who proposes a change and then tries to approve it gets *Whoever proposed a change
-cannot approve it.*
+A person who proposes a change and then tries to approve it gets *Whoever proposed a change, or
+had their agent propose it, cannot approve it.*
 
 `bot` acts on behalf of `eli`. `proposed_by` records `actor.principal.id`, the person an agent
 answers for, so a proposal by `bot` is `eli`'s, and `eli` cannot approve it either (ADR-0041).
