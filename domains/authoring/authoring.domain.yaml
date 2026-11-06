@@ -184,7 +184,7 @@ objects:
     source:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-    status: proposed
+    status: confirmed
 links:
   question:
     from: Answer
@@ -749,7 +749,7 @@ actions:
     source:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-    status: proposed
+    status: confirmed
   checkout_commit:
     description: Load a commit into the working copy, to revert to it or build on
       it; committing it makes a new commit.
@@ -769,7 +769,7 @@ actions:
     source:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-    status: proposed
+    status: confirmed
   confirm_all_proposed:
     description: Confirm every element still proposed in the working copy, as right.
     actor:
@@ -785,7 +785,7 @@ actions:
     source:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-    status: proposed
+    status: confirmed
   record_merge:
     description: Record the merge in progress and how many conflicts it left.
     actor:
@@ -806,7 +806,7 @@ actions:
     source:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-    status: proposed
+    status: confirmed
   record_checkout:
     description: Record that the working copy holds the commit's content.
     actor:
@@ -818,7 +818,7 @@ actions:
     source:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-    status: proposed
+    status: confirmed
   record_confirm_all:
     description: Record which elements were confirmed.
     actor:
@@ -831,7 +831,7 @@ actions:
     source:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-    status: proposed
+    status: confirmed
 transitions:
   Source:
     field: stage
@@ -989,37 +989,37 @@ transitions:
           source:
             kind: record
             ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-          status: proposed
+          status: confirmed
         record_merge:
           to: open
           source:
             kind: record
             ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-          status: proposed
+          status: confirmed
         checkout_commit:
           to: open
           source:
             kind: record
             ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-          status: proposed
+          status: confirmed
         record_checkout:
           to: open
           source:
             kind: record
             ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-          status: proposed
+          status: confirmed
         confirm_all_proposed:
           to: open
           source:
             kind: record
             ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-          status: proposed
+          status: confirmed
         record_confirm_all:
           to: open
           source:
             kind: record
             ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-          status: proposed
+          status: confirmed
   Commit:
     field: stage
     initial: recorded
