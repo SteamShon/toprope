@@ -1,14 +1,14 @@
 {
-  "build": "5b4e720d54b5937b",
+  "build": "b45e2bf45a0ccc2f",
   "domain": "authoring",
-  "version": 6,
-  "declaration": "/Users/doyungyoon/Workspace/toprope/experiments/m1/runs/phase-b/toprope/sandbox/.toprope/env-authoring/builds/5b4e720d54b5937b/domain.yaml",
-  "deployed_at": "2026-11-06T13:46:57+00:00",
+  "version": 18,
+  "declaration": "/Users/doyungyoon/Workspace/toprope/experiments/m1/runs/phase-b/toprope/sandbox/.toprope/env-authoring/builds/b45e2bf45a0ccc2f/domain.yaml",
+  "deployed_at": "2026-11-06T15:24:57+00:00",
   "approver": {
     "id": "researcher-standin <standin@m1.invalid>",
     "kind": "person"
   },
-  "commit": "6-4c22881736f7ba27",
-  "seq": 6,
+  "commit": "18-4130d767ddf2194f",
+  "seq": 18,
   "commit_domain": "authoring"
 }

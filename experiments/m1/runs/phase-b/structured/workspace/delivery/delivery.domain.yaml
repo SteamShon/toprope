@@ -21,6 +21,8 @@ objects:
         type: string
       interface:
         type: string
+      branch:
+        type: string
       environment:
         type: string
       approver:
@@ -37,14 +39,16 @@ objects:
       refusal:
         type: string
         optional: true
+      replaced_commit:
+        type: string
+        optional: true
       verified:
         type: boolean
         optional: true
       stage:
         enum:
         - requested
-        - previewing
-        - previewed
+        - built
         - deploying
         - done
         - verified
@@ -80,10 +84,17 @@ actions:
         type: string
       interface:
         type: string
+      branch:
+        type: string
       environment:
         type: string
       approver:
         type: string
+    preconditions:
+    - id: branch-stated
+      check: params.branch != null and params.branch != ''
+      reason: A delivery request must say which branch the commit came from.
+      status: proposed
     source:
       kind: interview
       ref: interview:interview/delivery/log.jsonl#L4
@@ -152,6 +163,25 @@ actions:
         ref: interview:interview/delivery/log.jsonl#L5
         quote: 전부 다 추천한 거 동의.
       status: confirmed
+  auto_deploy:
+    description: Deploy the commit on its own once its preview passed, without waiting
+      for a person to press deploy.
+    actor:
+    - system
+    target: DeliveryRequest
+    effects:
+    - call: deploy
+      with:
+        domain: target.domain_id
+        commit: target.commit
+        approver: target.approver
+      reply: record_deployment
+    preconditions:
+    - id: preview-passed
+      check: target.harness_ok == true
+      reason: Deploy on its own only a build whose preview (harness) passed.
+      status: proposed
+    status: proposed
   record_deployment:
     description: Record whether the deploy happened, or which floor rule refused it.
     actor:
@@ -162,10 +192,14 @@ actions:
         type: boolean
       error:
         type: string
+      replaced_commit:
+        type: string
+        optional: true
     effects:
     - set:
         target.deployed: params.deployed
         target.refusal: params.error
+        target.replaced_commit: params.replaced_commit
     source:
       kind: interview
       ref: interview:interview/delivery/log.jsonl#L4
@@ -190,13 +224,10 @@ actions:
     status: confirmed
     preconditions:
     - id: deployed
-      check: target.deployed == true
-      reason: Only a deployment that happened can be verified.
-      source:
-        kind: interview
-        ref: interview:interview/delivery/log.jsonl#L5
-        quote: 전부 다 추천한 거 동의.
-      status: confirmed
+      check: target.deployed != false
+      reason: A deployment that was refused cannot be verified; verify before a deploy
+        only as a dry run.
+      status: proposed
 transitions:
   DeliveryRequest:
     field: stage
@@ -204,7 +235,7 @@ transitions:
     matrix:
       requested:
         preview:
-          to: previewing
+          to: built
           source:
             kind: interview
             ref: interview:interview/delivery/log.jsonl#L5
@@ -218,41 +249,22 @@ transitions:
             ref: interview:interview/delivery/log.jsonl#L5
             quote: 전부 다 추천한 거 동의.
           status: confirmed
+        auto_deploy:
+          deny: Preview it first.
+          status: proposed
         record_deployment: n/a
         verify: n/a
-      previewing:
+      built:
         preview:
-          deny: A preview is running.
+          to: built
           source:
             kind: interview
             ref: interview:interview/delivery/log.jsonl#L5
             quote: 전부 다 추천한 거 동의.
           status: confirmed
         record_build:
-          to: previewed
-          source:
-            kind: interview
-            ref: interview:interview/delivery/log.jsonl#L5
-            quote: 전부 다 추천한 거 동의.
-          status: confirmed
-        deploy:
-          deny: The preview has not finished.
-          source:
-            kind: interview
-            ref: interview:interview/delivery/log.jsonl#L5
-            quote: 전부 다 추천한 거 동의.
-          status: confirmed
-        record_deployment: n/a
-        verify: n/a
-      previewed:
-        preview:
-          to: previewing
-          source:
-            kind: interview
-            ref: interview:interview/delivery/log.jsonl#L5
-            quote: 전부 다 추천한 거 동의.
-          status: confirmed
-        record_build: n/a
+          to: built
+          status: proposed
         deploy:
           to: deploying
           source:
@@ -260,8 +272,13 @@ transitions:
             ref: interview:interview/delivery/log.jsonl#L5
             quote: 전부 다 추천한 거 동의.
           status: confirmed
+        auto_deploy:
+          to: deploying
+          status: proposed
         record_deployment: n/a
-        verify: n/a
+        verify:
+          to: built
+          status: proposed
       deploying:
         preview:
           deny: A deploy is running.
@@ -278,6 +295,9 @@ transitions:
             ref: interview:interview/delivery/log.jsonl#L5
             quote: 전부 다 추천한 거 동의.
           status: confirmed
+        auto_deploy:
+          deny: A deploy is running.
+          status: proposed
         record_deployment:
           to: done
           source:
@@ -288,7 +308,7 @@ transitions:
         verify: n/a
       done:
         preview:
-          to: previewing
+          to: built
           source:
             kind: interview
             ref: interview:interview/delivery/log.jsonl#L5
@@ -302,6 +322,9 @@ transitions:
             ref: interview:interview/delivery/log.jsonl#L5
             quote: 전부 다 추천한 거 동의.
           status: confirmed
+        auto_deploy:
+          to: deploying
+          status: proposed
         record_deployment: n/a
         verify:
           to: verified
@@ -314,6 +337,7 @@ transitions:
         preview: n/a
         record_build: n/a
         deploy: n/a
+        auto_deploy: n/a
         record_deployment: n/a
         verify:
           deny: Already verified.
@@ -371,6 +395,7 @@ world:
       id: R1
       domain_id: authoring
       commit: 2-c3d4
+      branch: work
       interface: 1.1.0
       environment: local
       approver: ana
@@ -379,16 +404,18 @@ world:
       id: R2
       domain_id: authoring
       commit: 3-e5f6
+      branch: work
       interface: 1.1.0
       environment: local
       approver: ana
-      stage: previewed
+      stage: built
       build: b2
       harness_ok: false
   - DeliveryRequest:
       id: R3
       domain_id: authoring
       commit: 4-a7b8
+      branch: work
       interface: 1.2.0
       environment: local
       approver: ana
@@ -401,6 +428,7 @@ world:
       id: R4
       domain_id: delivery
       commit: 5-c9d0
+      branch: main
       interface: 1.0.0
       environment: local
       approver: ana
@@ -427,7 +455,7 @@ scenarios:
     target: R1
     expect:
       state:
-        R1.stage: previewing
+        R1.stage: built
   - actor:
       external: kernel
     do: record_build
@@ -437,7 +465,7 @@ scenarios:
       harness_ok: true
     expect:
       state:
-        R1.stage: previewed
+        R1.stage: built
         R1.harness_ok: true
   - actor:
       role: approver
@@ -495,7 +523,7 @@ scenarios:
     target: R3
     expect:
       state:
-        R3.stage: previewing
+        R3.stage: built
 glossary:
   delivery request: A request, handed over from Authoring, to put one approved commit
     of a domain into an environment.
@@ -504,5 +532,6 @@ glossary:
   deploy floor: 'Rules the kernel enforces on every deploy that no declaration can
     weaken: approved, on main, not a downgrade, harness passed, a person deploys,
     nothing stranded.'
-  verified: A deployment a person has checked in use, after it happened.
+  verified: A deployment a person has checked in use, after it happened. Before a
+    deploy, verifying records a dry run only; the request stays built.
 version: 1

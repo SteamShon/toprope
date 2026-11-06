@@ -19,7 +19,25 @@
   "of": 20,
   "done": [
     1,
-    2
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20
   ],
   "sessions": [
     {
@@ -47,6 +65,49 @@
           "cache_read": 1059475
         },
         "usd_estimate": 1.2576
+      }
+    },
+    {
+      "started_at": "2026-11-06T14:02:27.565002+00:00",
+      "harness_commit": "beb96cdfba4a0074ae92b31db17893efe9e2b098",
+      "seqs": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20
+      ],
+      "stopped": null,
+      "jobs": 4,
+      "backend": "cli",
+      "user_memory": null,
+      "probes": "c11d0d9b5ad766ddc5323d456c7e0732658e816820571c549c56f25e37997e69",
+      "baseline": {
+        "authoring": "4-b0c8834e25d9bbc7",
+        "delivery": "1-584aaeea5e686ee8"
+      },
+      "finished_at": "2026-11-06T14:27:15.722493+00:00",
+      "usage": {
+        "tokens": {
+          "input": 1270,
+          "output": 191396,
+          "cache_write": 1666048,
+          "cache_read": 7069269
+        },
+        "usd_estimate": 9.2876
       }
     }
   ],
