@@ -76,6 +76,8 @@ def test_an_approved_request_runs_its_steps_as_the_approver(tmp_path, monkeypatc
     files = subprocess.run(["git", "ls-files", "-z"], cwd=ROOT, capture_output=True, check=True).stdout.split(b"\0")
     for name in filter(None, files):
         src, dst = ROOT / name.decode(), tmp_path / name.decode()
+        if "/events/" in name.decode():
+            continue                   # start from empty logs: the repository's own drafts are open
         if src.is_file():
             dst.parent.mkdir(parents=True, exist_ok=True)
             dst.write_bytes(src.read_bytes())
