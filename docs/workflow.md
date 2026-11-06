@@ -29,7 +29,7 @@ toprope.authoring.workspace.yaml`.
 | Skip an optional stage | **owner** | `toprope-author skip STAGE --reason "..."` | invariants or handoffs can be empty, on the record |
 | Check the draft | anyone | `toprope-author check` | parses, validates, runs the model-level harness |
 | Read the domain | anyone | `toprope-worldmap --domain D --out wm.json --harness --guide D.guide.md` | the domain guide: purpose, actions, matrix, what is generated |
-| Confirm | **owner only** | `toprope-author confirm PATH... [--yes]` | marks elements `confirmed`; logs who (your git identity) and how |
+| Confirm | **owner only** | `toprope-author confirm PATH... [--yes]`, or `confirm --all-proposed` | marks elements `confirmed`; logs who (your git identity) and how. `--all-proposed` lists every element still proposed (objects, links, actions, preconditions, matrix cells, invariants, handoffs) and asks once |
 
 Stages, in order: sources → purpose → people and things → actions → transitions →
 invariants → examples and scenarios → handoffs → review (confirm, glossary). See
@@ -43,7 +43,7 @@ invariants → examples and scenarios → handoffs → review (confirm, glossary
 | Commit | owner or agent | `toprope-author commit -m "..." [--branch B]` | an immutable commit on a branch (`work` by default); reports what to re-confirm since the merge base |
 | See what changed | anyone | `toprope-author diff [FROM] TO` | the semantic diff: changed, added, removed elements |
 | Check the change | owner or agent | `toprope-author change-check [COMMIT] [--env DIR] [--full]` | structural, semantic, scenarios, harness (examples and mechanical), log replay, in-flight, NL; recorded on the commit; exits 1 on failure |
-| Re-confirm what changed | **owner only** | `toprope-author confirm PATH...` | only directly changed elements need it |
+| Re-confirm what changed | **owner only** | `toprope-author confirm --all-proposed` | only directly changed elements need it |
 | Approve | **owner only** | `toprope-author approve COMMIT [--yes]` | merges into the protected `main` and tags it; refused on conflicts |
 | Resolve conflicts | agent drafts, **owner** decides | `toprope-author merge [--branch B]`, then `commit --merge MAIN` | writes the merge into the working copy and lists conflicts by element |
 | History of an element | anyone | `toprope-author log ELEMENT [--at C]` | who changed it, when, citing what |

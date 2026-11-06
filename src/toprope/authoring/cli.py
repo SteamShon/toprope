@@ -19,7 +19,7 @@
   toprope-author checkout COMMIT [--force]            load a commit into the working copy (a revert,
                                                       once committed)
   toprope-author approve COMMIT [--as NAME] [--yes]     merge a commit into main and tag it (only you)
-  toprope-author confirm PATH... [--workspace DIR] [--yes] [--as NAME]   only you confirm (recorded as your git identity)
+  toprope-author confirm (PATH... | --all-proposed) [--workspace DIR] [--yes] [--as NAME]   only you confirm (recorded as your git identity)
   toprope-author check [--workspace DIR]
 """
 
@@ -105,7 +105,9 @@ def main(argv: list[str] | None = None) -> None:
     ap_.add_argument("--workspace", default=".")
     ap_.add_argument("--yes", action="store_true")
     c = sub.add_parser("confirm")
-    c.add_argument("paths", nargs="+")
+    c.add_argument("paths", nargs="*")
+    c.add_argument("--all-proposed", action="store_true",
+                   help="confirm every element still proposed (they are listed first; you still answer y/N)")
     c.add_argument("--workspace", default=".")
     c.add_argument("--yes", action="store_true", help="do not prompt (you are confirming as the owner)")
     c.add_argument("--as", dest="who", default=None, help="your name (default: your git user.name <user.email>)")
@@ -168,6 +170,14 @@ def main(argv: list[str] | None = None) -> None:
                     raise SystemExit("not approved")
             print(json.dumps(ws.approve_commit(args.commit, via="cli", who=args.who), indent=2))
         elif args.cmd == "confirm":
+            if args.all_proposed:
+                args.paths = ws._proposed(ws.draft())
+                if not args.paths:
+                    raise SystemExit("nothing is proposed: everything is confirmed")
+            elif not args.paths:
+                raise SystemExit("name the elements to confirm, or use --all-proposed")
+            if args.yes:
+                print("Confirming:\n" + "\n".join(f"  {p}" for p in args.paths), file=sys.stderr)
             if not args.yes:
                 if not sys.stdin.isatty():
                     raise SystemExit("confirm needs your terminal (or --yes when you run it yourself)")
