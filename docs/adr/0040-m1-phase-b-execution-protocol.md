@@ -66,6 +66,18 @@ and the key is in git.
 4. **Every change is deployed, flagged or not (D1).** The arms then pass through the same
    sequence of states, so their numbers compare. A flag is recorded as the arm's pre-deploy
    finding; it does not stop the change.
+
+   **In the Toprope arm**, approval itself refuses a commit whose check failed. The researcher
+   decided (2026-11-06):
+   - The stand-in records an override approval in the sandbox's commit store, and the commit
+     is previewed and deployed through the kernel.
+   - The kernel's floors still hold: a valid declaration, and a passing build harness.
+   - When a floor refuses, the change is recorded as undeployable, and the working copy goes
+     back to `main`, the last deployed state.
+
+   The build harness runs the declared scenarios, as the scenario check does. So a change
+   that breaks a scenario is usually undeployable, and from there the Toprope arm's states
+   differ from the other arms'. The report states which changes did not deploy.
 5. **In the sandbox, a stand-in for the researcher takes the person-only steps (D2).** These
    are confirming, approving and deploying, taken by the harness under an identity named
    `researcher-standin`, and the report says so.

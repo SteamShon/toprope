@@ -17,13 +17,13 @@ from pathlib import Path
 from .agent import Tool, ToolError, file_tools
 
 SERVER = "phase_b"
-KINDS = {"files": file_tools}
 
 
 @dataclass(frozen=True)
 class ToolSpec:
     kind: str
     root: str
+    context: str = "{}"                 # JSON: what the kind's tools need besides the root
 
     def dumps(self) -> str:
         return json.dumps(asdict(self))
@@ -37,9 +37,12 @@ class ToolSpec:
 
 
 def build_tools(spec: ToolSpec) -> list[Tool]:
-    if spec.kind not in KINDS:
-        raise ValueError(f"no tool kind {spec.kind!r}")
-    return KINDS[spec.kind](Path(spec.root))
+    if spec.kind == "files":
+        return file_tools(Path(spec.root))
+    if spec.kind == "toprope":
+        from .toprope_arm import toprope_tools
+        return toprope_tools(Path(spec.root), json.loads(spec.context))
+    raise ValueError(f"no tool kind {spec.kind!r}")
 
 
 def make_server(spec: ToolSpec):
