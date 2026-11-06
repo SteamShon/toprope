@@ -551,8 +551,7 @@ class Workspace:
             raise AuthoringError(f"the draft does not parse: {e.errors()[0]['msg']}") from None
         except CommitError as e:
             raise AuthoringError(str(e)) from None
-        main = self.commits.main(c.domain)          # ADR-0033: a branch is reviewed from its merge base
-        base_id = self.commits.merge_base(c.domain, c.id, main.id) if main else None
+        base_id = self.commits.review_base(c.domain, c.id)   # ADR-0033
         review = self.commits.diff(c.domain, base_id, c.id)
         return {"commit": c.id, "seq": c.seq, "branch": branch, "created": created, "interface": c.interface,
                 "since": base_id, **review}

@@ -146,8 +146,7 @@ class LocalKernel(KernelServices):
     # -- commits (ADR-0029) -----------------------------------------------------------------
     def _commit(self, declaration):
         c, created = self.commits.commit(self._path(declaration), author=str((self.caller or {}).get("id") or ""))
-        main = self.commits.main(c.domain)          # reviewed from the merge base with main (ADR-0033)
-        base = self.commits.merge_base(c.domain, c.id, main.id) if main else None
+        base = self.commits.review_base(c.domain, c.id)      # ADR-0033
         review = self.commits.diff(c.domain, base, c.id)["to_review"] if created else []
         approved = self.commits.latest_approved(c.domain)
         return {"id": c.id, "seq": c.seq, "content": c.content, "created": created,
