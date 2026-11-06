@@ -21,6 +21,9 @@
   toprope-author approve COMMIT [--as NAME] [--yes]     merge a commit into main and tag it (only you)
   toprope-author confirm (PATH... | --all-proposed) [--workspace DIR] [--yes] [--as NAME]   only you confirm (recorded as your git identity)
   toprope-author check [--workspace DIR]
+  toprope-author ship [-m MESSAGE] [--workspace W ...] [--yes]
+                                                      commit, change-check and approve in one go, per
+                                                      domain; stops at a failing check (only you)
 """
 
 from __future__ import annotations
@@ -111,8 +114,16 @@ def main(argv: list[str] | None = None) -> None:
     c.add_argument("--workspace", default=".")
     c.add_argument("--yes", action="store_true", help="do not prompt (you are confirming as the owner)")
     c.add_argument("--as", dest="who", default=None, help="your name (default: your git user.name <user.email>)")
+    sh = sub.add_parser("ship", help="commit, change-check and approve in one go (only you)")
+    sh.add_argument("-m", "--message", default="")
+    sh.add_argument("--workspace", action="append", help="repeat for several domains (default: .)")
+    sh.add_argument("--as", dest="who", default=None, help="your name (default: your git identity)")
+    sh.add_argument("--examples", type=int, default=50)
+    sh.add_argument("--yes", action="store_true", help="do not prompt (you are approving yourself)")
     args = ap.parse_args(argv)
 
+    if args.cmd == "ship":
+        raise SystemExit(_ship(args))
     if args.cmd == "init":
         target = Path(args.dir) / CONFIG
         if target.exists():
@@ -191,3 +202,42 @@ def main(argv: list[str] | None = None) -> None:
 
 if __name__ == "__main__":
     main()
+
+
+def _ship(args) -> int:
+    """For each workspace: commit the working copy, run the change check, and, if it passes,
+    approve the commit (merge it into main). Owner only: approval asks on your terminal."""
+    rc = 0
+    for path in args.workspace or ["."]:
+        try:
+            ws = Workspace(path)
+            who = args.who or ws.identity()
+            c = ws.commit(args.message, author=who or "")
+            r = ws.change_check(c["commit"], examples=args.examples)
+            line = f"{ws.draft().get('domain')}: commit {c['commit']} ({'new' if c['created'] else 'unchanged'})"
+            print(f"{line}; change check {r['summary']}", file=sys.stderr)
+            if r.get("impact"):
+                print(f"  impact: {r['impact']['summary']}", file=sys.stderr)
+            if c["to_review"]:
+                print(f"  changed since {c['since'] or 'the start'}: {', '.join(c['to_review'][:12])}"
+                      + (" ..." if len(c["to_review"]) > 12 else ""), file=sys.stderr)
+            if not r["ok"]:
+                print("  not approved: the change check fails (see `toprope-author change-check`)", file=sys.stderr)
+                rc = 1
+                continue
+            main = ws.commits.main(ws.draft().get("domain"))
+            if main is not None and main.id == c["commit"]:
+                print("  already approved: main points to it", file=sys.stderr)
+                continue
+            if not args.yes:
+                if not sys.stdin.isatty():
+                    raise SystemExit("ship needs your terminal to approve (or --yes when you run it yourself)")
+                if input(f"  Approve {c['commit']} as {who}? [y/N] ").strip().lower() != "y":
+                    print("  not approved", file=sys.stderr)
+                    continue
+            out = ws.approve_commit(c["commit"], via="cli", who=who or "")
+            print(f"  approved: main is {out['main']}", file=sys.stderr)
+        except AuthoringError as e:
+            print(f"error: {e}", file=sys.stderr)
+            rc = 1
+    return rc

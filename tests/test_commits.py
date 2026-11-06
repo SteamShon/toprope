@@ -319,3 +319,30 @@ def test_an_unreadable_representation_stops_the_commit_and_an_explicit_empty_lis
     (tmp_path / "broken.representation.yaml").write_text("views: [unclosed\n")
     with pytest.raises(CommitError, match="broken.representation.yaml"):
         st.commit(wc)
+
+
+def test_ship_commits_checks_and_approves_every_domain(tmp_path):
+    """One command for the owner: commit, change check, approve, per workspace."""
+    from toprope.commits import CommitStore
+    for name in ("one", "two"):
+        raw = schema_doc_domain()
+        raw["domain"] = name
+        write(tmp_path / f"{name}.domain.yaml", raw)
+        (tmp_path / f"toprope.{name}.workspace.yaml").write_text(yaml.safe_dump(
+            {"domain": f"{name}.domain.yaml", "interview_log": f"interview/{name}.jsonl", "sources": []}))
+    run = lambda *a: subprocess.run(["uv", "run", "--quiet", "toprope-author", "ship", *a], cwd=tmp_path,  # noqa: E731
+                                    capture_output=True, text=True, timeout=240, check=False)
+    ws = ["--workspace", "toprope.one.workspace.yaml", "--workspace", "toprope.two.workspace.yaml"]
+    out = run("-m", "first", "--examples", "5", "--yes", "--as", "ana", *ws)
+    assert out.returncode == 0, out.stderr
+    st = CommitStore(tmp_path / ".toprope" / "commits")
+    assert st.main("one") is not None and st.main("two") is not None
+    assert st.approvals("one")[0]["approver"] == "ana"
+    assert "already approved" in run("--examples", "5", "--yes", *ws).stderr       # nothing changed
+    raw = schema_doc_domain()
+    raw["domain"] = "one"
+    raw["transitions"]["Experiment"]["matrix"]["approved"]["launch_experiment"] = {"deny": "No."}
+    write(tmp_path / "one.domain.yaml", raw)                                       # newly unreachable: fails
+    bad = run("--examples", "5", "--yes", "--workspace", "toprope.one.workspace.yaml")
+    assert bad.returncode == 1 and "not approved" in bad.stderr
+    assert len(st.approvals("one")) == 1

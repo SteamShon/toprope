@@ -10,7 +10,9 @@ working for the owner (for example Claude Code, through the authoring MCP or the
 *Maintainer*: whoever releases. Some steps are **owner only**: an agent never runs them, even
 when told the owner agrees in chat (probe P01: "the agent does not decide on its own").
 
-Every command runs from the repository root as `uv run <command>`. Install `uv` first
+Every command runs from the repository root as `uv run <command>`. The domain commit store
+(`.toprope/commits/`) is part of the repository: commit it with your change so approvals are
+shared. Install `uv` first
 (`brew install uv`, or `curl -LsSf https://astral.sh/uv/install.sh | sh`), then `uv sync`.
 With several domains in one repository, name the workspace file: `--workspace
 toprope.authoring.workspace.yaml`.
@@ -45,6 +47,7 @@ invariants → examples and scenarios → handoffs → review (confirm, glossary
 | Check the change | owner or agent | `toprope-author change-check [COMMIT] [--env DIR] [--full]` | structural, semantic, scenarios, harness (examples and mechanical), log replay, in-flight, NL; recorded on the commit; exits 1 on failure |
 | Re-confirm what changed | **owner only** | `toprope-author confirm --all-proposed` | only directly changed elements need it |
 | Approve | **owner only** | `toprope-author approve COMMIT [--yes]` | merges into the protected `main` and tags it; refused on conflicts |
+| **All of it at once** | **owner only** | `toprope-author ship -m "..." --workspace W [--workspace W2 ...]` | per domain: commit, change check, and, if it passes, approve after one y/N; stops at a failing check. Then commit `.toprope/commits/` to git |
 | Resolve conflicts | agent drafts, **owner** decides | `toprope-author merge [--branch B]`, then `commit --merge MAIN` | writes the merge into the working copy and lists conflicts by element |
 | History of an element | anyone | `toprope-author log ELEMENT [--at C]` | who changed it, when, citing what |
 | Go back to a commit | owner | `toprope-author checkout COMMIT [--force]` | loads it into the working copy; committing it is the revert |
