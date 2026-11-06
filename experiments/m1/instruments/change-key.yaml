@@ -1,11 +1,12 @@
-# M1 seeded-problem key (status: draft). Drafted with the change requests (ADR-0034 §3) and
+# M1 seeded-problem key (status: frozen). Drafted with the change requests (ADR-0034 §3) and
 # selected by the researcher on 2026-11-06. SEALED from every arm, agent run and reviewer
 # during the experiment (ADR-0034 no longer requires sealing it from the drafting agent).
+# Reviewed with the change requests (2026-11-06): seq 2 and 12 changed intent, both stay clean.
 # One entry per change request seq. Mix: 6 conflict, 4 breakage, 10 none; seq 9 breaks the
 # Authoring → Delivery handoff; seq 13 and 18 are types the checks were not designed for.
 instrument: change-key
 experiment: M1
-status: draft
+status: frozen
 entries:
 - seq: 1
   problem: none

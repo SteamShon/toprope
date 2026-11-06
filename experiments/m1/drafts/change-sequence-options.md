@@ -45,3 +45,10 @@ deploy, verify, owner, expert, approver.
 One line, for example `1A 2B 3A 4A 5B 6A 7A 8A 9A 10A 11B 12A 13A 14A 15A 16A 17B 18A 19B 20A`.
 Any slot can instead be your own wording (`5: <intent>`), with its key. Wording to avoid in
 an intent: "conflict", "break", "seeded" (the validator warns about them).
+
+## Selected (2026-11-06)
+The researcher picked the recommended line. In review, at the researcher's request, two picks
+changed: slot 2's B already contradicts "a new decision needs a new request" (so it was not
+clean) and was replaced by a new clean intent, "Let a decision request carry a deadline that
+the owner sees when it is asked"; slot 12's A is already allowed, so 12B was taken. The result
+is in `instruments/change-requests.yaml` and `instruments/change-key.yaml`.

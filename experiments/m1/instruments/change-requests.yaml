@@ -1,21 +1,24 @@
-# M1 change requests (status: draft). Drafted by the assistant as options at the researcher's
+# M1 change requests (status: frozen). Drafted by the assistant as options at the researcher's
 # request (ADR-0034 §3); the researcher selected them on 2026-11-06 ("as recommended":
 # 1A 2B 3A 4A 5B 6A 7A 8A 9A 10A 11B 12A 13A 14A 15A 16A 17B 18A 19B 20A, from
 # experiments/m1/drafts/change-sequence-options.md). The researcher reviews them, sets
 # `status: frozen` and freezes them in their own commit before the pilot runs.
+# Reviewed by the assistant at the researcher's request (2026-11-06), two picks changed:
+#   seq 2: 2B (reopen a decided decision request) already contradicts the rule "a new decision
+#          needs a new request", so it was not clean; replaced by a new clean intent (deadline).
+#   seq 12: 12A (run a failed preview again) is already allowed; replaced by 12B.
 # Shown to all arms. Intents in domain language; the answers are in change-key.yaml.
 instrument: change-requests
 experiment: M1
-status: draft
+status: frozen
 requests:
 - seq: 1
   intent: Let the expert ask interview questions too, not only the owner.
   rationale: The expert often knows which question to ask next; routing every question through the owner
     slows the interview.
 - seq: 2
-  intent: Let a person reopen a decided decision request when new facts come in, keeping the earlier choice
-    on record.
-  rationale: Decisions get revisited; today a decided request is final and a new one loses the history.
+  intent: Let a decision request carry a deadline that the owner sees when it is asked.
+  rationale: Open decisions stall a domain; a visible date makes the owner answer in time.
 - seq: 3
   intent: Let an agent confirm elements that only fix wording.
   rationale: Wording fixes are many and low-risk; the owner wants to spend attention on substance.
@@ -44,8 +47,8 @@ requests:
   intent: Allow verifying a delivery before it is deployed, to record a dry run.
   rationale: Teams rehearse verification before the real deploy.
 - seq: 12
-  intent: Let the approver run the preview again after a failed one.
-  rationale: A preview can fail for reasons that are fixed without a new commit.
+  intent: Show on each delivery request which commit it replaced.
+  rationale: Whoever deploys wants to see what was running before, at a glance.
 - seq: 13
   intent: Let the owner skip a required interview stage if they write why.
   rationale: Some domains really have nothing to say at a stage the tool calls required.
