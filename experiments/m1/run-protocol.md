@@ -19,8 +19,9 @@ The agents in an arm are its LLM reviewer and its probe agent. They see only wha
 arm's design gives them.
 
 - **No experiment words.** No directory, file, branch, prompt or tool name an agent sees
-  contains `experiment`, `eval`, `arm`, `seeded`, `key`, `judge`, `score`, `benchmark`,
-  `recall`, `M1` or `toprope-vs`. Each arm works in its own directory under a project-shaped
+  contains `experiment`, `eval`, `arm`, `seeded`, `answer key`, `change key`, `judge`,
+  `score`, `benchmark`, `recall` or `M1`. Words a domain's own tools use stay as they are, such as
+  the `idempotency_key` every generated action takes. Each arm works in its own directory under a project-shaped
   name, such as `release-process/`.
 - **An ordinary request.** The reviewer prompt is what a domain owner would ask before
   deploying, such as "Review this change to our process before we roll it out. Does it conflict
