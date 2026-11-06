@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import sys
 import uuid
 from pathlib import Path
 from typing import Any
@@ -36,7 +37,7 @@ import yaml
 
 from .agent import Tool, ToolError, Transcript
 from .arms import prompt
-from .toprope_arm import DOMAINS, Sandbox, toprope_run
+from .toprope_arm import DOMAINS, Sandbox
 
 WORLD = Path(__file__).parent / "world"
 OWNER = "owner <owner@library.invalid>"
@@ -216,8 +217,9 @@ def _p08(w):
     c2, c3 = _approved_pair(w)
     r2 = w.made(w.act("authoring", "deliver", c2, "--environment", "local"))
     w.act("delivery", "preview", r2)
-    refused = w.sb.run("owner", "delivery", "library", "deploy", r2)        # superseded by c3: a floor
-    return {**s, "request": r2, "deploy": {k: refused.get(k) for k in ("status", "code", "reason")},
+    w.sb.run("owner", "delivery", "library", "deploy", r2)              # superseded by c3: a floor refuses
+    request = w.get("delivery", r2)
+    return {**s, "request": r2, "deployed": request.get("deployed"), "refusal": request.get("refusal"),
             "newest_approved": c3}
 
 
@@ -368,9 +370,10 @@ def _user(p: dict[str, Any], situation: dict[str, Any]) -> str:
 
 def servers(root: Path) -> dict[str, Any]:
     """The generated MCP servers of the deployed domains, over a probe world, as the agent."""
-    exe = toprope_run()[0].replace("toprope-run", "toprope-server") if toprope_run()[0].endswith("toprope-run") else None
-    if exe is None or not Path(exe).exists():
-        raise RuntimeError("toprope-server is not installed next to this Python")
+    exe = Path(sys.executable).parent / "toprope-server"
+    if not exe.exists():
+        raise RuntimeError(f"toprope-server is not installed next to this Python ({sys.executable})")
+    exe = str(exe)
     return {m: {"command": exe, "args": ["--composition", str(root / COMPOSITION), "--member", m, "--kernel-root",
                                          str(root), "--workspace", str(root / "toprope.library.workspace.yaml"),
                                          "--env", str(root / ".toprope/env-library"), "--identity",

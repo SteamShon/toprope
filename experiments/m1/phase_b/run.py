@@ -40,6 +40,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -185,12 +186,25 @@ def probe_worlds(out: Path) -> Path:
     worlds = out / "worlds"
     if not worlds.is_dir():
         _line("building the probes' starting states (once per run directory) ...", end="\n")
-        tmp = out / "worlds.building"
-        shutil.rmtree(tmp, ignore_errors=True)
-        build_worlds(ROOT, export_toolchain(ROOT, tmp / "_toolchain"), tmp / "worlds")
-        (tmp / "worlds").rename(worlds)
-        shutil.rmtree(tmp)
+        out.mkdir(parents=True, exist_ok=True)
+        tmp = Path(tempfile.mkdtemp(prefix="worlds.building-", dir=out))      # one per process: no race
+        try:
+            build_worlds(ROOT, export_toolchain(ROOT, tmp / "_toolchain"), tmp / "worlds")
+            try:
+                (tmp / "worlds").rename(worlds)
+            except OSError:                                # another arm finished first: use its worlds
+                if not worlds.is_dir():
+                    raise
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
     return worlds
+
+
+def baseline() -> dict[str, str]:
+    """The self-domain commits everything starts from: each commit store's `main`."""
+    from toprope.commits import CommitStore
+    store = CommitStore(ROOT / ".toprope/commits")
+    return {d: store.main(d).id for d in ("authoring", "delivery")}
 
 
 def _worlds_hash(worlds: Path) -> str:
@@ -289,7 +303,16 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     t = time.monotonic()
     worlds = None if args.no_probes else probe_worlds(args.out)
     extra["probes"] = None if worlds is None else _worlds_hash(worlds)
-    arm = ARMS[args.arm](args.materials or M1 / "arms" / args.arm, work, backend, resume)
+    extra["baseline"] = baseline()             # every arm and the probes start from these commits
+    materials = args.materials or M1 / "arms" / args.arm
+    if args.arm == "toprope":
+        from toprope.commits import CommitStore
+        store = CommitStore(materials / ".toprope/commits")
+        got = {d: store.main(d).id for d in extra["baseline"]}
+        if got != extra["baseline"]:
+            raise SystemExit(f"the Toprope materials start from {got}, the repository from {extra['baseline']}: "
+                             "rebuild them with `sandbox`")
+    arm = ARMS[args.arm](materials, work, backend, resume)
     m = run_arm(arm, work, [r for r in reqs if r["seq"] in chosen], backend, args.model or "unnamed",
                 args.instruments, extra, total=len(reqs), worlds=worlds)
     stopped = m["sessions"][-1]["stopped"]

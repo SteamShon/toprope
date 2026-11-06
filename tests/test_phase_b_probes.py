@@ -87,6 +87,7 @@ def test_p05_p06_p07_p08_have_the_commits_their_states_say(worlds):
     assert not [o for o in p07.values() if o["type"] == "DeliveryRequest" and o["commit"] == worlds[1]["P07"]["approved"]]
     refused = p08[worlds[1]["P08"]["request"]]
     assert refused["refusal"].startswith("superseded") and refused["deployed"] is False
+    assert worlds[1]["P08"]["refusal"] == refused["refusal"] and worlds[1]["P08"]["deployed"] is False  # as shown
 
 
 # -- the probe agent's tools ------------------------------------------------------------------
@@ -231,6 +232,7 @@ def test_a_run_probes_after_every_change(worlds, tmp_path):
     assert len(list((out / "nl/seq-01/probes").glob("P0*.jsonl"))) == 8
     man = json.loads((out / "nl/manifest.json").read_text())
     assert man["probes"] and man["sessions"][-1]["probes"] == man["probes"]
+    assert man["baseline"] == runner.baseline() and set(man["baseline"]) == {"authoring", "delivery"}
     with pytest.raises(SystemExit, match="probes differs"):                 # a run does not switch them off
         runner.main(["arm", "nl", "--model", "m", "--materials", str(materials(tmp_path)), "--out", str(out),
                      "--seqs", "1-2", "--instruments", str(inst), "--no-probes"], backend=ApiBackend(FakeModel(script)))

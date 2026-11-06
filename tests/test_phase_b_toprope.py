@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -167,3 +168,17 @@ def test_a_proposal_without_a_recorded_request_is_a_tool_error(materials, tmp_pa
     tl = {t.name: t for t in build_tools(ToolSpec("toprope", str(arm.sb.root), json.dumps({"seq": 1, "cites": {}})))}
     with pytest.raises(ToolError, match="not recorded"):
         tl["propose_element"].fn(domain="delivery", path="actions.verify", value="{}")
+
+
+def test_toprope_materials_from_another_baseline_are_refused(materials, tmp_path):
+    from phase_b import run as runner
+    from test_phase_b import instruments
+    old = tmp_path / "old"
+    shutil.copytree(materials, old)
+    refs = old / ".toprope/commits/authoring/refs.jsonl"          # main as it was before the last approval
+    first = json.loads((old / ".toprope/commits/authoring/log.jsonl").read_text().splitlines()[0])["id"]
+    refs.write_text(refs.read_text() + json.dumps({"at": "t", "branch": "main", "commit": first}) + "\n")
+    with pytest.raises(SystemExit, match="rebuild them"):
+        runner.main(["arm", "toprope", "--model", "m", "--materials", str(old), "--out", str(tmp_path / "run"),
+                     "--seqs", "1", "--instruments", str(instruments(tmp_path)), "--no-probes"],
+                    backend=Editor(lambda a: None))
