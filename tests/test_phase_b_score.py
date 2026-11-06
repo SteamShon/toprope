@@ -337,11 +337,18 @@ def test_a_reviewers_finding_and_edit_labels_carry_to_the_next_round():
     old = {"arms": {"nl": {"changes": [{"seq": 3, "findings": [
         {"index": 0, "finding": f, "label": "seeded", "review": "other-real -> seeded: names it"},
         {"index": 1, "finding": f, "label": "false-alarm"}], "edit": {"fidelity": "partial", "review": "x"}}]}}}
+    old["arms"]["nl"]["probes"] = [{"seq": 3, "probe": "P01", "passed": True, "review": "a person read it"},
+                                   {"seq": 3, "probe": "P02", "passed": False}]
     new = {"arms": {"nl": {"changes": [{"seq": 3, "findings": [
         {"index": 0, "finding": f, "label": "other-real"}, {"index": 1, "finding": f, "label": "other-real"}],
-        "edit": {"fidelity": "implements"}}], "probes": []}}}
+        "edit": {"fidelity": "implements"}}], "probes": [
+        {"seq": 3, "probe": "P01", "passed": False, "look": True},
+        {"seq": 3, "probe": "P02", "passed": True, "look": True}]}}}
     out, log = carry(old, new)
     fs = out["arms"]["nl"]["changes"][0]["findings"]
     assert [x["label"] for x in fs] == ["seeded", "other-real"] and fs[0]["review"].startswith("other-real")
-    assert out["arms"]["nl"]["changes"][0]["edit"]["fidelity"] == "partial" and len(log) == 2
+    assert out["arms"]["nl"]["changes"][0]["edit"]["fidelity"] == "partial" and len(log) == 3
+    p01, p02 = out["arms"]["nl"]["probes"]
+    assert (p01["passed"], p01["rubric_passed"], p01["look"]) == (True, False, False)      # the person's verdict
+    assert (p02["passed"], p02["look"]) == (True, True) and out["to_look_at_first"]["probes_flagged"] == 1
     assert out["status"].startswith("reviewed")

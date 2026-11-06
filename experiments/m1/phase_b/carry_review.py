@@ -3,7 +3,8 @@
 After the first review of the Phase B grading (#119), the probes were graded again (a clarified
 prompt and the researcher's rulings) while the findings and edits kept their grades. This copies
 the reviewer's `review` notes, and the labels they changed, onto the new proposal, so the new
-`confirmed.yaml` starts from both. Probe verdicts are not carried: they were graded again.
+`confirmed.yaml` starts from both. A probe run a person judged keeps their verdict (the new grade
+stays as `rubric_passed`); the others take the new grade.
 
   python -m phase_b.carry_review OLD_REVIEWED.yaml NEW_PROPOSED.yaml OUT.yaml
 """
@@ -36,7 +37,16 @@ def carry(old: dict[str, Any], new: dict[str, Any]) -> tuple[dict[str, Any], lis
             if o["edit"].get("review"):
                 c["edit"]["fidelity"], c["edit"]["review"] = o["edit"]["fidelity"], o["edit"]["review"]
                 log.append(f"{arm} change {c['seq']} edit: {o['edit']['fidelity']} ({o['edit']['review'][:60]})")
-    new["status"] = "reviewed (findings and edits); probes graded again, to review"
+        olds = {(x["seq"], x["probe"]): x for x in old["arms"][arm]["probes"]}
+        for pr in g["probes"]:
+            o = olds.get((pr["seq"], pr["probe"]))
+            if o and o.get("review"):                    # a person judged this run: their verdict stands
+                pr["rubric_passed"], pr["passed"], pr["review"] = pr["passed"], o["passed"], o["review"]
+                pr["look"] = False
+                log.append(f"{arm} change {pr['seq']} {pr['probe']}: {o['passed']} (reviewed)")
+    looks = sum(p["look"] for g in new["arms"].values() for p in g["probes"])
+    new.setdefault("to_look_at_first", {})["probes_flagged"] = looks
+    new["status"] = "reviewed (findings, edits, reviewed probe runs); look at the flagged probes, then confirm"
     return new, log
 
 
