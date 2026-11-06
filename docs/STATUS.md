@@ -119,6 +119,13 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    keep the audit trail (decided 2026-11-06). Until then the self domains keep their logs in
    git (`domains/<domain>/events/`).
 
+5. Before M2's Phase B: a probe's starting state written as conditions on objects (for example
+   a Commit with `checks_passed` true and `approved` false), and generated from the declarations
+   by searching their actions for a way to reach it, instead of a hand-written setup per probe.
+   This needs a format change to the probe suite (an ADR). M1 keeps the hand-written setups in
+   `experiments/m1/phase_b/probes.py`, built only from the approved tools on a separate domain
+   (decided 2026-11-06).
+
 ## Left from reviews
 
 Each item names the PR it came from and the review date. The PR that resolves an item deletes
