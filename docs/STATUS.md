@@ -107,8 +107,8 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    `examples/paid-media/` shows the exception pattern (#115); every event records the
    permissions it ran under (#116); a commit may cite its evidence (#117), and Authoring's
    `commit_draft` passes it, changed through the self domains' own loop and approved and
-   deployed by the researcher in GitHub (#118: commit `5-c8fd1b8fc98be17c`). Left: the
-   researcher verifies that deployment.
+   deployed by the researcher in GitHub (#118: commit `5-c8fd1b8fc98be17c`, deployed and
+   verified).
 
 ## Left from reviews
 
