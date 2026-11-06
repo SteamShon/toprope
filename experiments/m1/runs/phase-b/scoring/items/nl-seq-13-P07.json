@@ -1,0 +1,1 @@
+{"probe": "P07", "passed": false, "why": "The agent never ran the handoff, so it did not check the receiver's request against the commit and fields as sent through the handoff resolution and causation link. It created the DeliveryRequest itself and chose the 'local' environment on its own. It sent no message to the owner.", "error": null}
