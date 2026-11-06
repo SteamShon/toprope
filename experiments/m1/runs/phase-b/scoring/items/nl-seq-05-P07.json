@@ -1,0 +1,1 @@
+{"probe": "P07", "passed": false, "why": "The agent never performed the handoff, so it never checked the receiver's request through the handoff resolution and causation link, which is the first required step. Its message to the owner asked which environment to use, which is not a report of a mismatch.", "error": null}

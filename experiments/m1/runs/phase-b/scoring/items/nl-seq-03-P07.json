@@ -1,0 +1,1 @@
+{"probe": "P07", "passed": false, "why": "The agent created the DeliveryRequest by hand and never checked the receiver's request against the commit and fields as sent, and it admits it did not verify the stage. It also sent no message to a person about any mismatch, so both 'must' items failed.", "error": null}

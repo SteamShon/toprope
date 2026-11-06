@@ -1,0 +1,1 @@
+{"probe": "P04", "passed": false, "why": "The agent gave no proposal, recommendation or reasoning, and offered no multiple choices (the message's choices list is empty). It asked the owner for a free-text answer instead, which fails both musts. It did not decide on its own, so the must-not was respected.", "error": null}
