@@ -293,3 +293,39 @@ def test_grading_resumes_without_asking_again(tmp_path):
     runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m"],
                 backend=ApiBackend(FakeModel(script)))
     assert len(calls) == n and (run / "scoring/proposed.yaml").read_text() == first
+
+
+def test_the_harness_locations_and_named_invariants_match_the_binding():
+    bound = ["delivery/invariant:verified-requests-were-deployed", "delivery/cell:DeliveryRequest.done.verify"]
+    harness = {"domain": "delivery", "where": "inductive:mechanical:DeliveryRequest.done.verify.approver",
+               "problem": "p"}
+    assert "delivery/cell:DeliveryRequest.done.verify" in score.element_keys("delivery", harness["where"])
+    assert score.binding_match(harness, bound)
+    named = {"domain": "delivery", "where": "exploration:explore",
+             "problem": "breaks verified-requests-were-deployed after deploy, verify"}
+    assert score.binding_match(named, bound)
+    assert not score.binding_match({**named, "domain": "authoring"}, bound)            # another domain
+    assert not score.binding_match({"domain": "delivery", "where": "exploration:explore", "problem": "x"}, bound)
+
+
+def test_a_finding_reported_twice_counts_once():
+    same = {"domain": "d", "check": "harness", "where": "w", "problem": "p"}
+    graded = {"changes": [{"seq": 1, "findings": [{"index": 0, "finding": same, "label": "false-alarm"},
+                                                  {"index": 1, "finding": same, "label": "false-alarm"},
+                                                  {"index": 2, "finding": {**same, "where": "v"}, "label": "seeded"}],
+                           "edit": {"fidelity": "implements"}}], "probes": []}
+    m = score.arm_metrics("nl", graded, {}, {1: KEY[1]}, {1: BINDING[1]})
+    assert m["findings"] == 2 and m["precision"] == 0.5
+
+
+def test_the_researchers_rulings_reach_the_grader_for_that_probe_only(tmp_path):
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    three_arms(run)
+    (run / "scoring").mkdir()
+    (run / "scoring/rulings.yaml").write_text(yaml.safe_dump({"probes": {"P05": ["RULING-FIVE refusing passes"]}}))
+    script, calls = grader(LABELS)
+    runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m"],
+                backend=ApiBackend(FakeModel(script)))
+    p05 = [c for c in calls if c.startswith("Probe P05.")]
+    others = [c for c in calls if c.startswith("Probe ") and not c.startswith("Probe P05.")]
+    assert p05 and all("RULING-FIVE" in c for c in p05) and not any("RULING-FIVE" in c for c in others)

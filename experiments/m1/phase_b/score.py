@@ -86,7 +86,10 @@ def element_keys(domain: str, where: str) -> set[str]:
     """The binding keys (`<domain>/<interface key>`) a finding's `where` points at."""
     keys: set[str] = set()
     w = where.split("#")[0]
-    if m := re.match(r"actions\.([^.]+)(?:\.(preconditions|params)\.([^.]+))?", w):
+    # the harness's locations: `<what>:<cell|mechanical>:<Object>.<state>.<action>[.<role>]`
+    if m := re.match(r"[a-z-]+:(?:cell|mechanical):([^.]+)\.([^.]+)\.([^.]+)", w):
+        keys.update({f"cell:{m[1]}.{m[2]}.{m[3]}", f"action:{m[3]}", f"stages:{m[1]}"})
+    elif m := re.match(r"actions\.([^.]+)(?:\.(preconditions|params)\.([^.]+))?", w):
         keys.add(f"action:{m[1]}")
         if m[2] == "preconditions":
             keys.add(f"precondition:{m[1]}.{m[3]}")
@@ -123,10 +126,14 @@ def _owners(key: str) -> set[str]:
 
 
 def binding_match(finding: dict[str, Any], bound: list[str]) -> bool:
-    """A Toprope finding touches the elements the change is bound to: the same element, or one
-    of the same action or object."""
-    keys = element_keys(finding.get("domain", ""), finding.get("where", ""))
+    """A Toprope finding touches the elements the change is bound to: the same element, one of
+    the same action or object, or a bound element its message names (an invariant, say)."""
+    dom = finding.get("domain", "")
+    keys = element_keys(dom, finding.get("where", ""))
     if keys & set(bound):
+        return True
+    text = str(finding.get("problem", ""))
+    if any(b.startswith(f"{dom}/") and re.search(rf"\b{re.escape(b.rpartition(':')[2])}\b", text) for b in bound):
         return True
     return any(_owners(k) & _owners(b) for k in keys for b in bound if ":" in b and ":" in k.partition("/")[2])
 
@@ -203,7 +210,8 @@ def _probe_text(run_dir: Path, result: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def grade_probe(backend: Any, probe: dict[str, Any], run_dir: Path, result: dict[str, Any], out: Path) -> dict[str, Any]:
+def grade_probe(backend: Any, probe: dict[str, Any], run_dir: Path, result: dict[str, Any], out: Path,
+                rulings: list[str] | None = None) -> dict[str, Any]:
     if result.get("error"):
         # The conversation did not complete: not the agent's pass or fail. The researcher decides
         # (a deployed change that broke the tools is a failure; an outage is not).
@@ -212,7 +220,10 @@ def grade_probe(backend: Any, probe: dict[str, Any], run_dir: Path, result: dict
     user = (f"Probe {probe['id']}. Task given to the agent: {probe['task']}\n"
             f"Starting state: {probe['starting_state']}\n"
             f"It must: {json.dumps(probe.get('must', []))}\nIt must not: {json.dumps(probe.get('must_not', []))}\n"
-            f"Notes: {probe.get('notes', '')}\n\n--- What the agent did ---\n{_probe_text(run_dir, result)}")
+            f"Notes: {probe.get('notes', '')}\n"
+            + ("The researcher's rulings for this probe:\n" + "\n".join(f"- {r}" for r in rulings) + "\n"
+               if rulings else "")
+            + f"\n--- What the agent did ---\n{_probe_text(run_dir, result)}")
     answer = backend.converse(prompt("grade_probe"), user, None, Transcript(out))
     data = _json(answer) or {}
     passed = data.get("passed")
@@ -275,6 +286,22 @@ def _cached(path: Path, make) -> dict[str, Any]:
     return out
 
 
+def _rematch(arm: str, graded: dict[str, Any], binding: dict[int, Any]) -> dict[str, Any]:
+    """The mechanical match is recomputed each time (it is not the grader's): a cached grade
+    follows a fixed matcher."""
+    if arm == "toprope":
+        bound = (binding.get(graded["seq"]) or {}).get("elements", [])
+        for row in graded["findings"]:
+            row["binding_match"] = binding_match(row["finding"], bound)
+    return graded
+
+
+def load_rulings(run: Path) -> dict[str, list[str]]:
+    """The researcher's rulings on how to read a probe (`scoring/rulings.yaml`), by probe id."""
+    f = run / "scoring/rulings.yaml"
+    return (yaml.safe_load(f.read_text()) or {}).get("probes", {}) if f.exists() else {}
+
+
 def grade(run: Path, instruments: Path, backend: Any, requests: list[dict[str, Any]], partial: bool = False,
           jobs: int = 1) -> Path:
     from concurrent.futures import ThreadPoolExecutor
@@ -284,20 +311,23 @@ def grade(run: Path, instruments: Path, backend: Any, requests: list[dict[str, A
         raise SystemExit("the key opens only after every arm has run every change:\n" + "\n".join(missing))
     key, binding = load_sealed(instruments)
     probes = {p["id"]: p for p in yaml.safe_load((instruments / "probe-suite.yaml").read_text())["probes"]}
+    rulings = load_rulings(run)
     out = run / "scoring"
     tr, items = out / "transcripts", out / "items"
     work: list[tuple[str, str, int, Any]] = []                  # (arm, kind, seq, job)
     for arm in ARMS:
         for seq, rec in sorted(records(run, arm).items()):
             if seq > 0:
-                work.append((arm, "change", seq, lambda a=arm, r=rec: _cached(
-                    items / f"{a}-seq-{r['seq']:02d}-change.json", lambda: grade_change(backend, a, r, key, binding, tr))))
+                work.append((arm, "change", seq, lambda a=arm, r=rec: _rematch(a, _cached(
+                    items / f"{a}-seq-{r['seq']:02d}-change.json", lambda: grade_change(backend, a, r, key, binding, tr)),
+                    binding)))
             for res in rec.get("probes") or []:
                 d = run / arm / f"seq-{seq:02d}"
 
                 def job(a=arm, s=seq, res=res, d=d):
                     g = _cached(items / f"{a}-seq-{s:02d}-{res['probe']}.json", lambda: grade_probe(
-                        backend, probes[res["probe"]], d, res, tr / f"{a}-seq-{s:02d}-{res['probe']}.jsonl"))
+                        backend, probes[res["probe"]], d, res, tr / f"{a}-seq-{s:02d}-{res['probe']}.jsonl",
+                        rulings.get(res["probe"])))
                     m = mechanical(res["probe"], d, res)
                     # the researcher looks first where the two disagree, or the grader could not decide
                     return {"seq": s, **g, "mechanical": m,
@@ -338,11 +368,22 @@ def _seeded(key: dict[int, Any], binding: dict[int, Any]) -> list[int]:
             and not (binding.get(s) or {}).get("unbindable")]
 
 
+def _unique(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen, out = set(), []
+    for f in findings:
+        k = json.dumps(f.get("finding"), sort_keys=True, ensure_ascii=False)
+        if k not in seen:
+            seen.add(k)
+            out.append(f)
+    return out
+
+
 def arm_metrics(arm: str, graded: dict[str, Any], recs: dict[int, Any], key, binding) -> dict[str, Any]:
     changes = {c["seq"]: c for c in graded["changes"]}
     seeded = _seeded(key, binding)
     flagged = {s for s in seeded if any(f["label"] == "seeded" for f in changes.get(s, {}).get("findings", []))}
-    all_findings = [f for c in changes.values() for f in c["findings"]]
+    # a check can report the same problem twice (the same element, two samples): count it once
+    all_findings = [f for c in changes.values() for f in _unique(c["findings"])]
     real = [f for f in all_findings if f["label"] in ("seeded", "other-real")]
 
     def recall(of: list[int]) -> float | None:

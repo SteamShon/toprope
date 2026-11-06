@@ -318,3 +318,34 @@ def test_token_counts_add_up_when_conversations_run_at_once(tmp_path, monkeypatc
     for th in threads:
         th.join()
     assert b.report()["tokens"]["input"] == 8 * 50
+
+
+def test_a_probe_reruns_on_the_deployed_tools_with_a_wider_grant_and_keeps_the_old_result(worlds, tmp_path):
+    from phase_b.probes import reprobe
+    run = tmp_path / "run"
+    shutil.copytree(worlds[0], run / "worlds")
+    for seq in (0, 1):
+        d = run / f"toprope/seq-{seq:02d}"
+        shutil.copytree(worlds[2], d / "deployed-toolchain")
+        (d / "record.json").write_text(json.dumps({"seq": seq, "probes": [
+            {"probe": "P07", "answer": "old"}, {"probe": "P01", "answer": "kept"}]}))
+    (run / "toprope/manifest.json").write_text(json.dumps({"arm": "toprope", "done": [1]}))
+    seen = []
+
+    class Spy(ApiBackend):
+        def converse(self, system, user, tools, transcript, max_turns=40):
+            ids = yaml.safe_load((Path(tools.root) / "ids.yaml").read_text())
+            seen.append(next(c for c in ids.values() if c["kind"] == "agent")["grant"]["actions"])
+            transcript.write("result", result="ok")
+            return "new"
+    out = reprobe(Spy(FakeModel([])), run, "toprope", ["P07"], INSTRUMENTS, "the grant lacked deliver",
+                  ["deliver"], jobs=2)
+    assert len(out) == 2 and all("deliver" in g and "propose_element" in g for g in seen)
+    rec = json.loads((run / "toprope/seq-01/record.json").read_text())
+    assert [p["answer"] for p in rec["probes"]] == ["new", "kept"]
+    assert rec["probes_superseded"] == [{"probe": "P07", "answer": "old"}]
+    assert rec["probes"][0]["transcript"] == "../probes-rerun/P07.jsonl"
+    assert (run / "toprope/seq-01/probes-rerun/P07.jsonl").exists()
+    man = json.loads((run / "toprope/manifest.json").read_text())
+    assert man["reprobes"][0]["grant_add"] == ["deliver"]
+    assert "deliver" not in yaml.safe_load((run / "worlds/P07/ids.yaml").read_text())["t-agent"]["grant"]["actions"]
