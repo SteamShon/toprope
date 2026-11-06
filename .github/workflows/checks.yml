@@ -15,6 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.12"
@@ -23,3 +25,6 @@ jobs:
         run: uv run pytest -q
       - name: Frozen instruments unchanged (amend records every change)
         run: uv run python experiments/tools/instruments.py verify experiments/m1/instruments --run
+      - name: Self-domain logs only extend the base's (AGENTS.md, Self domains)
+        if: github.event_name == 'pull_request'
+        run: uv run python tools/logs_check.py --base "origin/${{ github.base_ref }}"

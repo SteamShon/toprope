@@ -103,6 +103,11 @@ each into `umbrella/pstack-lessons`. Each sub-PR changes only its own item below
 
 - ⬜ 5. Harness mutants: the harness must catch a seeded break in each level
 
+- ✅ 6. The self domains' logs advance on one line: `AGENTS.md` says two branches never run the
+  loop at the same time, and the `checks` workflow fails a PR whose head does not extend each of
+  the base's append-only logs (`tools/logs_check.py`; it catches #124's first, diverged run)
+  (PR)
+
 ## M0b, M2 to M5
 
 Not started. Plans: [`roadmap.md`](roadmap.md).
