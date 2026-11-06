@@ -30,7 +30,8 @@ toprope-core     Python library: declaration, compilers, Execution, harness, por
 ```
 
 Minimum deployment: `toprope-server` + PostgreSQL (SQLite for tests). Drafting and
-interviewing run in the user's own agent through the generated authoring MCP. A `Runtime`
+interviewing run in the user's own agent through the Authoring domain's generated MCP and
+command line (ADR-0037). A `Runtime`
 adapter joins only for unattended workflows (M4). Semantics: [`semantics.md`](semantics.md).
 
 ## Bounded contexts
@@ -55,8 +56,8 @@ are generated, and only the kernel stays hand-built.
 | Port | Responsibility | First adapter | Later candidates |
 |---|---|---|---|
 | `SourceReader` | read code/schema, records, transcripts, interview logs | repo + markdown + transcript readers | Slack, Notion, DB introspection |
-| `Drafter` | sources → proposed elements with source links | the user's agent (e.g. Claude Code) through the authoring MCP (ADR-0017) | Aegra workflow calling an LLM |
-| `Interviewer` | targeted questions on unknown or conflicting elements, `undecided` matrix cells and candidate invariants, asked in plain domain language: defaults first, grouped cells, prioritized, with a stop rule (ADR-0014) | the user's agent through the authoring MCP (ADR-0017) | Aegra workflow with HITL interrupts |
+| `Drafter` | sources → proposed elements with source links | the user's agent (e.g. Claude Code) through the Authoring domain's generated surfaces (ADR-0017, ADR-0037) | Aegra workflow calling an LLM |
+| `Interviewer` | targeted questions on unknown or conflicting elements, `undecided` matrix cells and candidate invariants, asked in plain domain language: defaults first, grouped cells, prioritized, with a stop rule (ADR-0014) | the user's agent through the Authoring domain's generated surfaces and the kernel's interview services (ADR-0017, ADR-0037) | Aegra workflow with HITL interrupts |
 | `DomainStore` | versioned domain models | YAML in repo | git-backed registry |
 | `EventStore` | append events (matrix, preconditions and invariants enforced at append); read streams; projections for current state (ADR-0012) | PostgreSQL in its own schema, or SQLite for tests | EventStoreDB, Kafka-backed |
 | `AgentSurface` | expose reads and actions to agents | generated MCP served by `toprope-server` (ADR-0017) | in-process (embedded), OpenAPI, LangGraph tools |
@@ -140,9 +141,14 @@ M4) are a separate stream of agent-execution records, linked to domain events by
 ## Stack (ADR-0007, ADR-0017)
 
 - Domain core: pure Python (`uv`), with no runtime imports.
-- `toprope-server`: Python (MCP + HTTP), PostgreSQL event store.
+- `toprope-server`: Python (MCP + HTTP + query tools); it can also be imported as a library.
+  `toprope-run`: the command line generated from a declaration (ADR-0036).
+- Event store: PostgreSQL in its own schema; SQLite and in-memory for tests; an append-only
+  JSONL log kept in git for the self domains.
+- Drafting and interviewing: your own agent (e.g. Claude Code) through the generated surfaces.
+- Harness exploration: Hypothesis stateful testing.
 - `toprope-shell`: TypeScript, React + CopilotKit rendering A2UI (with a fallback view spec).
-- Optional `Runtime` adapter from M4: Aegra first.
+- Optional `Runtime` adapter for unattended workflows, from M4: [Aegra](https://github.com/aegra/aegra) first, behind a port.
 
 ## Guarantee boundary
 

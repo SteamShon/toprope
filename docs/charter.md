@@ -17,22 +17,19 @@ These workflows are implicit:
 - **Not accumulated.** Decisions are made in chats and meetings. Nothing structured links
   them to their inputs, so neither agents nor the organization can learn from them.
 
+Agents make this sharper: a system's safety was half in the machine and half in people's heads,
+and an agent that replaces the person takes the second half with it. The long form, with
+examples: [`problem.md`](problem.md).
+
 ## 2. What Toprope is
 
 Toprope is a light, open **correctness layer and software factory**. It turns hidden
 workflows into a domain model that people and agents both use. From that model it
 produces working software, and it keeps the model improving while it is used.
 
-```
-Intelligence   agents (Claude Code, Codex, any MCP client) and people
-      │        perceive the world model and its allowed boundary
-      ▼
-Toprope        correctness layer: declaration, transition matrix, invariants, Execution gate,
-               harness-verified generated MCP, UI and backend
-      │        only allowed actions pass, through adapters
-      ▼
-Effects        greenfield: the backend Toprope generates · brownfield: existing servers, APIs, DBs
-```
+It sits between an intelligence layer (agents and people) and an effect layer (a generated
+backend, or existing servers, APIs and databases); only allowed actions pass. The layers and
+pieces: [`how-it-works.md`](how-it-works.md).
 
 The work between people is where this started (§1) and what ⑥ tests. It is not the
 boundary. Toprope applies to any stateful domain where people or agents act: people ↔
@@ -191,6 +188,9 @@ without a real organization, and that limit is stated wherever ⑥ is discussed.
 - **Preregister** metrics and verdict rules before results. Freeze gold sets before drafting.
 - **Count human time and money**, not only tokens.
 - **Report negative results** and the claims we can no longer make.
+- **State the evidence level** of every claim: *measured*, *observed once*, or *hypothesis*.
+- **Small, falsifiable milestones** on an evenings-and-weekends budget (~10h+/week).
+- **Reuse OSS** for everything that is not a link in the chain.
 
 ## References
 
