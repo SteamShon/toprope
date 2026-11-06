@@ -54,7 +54,9 @@ uv run toprope-author check                      # validate + model-level harnes
 - **Only a person confirms**, through one of two channels. Each confirmation is logged with
   its channel (`via`):
   - `toprope-author confirm` on the owner's terminal. It prompts, or takes `--yes` when you
-    run it yourself; without a terminal and without `--yes` it is refused.
+    run it yourself; without a terminal and without `--yes` it is refused. It records who
+    confirmed as the terminal's git identity (`user.name <user.email>`), or `--as NAME`.
+    `approve` does the same.
   - the MCP `confirm` tool, which shows the owner an elicitation prompt in their client and
     confirms only on acceptance. A client that cannot show one is refused.
 

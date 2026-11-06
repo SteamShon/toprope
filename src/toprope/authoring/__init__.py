@@ -320,10 +320,34 @@ class Workspace:
         return next((s.id for s in self.sources.values() if s.kind == "interview-log"
                      and (s.path == rel or rel.startswith(s.path.rstrip("/") + "/"))), "interview")
 
+    def identity(self) -> str | None:
+        """Who is at this terminal: the repository's git identity (`user.name <user.email>`), else
+        the login name. Recorded with confirmations and approvals made on the CLI, so the log says
+        who decided without anyone typing it."""
+        import getpass
+        import subprocess
+        def git(key: str) -> str:
+            try:
+                out = subprocess.run(["git", "-C", str(self.root), "config", key], capture_output=True,
+                                     text=True, timeout=5, check=False)
+                return out.stdout.strip()
+            except (OSError, subprocess.SubprocessError):
+                return ""
+        name, email = git("user.name"), git("user.email")
+        if name:
+            return f"{name} <{email}>" if email else name
+        try:
+            return getpass.getuser() or None
+        except Exception:  # noqa: BLE001 - no login name: record nothing rather than guess
+            return None
+
     def confirm(self, paths: list[str], via: str, who: str | None = None) -> dict[str, Any]:
-        """Mark elements confirmed. Call only with a human channel (`cli`, `elicitation`)."""
+        """Mark elements confirmed. Call only with a human channel (`cli`, `elicitation`). On the
+        CLI, `who` defaults to the terminal's git identity."""
         if via not in ("cli", "elicitation"):
             raise AuthoringError("only a person confirms, through the CLI or an MCP elicitation")
+        if who is None and via == "cli":
+            who = self.identity()
         doc = self.draft()
         for p in paths:
             segs = element_path(p)
