@@ -103,6 +103,23 @@ included, except provenance (`source`, `status`). Confirming an element changes 
 `change-check` runs the change check on a commit and records the result on it, one record
 per check plus the whole; a preview records its harness. See [`change-check.md`](change-check.md).
 
+## Evidence (ADR-0041)
+A commit may cite the evidence for its change, through the kernel's `cite_evidence` service
+or `CommitStore.cite`. Evidence is a pointer that must resolve, never prose. A claim with no
+pointer is refused. Each kind has a strength, which says how far the evidence goes:
+
+| Kind | Ref | Must resolve to | Strength |
+|---|---|---|---|
+| `interview` | a chunk of an interview-log source | a line the owner said | pointed |
+| `source` | a chunk of any other source | a line in the code or the records | pointed |
+| `check` | a check name, e.g. `change-check` | a check recorded on this commit | ran |
+| `event` | `<stream>@<version>` | an event in the deployed domain's store | observed |
+
+Citations are appended to `evidence.jsonl` next to the commit log, with who cited and when,
+and are never rewritten. `toprope-commits evidence DOMAIN COMMIT` lists them. Nothing requires
+evidence yet. The Authoring declaration can call `cite_evidence` once the owner confirms an
+action for it, and a rule such as "approve only with evidence that ran" is a later decision.
+
 ## Approval
 An approval is an immutable tag on a commit `main` points to. Tagging again is a no-op. A
 wrong approval is superseded by approving a newer commit. The kernel's `approve_commit`

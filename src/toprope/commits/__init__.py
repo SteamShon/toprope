@@ -59,6 +59,12 @@ DEFAULT_BRANCH = "work"
 MERGING = "merging.json"          # a merge in progress per branch (not shared: kept out of git)
 
 
+# What a commit may cite as evidence, and how strong each kind is: a person's words or a source
+# line point at the reason; a check record shows a run against the real declaration; an event
+# shows the behavior in use. A claim with no pointer is not evidence.
+EVIDENCE = {"interview": "pointed", "source": "pointed", "check": "ran", "event": "observed"}
+
+
 class CommitError(Exception):
     pass
 
@@ -585,6 +591,28 @@ class CommitStore:
             out[r["check"]] = r
         return out
 
+    # -- evidence (ADR-0041, Resolved 3) ----------------------------------------------------------
+    def cite(self, domain: str, commit_id: str, kind: str, ref: str, by: str = "") -> dict[str, Any]:
+        """Append one piece of evidence a commit cites. Evidence is a pointer that resolves, never
+        prose: the caller resolves interview, source and event refs; a `check` ref must name a check
+        recorded on this commit. Its strength follows from its kind (EVIDENCE). Never rewritten."""
+        if kind not in EVIDENCE:
+            raise CommitError(f"evidence kind {kind!r}: use one of {', '.join(EVIDENCE)}")
+        if not ref.strip():
+            raise CommitError("evidence needs a ref: a pointer, not prose")
+        with self._lock(domain) as dirp:
+            self.get(domain, commit_id)
+            if kind == "check" and ref not in self.check_status(domain, commit_id):
+                raise CommitError(f"no check {ref!r} recorded on {commit_id}: run it first, then cite it")
+            entry = {"commit": commit_id, "kind": kind, "ref": ref, "strength": EVIDENCE[kind],
+                     "by": by, "at": _now()}
+            self._append(dirp / "evidence.jsonl", entry)
+            return entry
+
+    def evidence(self, domain: str, commit_id: str | None = None) -> list[dict[str, Any]]:
+        rows = self._lines(self._dir(domain) / "evidence.jsonl")
+        return [r for r in rows if commit_id is None or r["commit"] == commit_id]
+
     # -- history and checkout (ADR-0032) --------------------------------------------------------
     def element_log(self, domain: str, key: str, at: str | None = None) -> list[dict[str, Any]]:
         """An element's history, like `git log -- path`: every commit reachable from `at` (default:
@@ -732,5 +760,5 @@ class CommitStore:
         return {"changed": r.changed, "added": r.added, "removed": r.removed, "to_review": r.to_review}
 
 
-__all__ = ["DEFAULT_BRANCH", "MAIN", "Commit", "CommitError", "CommitStore", "Conflict", "Merge", "MergeConflict",
+__all__ = ["DEFAULT_BRANCH", "EVIDENCE", "MAIN", "Commit", "CommitError", "CommitStore", "Conflict", "Merge", "MergeConflict",
            "content_id"]

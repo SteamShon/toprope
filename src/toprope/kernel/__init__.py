@@ -76,6 +76,11 @@ CATALOG: dict[str, Service] = {s.name: s for s in (
             {"id": "string", "seq": "integer", "content": "string", "created": "boolean", "parent": "string",
              "interface": "string", "to_review": "strings", "last_approved": "string", "domain": "string",
              "branch": "string", "author": "string"}, optional=frozenset({"evidence"})),
+    Service("cite_evidence", "Cite evidence for a commit (ADR-0041): `kind` is interview or source (a chunk "
+            "ref), check (a check recorded on the commit) or event (`<stream>@<version>` in the domain's "
+            "environment). The ref must resolve; a claim with no pointer is refused.",
+            {"domain": "string", "commit": "string", "kind": "string", "ref": "string"},
+            {"strength": "string"}),
     Service("diff", "The semantic diff between two commits: what changed directly.",
             {"domain": "string", "from": "string", "to": "string"},
             {"changed": "strings", "added": "strings", "removed": "strings", "to_review": "strings"}),

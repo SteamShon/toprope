@@ -97,7 +97,11 @@ each into `umbrella/pstack-lessons`. Each sub-PR changes only its own item below
   It is left for the researcher to review and freeze before any arm runs. Its four questions
   need answers first (#123)
 
-- ⬜ 3. Commits cite evidence, with how strong it is (ADR-0041 follow-up)
+- 🟡 3. Commits cite evidence, with how strong it is (ADR-0041 follow-up). Done: the kernel's
+  `cite_evidence` refuses a ref that does not resolve (an interview line, a source chunk, a
+  check recorded on the commit, or a stored event) and records its strength
+  (pointed, ran or observed); `toprope-commits evidence` lists it (`docs/commits.md`). Left: an
+  Authoring action that calls it, proposed through the loop for the owner to confirm (PR)
 
 - ⬜ 4. World map state charts mark where the harness found a break, and draw minimal flows
 
