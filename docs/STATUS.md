@@ -86,10 +86,16 @@ command reference are generated.
 Five changes taken from a review of the pstack agent skills (`cursor/plugins`), one sub-PR
 each into `umbrella/pstack-lessons`. Each sub-PR changes only its own item below.
 
-- ⬜ 1. Rules enforced by checks, not text: tests, frozen instruments and file references
-  checked in CI; a rule ↔ enforcer table in `AGENTS.md`
+- ✅ 1. Rules enforced by checks, not text: a `checks` workflow runs the tests and
+  `instruments.py verify --run`; a workspace source that matches no file is reported
+  (`Workspace.stale_sources`, the mistake #91 fixed); `AGENTS.md` pairs each rule with what
+  enforces it. Three rules stay text only (gold sets, real tests, model identifiers): no past
+  mistake to prove a check on (#122)
 
-- ⬜ 2. M1 Phase B run protocol (draft): blinding and run counts for the three arms
+- 🟡 2. M1 Phase B run protocol: drafted (`experiments/m1/run-protocol.md`), with blinding,
+  grading by sanitized label, 3 runs per stochastic part, and the spread with every number.
+  It is left for the researcher to review and freeze before any arm runs. Its four questions
+  need answers first (#123)
 
 - ✅ 3. Commits cite evidence, with how strong it is (ADR-0041 follow-up). The kernel's
   `cite_evidence` refuses a ref that does not resolve (an interview line, a source chunk, a
