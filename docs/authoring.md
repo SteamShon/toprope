@@ -1,5 +1,7 @@
 # Authoring: sources, drafting and the interview
 
+> Every command by workflow and step, with who runs it: [`workflow.md`](workflow.md).
+
 Link: ① ②. M0a's authoring tools (ADR-0014, ADR-0017). Your own agent (for example Claude
 Code) drafts a declaration from sources and interviews you through the authoring MCP. M1
 Phase A runs on them.
