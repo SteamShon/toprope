@@ -1,0 +1,6 @@
+summary: Confirm and approve citing evidence in Authoring (cite_evidence, record_evidence; commit_draft without free-string evidence)
+steps:
+  - run: {member: authoring, action: confirm_all_proposed, target: authoring}
+  - run: {member: authoring, action: commit_draft, target: authoring}
+  - run: {member: authoring, action: check_commit, target: 7-92bcb1c921be21bd}
+  - run: {member: authoring, action: approve_commit, target: 7-92bcb1c921be21bd}
