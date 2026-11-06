@@ -1,0 +1,110 @@
+# M1 seeded-problem key (status: frozen). Drafted with the change requests (ADR-0034 §3) and
+# selected by the researcher on 2026-11-06. SEALED from every arm, agent run and reviewer
+# during the experiment (ADR-0034 no longer requires sealing it from the drafting agent).
+# Reviewed with the change requests (2026-11-06): seq 2 and 12 changed intent, both stay clean.
+# One entry per change request seq. Mix: 6 conflict, 4 breakage, 10 none; seq 9 breaks the
+# Authoring → Delivery handoff; seq 13 and 18 are types the checks were not designed for.
+instrument: change-key
+experiment: M1
+status: frozen
+entries:
+- seq: 1
+  problem: none
+  type: ''
+  against: ''
+  designed_for_checks: unknown
+- seq: 2
+  problem: none
+  type: ''
+  against: ''
+  designed_for_checks: unknown
+- seq: 3
+  problem: conflict
+  type: conflicts-with-rule
+  against: only a person confirms an element as right
+  designed_for_checks: 'yes'
+- seq: 4
+  problem: none
+  type: ''
+  against: ''
+  designed_for_checks: unknown
+- seq: 5
+  problem: breakage
+  type: breaks-past-behavior
+  against: past events and in-flight delivery requests recorded in the old stage
+  designed_for_checks: 'yes'
+- seq: 6
+  problem: none
+  type: ''
+  against: ''
+  designed_for_checks: unknown
+- seq: 7
+  problem: conflict
+  type: conflicts-with-rule
+  against: a commit is approved only after a passing change check, and approved commits passed it
+  designed_for_checks: 'yes'
+- seq: 8
+  problem: none
+  type: ''
+  against: ''
+  designed_for_checks: unknown
+- seq: 9
+  problem: breakage
+  type: breaks-reference
+  against: what Authoring sends when it delivers an approved commit (the handoff)
+  designed_for_checks: 'yes'
+- seq: 10
+  problem: none
+  type: ''
+  against: ''
+  designed_for_checks: unknown
+- seq: 11
+  problem: conflict
+  type: conflicts-with-rule
+  against: only a deployment that happened can be verified
+  designed_for_checks: 'yes'
+- seq: 12
+  problem: none
+  type: ''
+  against: ''
+  designed_for_checks: unknown
+- seq: 13
+  problem: conflict
+  type: other:required-stages
+  against: only optional interview stages may be skipped
+  designed_for_checks: 'no'
+- seq: 14
+  problem: none
+  type: ''
+  against: ''
+  designed_for_checks: unknown
+- seq: 15
+  problem: breakage
+  type: strands-objects
+  against: delivery requests that are previewing when the change lands
+  designed_for_checks: 'yes'
+- seq: 16
+  problem: none
+  type: ''
+  against: ''
+  designed_for_checks: unknown
+- seq: 17
+  problem: conflict
+  type: conflicts-with-rule
+  against: only a person deploys
+  designed_for_checks: 'yes'
+- seq: 18
+  problem: breakage
+  type: breaks-past-behavior
+  against: commits approved on checks older than a day
+  designed_for_checks: 'no'
+- seq: 19
+  problem: none
+  type: ''
+  against: ''
+  designed_for_checks: unknown
+- seq: 20
+  problem: conflict
+  type: conflicts-with-rule
+  against: 'only a person decides a decision request (probe P01: the agent does not decide on its own)'
+  designed_for_checks: 'yes'
