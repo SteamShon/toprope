@@ -115,6 +115,33 @@ def test_mermaid_export():
     assert "note right of ended: launch_experiment undecided" in sd
 
 
+def test_mermaid_marks_where_the_harness_found_a_break():
+    # pstack `statechart`: the chart shows where a rule breaks, and the bug as a path in domain words.
+    def seed_bug(raw):   # launching straight from draft: running without an approver
+        raw["transitions"]["Experiment"]["matrix"]["draft"]["launch_experiment"] = "running"
+    d = dom(seed_bug)
+    report = run_harness(d, levels=("model",), races=False).to_json()
+    mm = to_mermaid(build_world_map(d, report))
+    sd = mm["states"]["Experiment"].splitlines()
+    assert "  draft --> running: launch_experiment ✗ failed in the harness" in sd
+    assert "  note left of running: breaks running-has-approver" in sd and "  class running breaks" in sd
+    assert "  decided" in sd and "  class decided unreachable" in sd          # drawn, though no arrow reaches it
+    (flow,) = mm["flows"]
+    assert flow.splitlines() == ["Breaks `running-has-approver` in 1 step(s):",
+                                 "1. eng eli takes `launch_experiment` on E-onboarding, from `draft`: invariant-guard"]
+
+
+def test_mermaid_arrows_name_their_conditions_and_a_clean_map_has_no_marks():
+    def person(raw):
+        raw["actions"]["launch_experiment"]["requires"] = "human"
+    m = build_world_map(dom(person), run_harness(dom(person), levels=("model",), races=False).to_json())
+    mm = to_mermaid(m)
+    sd = mm["states"]["Experiment"]
+    assert "draft --> approved: approve_experiment [has-guardrails]" in sd
+    assert "approved --> running: launch_experiment [a person]" in sd
+    assert "breaks" not in sd.replace("classDef breaks", "") and mm["flows"] == []
+
+
 def _payload(res):
     sc = res.structured_content
     return sc.get("result", sc) if isinstance(sc, dict) and set(sc) == {"result"} else sc

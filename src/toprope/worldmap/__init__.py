@@ -139,7 +139,8 @@ def build_world_map(d: Domain, harness: dict[str, Any] | None = None) -> dict[st
             "behavior": {"states": states, "roles": roles, "system_actors": reserved, "edges": edges},
             "handoffs": [{"handoff": n, "when": h.when.action, "to": h.to.model_dump()}
                          for n, h in sorted(d.handoffs.items())],
-            "unreachable": unreachable}
+            "unreachable": unreachable,
+            "minimal_flows": (harness or {}).get("minimal_flows") or []}
 
 
 # -- path questions --------------------------------------------------------------------------
@@ -192,13 +193,45 @@ def how_to_reach(world_map: dict[str, Any], obj: str, from_state: str | None, ta
 
 
 # -- docs view -------------------------------------------------------------------------------
+CLASSES = ("  classDef breaks fill:#fde2e2,stroke:#c0392b,stroke-width:2px",
+           "  classDef mayBreak stroke:#c0392b,stroke-width:2px,stroke-dasharray:4 3",
+           "  classDef unreachable fill:#eeeeee,color:#888888,stroke-dasharray:2 2")
+
+
+def _label(e: dict[str, Any], role: str | None) -> str:
+    """The arrow's words: the action and who, then its conditions in brackets."""
+    label = e["action"] + (f" ({role})" if role else "")
+    when = [p["id"] for p in e["unlock"]["preconditions"]] + (["a person"] if e["unlock"]["requires_human"] else [])
+    if when:
+        label += f" [{', '.join(when)}]"
+    if e["harness"] == "failed":
+        label += " ✗ failed in the harness"
+    return label
+
+
+def _breaks(world_map: dict[str, Any]) -> dict[tuple[str, str], list[str]]:
+    """(object, state) → the invariants a minimal flow breaks by stepping into it."""
+    out: dict[tuple[str, str], list[str]] = {}
+    for mf in world_map.get("minimal_flows") or []:
+        last = mf["steps"][-1]
+        for e in world_map["behavior"]["edges"]:
+            if e["action"] == last["action"] and e["from"] == last["from"]:
+                for _, to in _targets(e["outcome"]):
+                    out.setdefault((e["object"], to), []).append(mf["invariant"])
+    return out
+
+
 def to_mermaid(world_map: dict[str, Any]) -> dict[str, Any]:
-    """A flowchart of the structure layer and a state diagram per stateful object."""
+    """A flowchart of the structure layer, a state diagram per stateful object, and each minimal
+    flow the harness found, told step by step. With harness results, a state diagram marks a
+    state a minimal flow breaks an invariant in (`breaks`, with a note naming it), a state a
+    failed edge leads to (`mayBreak`), and a state no example reaches (`unreachable`)."""
     lines = ["flowchart LR"]
     for n in world_map["structure"]["nodes"]:
         lines.append(f"  {n['id']}[{n['id']}]")
     for e in world_map["structure"]["edges"]:
         lines.append(f"  {e['from']} -->|{e['id']}| {e['to']}")
+    breaks = _breaks(world_map)
     diagrams = {}
     by_obj: dict[str, list] = {}
     for e in world_map["behavior"]["edges"]:
@@ -208,16 +241,40 @@ def to_mermaid(world_map: dict[str, Any]) -> dict[str, Any]:
         initial = next((s["state"] for s in world_map["behavior"]["states"] if s["object"] == obj and s["initial"]), None)
         if initial:
             sd.append(f"  [*] --> {initial}")
+        # Every state, so a state with no arrow (one no example reaches) is drawn and can be marked.
+        sd += [f"  {s['state']}" for s in world_map["behavior"]["states"] if s["object"] == obj]
+        marks: dict[str, str] = {}
         for e in es:
             if e["from"] == NEW:
                 continue
             for role, to in _targets(e["outcome"]):
-                label = e["action"] + (f" ({role})" if role else "")
-                sd.append(f"  {e['from']} --> {to}: {label}")
+                sd.append(f"  {e['from']} --> {to}: {_label(e, role)}")
+                if e["harness"] == "failed":
+                    marks.setdefault(to, "mayBreak")
             if e["fog"]:
                 sd.append(f"  note right of {e['from']}: {e['action']} undecided")
+        for (o, state), invs in sorted(breaks.items()):
+            if o == obj:
+                marks[state] = "breaks"
+                sd.append(f"  note left of {state}: breaks {', '.join(sorted(set(invs)))}")
+        for state in (world_map.get("unreachable") or {}).get(obj, []):
+            marks.setdefault(state, "unreachable")
+        if marks:
+            sd += [c for c in CLASSES if c.split()[1] in marks.values()]
+            sd += [f"  class {state} {cls}" for state, cls in sorted(marks.items())]
         diagrams[obj] = "\n".join(sd)
-    return {"structure": "\n".join(lines), "states": diagrams}
+    return {"structure": "\n".join(lines), "states": diagrams,
+            "flows": [_flow_text(mf) for mf in world_map.get("minimal_flows") or []]}
+
+
+def _flow_text(mf: dict[str, Any]) -> str:
+    """A minimal flow as the shortest path to the broken rule, one numbered step per action."""
+    out = [f"Breaks `{mf['invariant']}` in {len(mf['steps'])} step(s):"]
+    for k, st in enumerate(mf["steps"], 1):
+        how = f" (reached by {', then '.join(st['path'])})" if st.get("path") else ""
+        out.append(f"{k}. {st['actor']} takes `{st['action']}` on {st['target']}, from `{st['from']}`{how}: "
+                   f"{st['outcome']}")
+    return "\n".join(out)
 
 
 __all__ = ["FORMAT", "NEW", "build_world_map", "how_to_reach", "to_mermaid"]

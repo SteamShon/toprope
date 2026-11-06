@@ -93,7 +93,10 @@ each into `umbrella/pstack-lessons`. Each sub-PR changes only its own item below
 
 - ⬜ 3. Commits cite evidence, with how strong it is (ADR-0041 follow-up)
 
-- ⬜ 4. World map state charts mark where the harness found a break, and draw minimal flows
+- ✅ 4. World map state charts show where the harness found a break: failed arrows, `breaks`,
+  `mayBreak` and `unreachable` states, arrow conditions in brackets, and each minimal flow told
+  step by step (`minimal-flows.md`; `docs/world-map.md`). A TLA+ export checked by TLC, as a
+  second oracle beside bounded exploration, would need an ADR; not proposed yet (PR)
 
 - ⬜ 5. Harness mutants: the harness must catch a seeded break in each level
 

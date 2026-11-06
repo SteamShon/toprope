@@ -26,7 +26,8 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--harness-report", help="use an existing harness report JSON instead (with "
                                              "--composition: the member → report map that "
                                              "`toprope-harness --composition --json` writes)")
-    ap.add_argument("--mermaid", help="also write structure.mmd and <Object>.states.mmd here")
+    ap.add_argument("--mermaid", help="also write structure.mmd, <Object>.states.mmd and, when the harness "
+                                         "found any, minimal-flows.md here")
     ap.add_argument("--guide", help="also write the domain guide (Markdown) to this path")
     return ap
 
@@ -90,6 +91,8 @@ def _write_mermaid(out: Path, wmap: dict) -> None:
     (out / "structure.mmd").write_text(mm["structure"] + "\n")
     for obj, text in mm["states"].items():
         (out / f"{obj}.states.mmd").write_text(text + "\n")
+    if mm["flows"]:
+        (out / "minimal-flows.md").write_text("# Minimal flows the harness found\n\n" + "\n\n".join(mm["flows"]) + "\n")
 
 
 if __name__ == "__main__":
