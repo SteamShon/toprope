@@ -30,3 +30,12 @@
 {"at": "2026-11-06T03:57:47+00:00", "base": "3-8d96520f5a0bd33b", "check": "in_flight", "commit": "4-b0c8834e25d9bbc7", "ok": null, "run": "1afe188ad010", "summary": "skipped: no event store (nothing deployed)"}
 {"at": "2026-11-06T03:57:47+00:00", "base": "3-8d96520f5a0bd33b", "check": "nl", "commit": "4-b0c8834e25d9bbc7", "ok": null, "run": "1afe188ad010", "summary": "skipped: no natural-language checker configured"}
 {"at": "2026-11-06T03:57:47+00:00", "base": "3-8d96520f5a0bd33b", "check": "change-check", "commit": "4-b0c8834e25d9bbc7", "ok": true, "run": "1afe188ad010", "summary": "passes; 0 error(s), 0 warning(s)"}
+{"at": "2026-11-06T17:57:15+00:00", "base": "4-b0c8834e25d9bbc7", "check": "structural", "commit": "5-c8fd1b8fc98be17c", "ok": true, "run": "8d244fc5531d", "summary": "0 error(s), 0 warning(s)"}
+{"at": "2026-11-06T17:57:15+00:00", "base": "4-b0c8834e25d9bbc7", "check": "semantic", "commit": "5-c8fd1b8fc98be17c", "ok": true, "run": "8d244fc5531d", "summary": "0 error(s), 0 warning(s)"}
+{"at": "2026-11-06T17:57:15+00:00", "base": "4-b0c8834e25d9bbc7", "check": "scenarios", "commit": "5-c8fd1b8fc98be17c", "ok": true, "run": "8d244fc5531d", "summary": "0 error(s), 0 warning(s); 4/4 scenarios pass"}
+{"at": "2026-11-06T17:57:15+00:00", "base": "4-b0c8834e25d9bbc7", "check": "harness", "commit": "5-c8fd1b8fc98be17c", "ok": true, "run": "8d244fc5531d", "summary": "0 error(s), 0 warning(s); 167 tests: 167 run, 0 from cache, 0.456 s"}
+{"at": "2026-11-06T17:57:15+00:00", "base": "4-b0c8834e25d9bbc7", "check": "log_replay", "commit": "5-c8fd1b8fc98be17c", "ok": null, "run": "8d244fc5531d", "summary": "skipped: no event store (nothing deployed)"}
+{"at": "2026-11-06T17:57:15+00:00", "base": "4-b0c8834e25d9bbc7", "check": "in_flight", "commit": "5-c8fd1b8fc98be17c", "ok": null, "run": "8d244fc5531d", "summary": "skipped: no event store (nothing deployed)"}
+{"at": "2026-11-06T17:57:15+00:00", "base": "4-b0c8834e25d9bbc7", "check": "nl", "commit": "5-c8fd1b8fc98be17c", "ok": null, "run": "8d244fc5531d", "summary": "skipped: no natural-language checker configured"}
+{"at": "2026-11-06T17:57:15+00:00", "base": "4-b0c8834e25d9bbc7", "check": "change-check", "commit": "5-c8fd1b8fc98be17c", "ok": true, "run": "8d244fc5531d", "summary": "passes; 0 error(s), 0 warning(s)"}
+{"at": "2026-11-06T17:57:15+00:00", "base": "4-b0c8834e25d9bbc7", "check": "confirmed", "commit": "5-c8fd1b8fc98be17c", "ok": true, "run": "8d244fc5531d", "summary": "0 proposed element(s)"}
