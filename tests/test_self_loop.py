@@ -76,6 +76,8 @@ def test_the_whole_loop_runs_on_the_generated_command_line(tmp_path):
     files = subprocess.run(["git", "ls-files", "-z"], cwd=ROOT, capture_output=True, check=True).stdout.split(b"\0")
     for f in filter(None, files):
         src, dst = ROOT / f.decode(), tmp_path / f.decode()
+        if "/events/" in f.decode():
+            continue                   # start from empty logs: the repository's own drafts are open
         if src.is_file():
             dst.parent.mkdir(parents=True, exist_ok=True)
             dst.write_bytes(src.read_bytes())
