@@ -1,7 +1,10 @@
 # ADR-0040: How M1 Phase B runs
 
 - Link: ① iterate safely, ⑥ org productivity (pilot, ADR-0034) · Status: accepted ·
-  2026-11-06 · decided by: SteamShon (D1–D4 "as recommended"; drafted by the assistant)
+  2026-11-06 · decided by: SteamShon (D1–D4 "as recommended"; drafted by the assistant).
+  Amended the same day by SteamShon: §1 and §2 run on the researcher's own Claude Code, on
+  their machine, instead of the model API in GitHub Actions (no API key; the CI setup cost more
+  than the run)
 - Refines: [`M1-self-compile.md`](../experiments/M1-self-compile.md) Phase B; ADR-0034
 
 ## Context
@@ -17,18 +20,38 @@ would not be blind. A coding-agent subagent is no better, because it can read th
 and the key is in git.
 
 ## Decision
-1. **A harness runs the arms through the model API.** Each agent role (editor, reviewer,
-   probe, grader) is a fresh API conversation. Its context holds only:
-   - a fixed, generic prompt for its role,
+1. **A harness runs every role as a fresh conversation** on the researcher's own Claude Code
+   (`claude -p`, their subscription). The roles are editor, reviewer, probe and grader. Each
+   conversation's context holds only:
+   - a fixed, generic prompt for its role, as the whole system prompt,
    - its arm's materials,
    - the tools the harness defines.
 
+   How the harness keeps each conversation blind:
+   - **No built-in tools.** Claude Code's own tools are off: no file reads, no shell.
+   - **Only the harness's tools.** They are served over MCP and confined to the arm's
+     workspace, and the conversation loads no other MCP server.
+   - **No project files.** It runs in an empty directory outside the repository, so no
+     project CLAUDE.md or project settings load.
+   - **No user memory.** The run refuses to start when `~/.claude/CLAUDE.md` exists, unless
+     the researcher allows it; the run then records its hash.
+   - **Checked at the start.** The conversation's init event must list only the harness's
+     tools, or the run stops.
+
    No role gets the repository, `change-key.yaml`, `binding.yaml`, the option drafts or the
-   working notes. The harness records every conversation, its token use and cost.
-2. **It runs in GitHub Actions, after the researcher approves.** It does not run in an
-   assistant session. The workflow waits on the `researcher` environment (ADR-0039), as human
-   requests do. The API key is a repository secret, and the run stops at a cost cap the
-   researcher sets.
+   working notes. The harness records every conversation and its token use. The model API is
+   kept as an alternative backend, for a run with an API key.
+2. **The researcher runs it on their own machine, in an ordinary terminal.** It does not run in
+   an assistant session, which can read the repository, and starting it is the researcher's
+   approval. The run is bounded by the subscription's usage limits rather than a dollar cap:
+   - **Stopping is safe.** Reaching the limit, or Ctrl-C, stops it and keeps every finished
+     change.
+   - **Resuming is the same command.** It continues where the run stopped, and refuses to
+     resume with another model, other materials, instruments or prompts.
+   - **The run is visible.** A progress line shows the arm, the change, the role and the turn,
+     and every conversation is written as it happens.
+   - **The results come back as a PR.** The researcher commits the run directory in their own
+     PR.
 3. **The arms start from the same approved models**, `authoring@4-b0c8834e25d9bbc7` and
    `delivery@1-584aaeea5e686ee8`:
    - **NL arm:** a SKILL.md with examples, rendered from the declarations by a fresh agent
@@ -72,9 +95,9 @@ and the key is in git.
 
 ## Consequences
 - The researcher's part:
-  - adding the API key and the cost cap,
   - reviewing the three arms' materials,
-  - approving the dry run and the full run,
+  - running the dry run, then the full run, from their terminal,
+  - committing the results,
   - confirming the scoring.
 
   Nothing else waits on them.
@@ -82,5 +105,6 @@ and the key is in git.
   (`instruments.py verify --run` runs first), the prompts, the model and the harness commit.
 - The stand-in means M1 does not test the researcher's own approval habits; M2 does, with an
   expert who is not the builder.
-- The cost is about 480 probe conversations plus 60 edits and 40 reviews. The dry run turns
-  that into a number before anything large is spent.
+- The run is about 480 probe conversations plus 60 edits and 40 reviews. The dry run shows how
+  much of the usage limit one change takes, so the full run can be planned across limit windows.
+  The same usage limit covers the researcher's other use of Claude.
