@@ -109,6 +109,13 @@ it; each release's cleanup PR handles items older than one release.
   differently (the identity file's name vs git `user.name`); only the workspace API's
   `confirm(via="cli")` still uses the latter (#85, 2026-11-06)
 - The mechanical layer computes `unreachable_from_creation` twice per run (#71, 2026-11-05)
+- `merge_main` writes the working copy and records the merge in progress in two steps; a
+  commit from another process between them gets one parent, and the next commit a stale
+  second one (#89, 2026-11-06)
+- The kernel reference generator reads private `argparse` attributes (`_actions`,
+  `_SubParsersAction`); a Python release that renames them breaks it (#89, 2026-11-06)
+- `Workspace.confirm` and `approve_commit` still name the removed channels (`cli`,
+  `elicitation`) (#89, 2026-11-06)
 
 ## Open questions
 

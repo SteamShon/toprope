@@ -388,6 +388,26 @@ def test_branches_merge_and_approve_and_the_read_command(tmp_path):
     assert out.returncode == 0 and json.loads(out.stdout) == {"feat": c1["commit"], "main": c1["commit"]}
     assert ws.merge_main("feat")["up_to_date"] is True
     unknown = commits_cli(tmp_path, "checks", "example", "9-nope")
-    assert unknown.returncode == 0 and json.loads(unknown.stdout) == {}
+    assert unknown.returncode == 1 and "no commit" in unknown.stderr
+    typo = commits_cli(tmp_path, "branches", "exampel")
+    assert typo.returncode == 1 and "no commits for domain 'exampel'" in typo.stderr
     bad = commits_cli(tmp_path, "diff", "example", "1-a", "2-b", "3-c")
     assert bad.returncode == 1 and "diff takes [FROM] TO" in bad.stderr
+
+
+def test_a_checkout_abandons_a_merge_in_progress(tmp_path):
+    raw = schema_doc_domain()
+    ws = workspace(tmp_path, raw)
+    ws.approve_commit(ws.commit()["commit"], via="cli", who="ana")
+    other = copy.deepcopy(raw)
+    other["glossary"]["o"] = "O."
+    land_on_main(ws, tmp_path, other)
+    raw["glossary"]["mine"] = "M."
+    write(tmp_path / "d.domain.yaml", raw)
+    head = ws.commit()["commit"]
+    assert ws.merge_main()["up_to_date"] is False and ws.commits.pending_merge("example")
+    ws.checkout(head, force=True)                                  # back to the branch, merge abandoned
+    assert ws.commits.pending_merge("example") is None
+    raw["glossary"]["later"] = "L."
+    write(tmp_path / "d.domain.yaml", raw)
+    assert len(ws.commits.get("example", ws.commit()["commit"]).parents) == 1

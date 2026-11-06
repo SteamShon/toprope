@@ -60,7 +60,11 @@ $R --member delivery verify authoring:<id>:local --verified true
 - **Your agent's tools** are the generated MCP server:
   `claude mcp add toprope-authoring -- uv run --directory <repo> toprope-server --composition
   domains/toprope-self.composition.yaml --member authoring --kernel-root . --workspace
-  toprope.authoring.workspace.yaml --identity static:<tokens file>`.
+  toprope.authoring.workspace.yaml --identity static:<tokens file>`, with `TOPROPE_TOKEN` set
+  in its environment. The tokens file maps a token to the agent and the person it works for,
+  as `toprope.identity.yaml` does by email: `t-claude: {id: claude, kind: agent, roles: [owner],
+  on_behalf_of: {id: "you <you@example.com>", roles: [owner]}, grant: {id: drafting, actions:
+  [...]}}`. Keep it out of git.
 - **Read the history** with `toprope-commits`: `branches`, `log` (an element's history),
   `diff`, `checks`, and `deployed` (what an environment runs).
 - **A new domain** gets a workspace file (`toprope.<domain>.workspace.yaml`: the declaration

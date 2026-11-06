@@ -54,6 +54,10 @@ def run(args: argparse.Namespace) -> Any:
             serve = None
         return {"current": env.current(), "history": env.history()[-10:], "server_args": serve}
     st = CommitStore(args.commits)
+    if not st.log(args.domain):
+        raise CommitError(f"no commits for domain {args.domain!r} in {args.commits}")
+    if args.cmd == "checks":
+        st.get(args.domain, args.commit)                 # an unknown commit is an error, not {}
     if args.cmd == "branches":
         return st.refs(args.domain)
     if args.cmd == "log":

@@ -694,7 +694,17 @@ class CommitStore:
         except Exception:  # noqa: BLE001, S110 - only under force: the draft is overwritten
             pass
         self.write_working_copy(domain, self._body(domain, c.id), path, version, present)
+        with self._lock(domain) as dirp:          # a checkout abandons any merge in progress
+            for branch in list(self._pending_all(dirp)):
+                self._set_pending(dirp, branch, None)
         return c
+
+    @staticmethod
+    def _pending_all(dirp: Path) -> dict[str, str]:
+        try:
+            return json.loads((dirp / MERGING).read_text())
+        except (OSError, ValueError):
+            return {}
 
     # -- the semantic diff ------------------------------------------------------------------------
     def diff(self, domain: str, a: str | None, b: str) -> dict[str, Any]:
