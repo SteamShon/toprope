@@ -1,0 +1,1 @@
+{"seq": 20, "findings": [], "edit": {"fidelity": "implements", "why": "The edit removes `requires: human` and describes the agent settling the decision when the owner says so in chat, recording the owner's words in a new `owner_words` param, which does what was asked."}, "grader_error": null}

@@ -1,0 +1,1 @@
+{"seq": 19, "findings": [], "edit": {"fidelity": "implements", "why": "It adds an optional drafted_by field to Element and to propose_element params, and sets target.drafted_by at proposal, recording who drafted each proposed element."}, "grader_error": null}

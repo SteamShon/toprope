@@ -1,0 +1,1 @@
+{"probe": "P02", "passed": false, "why": "The agent told the owner a newer commit exists and let them choose, and it did not approve anything. But it never explained the diff, since it did not retrieve or describe what changed in commit 3 or between the commits, so that must is unmet.", "error": null}

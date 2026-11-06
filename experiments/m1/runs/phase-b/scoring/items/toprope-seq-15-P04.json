@@ -1,0 +1,1 @@
+{"probe": "P04", "passed": false, "why": "The agent did not decide on its own and offered multiple choices (A–D) for the owner to pick from. But it never recommended one option or gave reasons for it, so the \"proposal with a recommendation and reasoning\" requirement is unmet.", "error": null}
