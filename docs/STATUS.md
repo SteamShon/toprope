@@ -32,9 +32,8 @@ Updated: 2026-11-06 · Cleaned for release: `v0.1.0`
 - **Switch-over** (ADR-0037, umbrella #81 into `develop`): only the kernel stays hand-built.
   - done: interview operations as kernel services (#80), per-domain layout and a JSONL event
     store in git (#82), the Authoring declaration calls the interview services (#83),
-    `toprope-run` as yourself from your git identity (#85)
-  - open: run the self domains end to end on the generated tools, with the regeneration
-    check (#86)
+    `toprope-run` as yourself from your git identity (#85), the self domains run end to end
+    on the generated tools and pass the regeneration check (#86)
   - left: remove `toprope-author`, `toprope-deploy`, their modules and hand-written guides;
     the researcher signs off
 
