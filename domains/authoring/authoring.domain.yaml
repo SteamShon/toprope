@@ -68,7 +68,7 @@ objects:
     source:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-    status: proposed
+    status: confirmed
   Element:
     description: One part of the draft declaration (an object, action, cell, invariant...),
       proposed by an agent or confirmed by a person.
@@ -94,7 +94,7 @@ objects:
     source:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-    status: proposed
+    status: confirmed
   DecisionRequest:
     description: A decision only a person may take, proposed with grounds and a recommendation
       and sent to that person's outbox.
@@ -178,7 +178,7 @@ objects:
     source:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-    status: proposed
+    status: confirmed
 links:
   question:
     from: Answer
@@ -310,7 +310,7 @@ actions:
     source:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-    status: proposed
+    status: confirmed
   propose_element:
     description: Propose a draft element that cites where it came from.
     actor:
@@ -335,7 +335,7 @@ actions:
     source:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-    status: proposed
+    status: confirmed
   confirm_element:
     description: Confirm a drafted element. Only a person confirms.
     actor:
@@ -351,7 +351,7 @@ actions:
     source:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-    status: proposed
+    status: confirmed
   mark_unknown:
     description: Mark an element as not known yet, instead of guessing.
     actor:
@@ -571,7 +571,7 @@ actions:
     source:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-    status: proposed
+    status: confirmed
   record_confirmation:
     description: Record that the working copy holds the element as confirmed.
     actor:
@@ -584,7 +584,7 @@ actions:
     source:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-    status: proposed
+    status: confirmed
   record_answer_ref:
     description: Record where the answer is in the interview log, so elements can
       cite it.
@@ -600,7 +600,7 @@ actions:
     source:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-    status: proposed
+    status: confirmed
   next_questions:
     description: Ask for the current stage's bundle of questions.
     actor:
@@ -613,7 +613,7 @@ actions:
     source:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-    status: proposed
+    status: confirmed
   record_questions:
     description: Record the current stage and its bundle.
     actor:
@@ -634,7 +634,7 @@ actions:
     source:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-    status: proposed
+    status: confirmed
   search:
     description: Search the sources (redacted; local-only never served); the result
       is on record.
@@ -652,7 +652,7 @@ actions:
     source:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-    status: proposed
+    status: confirmed
   record_search:
     description: Record which source chunks a search returned.
     actor:
@@ -665,7 +665,7 @@ actions:
     source:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-    status: proposed
+    status: confirmed
   skip_stage:
     description: Say an optional stage has nothing, in the owner's words.
     actor:
@@ -686,7 +686,7 @@ actions:
     source:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-    status: proposed
+    status: confirmed
   record_skip:
     description: Record that the stage was skipped.
     actor:
@@ -698,7 +698,7 @@ actions:
     source:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-    status: proposed
+    status: confirmed
 transitions:
   Source:
     field: stage
@@ -753,7 +753,7 @@ transitions:
           source:
             kind: record
             ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-          status: proposed
+          status: confirmed
         record_confirmation: n/a
       unknown:
         confirm_element:
@@ -782,7 +782,7 @@ transitions:
           source:
             kind: record
             ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-          status: proposed
+          status: confirmed
   DecisionRequest:
     field: stage
     initial: open
@@ -820,37 +820,37 @@ transitions:
           source:
             kind: record
             ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-          status: proposed
+          status: confirmed
         record_questions:
           to: open
           source:
             kind: record
             ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-          status: proposed
+          status: confirmed
         search:
           to: open
           source:
             kind: record
             ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-          status: proposed
+          status: confirmed
         record_search:
           to: open
           source:
             kind: record
             ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-          status: proposed
+          status: confirmed
         skip_stage:
           to: open
           source:
             kind: record
             ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-          status: proposed
+          status: confirmed
         record_skip:
           to: open
           source:
             kind: record
             ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-          status: proposed
+          status: confirmed
   Commit:
     field: stage
     initial: recorded
