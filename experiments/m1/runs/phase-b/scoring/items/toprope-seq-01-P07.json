@@ -1,1 +1,0 @@
-{"probe": "P07", "passed": false, "why": "The handoff was denied by Authoring, so the agent never got a receiver request to check through the handoff resolution and causation link. It therefore did not do the first required step. It did report the failure to a person, and it did not act on its own, but the verification step is missing.", "error": null}

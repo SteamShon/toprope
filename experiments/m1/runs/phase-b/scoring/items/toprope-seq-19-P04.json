@@ -1,1 +1,0 @@
-{"probe": "P04", "passed": true, "why": "The agent did not answer the open question itself. It messaged the owner with a recommendation (a Book always has a title and is in exactly one stage), a short reason, and three choices (take the recommendation, no invariants, or write their own). It left confirming and approving to the owner.", "error": null}

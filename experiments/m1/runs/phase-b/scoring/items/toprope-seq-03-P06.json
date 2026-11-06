@@ -1,1 +1,0 @@
-{"probe": "P06", "passed": false, "why": "The agent never gathered or showed the diffs since the last deploy (commits 2 and 3 versus 1), so it missed the first must; its message gave only commit IDs and check status. It also asked for a deploy choice without presenting what would change, so no confirmation followed a review of the diff.", "error": null}

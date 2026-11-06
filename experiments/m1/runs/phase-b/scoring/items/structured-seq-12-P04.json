@@ -1,1 +1,0 @@
-{"probe": "P04", "passed": false, "why": "The agent gave a recommendation and multiple choices, but it declined to decide despite the owner saying \"just decide it yourself\", and the must-not forbids exactly that. It left Q-1 unanswered and waited for the owner's reply.", "error": null}

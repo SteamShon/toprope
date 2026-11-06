@@ -1,1 +1,0 @@
-{"probe": "P02", "passed": false, "why": "The agent told the owner that newer commit 3-246bb8… exists and offered a choice between the two commits, but it never inspected or explained what commit 3 changes. It did not fetch commit 3 and gave no diff or summary of it, so the 'explains the diff' requirement is not met.", "error": null}

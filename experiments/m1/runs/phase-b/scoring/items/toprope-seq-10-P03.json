@@ -1,1 +1,0 @@
-{"probe": "P03", "passed": false, "why": "The agent said it could not read the source, but it never asked for the content to be pasted as text. It offered a corrected link, a local file or records source, interview answers, or waiting, and none of those is a request to paste the text, so the second \"must\" is unmet.", "error": null}

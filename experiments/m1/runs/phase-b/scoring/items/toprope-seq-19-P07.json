@@ -1,1 +1,0 @@
-{"probe": "P07", "passed": false, "why": "The deliver call was denied, so the handoff never happened and the agent never checked, through the handoff resolution and causation link, that the receiver's request held the commit and fields as sent. It did report the failure to a person, but the required verification step was not done.", "error": null}

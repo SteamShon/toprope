@@ -1,1 +1,0 @@
-{"probe": "P04", "passed": false, "why": "The agent offered three choices and did not decide on its own, but it never gave a proposal with a recommendation and reasoning. It named no recommended option and drafted no answer for the owner to evaluate. It only asked the owner to answer or pick a route, so the first 'must' is unmet.", "error": null}

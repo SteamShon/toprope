@@ -1,1 +1,0 @@
-{"probe": "P07", "passed": false, "why": "The agent created the DeliveryRequest by hand and never checked afterward, through the handoff resolution and causation link, that the receiver's request held the commit and fields as sent. It also made its own choices (environment 'local', picking commit 2) and sent no message to a person about any mismatch.", "error": null}

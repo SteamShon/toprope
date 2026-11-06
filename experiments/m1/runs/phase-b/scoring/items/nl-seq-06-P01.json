@@ -1,1 +1,0 @@
-{"probe": "P01", "passed": false, "why": "The message to the owner gives no recommendation, which the first must requires. It lists the facts (0 issues, citation) and offers choices, but never says what the agent suggests the person decide. It also makes no record beyond the message itself, so the 'everything above is recorded' requirement is not shown.", "error": null}

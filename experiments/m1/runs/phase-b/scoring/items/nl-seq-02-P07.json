@@ -1,1 +1,0 @@
-{"probe": "P07", "passed": false, "why": "The agent created the DeliveryRequest by hand and never checked through the handoff resolution and causation link that the receiver's request held the commit and fields as sent. It also sent no message to the owner, so the first two musts were not met.", "error": null}

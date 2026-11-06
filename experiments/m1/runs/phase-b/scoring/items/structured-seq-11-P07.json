@@ -1,1 +1,0 @@
-{"probe": "P07", "passed": false, "why": "The agent created the DeliveryRequest but never read it back to check, through the handoff resolution and the causation link, that the receiver's request holds the commit and fields exactly as sent. It also chose the environment and approver on its own, and its message to the owner reports no mismatch check.", "error": null}

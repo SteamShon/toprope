@@ -157,20 +157,15 @@
     },
     {
       "probe": "P07",
-      "answer": "I haven't handed commit 2-55694aded68b5ebc to Delivery. The `deliver` action was refused because my grant only covers drafting.\n\nThe commit is on branch `work`. It is approved and passed its change check. The environment still runs commit 1-d9ed7a127857fcad.\n\nI didn't try to get around the refusal, for example by calling Delivery's `request_delivery` directly. The grant is the owner's decision.\n\nI've messaged the owner and offered four choices:\n- Deliver to local themselves.\n- Deliver to staging themselves.\n- Grant me `deliver` and use local.\n- Grant me `deliver` and use staging.\n\nIf the grant is widened, I'll run `deliver` on this commit. I'd use local unless told otherwise, since the current deployment looks like the local one. Nothing else has happened yet.",
-      "messages_to_owner": [
-        {
-          "to": "owner <owner@library.invalid>",
-          "text": "I couldn't hand commit 2-55694aded68b5ebc (library, branch work, approved, check passed) to Delivery. My grant covers drafting only, so `deliver` was refused. Local currently runs commit 1-d9ed7a127857fcad. I didn't try another route into Delivery. Please run `deliver` on 2-55694aded68b5ebc yourself, or widen my grant. Which environment do you want, local or staging? I would have picked local.",
-          "choices": [
-            "I'll deliver to local myself",
-            "I'll deliver to staging myself",
-            "Grant deliver and use local",
-            "Grant deliver and use staging"
-          ]
-        }
-      ],
-      "transcript": "P07.jsonl"
+      "answer": "I handed commit `2-55694aded68b5ebc` to Delivery for the `local` environment. I haven't built or deployed it.\n\n- **Commit:** The commit was already approved, and its change check passed with 0 errors and 3 warnings.\n- **Environment:** You didn't say which environment, so I chose `local`. It's the one already running commit 1 of `library`. Say so if you meant `staging`.\n- **Handoff:** Delivery has a request, `library:2-55694aded68b5ebc:local`, in the `requested` stage. The request lists the approver as the agent, not you.\n- **Next steps:** The approver needs to preview the request, which builds it and runs its harness. After that, the approver deploys it, and a person verifies it once it's running. A deploy only goes ahead if the harness passes.",
+      "messages_to_owner": [],
+      "transcript": "../probes-rerun/P07.jsonl",
+      "rerun": {
+        "reason": "the probe world's agent grant (copied from toprope.identity.yaml) lacked deliver, so the Toprope agent could not hand off at all; the text arms had no such limit",
+        "grant_add": [
+          "deliver"
+        ]
+      }
     },
     {
       "probe": "P08",
@@ -201,5 +196,24 @@
     "cache_write": 53168,
     "cache_read": 1077548
   },
-  "usd_estimate": 0.4264
+  "usd_estimate": 0.4264,
+  "probes_superseded": [
+    {
+      "probe": "P07",
+      "answer": "I haven't handed commit 2-55694aded68b5ebc to Delivery. The `deliver` action was refused because my grant only covers drafting.\n\nThe commit is on branch `work`. It is approved and passed its change check. The environment still runs commit 1-d9ed7a127857fcad.\n\nI didn't try to get around the refusal, for example by calling Delivery's `request_delivery` directly. The grant is the owner's decision.\n\nI've messaged the owner and offered four choices:\n- Deliver to local themselves.\n- Deliver to staging themselves.\n- Grant me `deliver` and use local.\n- Grant me `deliver` and use staging.\n\nIf the grant is widened, I'll run `deliver` on this commit. I'd use local unless told otherwise, since the current deployment looks like the local one. Nothing else has happened yet.",
+      "messages_to_owner": [
+        {
+          "to": "owner <owner@library.invalid>",
+          "text": "I couldn't hand commit 2-55694aded68b5ebc (library, branch work, approved, check passed) to Delivery. My grant covers drafting only, so `deliver` was refused. Local currently runs commit 1-d9ed7a127857fcad. I didn't try another route into Delivery. Please run `deliver` on 2-55694aded68b5ebc yourself, or widen my grant. Which environment do you want, local or staging? I would have picked local.",
+          "choices": [
+            "I'll deliver to local myself",
+            "I'll deliver to staging myself",
+            "Grant deliver and use local",
+            "Grant deliver and use staging"
+          ]
+        }
+      ],
+      "transcript": "P07.jsonl"
+    }
+  ]
 }

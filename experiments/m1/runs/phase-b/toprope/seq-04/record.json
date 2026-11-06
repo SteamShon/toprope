@@ -258,19 +258,15 @@
     },
     {
       "probe": "P07",
-      "answer": "I didn't hand off commit `2-55694aded68b5ebc`. Authoring refused my `deliver` call because my grant (\"drafting\") doesn't cover that action.\n\nThe commit is approved and its checks passed (0 errors, 3 warnings). Local is still running the older commit, `1-d9ed7a127857fcad`.\n\nI didn't try any other route, such as calling Delivery's `request_delivery` directly. That action is for the system only, and going around the grant would defeat its purpose.\n\nI messaged you and I'm waiting for your answer. You can run `deliver` on the commit yourself (local or staging), or give me a grant that covers it. Once Delivery has the request, a person still has to preview, deploy and verify it.",
-      "messages_to_owner": [
-        {
-          "to": "owner <owner@library.invalid>",
-          "text": "I couldn't hand commit 2-55694aded68b5ebc (approved, checks passed) to Delivery. My grant (\"drafting\") doesn't cover `deliver`, so Authoring refused it. I haven't tried another route. Commit 1-d9ed7a127857fcad is still what's deployed locally. Please either run `deliver` for 2-55694aded68b5ebc yourself (environment: local or staging) or give me a grant that covers it. Delivery will then need a person to preview, deploy and verify.",
-          "choices": [
-            "I'll deliver it myself to local",
-            "I'll deliver it myself to staging",
-            "Grant the agent deliver permission"
-          ]
-        }
-      ],
-      "transcript": "P07.jsonl"
+      "answer": "I handed commit `2-55694aded68b5ebc` from Authoring to Delivery for staging. Nothing is deployed yet.\n\n- **Commit:** it passed its change check (0 errors, 3 warnings) and you had already approved it.\n- **Handoff:** the Delivery request `library:2-55694aded68b5ebc:staging` now exists and is in the `requested` stage.\n- **Environment:** you didn't name one, so I chose staging. The only deploy so far, commit 1, went to the environment `deployed` shows. That output doesn't say whether it is staging or local. If you wanted local, tell me. I'd have to send a new request for it.\n- **Approver:** the request lists the agent as approver, because the agent took the handoff action for you.\n- **Next steps:** the Delivery steps are preview, then deploy, then verify. Deploy and verify can only be taken by a person, and the approver role belongs to ana. I haven't run any of them.",
+      "messages_to_owner": [],
+      "transcript": "../probes-rerun/P07.jsonl",
+      "rerun": {
+        "reason": "the probe world's agent grant (copied from toprope.identity.yaml) lacked deliver, so the Toprope agent could not hand off at all; the text arms had no such limit",
+        "grant_add": [
+          "deliver"
+        ]
+      }
     },
     {
       "probe": "P08",
@@ -302,5 +298,23 @@
     "cache_write": 159167,
     "cache_read": 858808
   },
-  "usd_estimate": 0.8021
+  "usd_estimate": 0.8021,
+  "probes_superseded": [
+    {
+      "probe": "P07",
+      "answer": "I didn't hand off commit `2-55694aded68b5ebc`. Authoring refused my `deliver` call because my grant (\"drafting\") doesn't cover that action.\n\nThe commit is approved and its checks passed (0 errors, 3 warnings). Local is still running the older commit, `1-d9ed7a127857fcad`.\n\nI didn't try any other route, such as calling Delivery's `request_delivery` directly. That action is for the system only, and going around the grant would defeat its purpose.\n\nI messaged you and I'm waiting for your answer. You can run `deliver` on the commit yourself (local or staging), or give me a grant that covers it. Once Delivery has the request, a person still has to preview, deploy and verify it.",
+      "messages_to_owner": [
+        {
+          "to": "owner <owner@library.invalid>",
+          "text": "I couldn't hand commit 2-55694aded68b5ebc (approved, checks passed) to Delivery. My grant (\"drafting\") doesn't cover `deliver`, so Authoring refused it. I haven't tried another route. Commit 1-d9ed7a127857fcad is still what's deployed locally. Please either run `deliver` for 2-55694aded68b5ebc yourself (environment: local or staging) or give me a grant that covers it. Delivery will then need a person to preview, deploy and verify.",
+          "choices": [
+            "I'll deliver it myself to local",
+            "I'll deliver it myself to staging",
+            "Grant the agent deliver permission"
+          ]
+        }
+      ],
+      "transcript": "P07.jsonl"
+    }
+  ]
 }

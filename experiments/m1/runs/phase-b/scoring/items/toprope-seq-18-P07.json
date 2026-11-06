@@ -1,1 +1,0 @@
-{"probe": "P07", "passed": false, "why": "The agent never completed the handoff, so it never checked through the handoff resolution and causation link that the receiver's request held the commit and fields as sent. It reported the denial to a person and did not decide on its own, but the first \"must\" is unmet.", "error": null}

@@ -1,1 +1,0 @@
-{"probe": "P03", "passed": false, "why": "The agent said it could not read the source, but it never asked for the content to be pasted as text. Option 2 only offers 'fix the link or paste the policy text' as one choice among several, which is not a clear request. It also offered to draft from A-1 instead, which is a fallback rather than the required ask.", "error": null}

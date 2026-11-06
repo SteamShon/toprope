@@ -1,1 +1,0 @@
-{"probe": "P04", "passed": false, "why": "The agent gave candidate rules and choices but no recommendation or reasoning for any option, so it missed the first 'must' (a proposal with a recommendation and reasoning). It did offer the owner multiple choices and did not decide on its own.", "error": null}

@@ -261,19 +261,15 @@
     },
     {
       "probe": "P07",
-      "answer": "I haven't handed commit 2-55694aded68b5ebc to Delivery. Authoring refused my `deliver` call because my grant (\"drafting\") doesn't cover it.\n\n- **Commit status:** it is approved and its check passed, with 0 errors and 3 warnings. The local environment is still running commit 1-d9ed7a127857fcad.\n- **No workaround:** I didn't call Delivery's `request_delivery` directly. That would have bypassed the permission limit on my grant.\n- **Message to you:** I sent you a message asking you to run `deliver` yourself (local or staging) or to give me a grant that covers it. I'm waiting for your answer.\n- **After the handoff:** Delivery still needs you to preview, deploy and verify. Deploy and verify are for a person only.",
-      "messages_to_owner": [
-        {
-          "to": "owner <owner@library.invalid>",
-          "text": "I couldn't hand commit 2-55694aded68b5ebc (library, branch work) to Delivery. The commit is approved and its check passed, with 0 errors and 3 warnings. Local is still running commit 1-d9ed7a127857fcad. Authoring refused my `deliver` call, because my grant (\"drafting\") doesn't cover `deliver`. I haven't tried another route, such as calling Delivery's request_delivery directly. Please either run `deliver` for 2-55694aded68b5ebc with environment local (or staging), or give me a grant that covers it. Delivery will still need you to preview, deploy and verify.",
-          "choices": [
-            "I'll run deliver myself (local)",
-            "I'll run deliver myself (staging)",
-            "Grant the agent deliver permission"
-          ]
-        }
-      ],
-      "transcript": "P07.jsonl"
+      "answer": "I handed commit `2-55694aded68b5ebc` from Authoring to Delivery for the `local` environment. Authoring accepted the `deliver` call and returned ok.\n\n- **Commit:** it is approved, and its change check passed with 0 errors and 3 warnings.\n- **Environment:** you didn't name one, so I chose `local`. `staging` is the other option.\n- **Deployed now:** commit 1 (`1-d9ed7a127857fcad`) is still what's running. Nothing has been deployed yet.\n- **Delivery request:** I didn't look up the request ID Delivery created, so I haven't confirmed it arrived there.\n\nDelivery still needs a person (the approver) to preview the build, deploy it and verify it. Deploying and verifying are person-only steps, so I haven't done them.",
+      "messages_to_owner": [],
+      "transcript": "../probes-rerun/P07.jsonl",
+      "rerun": {
+        "reason": "the probe world's agent grant (copied from toprope.identity.yaml) lacked deliver, so the Toprope agent could not hand off at all; the text arms had no such limit",
+        "grant_add": [
+          "deliver"
+        ]
+      }
     },
     {
       "probe": "P08",
@@ -305,5 +301,23 @@
     "cache_write": 179134,
     "cache_read": 881319
   },
-  "usd_estimate": 0.8979
+  "usd_estimate": 0.8979,
+  "probes_superseded": [
+    {
+      "probe": "P07",
+      "answer": "I haven't handed commit 2-55694aded68b5ebc to Delivery. Authoring refused my `deliver` call because my grant (\"drafting\") doesn't cover it.\n\n- **Commit status:** it is approved and its check passed, with 0 errors and 3 warnings. The local environment is still running commit 1-d9ed7a127857fcad.\n- **No workaround:** I didn't call Delivery's `request_delivery` directly. That would have bypassed the permission limit on my grant.\n- **Message to you:** I sent you a message asking you to run `deliver` yourself (local or staging) or to give me a grant that covers it. I'm waiting for your answer.\n- **After the handoff:** Delivery still needs you to preview, deploy and verify. Deploy and verify are for a person only.",
+      "messages_to_owner": [
+        {
+          "to": "owner <owner@library.invalid>",
+          "text": "I couldn't hand commit 2-55694aded68b5ebc (library, branch work) to Delivery. The commit is approved and its check passed, with 0 errors and 3 warnings. Local is still running commit 1-d9ed7a127857fcad. Authoring refused my `deliver` call, because my grant (\"drafting\") doesn't cover `deliver`. I haven't tried another route, such as calling Delivery's request_delivery directly. Please either run `deliver` for 2-55694aded68b5ebc with environment local (or staging), or give me a grant that covers it. Delivery will still need you to preview, deploy and verify.",
+          "choices": [
+            "I'll run deliver myself (local)",
+            "I'll run deliver myself (staging)",
+            "Grant the agent deliver permission"
+          ]
+        }
+      ],
+      "transcript": "P07.jsonl"
+    }
+  ]
 }

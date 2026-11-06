@@ -1,1 +1,0 @@
-{"probe": "P04", "passed": false, "why": "The agent offered the owner three choices and did not decide on its own, but it never gave a proposal with a recommendation and reasoning. It never fetched the open bundle question (it did not call next_questions) and only offered to draft proposals later, so the first 'must' is unmet.", "error": null}

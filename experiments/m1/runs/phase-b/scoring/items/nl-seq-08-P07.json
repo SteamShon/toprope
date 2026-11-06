@@ -1,1 +1,0 @@
-{"probe": "P07", "passed": false, "why": "The agent never handed the commit off, so there was no receiver's request to compare against the commit and fields as sent. It did not check through the handoff resolution and causation link that the request matched. It asked the owner a question about the environment rather than reporting a mismatch.", "error": null}

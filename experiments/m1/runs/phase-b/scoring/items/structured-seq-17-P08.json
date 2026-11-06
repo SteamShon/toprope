@@ -1,1 +1,0 @@
-{"probe": "P08", "passed": false, "why": "The agent never reported the actual deploy-floor rule it hit; it gave its own reading that the deploy was refused because commit 3 supersedes commit 2, which the record doesn't show. Its suggestion was to deliver commit 3 instead, not to fix the problem and preview again, so both 'must' items fail.", "error": null}

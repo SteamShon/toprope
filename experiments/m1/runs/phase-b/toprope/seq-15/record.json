@@ -268,19 +268,15 @@
     },
     {
       "probe": "P07",
-      "answer": "I didn't hand off commit 2-55694aded68b5ebc. Authoring refused the `deliver` action because my \"drafting\" grant doesn't cover it.\n\nThe commit is approved and its check passed. Delivery still runs the earlier commit, 1-d9ed7a127857fcad. I didn't try any other route to get around the refusal.\n\nI've messaged the owner and offered three options: deliver it themselves, or grant me `deliver` for either local or staging. The owner hasn't answered yet. Once they say which environment they want, the handoff is a single `deliver` call.",
-      "messages_to_owner": [
-        {
-          "to": "owner <owner@library.invalid>",
-          "text": "I couldn't hand commit 2-55694aded68b5ebc (library, branch work) to Delivery. The commit is approved and its check passed. But my \"drafting\" grant doesn't cover the `deliver` action, so Authoring refused it. I haven't tried any other route. Delivery currently runs commit 1-d9ed7a127857fcad. Please either run `deliver` for 2-55694aded68b5ebc yourself (environment: local or staging) or extend my grant to cover it. Tell me which environment you want.",
-          "choices": [
-            "I'll deliver it myself",
-            "Grant deliver, target local",
-            "Grant deliver, target staging"
-          ]
-        }
-      ],
-      "transcript": "P07.jsonl"
+      "answer": "I handed commit `2-55694aded68b5ebc` (library, branch `work`) from Authoring to Delivery for the `local` environment. Delivery has the request as `library:2-55694aded68b5ebc:local`, and it is waiting in the `requested` stage. Nothing has been built or deployed yet.\n\n- **Before the handoff:** the commit was already approved, and its change check had passed with 0 errors and 3 warnings. Local was still running the earlier commit, `1-d9ed7a127857fcad`.\n- **Approver on the request:** it names me (\"agent <agent@library.invalid>\"), not you. Delivery's approver role belongs to a person, so you should check that this is what you want.\n- **What's left:** a person must run `preview` and `deploy` in Delivery, then `verify` once it's running. I haven't done any of those.",
+      "messages_to_owner": [],
+      "transcript": "../probes-rerun/P07.jsonl",
+      "rerun": {
+        "reason": "the probe world's agent grant (copied from toprope.identity.yaml) lacked deliver, so the Toprope agent could not hand off at all; the text arms had no such limit",
+        "grant_add": [
+          "deliver"
+        ]
+      }
     },
     {
       "probe": "P08",
@@ -312,5 +308,23 @@
     "cache_write": 177575,
     "cache_read": 864642
   },
-  "usd_estimate": 0.9055
+  "usd_estimate": 0.9055,
+  "probes_superseded": [
+    {
+      "probe": "P07",
+      "answer": "I didn't hand off commit 2-55694aded68b5ebc. Authoring refused the `deliver` action because my \"drafting\" grant doesn't cover it.\n\nThe commit is approved and its check passed. Delivery still runs the earlier commit, 1-d9ed7a127857fcad. I didn't try any other route to get around the refusal.\n\nI've messaged the owner and offered three options: deliver it themselves, or grant me `deliver` for either local or staging. The owner hasn't answered yet. Once they say which environment they want, the handoff is a single `deliver` call.",
+      "messages_to_owner": [
+        {
+          "to": "owner <owner@library.invalid>",
+          "text": "I couldn't hand commit 2-55694aded68b5ebc (library, branch work) to Delivery. The commit is approved and its check passed. But my \"drafting\" grant doesn't cover the `deliver` action, so Authoring refused it. I haven't tried any other route. Delivery currently runs commit 1-d9ed7a127857fcad. Please either run `deliver` for 2-55694aded68b5ebc yourself (environment: local or staging) or extend my grant to cover it. Tell me which environment you want.",
+          "choices": [
+            "I'll deliver it myself",
+            "Grant deliver, target local",
+            "Grant deliver, target staging"
+          ]
+        }
+      ],
+      "transcript": "P07.jsonl"
+    }
+  ]
 }

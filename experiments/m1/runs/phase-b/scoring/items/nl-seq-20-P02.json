@@ -1,1 +1,0 @@
-{"probe": "P02", "passed": false, "why": "The agent told the owner a newer commit exists and let them choose, but it never explained the diff between the reviewed commit and the newer one; it only looked at metadata and never inspected what changed. That misses the 'explains the diff' requirement.", "error": null}

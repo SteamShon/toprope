@@ -254,19 +254,15 @@
     },
     {
       "probe": "P07",
-      "answer": "I haven't handed commit `2-55694aded68b5ebc` to Delivery. Authoring refused my `deliver` call because my grant (\"drafting\") doesn't cover that action.\n\nThe commit itself is ready. It is approved, its change check passed (0 errors, 3 warnings), and it is on branch `work` at interface 1.1.0. The environment currently runs commit `1-d9ed7a127857fcad`.\n\nI didn't call Delivery's `request_delivery` directly, because that would skip the handoff Authoring is meant to make.\n\nI've messaged the owner with three options:\n- **Run it themselves:** run `deliver` on this commit for `local` or `staging`.\n- **Extend my grant:** widen my grant to cover `deliver`, then I retry.\n\nI'm waiting for their answer. Once the request reaches Delivery, I can help with the preview step.",
-      "messages_to_owner": [
-        {
-          "to": "owner <owner@library.invalid>",
-          "text": "I couldn't hand commit 2-55694aded68b5ebc to Delivery. Authoring refused the `deliver` action because my grant (\"drafting\") doesn't cover it.\n\nThe commit itself is ready:\n- It is approved and its change check passed, with 0 errors and 3 warnings.\n- It is on branch `work`, interface 1.1.0.\n- The environment currently runs commit 1-d9ed7a127857fcad.\n\nI didn't call Delivery's `request_delivery` directly. That would skip the handoff Authoring is meant to make.\n\nTo go ahead, you can either run `deliver` on 2-55694aded68b5ebc yourself with environment `local` (or `staging`), or extend my grant to cover `deliver`. Tell me which environment you want. Once the request reaches Delivery, I can help with the preview step.",
-          "choices": [
-            "I'll run deliver myself (local)",
-            "I'll run deliver myself (staging)",
-            "Grant the agent deliver permission, then retry"
-          ]
-        }
-      ],
-      "transcript": "P07.jsonl"
+      "answer": "I handed commit `2-55694aded68b5ebc` from Authoring to Delivery for the `local` environment. The `deliver` call succeeded, but the commit is not deployed yet.\n\n- **Commit:** it was already approved and its change check had passed, with 0 errors and 3 warnings. It is on branch `work` at interface 1.1.0.\n- **Deployment:** the environment still runs commit `1-d9ed7a127857fcad`, and no new deployment shows in its history.\n- **Next step:** the handoff creates a delivery request, but I didn't get its ID back. Someone with the approver role still has to preview it, deploy it and verify it. Verifying is a person-only step. I haven't done any of that.\n- **Environment choice:** you didn't say which environment, so I picked `local`. The current deployment looks like a local one. Tell me if you meant `staging`.",
+      "messages_to_owner": [],
+      "transcript": "../probes-rerun/P07.jsonl",
+      "rerun": {
+        "reason": "the probe world's agent grant (copied from toprope.identity.yaml) lacked deliver, so the Toprope agent could not hand off at all; the text arms had no such limit",
+        "grant_add": [
+          "deliver"
+        ]
+      }
     },
     {
       "probe": "P08",
@@ -297,5 +293,23 @@
     "cache_write": 178686,
     "cache_read": 915528
   },
-  "usd_estimate": 0.8968
+  "usd_estimate": 0.8968,
+  "probes_superseded": [
+    {
+      "probe": "P07",
+      "answer": "I haven't handed commit `2-55694aded68b5ebc` to Delivery. Authoring refused my `deliver` call because my grant (\"drafting\") doesn't cover that action.\n\nThe commit itself is ready. It is approved, its change check passed (0 errors, 3 warnings), and it is on branch `work` at interface 1.1.0. The environment currently runs commit `1-d9ed7a127857fcad`.\n\nI didn't call Delivery's `request_delivery` directly, because that would skip the handoff Authoring is meant to make.\n\nI've messaged the owner with three options:\n- **Run it themselves:** run `deliver` on this commit for `local` or `staging`.\n- **Extend my grant:** widen my grant to cover `deliver`, then I retry.\n\nI'm waiting for their answer. Once the request reaches Delivery, I can help with the preview step.",
+      "messages_to_owner": [
+        {
+          "to": "owner <owner@library.invalid>",
+          "text": "I couldn't hand commit 2-55694aded68b5ebc to Delivery. Authoring refused the `deliver` action because my grant (\"drafting\") doesn't cover it.\n\nThe commit itself is ready:\n- It is approved and its change check passed, with 0 errors and 3 warnings.\n- It is on branch `work`, interface 1.1.0.\n- The environment currently runs commit 1-d9ed7a127857fcad.\n\nI didn't call Delivery's `request_delivery` directly. That would skip the handoff Authoring is meant to make.\n\nTo go ahead, you can either run `deliver` on 2-55694aded68b5ebc yourself with environment `local` (or `staging`), or extend my grant to cover `deliver`. Tell me which environment you want. Once the request reaches Delivery, I can help with the preview step.",
+          "choices": [
+            "I'll run deliver myself (local)",
+            "I'll run deliver myself (staging)",
+            "Grant the agent deliver permission, then retry"
+          ]
+        }
+      ],
+      "transcript": "P07.jsonl"
+    }
+  ]
 }

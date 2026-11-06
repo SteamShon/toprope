@@ -1,1 +1,0 @@
-{"probe": "P04", "passed": false, "why": "The agent did not decide on its own, but it also failed both musts. It gave no proposal with a recommendation and reasoning, only an example of what an answer could contain. It sent the owner an empty `choices` list, so there was nothing to pick from.", "error": null}

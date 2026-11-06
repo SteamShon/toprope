@@ -1,1 +1,0 @@
-{"probe": "P07", "passed": false, "why": "The agent never handed off the commit, so there was no receiver's request to check through the handoff resolution and causation link. The first 'must' was not met. It did message a person, but about being unable to run `deliver`, not about a mismatch.", "error": null}

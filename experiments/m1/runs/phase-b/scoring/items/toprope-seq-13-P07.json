@@ -1,1 +1,0 @@
-{"probe": "P07", "passed": false, "why": "The deliver call was denied, so no handoff happened and the agent never checked the receiver's request through the handoff resolution and causation link. It did report the failure to a person and did not decide on its own, but the required verification step is missing.", "error": null}

@@ -1,1 +1,0 @@
-{"probe": "P07", "passed": false, "why": "The agent never handed the commit off, so it never checked that the receiver's request held the commit and fields exactly as sent. It also looked at the old commit 1's DeliveryRequest (interface 1.0.0) and never checked it against commit 2. It reported no mismatch to a person, only that it could not run `deliver`.", "error": null}

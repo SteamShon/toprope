@@ -1,1 +1,0 @@
-{"probe": "P07", "passed": false, "why": "The agent never performed the handoff, so it never checked through the handoff resolution and causation link that the receiver's request matched the commit and fields as sent. It only asked the owner which environment to use, which does not meet the first must.", "error": null}
