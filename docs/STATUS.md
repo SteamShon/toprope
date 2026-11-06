@@ -122,12 +122,15 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    member), through a new ADR superseding decision 29A for that case; an export to git can
    keep the audit trail (decided 2026-11-06). Until then the self domains keep their logs in
    git (`domains/<domain>/events/`).
-5. ADR-0041's follow-up work, one PR each (decided 2026-11-06). Done: approval refuses commits
-   with proposed elements, and the change check records how many are left; every decision
-   action takes an optional `rationale`, stored with the decision. Left: an optional evidence
-   field on commits; `actor.principal` in checks; events for issued grants and role changes;
-   the exception pattern in `examples/paid-media/`. `actor.principal` closes the matching *Left
-   from reviews* item.
+5. ADR-0041's follow-up work (decided 2026-11-06), the third on in
+   `umbrella/adr-0041-follow-ups` (#114). Done: approval refuses commits with proposed
+   elements, and the change check records how many are left (#110); every decision action takes
+   an optional `rationale` (#111); a check can read `actor.principal` (#113);
+   `examples/paid-media/` shows the exception pattern (#115); every event records the
+   permissions it ran under (#116); a commit may cite its evidence (#117), and Authoring's
+   `commit_draft` passes it, changed through the self domains' own loop and approved and
+   deployed by the researcher in GitHub (#118: commit `5-c8fd1b8fc98be17c`, deployed and
+   verified).
 
 ## Left from reviews
 
@@ -138,10 +141,6 @@ it; each release's cleanup PR handles items older than one release.
   person approves (`requires: human`) a commit whose checks passed. Charter §5 says "no
   self-approval"; ADR-0032 keeps one approver in M1. Decide whether to enforce author ≠
   approver before M2, when a domain gets more than one owner (#102, 2026-11-06)
-- A declaration cannot see whose agent acted: `actor` in a check carries only the actor's own
-  id and roles, not `on_behalf_of`. So `target.proposed_by != actor.id` does not stop a person
-  from approving a change their own agent proposed (`examples/paid-media/`; found writing the
-  example, 2026-11-06)
 - `then` in `toprope-run` reads only the target's stream, so a call or handoff set off on
   another stream (for example by a newly created object) is not shown (#86, 2026-11-06)
 - The effect-resolution summary is written twice, in `toprope-run` (`followed`) and in the

@@ -442,7 +442,7 @@ works. The catalog is the kernel itself (ADR-0027):
 | `record_answer` | `question`, `answer`, `decisions` (JSON) | `ref`: the owner's words; decisions become proposed elements citing it |
 | `confirm_element` | `paths` (or `all`), `approver` | `confirmed`: the calling person must be the approver |
 | `skip_stage` | `stage`, `reason` | `skipped` |
-| `commit` | `declaration` | `id`, `seq`, `content`, `created`, `parent`, `interface`, `to_review`, `last_approved` (ADR-0029) |
+| `commit` | `declaration`; optional `evidence` (strings: interview lines, events, check records the change rests on; ADR-0041) | `id`, `seq`, `content`, `created`, `parent`, `interface`, `to_review`, `last_approved` (ADR-0029) |
 | `diff` | `domain`, `from`, `to` | `changed`, `added`, `removed`, `to_review` |
 | `checkout` | `domain`, `commit`, `declaration` | `content` (loads a commit into a working copy, ADR-0032) |
 | `change_check` | `domain`, `commit` | `passed`, `errors`, `warnings`, `failing`, `summary` (recorded on the commit, ADR-0009) |
@@ -525,6 +525,9 @@ are reserved and are not roles: `system` (timers, handoffs and fixtures) and
 `on_behalf_of` a person with a **grant** (actions, targets, expiry), which is issued at
 runtime, not in the declaration. The declaration controls agents with `requires: human` and
 with actor rules: an agent must satisfy the rule both for itself and for its principal.
+A check or an effect can read `actor.principal` (`id`, `kind`, `roles`, `role`): the person an
+agent acts for, or the actor itself when it is not an agent. Record and compare
+`actor.principal.id` to say "not the proposer, nor the proposer's agent" (ADR-0041).
 
 ## Representation layer (ADR-0008)
 

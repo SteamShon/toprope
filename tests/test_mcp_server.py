@@ -415,3 +415,25 @@ def test_a_decision_actions_tool_takes_an_optional_rationale_and_others_do_not()
             assert "rationale" in approve["properties"] and "rationale" not in approve.get("required", [])
             assert "rationale" not in launch["properties"]
     run(go())
+
+
+# -- ADR-0041 Resolved 5: every event records the permissions it ran under ---------------------
+def test_events_record_the_roles_and_the_grant_in_force():
+    from toprope.store.codec import event_from_json, event_to_json
+    expires = NOW + timedelta(days=1)
+    ids = StaticIdentity({"t-bot": Caller(BOT, ANA, Grant("g1", frozenset({"approve_experiment"}),
+                                                          frozenset({"E-onboarding"}), expires)),
+                          "t-eli": Caller(ELI)})
+    store = MemoryEventStore()
+    ex = make_ex(store=store, ids=ids)
+    assert ex.submit("t-bot", "approve_experiment", "E-onboarding", {}, "k1").status == "ok"
+    assert ex.submit("t-eli", "approve_experiment", "E-onboarding", {}, "k2").status == "denied"
+    ok = next(e for e in store.read("E-onboarding") if e.kind == "domain" and e.actor["id"] == "bot")
+    assert ok.permissions == {"roles": ["approver"], "principal_roles": ["approver"],
+                              "grant": {"id": "g1", "actions": ["approve_experiment"],
+                                        "targets": ["E-onboarding"], "expires_at": expires.isoformat()}}
+    denied = ex.attempts("E-onboarding")[-1]
+    assert denied.permissions == {"roles": ["eng"]}
+    old = json.loads(event_to_json(ok))
+    del old["permissions"]                                   # an event written before ADR-0041
+    assert event_from_json(json.dumps(old)).permissions is None
