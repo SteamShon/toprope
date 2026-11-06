@@ -1,0 +1,66 @@
+{
+  "objects": {
+    "library": {
+      "type": "Draft",
+      "branch": "work",
+      "declaration": "library/library.domain.yaml",
+      "domain_id": "library",
+      "id": "library",
+      "stage": "open",
+      "bundle": "bundle:invariants:6a408017",
+      "current_stage": "invariants"
+    },
+    "S-notes": {
+      "type": "Source",
+      "id": "S-notes",
+      "kind": "records",
+      "path": "notes",
+      "stage": "added"
+    },
+    "Q-1": {
+      "type": "Question",
+      "id": "Q-1",
+      "stage": "actions",
+      "text": "What must a lent book have?"
+    },
+    "A-1": {
+      "type": "Answer",
+      "decisions": "[]",
+      "id": "A-1",
+      "question": "Q-1",
+      "stage": "recorded",
+      "words": "Every lent book has a borrower. A member may renew a book once.",
+      "ref": "interview:library/interview.jsonl#L1"
+    },
+    "1-d9ed7a127857fcad": {
+      "type": "Commit",
+      "author": "owner <owner@library.invalid>",
+      "branch": "work",
+      "content": "d9ed7a127857fcad",
+      "domain_id": "library",
+      "id": "1-d9ed7a127857fcad",
+      "interface": "1.0.0",
+      "seq": 1,
+      "stage": "recorded",
+      "checks_passed": true,
+      "failing": "passes; 0 error(s), 0 warning(s)",
+      "approved": true,
+      "main": "1-d9ed7a127857fcad"
+    },
+    "library:1-d9ed7a127857fcad:local": {
+      "type": "DeliveryRequest",
+      "approver": "owner <owner@library.invalid>",
+      "commit": "1-d9ed7a127857fcad",
+      "domain_id": "library",
+      "environment": "local",
+      "id": "library:1-d9ed7a127857fcad:local",
+      "interface": "1.0.0",
+      "stage": "verified",
+      "build": "0e9d8cb8f26374a7",
+      "harness_ok": true,
+      "deployed": true,
+      "refusal": "",
+      "verified": true
+    }
+  }
+}
