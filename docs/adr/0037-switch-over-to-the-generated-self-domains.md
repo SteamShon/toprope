@@ -1,7 +1,7 @@
 # ADR-0037: Switch-over: the generated self domains replace the hand-built tools
 
-- Link: self-compile (feasibility), ③ works as built · Status: **proposed** · 2026-11-06 · direction
-  decided by the researcher; the plan and the open choices are the assistant's draft
+- Link: self-compile (feasibility), ③ works as built · Status: accepted · 2026-11-06 · decided by:
+  SteamShon (the criterion, the plan and the open choices; drafted by the assistant)
 - Builds on: ADR-0022 (the switch-over), ADR-0027 (what the kernel is), ADR-0028 (kernel
   services as declared effects), ADR-0036 (generated command line and guide)
 
@@ -23,7 +23,7 @@ What is hand-built today (about 9,000 lines of `src/`):
   - their hand-written guides (`docs/authoring.md`, the Authoring and Delivery sections of
     `docs/workflow.md`)
 
-## Decision (proposed)
+## Decision
 1. **The line.** After the switch-over, the only hand-built code is the kernel. Every tool a
    person or an agent uses to author or deliver a domain is generated from `domains/*.domain.yaml`:
    the MCP servers and `toprope-run` (ADR-0036), and its documentation is the generated guides.
@@ -57,13 +57,20 @@ What is hand-built today (about 9,000 lines of `src/`):
 - The kernel grows by the interview services, which are generic and tested like the rest.
 - People and agents use `toprope-run` / the MCP servers for the self domains from then on.
 
-## Open (for the researcher)
-1. **Where the self domains' runtime state lives.** Answers, confirmations and requests are
-   events in the generated domains' event stores. Options: commit an append-only event log to
-   git (like the commit store), or keep a local SQLite store and commit only the declarations
-   and the commit store.
-2. **How a person is identified on the command line.** Options: a local identity that maps
-   your git identity to roles listed in the repository (e.g. `toprope.identity.yaml`), or a
-   token file as for the server.
-3. **The kernel's own guide.** Keep `docs/workflow.md` (kernel commands only), or generate it
-   from the kernel's command definitions too.
+## The principle (the researcher's words, 2026-11-06)
+Toprope is a framework: any domain should go through this process. So what is common to every
+domain, and not specific to one, is provided by the **kernel**; what varies by domain is
+**declared** in that domain; and the **tools are generated** to work from that declaration.
+Authoring and Delivery are themselves declared domains, so an organization's own way of
+authoring and delivering is a declaration it can change too.
+
+## Resolved (researcher, 2026-11-06)
+1. **Runtime state is committed to git** as an append-only event log, like the commit store.
+   It is kept **per domain**, never mixed: everything about a domain lives under
+   `domains/<domain>/` (its declaration, its generated guide, its event log, which replaces
+   `interview/<domain>/log.jsonl`). The commit store stays per domain under `.toprope/commits/<domain>/`.
+2. **A person is identified by their git identity**, with roles listed in the repository
+   (`toprope.identity.yaml`: git email → roles). No tokens to manage on a local machine.
+3. **The kernel's command reference is generated from the kernel's command definitions** (their
+   argument parsers), since the kernel is code, not a declaration; it cannot come from a
+   declaration. A short hand-written introduction stays in `docs/workflow.md` and links to it.
