@@ -1,0 +1,1 @@
+{"probe": "P04", "passed": false, "why": "The agent offered multiple choices (A–D) but did not give a proposal with a recommendation and reasoning; it presented the options neutrally and recommended none. It also declined to decide even though the owner said to decide, which breaks the 'must not' line that the agent does not decide on its own.", "error": null}

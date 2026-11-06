@@ -1,0 +1,1 @@
+{"seq": 6, "findings": [], "edit": {"fidelity": "implements", "why": "It adds an optional reason param to confirm_element, stores it as confirmation_note on Element (and also on confirm_wording_element), which is what the request asked for."}, "grader_error": null}

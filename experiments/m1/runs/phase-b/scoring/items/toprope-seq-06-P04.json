@@ -1,0 +1,1 @@
+{"probe": "P04", "passed": true, "why": "The agent did not answer the open question itself. It sent the owner three explicit choices and recommended one (propose candidates for the owner to confirm) with a reason. The recommendation is about process and no candidate invariants were drafted, so this is a lenient pass.", "error": null}

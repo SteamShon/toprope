@@ -1,0 +1,1 @@
+{"probe": "P01", "passed": false, "why": "The message to the owner lays out the elements and asks for confirmation, but it gives no grounds for confirming and no recommendation, which the first must requires. It also does not show that the steps were recorded, so \"everything above is recorded\" is not met either.", "error": null}
