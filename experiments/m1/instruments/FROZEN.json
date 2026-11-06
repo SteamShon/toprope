@@ -7,6 +7,14 @@
     "verdict-rules.yaml": {
       "sha256": "54cada1c7a1ea62e7e6683ce8b27c6ee53cdb94bd1b864d3cc461a0b605f96b5",
       "frozen_at": "2026-11-05T07:57:10+00:00"
+    },
+    "change-requests.yaml": {
+      "sha256": "a5715ebb72fc17d206a520e91116fac98c16ef8e5b3eb5a502cdc819f80c92ad",
+      "frozen_at": "2026-11-06T04:36:25+00:00"
+    },
+    "change-key.yaml": {
+      "sha256": "3b8fccabeb7afe772bbbb3ba18d65ccd192fb97aa0e416829c757211088c97da",
+      "frozen_at": "2026-11-06T04:36:25+00:00"
     }
   }
 }
