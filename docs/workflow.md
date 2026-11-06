@@ -17,6 +17,16 @@ working for the owner (for example Claude Code, through the authoring MCP or the
 *Maintainer*: whoever releases. Some steps are **owner only**: an agent never runs them, even
 when told the owner agrees in chat (probe P01: "the agent does not decide on its own").
 
+**You, on your machine (ADR-0037).** `toprope-run` knows who you are from your git email
+(`git config user.email`), looked up in [`toprope.identity.yaml`](../toprope.identity.yaml):
+each person's roles, and each agent's own git email with the person it works for and a grant
+of what it may draft. No token is needed; `toprope-run ... whoami` shows the result. A git
+email is self-asserted, and an agent on your machine has your git email, so this trusts the
+processes on your machine; an `agents` entry applies to an agent with its own git email (for
+example in its own container). As a guard against mistakes, an action only a person may take
+(`requires: human`) also asks you to confirm on your terminal, which an agent's ordinary shell
+cannot do.
+
 Every command runs from the repository root as `uv run <command>`. The domain commit store
 (`.toprope/commits/`) is part of the repository: commit it with your change so approvals are
 shared. Install `uv` first

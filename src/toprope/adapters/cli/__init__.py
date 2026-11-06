@@ -7,9 +7,12 @@ Execution, so the same rules apply: the matrix, actor rules, preconditions, inva
   toprope-run --domain d.domain.yaml --store sqlite:events.db --identity static:ids.yaml --help
   toprope-run --domain d.domain.yaml ... approve_experiment E-1 --note "ok"
   toprope-run --composition self.composition.yaml --member authoring --store-dir .toprope/run ... deliver C2 --environment local
-  toprope-run ... get ID | history ID | allowed ID | guide
+  toprope-run ... get ID | history ID | allowed ID | whoami | guide
 
-The caller comes from TOPROPE_TOKEN (or --token), resolved by the identity, as for the server.
+Who you are: with `--identity git` (the default when `toprope.identity.yaml` is in the current
+directory and no token is given), your repository's git email, looked up in that file
+(ADR-0037). An action that requires a person asks you to confirm on your terminal, so an agent's
+ordinary shell cannot take it as you. With `static:FILE` or `jwt`, the caller comes from TOPROPE_TOKEN (or --token), as for the server.
 Exit status 1 when the command is denied or rejected.
 """
 
@@ -20,13 +23,15 @@ import json
 import os
 import sys
 import uuid
+from pathlib import Path
 from typing import Any
 
 from ...decl import load_domain, validate_domain
 from ...decl.models import Domain
 from ...exec import Execution
+from ...identity import Caller, Identity
 
-READS = ("get", "history", "allowed", "guide")
+READS = ("get", "history", "allowed", "whoami", "guide")
 
 
 def _base_parser(add_help: bool) -> argparse.ArgumentParser:
@@ -37,7 +42,8 @@ def _base_parser(add_help: bool) -> argparse.ArgumentParser:
     ap.add_argument("--member", help="with --composition: the member whose actions these are")
     ap.add_argument("--store", default="memory", help="with --domain: the event store (sqlite:FILE, postgres:DSN)")
     ap.add_argument("--store-dir", help="with --composition: one SQLite store per member, <dir>/<member>.db")
-    ap.add_argument("--identity", help="static:FILE or jwt (as for toprope-server)")
+    ap.add_argument("--identity", help="git[:FILE] (your git email, looked up in FILE, default "
+                    "toprope.identity.yaml; the default when that file is here), static:FILE or jwt")
     ap.add_argument("--token", help="your credential (default: TOPROPE_TOKEN)")
     ap.add_argument("--kernel-root", help="run declared kernel-service effects on files under this directory")
     ap.add_argument("--workspace", help="authoring workspace, for the source services")
@@ -81,15 +87,51 @@ def build_parser(d: Domain) -> argparse.ArgumentParser:
     for cmd, what in (("get", "an object's current state"), ("history", "an object's events"),
                       ("allowed", "the actions you may take on an object now")):
         sub.add_parser(cmd, help=what).add_argument("target")
+    sub.add_parser("whoami", help="who you are here, and your roles")
     sub.add_parser("guide", help="the domain guide: how this domain works and who does what")
     return ap
 
 
+def _identity(spec: str | None, token: str | None = None) -> Identity:
+    from ...identity.git import FILE, GitIdentity
+    from ..mcp.cli import open_identity
+    if spec is None and token is None and Path(FILE).is_file():     # a given token is never ignored
+        spec = "git"
+    if not spec:
+        raise SystemExit(f"--identity is required for this command (or put {FILE} here)")
+    if spec == "git" or spec.startswith("git:"):
+        try:
+            return GitIdentity(spec[4:] or FILE)
+        except (OSError, ValueError) as e:
+            raise SystemExit(f"identity file: {e}") from None
+    return open_identity(spec)
+
+
+def _caller(identity: Identity, token: str | None) -> Caller:
+    from ...identity.git import GitIdentity
+    caller = identity.resolve(token)
+    if caller is None:
+        raise SystemExit(identity.explain() if isinstance(identity, GitIdentity)
+                         else "TOPROPE_TOKEN (or --token) does not resolve to a caller")
+    return caller
+
+
+def _confirm_on_terminal(identity: Identity, caller: Caller, action: str, target: str) -> None:
+    """A git identity is self-asserted, so an action that requires a person is confirmed on a
+    terminal: a process without one (an agent's ordinary shell, a script) cannot take it as you.
+    It is a guard against mistakes, not a security boundary: a process can fake a terminal."""
+    from ...identity.git import GitIdentity
+    if not isinstance(identity, GitIdentity) or caller.actor.kind != "person":
+        return
+    if not sys.stdin.isatty():
+        raise SystemExit(f"{action} requires a person: run it yourself on a terminal")
+    if input(f"{action} {target} as {caller.actor.id}? [y/N] ").strip().lower() != "y":
+        raise SystemExit("not taken")
+
+
 def _execution(args: Any, d: Domain) -> Execution:
-    from ..mcp.cli import _kernel, _member, open_identity, open_store
-    if not args.identity:
-        raise SystemExit("--identity is required for this command")
-    identity = open_identity(args.identity)
+    from ..mcp.cli import _kernel, _member, open_store
+    identity = _identity(args.identity, args.token or os.environ.get("TOPROPE_TOKEN"))
     services = _kernel(args)
     if args.composition:
         args.no_seed = not args.seed
@@ -136,15 +178,22 @@ def main(argv: list[str] | None = None) -> None:
             out = ex.state(args.target)
         elif args.cmd == "history":
             out = [{"type": e.type, "at": str(e.at), "actor": e.actor, "payload": e.payload} for e in ex.history(args.target)]
+        elif args.cmd == "whoami":
+            c = _caller(ex.identity, token)
+            out = {"id": c.actor.id, "kind": c.actor.kind, "roles": list(c.actor.roles)}
+            if c.on_behalf_of is not None and c.grant is not None:
+                out |= {"on_behalf_of": c.on_behalf_of.id, "grant": sorted(c.grant.actions)}
         else:
-            caller = ex.identity.resolve(token)
-            if caller is None:
-                raise SystemExit("TOPROPE_TOKEN (or --token) does not resolve to a caller")
-            out = ex.allowed_actions(args.target, caller)
+            out = ex.allowed_actions(args.target, _caller(ex.identity, token))
         print(json.dumps(out, indent=2, ensure_ascii=False, default=str))
         return
     params = {name: getattr(args, f"p_{name}") for name in d.actions[args.cmd].params
               if getattr(args, f"p_{name}", None) is not None}
+    from ...identity.git import GitIdentity
+    if isinstance(ex.identity, GitIdentity):
+        caller = _caller(ex.identity, token)          # says why the git email is not listed
+        if d.actions[args.cmd].requires == "human":
+            _confirm_on_terminal(ex.identity, caller, args.cmd, args.target)
     from ..mcp import outcome_json
     o = ex.submit(token, args.cmd, args.target, params, idempotency_key=args.key or str(uuid.uuid4()))
     print(json.dumps(outcome_json(o), indent=2, ensure_ascii=False, default=str))
