@@ -22,13 +22,13 @@ from ..decl import load_domain, validate_domain
 from .run import DEFAULT_LEVELS, run_harness
 
 
-def main(argv: list[str] | None = None) -> None:
+def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="toprope-harness", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--domain", help="one declaration (or use --composition)")
     ap.add_argument("--composition", help="a *.composition.yaml: check members and wiring (ADR-0026), "
                                           "then run the harness on every member")
-    ap.add_argument("--levels", default=",".join(DEFAULT_LEVELS))
+    ap.add_argument("--levels", default=",".join(DEFAULT_LEVELS), help="comma-separated: model, execution, mcp")
     ap.add_argument("--examples", type=int, default=200, help="exploration examples (0 disables)")
     ap.add_argument("--depth", type=int, default=5, help="exploration depth")
     ap.add_argument("--json", help="write the full report as JSON to this path")
@@ -38,6 +38,11 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--receiver", action="append", default=[], metavar="FILE[@MAJOR]",
                     help="a receiving domain's declaration, with its published interface major "
                          "(default 1): checks this domain's handoffs against it (ADR-0024)")
+    return ap
+
+
+def main(argv: list[str] | None = None) -> None:
+    ap = build_parser()
     args = ap.parse_args(argv)
 
     if bool(args.domain) == bool(args.composition):

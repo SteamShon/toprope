@@ -166,21 +166,6 @@ def test_the_deploy_floor_uses_main_and_ancestry(st, tmp_path):
     assert e.value.rule == "downgrade"
 
 
-def test_cli_branches_merge_and_approve(tmp_path):
-    (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump({"domain": "d.domain.yaml", "sources": []}))
-    raw = schema_doc_domain()
-    write(tmp_path / "d.domain.yaml", raw)
-    def run(*a):
-        return subprocess.run(["uv", "run", "--quiet", "toprope-author", *a, "--workspace", str(tmp_path)],
-                              capture_output=True, text=True, timeout=120, check=False)
-    c1 = json.loads(run("commit", "--branch", "feat").stdout)
-    assert c1["branch"] == "feat"
-    assert "protected" in run("commit", "--branch", "main").stderr
-    assert json.loads(run("approve", c1["commit"], "--as", "ana", "--yes").stdout)["main"] == c1["commit"]
-    assert json.loads(run("branches").stdout) == {"feat": c1["commit"], "main": c1["commit"]}
-    assert json.loads(run("merge", "--branch", "feat").stdout)["up_to_date"] is True
-
-
 # -- review findings -----------------------------------------------------------------------------
 def workspace(tmp_path, raw):
     from toprope.workspace import Workspace
@@ -382,3 +367,27 @@ def test_the_kernel_merges_main_into_a_working_copy(tmp_path):
     assert len(ws.commits.get("example", done["id"]).parents) == 2
     again = k.call("merge_main", {"domain": "example", "branch": "work", "declaration": "d.domain.yaml"})
     assert again["up_to_date"] is True
+
+
+def commits_cli(tmp_path, *a):
+    """`toprope-commits`, the kernel's read-only command for a commit store."""
+    r = subprocess.run(["uv", "run", "--quiet", "toprope-commits", "--commits", str(tmp_path / ".toprope/commits"),
+                        *a], capture_output=True, text=True, timeout=120, check=False)
+    return r
+
+
+def test_branches_merge_and_approve_and_the_read_command(tmp_path):
+    ws = workspace(tmp_path, schema_doc_domain())
+    from toprope.workspace import AuthoringError
+    c1 = ws.commit(branch="feat")
+    assert c1["branch"] == "feat"
+    with pytest.raises(AuthoringError, match="protected"):
+        ws.commit(branch="main")
+    assert ws.approve_commit(c1["commit"], via="cli", who="ana")["main"] == c1["commit"]
+    out = commits_cli(tmp_path, "branches", "example")
+    assert out.returncode == 0 and json.loads(out.stdout) == {"feat": c1["commit"], "main": c1["commit"]}
+    assert ws.merge_main("feat")["up_to_date"] is True
+    unknown = commits_cli(tmp_path, "checks", "example", "9-nope")
+    assert unknown.returncode == 0 and json.loads(unknown.stdout) == {}
+    bad = commits_cli(tmp_path, "diff", "example", "1-a", "2-b", "3-c")
+    assert bad.returncode == 1 and "diff takes [FROM] TO" in bad.stderr

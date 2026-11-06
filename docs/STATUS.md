@@ -15,7 +15,7 @@ Legend: ✅ done · 🟡 in part · ⬜ not started
 | Milestone | Link | Status | Note |
 |---|---|---|---|
 | M0a thin slice | none (enabler) | ✅ | released as `v0.1.0` (#65); the tag is not pushed yet |
-| M1 self-compile | ① ⑥ pilot, no verdict | 🟡 | Phase A done; switch-over in progress; Phase B not started |
+| M1 self-compile | ① ⑥ pilot, no verdict | 🟡 | Phase A done; switch-over awaits sign-off; Phase B not started |
 | M0b surfaces and effects | none (enabler) | ⬜ | |
 | M2 dogfood | ① ② ③ | ⬜ | the first ① and ② verdicts |
 | M3 shared language | ④ | ⬜ | |
@@ -56,10 +56,12 @@ replay and in-flight check, incremental analysis, commits and branches (ADR-0029
 | 2. Per-domain layout and a JSONL event store in git; Authoring calls the interview services | ✅ | #82, #83 |
 | 3. `toprope-run` as yourself from your git identity (`toprope.identity.yaml`) | ✅ | #85 |
 | 4. The whole loop on the generated tools, end to end; the regeneration check passes | ✅ | #86 |
-| 5. Remove `toprope-author`, `toprope-deploy` and their hand-written guides; generate the kernel's command reference | 🟡 merge, checkout and confirm-all declared (proposed); removal next | #89 |
+| 5. Remove `toprope-author`, `toprope-deploy` and their hand-written guides; merge, checkout and confirm-all declared; the kernel's command reference generated (`docs/kernel-commands.md`) | ✅ | #89 |
 | Researcher sign-off; the umbrella merges into `develop` | ⬜ | |
 
-Sub-PRs 1–4 are on the umbrella branch, not yet on `develop`.
+All five sub-PRs are on the umbrella branch, not yet on `develop`. Nothing but the kernel is
+hand-built there: the self domains run from their declarations, and their guides and the
+kernel's command reference are generated.
 
 ### How the self domains run (on the umbrella branch)
 
@@ -71,6 +73,9 @@ Sub-PRs 1–4 are on the umbrella branch, not yet on `develop`.
   that require a person also ask on your terminal: a guard against mistakes, not a boundary.
 - `toprope-run` reports what a command set off (`then`): each kernel call, its reply, the
   object a creating reply made (for example the new commit's id), and each handoff.
+- Approving a change is `commit_draft`, `check_commit`, `approve_commit` (there is no `ship`
+  shortcut any more); `confirm_all_proposed` confirms every proposed element at once. Reads
+  are `toprope-commits` (branches, log, diff, checks, deployed).
 
 ## M0b, M2 to M5
 
@@ -78,7 +83,7 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 
 ## Next
 
-1. Switch-over sub-PR 5, then the researcher's sign-off and the umbrella merge.
+1. The researcher's sign-off on the switch-over, then the umbrella merges into `develop`.
 2. M1 instruments, the rest (researcher): the change requests and the sealed change key, frozen
    before the pilot runs; then the binding ([`experiments/m1/README.md`](../experiments/m1/README.md)).
 3. M1 Phase B, then the M1 report.
@@ -101,11 +106,16 @@ it; each release's cleanup PR handles items older than one release.
 - `toprope-run` reads `git config` twice per command (once to check the caller, once in
   `submit`) (#85, 2026-11-06)
 - `identity/git.py` repeats the git lookup in `Workspace.identity`, and the two name a person
-  differently (the identity file's name vs git `user.name`); goes away with sub-PR 5
-  (#85, 2026-11-06)
+  differently (the identity file's name vs git `user.name`); only the workspace API's
+  `confirm(via="cli")` still uses the latter (#85, 2026-11-06)
 - The mechanical layer computes `unreachable_from_creation` twice per run (#71, 2026-11-05)
 
 ## Open questions
+
+- The generated Authoring tools give an agent source *references* (`search`), not the text the
+  removed authoring MCP served with redaction (`read_source`). Agents read files directly now,
+  so redaction and local-only rules hold only for what goes through the kernel. Add a
+  `read_source` text service and action, or accept for M1? (#89)
 
 - An agent on the researcher's own machine runs with the researcher's git email, so it acts as
   the researcher for every action that does not require a person. Accept this for M1 (the

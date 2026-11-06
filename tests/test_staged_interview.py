@@ -1,4 +1,3 @@
-import asyncio
 import copy
 import http.server
 import json
@@ -6,10 +5,8 @@ import threading
 
 import pytest
 import yaml
-from mcp import Client
 
 from toprope.workspace import AuthoringError, Workspace
-from toprope.authoring.mcp import build_authoring_server
 
 CONFIG = {"domain": "drafts/d.domain.yaml", "interview_log": "interview/log.jsonl",
           "sources": [{"id": "docs", "kind": "records", "path": "docs"},
@@ -253,19 +250,17 @@ def test_a_local_only_link_is_fetched_but_never_served(tmp_path, site):
         ws.read_source("wiki")
 
 
-def test_mcp_exposes_stages_progress_and_skip(ws):
+def test_the_kernel_serves_stages_and_skips_an_optional_one(ws):
+    """The stage operations the generated Authoring tools call (next_questions, skip_stage)."""
+    from toprope.kernel.services import LocalKernel
     put(ws, upto("invariants"))
+    k = LocalKernel(ws.root, workspace=ws)
+    b = k.call("stage_questions", {})
+    assert b["ok"] and b["stage"] == "invariants" and ws.questions()["optional"] is True
+    assert ws.progress()["current"] == "invariants"
+    assert k.call("skip_stage", {"stage": "invariants", "reason": "None beyond the stages."})["skipped"] is True
+    assert ws.progress()["current"] == "world"
+    refused = k.call("skip_stage", {"stage": "cast", "reason": "x"})
+    assert not refused["ok"] and "optional" in refused["error"]
 
-    async def go():
-        async with Client(build_authoring_server(ws)) as c:
-            def p(r):
-                sc = r.structured_content
-                return sc.get("result", sc) if isinstance(sc, dict) and set(sc) == {"result"} else sc
-            b = p(await c.call_tool("questions", {}))
-            assert b["stage"] == "invariants" and b["optional"] is True
-            assert p(await c.call_tool("progress", {}))["current"] == "invariants"
-            out = p(await c.call_tool("skip_stage", {"stage": "invariants", "reason": "None beyond the stages."}))
-            assert out["current"] == "world"
-            r = await c.call_tool("skip_stage", {"stage": "cast", "reason": "x"})
-            assert r.is_error
-    asyncio.run(go())
+

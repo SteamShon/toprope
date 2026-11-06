@@ -98,20 +98,23 @@ def test_floor_no_stranded_objects(tmp_path):
     assert e.value.rule == "stranded" and "E-live" in e.value.reason
 
 
-def test_cli(tmp_path):
+def test_preview_deploy_through_the_kernel_and_the_deployed_command(tmp_path):
+    from toprope.kernel.services import LocalKernel
     st = CommitStore(tmp_path / "commits")
     c, _ = st.commit(write(tmp_path, schema_doc_domain()))
-    run = lambda *a: subprocess.run(["uv", "run", "--quiet", "toprope-deploy", "--env", str(tmp_path / "env"),  # noqa: E731
-                                     "--commits", str(tmp_path / "commits"), *a],
-                                    capture_output=True, text=True, timeout=120)
-    assert run("preview", "example", c.id).returncode == 0
-    unapproved = run("deploy", "example", c.id, "--approver", "ana")
-    assert unapproved.returncode != 0 and "refused (unapproved)" in unapproved.stderr
+    k = LocalKernel(tmp_path, environment=LocalEnvironment(tmp_path / "env"), harness_examples=5, commits=st)
+    ana = {"id": "ana", "kind": "person"}
+    assert k.call("preview", {"domain": "example", "commit": c.id})["harness_ok"] is True
+    unapproved = k.call("deploy", {"domain": "example", "commit": c.id, "approver": "ana"}, caller=ana)
+    assert unapproved["deployed"] is False and unapproved["error"].startswith("unapproved")
     st.approve("example", c.id, "ana")
-    assert run("deploy", "example", c.id, "--approver", "ana").returncode == 0
-    assert json.loads(run("status").stdout)["current"]["commit"] == c.id
-    unknown = run("deploy", "example", "9-nope", "--approver", "ana")
-    assert unknown.returncode != 0 and "no commit" in unknown.stderr
+    assert k.call("deploy", {"domain": "example", "commit": c.id, "approver": "ana"}, caller=ana)["deployed"] is True
+    r = subprocess.run(["uv", "run", "--quiet", "toprope-commits", "deployed", "--env", str(tmp_path / "env")],
+                       capture_output=True, text=True, timeout=120)
+    out = json.loads(r.stdout)
+    assert out["current"]["commit"] == c.id and out["server_args"] and out["history"]
+    unknown = k.call("deploy", {"domain": "example", "commit": "9-nope", "approver": "ana"}, caller=ana)
+    assert not unknown["ok"] and "no commit" in unknown["error"]
 
 
 def test_a_terminal_state_without_a_matrix_row_is_not_stranded(tmp_path):

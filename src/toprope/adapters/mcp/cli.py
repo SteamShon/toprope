@@ -69,7 +69,7 @@ def open_identity(spec: str) -> Identity:
     raise SystemExit(f"unknown identity {spec!r}: use static:FILE or jwt")
 
 
-def main(argv: list[str] | None = None) -> None:
+def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="toprope-server", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--domain", help="one declaration (or --composition with --member)")
@@ -84,13 +84,20 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--env", help="local deploy environment, for the preview and deploy services")
     ap.add_argument("--store", default=None, help="with --domain: memory (default), sqlite:FILE, postgres:DSN or "
                                                "jsonl:DIR; with --composition, memory keeps nothing")
-    ap.add_argument("--identity", required=True)
-    ap.add_argument("--transport", choices=["stdio", "http"], default="stdio")
-    ap.add_argument("--host", default="127.0.0.1")
-    ap.add_argument("--port", type=int, default=8765)
+    ap.add_argument("--identity", required=True, help="how callers are resolved: static:FILE (token -> caller) or jwt")
+    ap.add_argument("--transport", choices=["stdio", "http"], default="stdio",
+                    help="stdio for one local caller (TOPROPE_TOKEN), http for many (streamable HTTP)")
+    ap.add_argument("--host", default="127.0.0.1", help="with --transport http: the address to listen on")
+    ap.add_argument("--port", type=int, default=8765, help="with --transport http: the port")
     ap.add_argument("--public-url", help="URL clients use to reach this server (default http://HOST:PORT)")
-    ap.add_argument("--no-seed", action="store_true", help="do not load the declaration's fixtures")
+    ap.add_argument("--no-seed", action="store_true", help="do not load the declaration's example fixtures "
+                    "(never loaded into a composition member's own event log)")
     ap.add_argument("--harness-report", help="harness report JSON (toprope-harness --json) shown in the world map")
+    return ap
+
+
+def main(argv: list[str] | None = None) -> None:
+    ap = build_parser()
     args = ap.parse_args(argv)
 
     if bool(args.domain) == bool(args.composition) or bool(args.composition) != bool(args.member):

@@ -238,24 +238,23 @@ def test_concurrent_deploys_of_one_commit_deploy_once(tmp_path):
     assert sorted(results) == ["deployed"] + ["downgrade"] * 4
 
 
-# -- the bootstrap authoring tool ---------------------------------------------------------------------
-def test_authoring_cli_commit_diff_approve(tmp_path):
+# -- the workspace and the read command -----------------------------------------------------------
+def test_workspace_commit_diff_approve_and_the_diff_command(tmp_path):
+    from toprope.workspace import Workspace
     (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump({"domain": "d.domain.yaml", "sources": []}))
     raw = schema_doc_domain()
     write(tmp_path / "d.domain.yaml", raw)
-    run = lambda *a, **kw: subprocess.run(["uv", "run", "--quiet", "toprope-author", *a, "--workspace", str(tmp_path)],  # noqa: E731
-                                          capture_output=True, text=True, timeout=120, **kw)
-    c1 = json.loads(run("commit", "-m", "first").stdout)
+    ws = Workspace(tmp_path)
+    c1 = ws.commit("first")
     assert c1["created"] and c1["since"] is None and c1["to_review"]
-    refused = run("approve", c1["commit"], "--as", "ana", stdin=subprocess.DEVNULL)
-    assert refused.returncode != 0 and "terminal" in refused.stderr
-    assert run("approve", c1["commit"], "--as", "ana", "--yes").returncode == 0
+    ws.approve_commit(c1["commit"], via="cli", who="ana")
     raw["actions"]["launch_experiment"]["description"] = "Start traffic."
     write(tmp_path / "d.domain.yaml", raw)
-    c2 = json.loads(run("commit").stdout)
+    c2 = ws.commit()
     assert c2["since"] == c1["commit"] and c2["to_review"] == ["action:launch_experiment"]
-    d = json.loads(run("diff", c1["commit"], c2["commit"]).stdout)
-    assert d["changed"] == ["action:launch_experiment"]
+    r = subprocess.run(["uv", "run", "--quiet", "toprope-commits", "--commits", str(tmp_path / ".toprope/commits"),
+                        "diff", "example", c1["commit"], c2["commit"]], capture_output=True, text=True, timeout=120)
+    assert json.loads(r.stdout)["changed"] == ["action:launch_experiment"]
 
 
 def test_approving_without_a_domain_or_an_unknown_commit_is_an_authoring_error(tmp_path):
@@ -321,28 +320,3 @@ def test_an_unreadable_representation_stops_the_commit_and_an_explicit_empty_lis
         st.commit(wc)
 
 
-def test_ship_commits_checks_and_approves_every_domain(tmp_path):
-    """One command for the owner: commit, change check, approve, per workspace."""
-    from toprope.commits import CommitStore
-    for name in ("one", "two"):
-        raw = schema_doc_domain()
-        raw["domain"] = name
-        write(tmp_path / f"{name}.domain.yaml", raw)
-        (tmp_path / f"toprope.{name}.workspace.yaml").write_text(yaml.safe_dump(
-            {"domain": f"{name}.domain.yaml", "interview_log": f"interview/{name}.jsonl", "sources": []}))
-    run = lambda *a: subprocess.run(["uv", "run", "--quiet", "toprope-author", "ship", *a], cwd=tmp_path,  # noqa: E731
-                                    capture_output=True, text=True, timeout=240, check=False)
-    ws = ["--workspace", "toprope.one.workspace.yaml", "--workspace", "toprope.two.workspace.yaml"]
-    out = run("-m", "first", "--examples", "5", "--yes", "--as", "ana", *ws)
-    assert out.returncode == 0, out.stderr
-    st = CommitStore(tmp_path / ".toprope" / "commits")
-    assert st.main("one") is not None and st.main("two") is not None
-    assert st.approvals("one")[0]["approver"] == "ana"
-    assert "already approved" in run("--examples", "5", "--yes", *ws).stderr       # nothing changed
-    raw = schema_doc_domain()
-    raw["domain"] = "one"
-    raw["transitions"]["Experiment"]["matrix"]["approved"]["launch_experiment"] = {"deny": "No."}
-    write(tmp_path / "one.domain.yaml", raw)                                       # newly unreachable: fails
-    bad = run("--examples", "5", "--yes", "--workspace", "toprope.one.workspace.yaml")
-    assert bad.returncode == 1 and "not approved" in bad.stderr
-    assert len(st.approvals("one")) == 1

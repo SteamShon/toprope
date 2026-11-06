@@ -230,7 +230,7 @@ def fetch(spec: SourceSpec, root: Path, timeout: float = 20) -> dict:
     if spec.kind not in ("records", "transcripts"):
         raise FetchError(f"source {spec.id}: a link can be a records or transcripts source; "
                          "clone a repository and give its path instead")
-    req = urllib.request.Request(spec.url, headers={"User-Agent": "toprope-author/0", "Accept": "text/*, application/json"})
+    req = urllib.request.Request(spec.url, headers={"User-Agent": "toprope/0", "Accept": "text/*, application/json"})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             final = r.geturl()
