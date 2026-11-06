@@ -91,15 +91,12 @@ each into `umbrella/pstack-lessons`. Each sub-PR changes only its own item below
 
 - ⬜ 2. M1 Phase B run protocol (draft): blinding and run counts for the three arms
 
-- 🟡 3. Commits cite evidence, with how strong it is (ADR-0041 follow-up). Done: the kernel's
+- ✅ 3. Commits cite evidence, with how strong it is (ADR-0041 follow-up). The kernel's
   `cite_evidence` refuses a ref that does not resolve (an interview line, a source chunk, a
-  check recorded on the commit, or a stored event) and records its strength
-  (pointed, ran or observed); `toprope-commits evidence` lists it (`docs/commits.md`). The Authoring
-  declaration calls it: `cite_evidence` and its reply `record_evidence` were proposed through
-  `toprope-run` by the agent and confirmed by the researcher (human request
-  `confirm-cite-evidence`); the confirmed commit `6-7a576971f3e73bb4` passes every check, and the
-  agent's grant includes `cite_evidence`. Left: the researcher approves that commit (human
-  request `approve-cite-evidence`) (#124)
+  check recorded on the commit, or a stored event) and records its strength (pointed, ran or
+  observed); `toprope-commits evidence` lists it (`docs/commits.md`). The Authoring declaration
+  calls it through the loop: proposed by the agent, confirmed and approved by the researcher
+  (human requests, Authoring `main` is `6-7a576971f3e73bb4`); the agent's grant includes it (#124)
 
 - ⬜ 4. World map state charts mark where the harness found a break, and draw minimal flows
 
