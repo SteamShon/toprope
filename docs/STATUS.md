@@ -106,6 +106,10 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 Each item names the PR it came from and the review date. The PR that resolves an item deletes
 it; each release's cleanup PR handles items older than one release.
 
+- Nothing keeps the author of a commit from approving it: `approve_commit` checks only that a
+  person approves (`requires: human`) a commit whose checks passed. Charter §5 says "no
+  self-approval"; ADR-0032 keeps one approver in M1. Decide whether to enforce author ≠
+  approver before M2, when a domain gets more than one owner (#102, 2026-11-06)
 - `then` in `toprope-run` reads only the target's stream, so a call or handoff set off on
   another stream (for example by a newly created object) is not shown (#86, 2026-11-06)
 - The effect-resolution summary is written twice, in `toprope-run` (`followed`) and in the
@@ -136,6 +140,10 @@ it; each release's cleanup PR handles items older than one release.
 
 ## Open questions
 
+- The README now calls brownfield the case Toprope designs for, but the first brownfield adapter
+  is planned for M0b, after M1, and M2 does not require one. Make brownfield an actual priority
+  (move the adapter earlier, or a brownfield M2)? That would need an ADR changing the roadmap
+  order (#102)
 - An agent on the researcher's own machine runs with the researcher's git email, so it acts as
   the researcher for every action that does not require a person. Accept this for M1 (the
   decision 30A trust model), or give local agents their own identity? (#85)
