@@ -299,6 +299,14 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     g.add_argument("--instruments", type=Path, default=INSTRUMENTS)
     g.add_argument("--partial", action="store_true", help="grade an incomplete run (tests; never for the report)")
     g.add_argument("--jobs", type=int, default=4, help="grader conversations at once (default 4)")
+    g.add_argument("--whole-probe", action="store_true", help="grade each probe in one verdict (no rubric)")
+    st = sub.add_parser("stability", parents=[common], help="grade a sample of probe runs several times, the "
+                        "whole-probe way and by the rubric, and compare how often each agrees with itself")
+    st.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    st.add_argument("--instruments", type=Path, default=INSTRUMENTS)
+    st.add_argument("--per-probe", type=int, default=5)
+    st.add_argument("--samples", type=int, default=3)
+    st.add_argument("--jobs", type=int, default=4)
     rp = sub.add_parser("reprobe", parents=[common], help="run probes again on a finished Toprope run "
                         "(a probe world set up wrong); the old results are kept")
     rp.add_argument("arm", choices=["toprope"])
@@ -336,12 +344,17 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
         print(json.dumps({"rerun": len(rs), "errors": sum(1 for r in rs if r.get("error")),
                           "usage": backend.report()}))
         return
+    if args.cmd == "stability":
+        from .score import stability
+        s = stability(args.out, args.instruments, backend, args.per_probe, args.samples, jobs=args.jobs)
+        print(json.dumps({k: v for k, v in s.items() if k != "rows"} | {"usage": backend.report()}))
+        return
     if args.cmd == "grade":
         errs = verify_instruments(args.instruments)
         if errs:
             raise SystemExit("the instruments do not verify; nothing is graded:\n" + "\n".join(errs))
         path = grade_run(args.out, args.instruments, backend, change_requests(args.instruments), args.partial,
-                         jobs=args.jobs)
+                         jobs=args.jobs, use_rubric=not args.whole_probe)
         print(json.dumps({"proposed": str(path), "usage": backend.report()}))
         return
     if args.cmd == "render":

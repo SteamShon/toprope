@@ -303,7 +303,7 @@ def load_rulings(run: Path) -> dict[str, list[str]]:
 
 
 def grade(run: Path, instruments: Path, backend: Any, requests: list[dict[str, Any]], partial: bool = False,
-          jobs: int = 1) -> Path:
+          jobs: int = 1, use_rubric: bool = True, samples: int = 3) -> Path:
     from concurrent.futures import ThreadPoolExecutor
     seqs = [r["seq"] for r in requests]
     missing = complete(run, seqs)
@@ -312,6 +312,8 @@ def grade(run: Path, instruments: Path, backend: Any, requests: list[dict[str, A
     key, binding = load_sealed(instruments)
     probes = {p["id"]: p for p in yaml.safe_load((instruments / "probe-suite.yaml").read_text())["probes"]}
     rulings = load_rulings(run)
+    from . import rubric as rubric_mod
+    rubric = rubric_mod.load(run) if use_rubric else None
     out = run / "scoring"
     tr, items = out / "transcripts", out / "items"
     work: list[tuple[str, str, int, Any]] = []                  # (arm, kind, seq, job)
@@ -325,9 +327,14 @@ def grade(run: Path, instruments: Path, backend: Any, requests: list[dict[str, A
                 d = run / arm / f"seq-{seq:02d}"
 
                 def job(a=arm, s=seq, res=res, d=d):
-                    g = _cached(items / f"{a}-seq-{s:02d}-{res['probe']}.json", lambda: grade_probe(
-                        backend, probes[res["probe"]], d, res, tr / f"{a}-seq-{s:02d}-{res['probe']}.jsonl",
-                        rulings.get(res["probe"])))
+                    name = f"{a}-seq-{s:02d}-{res['probe']}"
+                    if rubric is not None:              # item by item (rubric.py)
+                        g = _cached(items / f"{name}.rubric.json", lambda: rubric_mod.grade_run(
+                            backend, probes[res["probe"]], rubric, d, res, tr / f"{name}.rubric.jsonl",
+                            rulings.get(res["probe"]), samples))
+                        return {"seq": s, **g}
+                    g = _cached(items / f"{name}.json", lambda: grade_probe(
+                        backend, probes[res["probe"]], d, res, tr / f"{name}.jsonl", rulings.get(res["probe"])))
                     m = mechanical(res["probe"], d, res)
                     # the researcher looks first where the two disagree, or the grader could not decide
                     return {"seq": s, **g, "mechanical": m,
@@ -343,7 +350,9 @@ def grade(run: Path, instruments: Path, backend: Any, requests: list[dict[str, A
         return w, r
     with ThreadPoolExecutor(max_workers=max(1, jobs)) as pool:
         results = list(pool.map(run_one, work))
-    proposal: dict[str, Any] = {"status": "proposed", "partial": bool(missing), "missing": missing, "arms": {
+    proposal: dict[str, Any] = {"status": "proposed", "partial": bool(missing), "missing": missing,
+                                "probe_grading": ({"rubric": rubric.get("status"), "samples": samples}
+                                                  if rubric is not None else "whole-probe"), "arms": {
         arm: {"changes": [r for w, r in results if w[0] == arm and w[1] == "change"],
               "probes": [r for w, r in results if w[0] == arm and w[1] == "probe"]} for arm in ARMS}}
     looks = sum(p["look"] for a in proposal["arms"].values() for p in a["probes"])
@@ -496,3 +505,47 @@ def score(run: Path, instruments: Path) -> dict[str, Any]:
               "unbindable": sorted(s for s, b in binding.items() if b.get("unbindable"))}
     (run / "scoring/metrics.json").write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n")
     return result
+
+
+# -- how stable the probe grading is -------------------------------------------------------------------------
+
+def stability(run: Path, instruments: Path, backend: Any, per_probe: int = 5, samples: int = 3, seed: int = 119,
+              jobs: int = 1) -> dict[str, Any]:
+    """The same sample of probe runs graded `samples` times by the whole-probe grader and by the
+    rubric: how often each gives the same verdict every time."""
+    import random
+    from concurrent.futures import ThreadPoolExecutor
+
+    from . import rubric as rubric_mod
+    rubric = rubric_mod.load(run)
+    if rubric is None:
+        raise SystemExit("no scoring/rubric.yaml")
+    probes = {p["id"]: p for p in yaml.safe_load((instruments / "probe-suite.yaml").read_text())["probes"]}
+    rulings = load_rulings(run)
+    runs = [(arm, seq, res) for arm in ARMS for seq, rec in sorted(records(run, arm).items())
+            for res in rec.get("probes") or [] if not res.get("error")]
+    rng = random.Random(seed)
+    sample = []
+    for pid in sorted(probes):
+        mine = [r for r in runs if r[2]["probe"] == pid]
+        sample += rng.sample(mine, min(per_probe, len(mine)))
+    tr = run / "scoring/stability"
+
+    def one(item):
+        arm, seq, res = item
+        d = run / arm / f"seq-{seq:02d}"
+        name = f"{arm}-seq-{seq:02d}-{res['probe']}"
+        whole = [grade_probe(backend, probes[res["probe"]], d, res, tr / f"{name}.whole-{i}.jsonl",
+                             rulings.get(res["probe"]))["passed"] for i in range(samples)]
+        items = [rubric_mod.grade_run(backend, probes[res["probe"]], rubric, d, res, tr / f"{name}.rubric-{i}.jsonl",
+                                      rulings.get(res["probe"]), samples=1)["passed"] for i in range(samples)]
+        return {"run": name, "whole": whole, "rubric": items}
+    with ThreadPoolExecutor(max_workers=max(1, jobs)) as pool:
+        rows = list(pool.map(one, sample))
+    same = lambda vs: len(set(vs)) == 1
+    out = {"sample": len(rows), "samples_each": samples, "seed": seed,
+           "whole_probe_unanimous": round(sum(same(r["whole"]) for r in rows) / len(rows), 4) if rows else None,
+           "rubric_unanimous": round(sum(same(r["rubric"]) for r in rows) / len(rows), 4) if rows else None,
+           "rows": rows}
+    (run / "scoring/stability.json").write_text(json.dumps(out, indent=2) + "\n")
+    return out
