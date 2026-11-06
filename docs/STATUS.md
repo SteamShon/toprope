@@ -92,7 +92,10 @@ each into `umbrella/pstack-lessons`. Each sub-PR changes only its own item below
   enforces it. Three rules stay text only (gold sets, real tests, model identifiers): no past
   mistake to prove a check on (#122)
 
-- ⬜ 2. M1 Phase B run protocol (draft): blinding and run counts for the three arms
+- 🟡 2. M1 Phase B run protocol: drafted (`experiments/m1/run-protocol.md`), with blinding,
+  grading by sanitized label, 3 runs per stochastic part, and the spread with every number.
+  It is left for the researcher to review and freeze before any arm runs. Its four questions
+  need answers first (#123)
 
 - ⬜ 3. Commits cite evidence, with how strong it is (ADR-0041 follow-up)
 
