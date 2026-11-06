@@ -81,6 +81,22 @@ command reference are generated.
   shortcut any more); `confirm_all_proposed` confirms every proposed element at once. Reads
   are `toprope-commits` (branches, log, diff, checks, deployed).
 
+## Lessons from pstack (umbrella, link: ① ② ③ and none)
+
+Five changes taken from a review of the pstack agent skills (`cursor/plugins`), one sub-PR
+each into `umbrella/pstack-lessons`. Each sub-PR changes only its own item below.
+
+- ⬜ 1. Rules enforced by checks, not text: tests, frozen instruments and file references
+  checked in CI; a rule ↔ enforcer table in `AGENTS.md`
+
+- ⬜ 2. M1 Phase B run protocol (draft): blinding and run counts for the three arms
+
+- ⬜ 3. Commits cite evidence, with how strong it is (ADR-0041 follow-up)
+
+- ⬜ 4. World map state charts mark where the harness found a break, and draw minimal flows
+
+- ⬜ 5. Harness mutants: the harness must catch a seeded break in each level
+
 ## M0b, M2 to M5
 
 Not started. Plans: [`roadmap.md`](roadmap.md).
