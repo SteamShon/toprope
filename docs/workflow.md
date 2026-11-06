@@ -5,6 +5,13 @@ use them, with who runs each step. Until the M1 switch-over (ADR-0022), these ha
 commands are how Authoring and Delivery are done; afterwards the same steps are actions of the
 generated Authoring and Delivery domains (`domains/*.guide.md`).
 
+**Generated for every domain (ADR-0036).** Each domain's guide (`domain-guide.md` at preview;
+for the self domains, [`domains/authoring.guide.md`](../domains/authoring.guide.md) and
+[`domains/delivery.guide.md`](../domains/delivery.guide.md)) has a generated *How to work in
+this domain* section: every stage, who acts, what only a person may do, and the
+`toprope-run` command for each action. This page keeps the kernel's commands, and, until the
+M1 switch-over, the bootstrap commands for Authoring and Delivery (§1–§3).
+
 **Who.** *Owner*: the person who owns a domain (in M1, the researcher). *Agent*: an AI agent
 working for the owner (for example Claude Code, through the authoring MCP or the CLI).
 *Maintainer*: whoever releases. Some steps are **owner only**: an agent never runs them, even

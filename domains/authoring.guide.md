@@ -119,8 +119,73 @@ For each stage: may the action happen, and where does it lead? A missing cell is
 
 - `deliver_approved_commit`: after `deliver`, calls delivery.`request_delivery`
 
+## How to work in this domain
+
+Generated from the actions, their actors, the matrix and the kernel calls: for each thing, how it comes to exist, then what can happen in each stage and who does it. Steps marked **a person only** are never taken by an agent.
+
+### Commit
+
+- **record_commit** by the kernel, automatically (a reply) → `recorded`
+
+**In `recorded`:**
+
+- **check_commit** by `owner`. Then starts kernel `change_check`, answered by `record_check`. Run: `toprope-run --domain authoring.domain.yaml check_commit ID`
+- **record_check** by the kernel, automatically (a reply)
+- **approve_commit** by `owner` — **a person only** — recorded as a decision. Needs: Run the change check, and approve only a commit that passes it. Already approved; approve a newer commit. Then starts kernel `approve_commit`, answered by `record_approval`. Run: `toprope-run --domain authoring.domain.yaml approve_commit ID`
+- **record_approval** by the kernel, automatically (a reply). Needs: A commit is recorded as approved only if its change check passed
+- **deliver** by `owner`. Needs: Only an approved commit is delivered. Then hands over to delivery.`request_delivery`. Run: `toprope-run --domain authoring.domain.yaml deliver ID --environment ENVIRONMENT`
+
+### DecisionRequest
+
+- **request_decision** by `owner` → `open`. Run: `toprope-run --domain authoring.domain.yaml request_decision NEW_ID --element ELEMENT --subject SUBJECT --grounds GROUNDS --recommendation RECOMMENDATION`
+
+**In `open`:**
+
+- **decide** by `owner` — **a person only** — recorded as a decision → `decided`. Run: `toprope-run --domain authoring.domain.yaml decide ID --choice CHOICE`
+
+**In `decided`:** nothing more happens (final).
+
+### Draft
+
+
+**In `open`:**
+
+- **commit_draft** by `owner`. Then starts kernel `commit`, answered by `record_commit`. Run: `toprope-run --domain authoring.domain.yaml commit_draft ID`
+
+### Element
+
+- **propose_element** by `owner` → `proposed`. Run: `toprope-run --domain authoring.domain.yaml propose_element NEW_ID --path PATH --origin ORIGIN`
+
+**In `proposed`:**
+
+- **confirm_element** by `owner` — **a person only** → `confirmed`. Run: `toprope-run --domain authoring.domain.yaml confirm_element ID`
+- **mark_unknown** by `owner`, `expert` → `unknown`. Run: `toprope-run --domain authoring.domain.yaml mark_unknown ID`
+
+**In `confirmed`:** nothing more happens (final).
+
+**In `unknown`:**
+
+- **confirm_element** by `owner` — **a person only** → `confirmed`. Run: `toprope-run --domain authoring.domain.yaml confirm_element ID`
+
+### Source
+
+- **add_source** by `owner` → `added`. Run: `toprope-run --domain authoring.domain.yaml add_source NEW_ID --kind KIND --path PATH`
+
+**In `added`:**
+
+- **fetch_source** by `owner`. Then starts kernel `fetch_source`, answered by `record_fetch`. Run: `toprope-run --domain authoring.domain.yaml fetch_source ID`
+- **record_fetch** by the kernel, automatically (a reply) → `fetched`
+
+**In `fetched`:** nothing more happens (final).
+
+### Other actions
+
+- **ask_question** by `owner`. Run: `toprope-run --domain authoring.domain.yaml ask_question NEW_ID --stage STAGE --text TEXT`
+- **answer_question** by `owner`, `expert`. Run: `toprope-run --domain authoring.domain.yaml answer_question NEW_ID --question QUESTION --words WORDS`
+
 ## What is generated
 
+- **Command line** `toprope-run --domain authoring.domain.yaml ...`: one subcommand per action, with the same rules as every other surface (ADR-0036), plus `get`, `history`, `allowed` and `guide`.
 - **MCP server** `toprope:authoring`: one tool per action (17), plus `get_object`, `history`, `attempts`, `allowed_actions`, `describe_domain`, `world_map` and `how_to_reach`. Kernel replies (`record_fetch`, `record_commit`, `record_check`, `record_approval`) are tools too, but only the kernel may take them.
 - **Events**: one per action (`AnswerCreated`, `CommitApproveCommit`, `CommitCheckCommit`, `CommitCreated`, `CommitDeliver`, `CommitRecordApproval`, `CommitRecordCheck`, `DecisionRequestCreated`, `DecisionRequestDecide`, `DraftCommitDraft`, `ElementConfirmElement`, `ElementCreated`, `ElementMarkUnknown`, `QuestionCreated`, `SourceCreated`, `SourceFetchSource`, `SourceRecordFetch`); the current state is the events replayed in order.
 - **World map** (`world-map.json`): every object, link, stage and (stage, action) edge.

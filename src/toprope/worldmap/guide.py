@@ -56,6 +56,83 @@ def _row(cells: list[str]) -> str:
     return "| " + " | ".join(c.replace("|", "\\|").replace("\n", " ") for c in cells) + " |"
 
 
+def _doer(a: Action) -> str:
+    """Who takes an action, in words: people by role, the kernel, or another domain."""
+    who = []
+    for r in a.actor:
+        role = r if isinstance(r, str) else r.role
+        if role == KERNEL:
+            who.append("the kernel, automatically (a reply)")
+        elif role == "system":
+            who.append("the system (a handoff from another domain)")
+        else:
+            who.append(f"`{role}`" + (f" (where `{r.where}`)" if not isinstance(r, str) and r.where else ""))
+    return ", ".join(who)
+
+
+def _command(d: Domain, n: str, a: Action) -> str:
+    args = " ".join(f"--{p.replace('_', '-')} {p.upper()}" for p, spec in a.params.items() if not spec.optional)
+    target = "NEW_ID" if a.creates else "ID"
+    return f"`toprope-run --domain {d.domain}.domain.yaml {n} {target}{(' ' + args) if args else ''}`"
+
+
+def _step(d: Domain, n: str, a: Action, to: str | None) -> str:
+    flags = " — **a person only**" if a.requires == "human" else ""
+    flags += " — recorded as a decision" if a.records_decision else ""
+    starts = [f"starts kernel `{e.call}`, answered by `{e.reply}`" for e in a.effects if e.call]
+    starts += [f"hands over to {h.to.domain}.`{h.to.action}`" for h in d.handoffs.values() if h.when.action == n]
+    needs = [p.reason for p in a.preconditions]
+    line = f"- **{n}** by {_doer(a)}{flags}" + (f" → `{to}`" if to else "")
+    if needs:
+        line += ". Needs: " + " ".join(r.rstrip(".") + "." for r in needs).rstrip(".")
+    if starts:
+        line += f". Then {'; '.join(starts)}"
+    is_reply = any((r if isinstance(r, str) else r.role) in (KERNEL, "system") for r in a.actor)
+    return line + ("" if is_reply else f". Run: {_command(d, n, a)}")
+
+
+def _how_to_work(d: Domain) -> list[str]:
+    """Who does what, stage by stage, in the order a thing moves through its stages."""
+    L = ["## How to work in this domain", "",
+         ("Generated from the actions, their actors, the matrix and the kernel calls: for each thing, "
+          "how it comes to exist, then what can happen in each stage and who does it. "
+          "Steps marked **a person only** are never taken by an agent."), ""]
+    done: set[str] = set()
+    for obj, tr in sorted(d.transitions.items()):
+        L += [f"### {obj}", ""]
+        for n, a in d.actions.items():
+            if a.creates == obj:
+                L += [_step(d, n, a, tr.initial)]
+                done.add(n)
+        L += [""]
+        order, todo = [], [tr.initial]
+        while todo:
+            st = todo.pop(0)
+            if st in order or st not in tr.matrix:
+                continue
+            order.append(st)
+            for c in tr.matrix[st].values():
+                to = getattr(c, "to", None) or (c if isinstance(c, str) and c not in ("n/a", "undecided") else None)
+                if to:
+                    todo.append(to)
+        order += [s for s in tr.matrix if s not in order]
+        for st in order:
+            steps = []
+            for n, a in d.actions.items():
+                if a.target != obj:
+                    continue
+                c = tr.matrix[st].get(n, "undecided")
+                to = c.to if isinstance(c, Target) else (c if isinstance(c, str) and c not in ("n/a", "undecided") else None)
+                if to is not None or isinstance(c, ByRole):
+                    steps.append(_step(d, n, a, to if to != st else None))
+                    done.add(n)
+            L += ([f"**In `{st}`:**", ""] + steps if steps else [f"**In `{st}`:** nothing more happens (final)."]) + [""]
+    rest = [(n, a) for n, a in d.actions.items() if n not in done]
+    if rest:
+        L += ["### Other actions", ""] + [_step(d, n, a, None) for n, a in rest] + [""]
+    return L
+
+
 def build_domain_guide(d: Domain, harness: dict[str, Any] | None = None) -> str:
     """`harness` is a harness report as JSON; without it, coverage is not reported."""
     L: list[str] = [f"# Domain guide: `{d.domain}` (version {d.version})", "",
@@ -137,8 +214,11 @@ def build_domain_guide(d: Domain, harness: dict[str, Any] | None = None) -> str:
         L += ["## Handoffs", ""]
         L += [f"- `{n}`: after `{h.when.action}`, calls {h.to.domain}.`{h.to.action}`" for n, h in d.handoffs.items()] + [""]
 
+    L += _how_to_work(d)
     replies = [n for n, a in d.actions.items() if KERNEL in [r if isinstance(r, str) else r.role for r in a.actor]]
     L += ["## What is generated", "",
+          (f"- **Command line** `toprope-run --domain {d.domain}.domain.yaml ...`: one subcommand per action, "
+           "with the same rules as every other surface (ADR-0036), plus `get`, `history`, `allowed` and `guide`."),
           (f"- **MCP server** `toprope:{d.domain}`: one tool per action ({len(d.actions)}), plus `get_object`, "
            "`history`, `attempts`, `allowed_actions`, `describe_domain`, `world_map` and `how_to_reach`."
            + (f" Kernel replies ({', '.join(f'`{r}`' for r in replies)}) are tools too, but only the kernel "
