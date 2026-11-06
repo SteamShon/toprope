@@ -15,7 +15,7 @@ Legend: ✅ done · 🟡 in part · ⬜ not started
 | Milestone | Link | Status | Note |
 |---|---|---|---|
 | M0a thin slice | none (enabler) | ✅ | released as `v0.1.0` (#65); the tag is not pushed yet |
-| M1 self-compile | ① ⑥ pilot, no verdict | 🟡 | Phase A done; switch-over awaits sign-off; Phase B not started |
+| M1 self-compile | ① ⑥ pilot, no verdict | 🟡 | Phase A and the switch-over done; instruments and Phase B left |
 | M0b surfaces and effects | none (enabler) | ⬜ | |
 | M2 dogfood | ① ② ③ | ⬜ | the first ① and ② verdicts |
 | M3 shared language | ④ | ⬜ | |
@@ -44,7 +44,7 @@ replay and in-flight check, incremental analysis, commits and branches (ADR-0029
 | Mechanical harness layer (ADR-0035) | ✅ | #71 |
 | Domain commit store kept in git | ✅ | #75 |
 | Generated `toprope-run` and how-to-work guide (ADR-0036) | ✅ | #76 |
-| Switch-over (ADR-0037, umbrella #81): only the kernel stays hand-built | 🟡 | below |
+| Switch-over (ADR-0037, umbrella #81): only the kernel stays hand-built | ✅ | #81 |
 | Phase B: the change sequence on the three arms | ⬜ | |
 | M1 report ([`experiments/M1-self-compile.md`](experiments/M1-self-compile.md)) | ⬜ | |
 
@@ -57,13 +57,13 @@ replay and in-flight check, incremental analysis, commits and branches (ADR-0029
 | 3. `toprope-run` as yourself from your git identity (`toprope.identity.yaml`) | ✅ | #85 |
 | 4. The whole loop on the generated tools, end to end; the regeneration check passes | ✅ | #86 |
 | 5. Remove `toprope-author`, `toprope-deploy` and their hand-written guides; merge, checkout and confirm-all declared; the kernel's command reference generated (`docs/kernel-commands.md`) | ✅ | #89 |
-| Researcher sign-off; the umbrella merges into `develop` | ⬜ | |
+| Researcher sign-off; the umbrella merges into `develop` | ✅ | #81 |
 
-All five sub-PRs are on the umbrella branch, not yet on `develop`. Nothing but the kernel is
-hand-built there: the self domains run from their declarations, and their guides and the
-kernel's command reference are generated.
+Signed off by the researcher and merged into `develop` (#81). Nothing but the kernel is
+hand-built: the self domains run from their declarations, and their guides and the kernel's
+command reference are generated.
 
-### How the self domains run (on the umbrella branch)
+### How the self domains run
 
 - `toprope-run --composition domains/toprope-self.composition.yaml --member <m>` runs the whole
   loop (commands in [`workflow.md`](workflow.md)). Each member's events go to its own
@@ -83,11 +83,20 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 
 ## Next
 
-1. The researcher's sign-off on the switch-over, then the umbrella merges into `develop`.
-2. M1 instruments, the rest (researcher): the change requests and the sealed change key, frozen
+1. M1 instruments, the rest (researcher): the change requests and the sealed change key, frozen
    before the pilot runs; then the binding ([`experiments/m1/README.md`](../experiments/m1/README.md)).
-3. M1 Phase B, then the M1 report.
-4. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
+2. M1 Phase B, then the M1 report.
+3. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
+4. Before M2 (a domain whose sources may be private): a kernel `read_source` MCP tool that
+   serves source text with redaction and refuses local-only sources, as the removed authoring
+   MCP did. A read, not an action: the text never goes into an event log (decided 2026-11-06).
+   Until then agents get references from `search` and read files directly, which is safe for
+   the self domains (no local-only sources; the agent already sees the repository).
+5. When a domain is shared by several people or agents (M2, or a hosted server): its event
+   log moves from git to a database (`--store postgres:DSN` for a composition, one schema per
+   member), through a new ADR superseding decision 29A for that case; an export to git can
+   keep the audit trail (decided 2026-11-06). Until then the self domains keep their logs in
+   git (`domains/<domain>/events/`).
 
 ## Left from reviews
 
@@ -118,11 +127,6 @@ it; each release's cleanup PR handles items older than one release.
   `elicitation`) (#89, 2026-11-06)
 
 ## Open questions
-
-- The generated Authoring tools give an agent source *references* (`search`), not the text the
-  removed authoring MCP served with redaction (`read_source`). Agents read files directly now,
-  so redaction and local-only rules hold only for what goes through the kernel. Add a
-  `read_source` text service and action, or accept for M1? (#89)
 
 - An agent on the researcher's own machine runs with the researcher's git email, so it acts as
   the researcher for every action that does not require a person. Accept this for M1 (the
