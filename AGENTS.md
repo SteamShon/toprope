@@ -67,6 +67,8 @@ umbrella is up to date with `develop`.
 - A release PR has head `develop`, base `main`, and the title `Release vX.Y.Z` (or
   `Release <milestone>`, e.g. `Release M1`).
 - Its description lists the merged PRs and any change to the claim-status table.
+- Before it, a cleanup PR into `develop` trims `docs/STATUS.md` (see Progress) and sets
+  `Cleaned for release: <name>`. The release PR's check fails until that name matches.
 - Merge with a merge commit. Then tag `main` with `vX.Y.Z`.
 - Releases are cut by the maintainer.
 
@@ -76,6 +78,25 @@ umbrella is up to date with `develop`.
   characters, e.g. `Add M1 self-compile gold-set template`.
 - The PR description says what changed, why, and how it was checked.
 - Keep PRs small: one concern per PR.
+
+## Progress: `docs/STATUS.md`
+
+[`docs/STATUS.md`](docs/STATUS.md) is the one place that says what is done and what is left.
+It is a snapshot, not a log: history stays in git, PRs and ADRs, and plans stay in the
+roadmap and the milestone and experiment docs. Other documents do not restate the current
+state; they link here. The README claim-status table stays in the README, because its
+`Status` column follows the verdict rule above.
+
+- **Every PR into `develop` or an `umbrella/*` branch updates it**: move what the PR
+  finishes to Done, add what it starts to In progress, and change `Updated:`. A PR that
+  changes nothing there says so in its description with a line
+  `STATUS.md: no change - <reason>`.
+- **CI enforces this.** `.github/workflows/status.yml` runs `tools/status_check.py` on every
+  PR. It also checks that the file keeps its sections: Where we are, Done, In progress,
+  Next, Open questions.
+- **Each release trims it.** In the cleanup PR before a release: remove Done items that the
+  release ships (the release PR description lists them), remove anything no longer true,
+  collapse finished sub-items into one line, and set `Cleaned for release: <name>`.
 
 ## Project conventions every PR follows
 
@@ -121,6 +142,7 @@ umbrella is up to date with `develop`.
 - Do not change the claim-status table, ADR decisions or gold sets on your own initiative.
   Propose them in the PR description instead.
 - Do not put model identifiers in commits, PRs or code.
+- Update `docs/STATUS.md` in the same PR as the work it describes (see Progress).
 - **Real tests only.** A new test must fail against the code before your change (or cover
   behavior the change adds). Never write a test that already passes against the old code
   and call it coverage. Never skip, delete, `xfail`, comment out or weaken a test, or loosen
@@ -145,3 +167,5 @@ These cannot be enforced from the repository files. Set them in GitHub:
 - Automatically delete head branches: on, so a work branch is removed when its PR
   merges. `develop` is safe as the default branch; a deleted branch can be restored from
   its merged PR.
+- Required status check: add `status` (from `.github/workflows/status.yml`) to the ruleset
+  on `main` and `develop`, so a PR cannot merge while `docs/STATUS.md` is stale.

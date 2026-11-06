@@ -9,8 +9,8 @@ compile working software that people and agents both use, and to verify every al
 denied state transition before anything is deployed. Every action and decision is recorded
 as an event, so the model can keep improving. Everything below describes the design.
 
-> Status: **pre-M0, design only.** No code yet, and no claims are measured. See
-> [Claim status](#claim-status).
+> Status: **M1 in progress**, and no link has a verdict yet. What is done and what is left:
+> [`docs/STATUS.md`](docs/STATUS.md). Verdicts: [Claim status](#claim-status).
 
 ---
 
@@ -341,6 +341,7 @@ Details, exit criteria and kill criteria: [`docs/roadmap.md`](docs/roadmap.md).
 
 ## Documents
 
+- [`docs/STATUS.md`](docs/STATUS.md): what is done and what is left, now
 - [`docs/charter.md`](docs/charter.md): problem, what Toprope is, the chain, hypotheses, principles
 - [`docs/roadmap.md`](docs/roadmap.md): milestones, each ending with a verdict on a link
 - [`docs/architecture.md`](docs/architecture.md): layers, bounded contexts, ports and adapters, pipelines
