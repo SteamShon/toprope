@@ -291,7 +291,9 @@ class Interpreter:
             {"changes": changes, "params": cmd.params, "action": cmd.action, "created": creating}), **meta)]
         if action.records_decision:
             events.append(Event("DecisionRecorded", stream, obj, kind="decision", payload=copy.deepcopy(
-                {"action": cmd.action, "params": cmd.params, "inputs": current}), **meta))
+                {"action": cmd.action, "params": cmd.params, "inputs": current,
+                 **({"rationale": cmd.params["rationale"]} if cmd.params.get("rationale") else {})}),
+                **meta))
         events += self._handoffs(cmd, obj, new, lookup, meta)                              # step 12
         events += self._calls(cmd, action, obj, new, lookup, meta)
         return Decision(Outcome("ok", state=copy.deepcopy(new)), tuple(events), ())

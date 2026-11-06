@@ -416,7 +416,8 @@
             }
           },
           "records_decision": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "a work decision; such an action also takes an optional `rationale` (string), which it may not declare (ADR-0041)"
           },
           "event": {
             "type": "string"

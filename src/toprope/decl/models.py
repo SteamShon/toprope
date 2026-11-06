@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Literal, Union
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, StringConstraints, field_serializer, model_validator
 from typing import Annotated
 
 Ident = Annotated[str, StringConstraints(pattern=r"^[A-Za-z_][A-Za-z0-9_-]*$")]
@@ -123,6 +123,27 @@ class Action(Provenance):
     applies_in: list[str] | None = None
     requires: Literal["human"] | None = None
     approvals: dict[str, Any] | None = None
+
+    _added: set[str] = PrivateAttr(default_factory=set)        # params the kernel added, not declared
+    _declared_rationale: bool = PrivateAttr(default=False)
+
+    @model_validator(mode="after")
+    def _rationale(self) -> Action:
+        """A decision action takes an optional `rationale` (ADR-0041, Resolved 2): the reason a
+        person gives, stored with the decision. Added here, after the declaration parses, so every
+        surface offers it; a declared one is reported by validation (`reserved-param`)."""
+        if self.records_decision:
+            if "rationale" in self.params:
+                self._declared_rationale = True
+            else:
+                self.params["rationale"] = Param(type="string", optional=True)
+                self._added.add("rationale")
+        return self
+
+    @field_serializer("params")
+    def _declared_params(self, params: dict[str, Param]) -> dict[str, Any]:
+        """Dump what was declared, so a dumped action validates again to the same action."""
+        return {k: v for k, v in params.items() if k not in self._added}
 
     @model_validator(mode="after")
     def _target_or_creates(self) -> Action:

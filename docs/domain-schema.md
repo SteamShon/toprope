@@ -89,7 +89,7 @@ actions:
         reason: An experiment needs at least one guardrail metric before approval.
     effects:
       - set: {target.approved_by: actor.id}
-    records_decision: true  # produces a Decision: who, when, the params and the prior state
+    records_decision: true  # produces a Decision: who, when, the params, the prior state, a rationale
   launch_experiment:
     description: Start traffic to an approved experiment.
     actor: [eng]
@@ -159,7 +159,11 @@ world:                      # the expert's examples; the compiler grows a small 
   string with a string or an integer (ADR-0024); floats, booleans, null and lists
   are refused. The set operators and boolean combinators were added by ADR-0010. Any further
   extension requires an ADR.
-- `records_decision: true` turns an action into an accumulated work decision (⑤).
+- `records_decision: true` turns an action into an accumulated work decision (⑤). Every such
+  action takes an optional `rationale` (string), the reason the person gives. The declaration
+  model adds it, so every surface offers it; it is stored in the `DecisionRecorded` event when
+  given. A decision action may not declare it (`reserved-param`); a non-decision action may, but
+  then cannot become a decision action without renaming it (ADR-0041).
 - **Transition matrix** (ADR-0010):
   - It is the single source for state-based rules. Every (state, action) cell is one of:
     a target state, `{deny: reason}`, `n/a`, `undecided`, or a per-role cell
