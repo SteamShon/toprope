@@ -194,7 +194,7 @@ M0b's UI), checking the non-developer claim (M1 Phase B, M2), TLC modeling creat
   request made, read from its output. `human_request.py change` writes the four steps. A request
   is tooling, not a declared action: the steps stay the Authoring declaration's own.
 
-- 🟡 5. `verify` runs the domain's probes instead of taking a checkbox (#PR)
+- 🟡 5. `verify` runs the domain's probes instead of taking a checkbox (#147)
   The kernel's `probe` service checks a deployed commit in use: its build and the floor, its
   scenarios at the execution level, and every object in the deployed store against every
   invariant (`check.in_use`); recorded as the `probes` check. Delivery's change is proposed
