@@ -133,12 +133,14 @@ only its own item below.
 
 - ⬜ 1. ADR-0043: what is modeled, where TLC runs, what a finding is
 
-- 🟡 2. Exporter (`toprope.tla`; `toprope-harness --tla DIR`): a declaration's model level as a
+- ✅ 2. Exporter (`toprope.tla`; `toprope-harness --tla DIR`): a declaration's model level as a
   TLA+ module and TLC config, values tagged so the check language stays fail closed; actions that
-  create objects, use time or follow links are left out and named (PR)
+  create objects, use time or follow links are left out and named (#137)
 
-- 🟡 3. A `tla` CI job (`.github/workflows/tla.yml`, `tools/tla_check.py`): TLC 1.8.0 pinned by
-  sha256, on the four examples; a model TLC cannot check, or a reached state bound, fails (PR)
+- ✅ 3. A `tla` CI job (`.github/workflows/tla.yml`, `tools/tla_check.py`): TLC 1.8.0 pinned by
+  sha256. The four examples are checked (paid-media 133,686 states, no break), and a seeded break
+  (paid-media without `not-a-holdout`) must be found, so the job can fail; a model TLC cannot
+  check, or a reached state bound, fails (#137)
 
 - ⬜ 4. Replay: each counterexample on the interpreter; a harness gap or a model mismatch fails
 
