@@ -155,7 +155,7 @@ only its own item below.
   kernel reply with a failing result on an already approved commit (`record_check`, Authoring,
   `approved-commits-passed-their-checks`) or a deployed request (`record_build`, Delivery,
   `deployed-builds-passed-their-harness`). Exploration missed them because it tries one default
-  value per param (`true`). Left: decided with the researcher (PR)
+  value per param (`true`). Left: decided with the researcher (#139)
 
 ## M0b, M2 to M5
 
