@@ -93,3 +93,32 @@ def test_the_job_fails_what_it_cannot_trust(tmp_path, fake_tlc, capsys, stem, co
     spec = f"{decl}=breaks:Inv_holdouts_never_change" if decl == SEEDED else str(decl)
     assert tla_check.main(["--jar", "x.jar", "--out", str(tmp_path), spec]) == 1
     assert why in capsys.readouterr().err
+
+
+CREATED = ROOT / "tests/tla/delivery.created-deployed.domain.yaml"
+CREATE_TRACE = '''Error: Invariant Inv_deployed_builds_passed_their_harness is violated.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\\ last = <<"init">>
+/\\ obj = <<>>
+
+State 2: <Create_request_delivery_system line 80, col 1 to line 86, col 9 of module Toprope_delivery>
+/\\ last = << "request_delivery",
+   "system",
+   "new-DeliveryRequest",
+   << <<"domain_id", <<"s", "x">>>>, <<"commit", <<"s", "x">>>>, <<"interface", <<"s", "x">>>>,
+      <<"environment", <<"s", "x">>>>, <<"approver", <<"s", "x">>>> >> >>
+/\\ obj = <<>>
+'''
+
+
+def test_a_break_made_by_creation_is_replayed_too():
+    """The seeded creation break (the `tla` job requires TLC to find it): replay takes the
+    creating step as the `system` actor a handoff is, and the invariant guard refuses it."""
+    seeded, plain = load_domain(CREATED), load_domain(ROOT / "domains/delivery/delivery.domain.yaml")
+    inv, steps = parse_trace(CREATE_TRACE)
+    assert inv == "Inv_deployed_builds_passed_their_harness"
+    assert judge(seeded, inv, steps, harness_broken(seeded))["verdict"] in (KNOWN, GAP)
+    assert judge(plain, inv, steps, set())["verdict"] == MISMATCH    # without the seeded effect
+    workflow = (ROOT / ".github/workflows/tla.yml").read_text()
+    assert "delivery.created-deployed.domain.yaml=breaks:Inv_deployed_builds_passed_their_harness" in workflow

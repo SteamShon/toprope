@@ -13,10 +13,16 @@ Values are tagged, `<<"s", "x">>`, `<<"i", 3>>`, `<<"b", TRUE>>`, `<<"l", <<...>
 values of different types, and the check language's fail-closed rules hold: an operator on the
 wrong type gives `E`, and a check passes only when it gives `<<"b", TRUE>>`.
 
-Left out of the model, and named in `Export.left_out`: actions that create objects or whose
-object has no matrix, and any action whose guard or effect uses time (`now`, `days_since`), a
-path through a link, `new.`, an unknown function, a non-integer number, or a param of a type the
-model cannot enumerate.
+Creating actions are steps too: each created type gets one fresh id (`new-<Object>`), the empty
+world is one more start, and a creating step runs only from it, making one object (its declared
+params, its initial state, its `set` effects), so a run still follows one object. A creating
+param no expression reads gets one value. The `system` actor a handoff acts as is in the model
+when an action is for it.
+
+Left out of the model, and named in `Export.left_out`: actions whose object has no matrix, any
+action whose guard or effect uses time (`now`, `days_since`), a path through a link, `new.` on a
+non-creating action, an unknown function, a non-integer number, or a param of a type the model
+cannot enumerate, and an action no actor of the model may take.
 """
 
 from __future__ import annotations
@@ -208,9 +214,19 @@ def _candidates(d: Domain, spec: Any, actor_ids: list[str]) -> list[Any]:
     return {"boolean": [True, False], "datetime": list(DATES), "string": list(STRS) + actor_ids}[t]
 
 
+def model_actors(d: Domain) -> dict[str, Any]:
+    """The harness's actors, and the `system` actor a handoff acts as when an action is for it
+    (a receiving domain's creating action, such as Delivery's `request_delivery`)."""
+    from ..types import Actor
+    actors = dict(world_actors(d))
+    if any((r.role if isinstance(r, ActorRule) else r) == "system" for a in d.actions.values() for r in a.actor):
+        actors["system"] = Actor("handoff:model", "system", ("system",))
+    return actors
+
+
 def export(d: Domain, name: str | None = None, bound: int = BOUND) -> Export:
     mod = name or ident("Toprope", d.domain)
-    actors = world_actors(d)
+    actors = model_actors(d)
     ids = sorted({a.id for a in actors.values() if a.kind == "person"})
     out = Export(module="", cfg="", name=mod, actors={r: a.id for r, a in actors.items()})
 
@@ -228,10 +244,16 @@ def export(d: Domain, name: str | None = None, bound: int = BOUND) -> Export:
             fields["id"] = value(data["id"])
             instances.setdefault(obj, []).append((data["id"], fields))
 
+    # Creation: one fresh id per created type. A creating step runs only from the empty world and
+    # makes one object, so a run follows one created object, as a fixture run follows one fixture.
+    fresh = {a.creates: f"new-{a.creates}" for a in d.actions.values()
+             if a.creates is not None and a.creates in d.objects}
     lines = [f"---- MODULE {mod} ----", "EXTENDS Integers, Sequences, FiniteSets, TLC",
              "VARIABLES obj, last", "vars == <<obj, last>>", PRELUDE]
-    for obj, insts in sorted(instances.items()):
-        lines.append(f"Ids_{ident(obj)} == {{{', '.join(tla_str(i) for i, _ in insts)}}}")
+    modeled = sorted(set(instances) | set(fresh))
+    for obj in modeled:
+        ids_ = [i for i, _ in instances.get(obj, [])] + ([fresh[obj]] if obj in fresh else [])
+        lines.append(f"Ids_{ident(obj)} == {{{', '.join(tla_str(i) for i in ids_)}}}")
     for role, a in sorted(actors.items()):
         env = {"id": value(a.id), "kind": value(a.kind), "roles": value(list(a.roles)),
                "role": value(a.roles[0] if a.roles else None)}
@@ -242,32 +264,49 @@ def export(d: Domain, name: str | None = None, bound: int = BOUND) -> Export:
     # are left out, a `ref` param is only an id), so the instances are independent, and checking
     # each alone reaches the same states as checking them together, in a sum, not a product.
     starts = [f"({tla_str(i)} :> {record(f)})" for insts in instances.values() for i, f in insts]
-    init = "\n          \\/ ".join(f"obj = {x}" for x in starts) if starts else "obj = [x \\in {} |-> N]"
+    if fresh or not starts:
+        starts.append("[x \\in {} |-> N]")                      # the empty world, where creation starts
+    init = "\n          \\/ ".join(f"obj = {x}" for x in starts)
     lines.append(f"Init == /\\ \\/ {init}\n        /\\ last = <<\"init\">>")
 
     for name_, a in d.actions.items():
         obj = a.object_type
         tr = d.transitions.get(obj)
         if a.creates is not None:
-            out.left_out[name_] = "it creates an object"
+            if a.creates not in d.objects:
+                out.left_out[name_] = f"it creates an unknown {a.creates}"
+                continue
+            try:
+                steps = _create(d, name_, a, actors, ids, fresh[a.creates])
+            except Unsupported as e:
+                out.left_out[name_] = f"it uses {e}"
+                continue
+            if not steps:
+                out.left_out[name_] = "no actor of the model may take it"
+                continue
+            lines += [s for _, s in steps]
+            out.steps += [op for op, _ in steps]
             continue
         if tr is None:
             out.left_out[name_] = f"{obj} has no matrix"
             continue
-        if obj not in instances:
-            out.left_out[name_] = f"no fixture of {obj}"
+        if obj not in instances and obj not in fresh:
+            out.left_out[name_] = f"no fixture of {obj}, and nothing creates one"
             continue
         try:
             steps = _action(d, name_, a, tr, actors, ids)
         except Unsupported as e:
             out.left_out[name_] = f"it uses {e}"
             continue
+        if not steps:
+            out.left_out[name_] = "no actor of the model may take it, or no cell allows it"
+            continue
         lines += [s for _, s in steps]
         out.steps += [op for op, _ in steps]
 
     invs = []
     for inv in d.invariants:
-        if inv.scope != "aggregate" or inv.on not in instances:
+        if inv.scope != "aggregate" or inv.on not in modeled:
             continue
         try:
             body = Expr(d, inv.on, "N", {})(inv.check)
@@ -338,6 +377,82 @@ def _action(d: Domain, name: str, a: Any, tr: Any, actors: dict[str, Any], ids: 
                 f"\n    /\\ last' = <<{tla_str(name)}, {tla_str(role)}, i, {params_rec}>>")
         out.append((op, body))
     return out
+
+
+def _create(d: Domain, name: str, a: Any, actors: dict[str, Any], ids: list[str], new_id: str) -> list[tuple[str, str]]:
+    """One step operator per actor that may take a creating action: from the empty world only,
+    it makes `new_id` with every field of its type (null unless given), the declared params that
+    name a field, the initial state, then each `set` effect (`new.` and `target.` alike)."""
+    obj = a.creates
+    tr = d.transitions.get(obj)
+    names = set(d.objects[obj].properties) | {n for n, l in d.links.items() if l.from_ == obj}
+    if tr is not None:
+        names.add(tr.field)
+    required = {p: s for p, s in a.params.items() if not s.optional}
+    pvars = {p: f"p_{ident(p)}" for p in required}
+    read = _reads(d, obj, a)
+    cands = {}
+    for p, s in required.items():
+        vals = _candidates(d, s, ids)
+        if not vals:
+            raise Unsupported(f"the param {p} with no candidate value")
+        if p not in read:          # nothing reads it: one value stands for all (a smaller model)
+            vals = vals[:1]
+        cands[p] = [[v] if s.many else v for v in vals]
+    base = {k: "N" for k in sorted(names)}
+    base["id"] = value(new_id)
+    for p in required:
+        if p in names and (tr is None or p != tr.field):
+            base[p] = pvars[p]
+    if tr is not None and tr.initial:
+        base[tr.field] = value(tr.initial)
+    out = []
+    for role, actor in sorted(actors.items()):
+        if a.requires == "human" and actor.kind != "person":
+            continue
+        rules = [r for r in a.actor if (r.role if isinstance(r, ActorRule) else r) in actor.roles]
+        if not rules:
+            continue
+        ex = Expr(d, obj, f"Actor_{ident(role)}", dict(pvars))
+        who = "TRUE" if any(isinstance(r, str) or not r.where for r in rules) else \
+            " \\/ ".join(f"Pass({ex(r.where)})" for r in rules)
+        pre = [f"Pass({ex(p.check)})" for p in a.preconditions]
+        sets = {}
+        for e in a.effects:
+            for key, v in (e.set or {}).items():
+                attr = key.split(".", 1)[1] if key.startswith(("target.", "new.")) else key
+                sets[attr] = ex(v) if isinstance(v, str) else value(v)
+        new = record(base)
+        for attr, v in sorted(sets.items()):
+            new = f"({tla_str(attr)} :> {v}) @@ ({new})"
+        op = ident("Create", name, role)
+        args = ", ".join(f"{pvars[p]} \\in {{{', '.join(value(v) for v in cands[p])}}}" for p in required)
+        params_rec = "<<" + ", ".join(f"<<{tla_str(p)}, {pvars[p]}>>" for p in required) + ">>"
+        guard = ["DOMAIN obj = {}", who, *pre, *[f"Tag({v}) # \"e\"" for v in sets.values()]]
+        body = (f"{op} ==" + (f" \\E {args} :" if args else "") +
+                "\n    LET o == [x \\in {} |-> N] IN\n    /\\ " + "\n    /\\ ".join(guard) +
+                f"\n    /\\ obj' = ({tla_str(new_id)} :> {new})" +
+                f"\n    /\\ last' = <<{tla_str(name)}, {tla_str(role)}, {tla_str(new_id)}, {params_rec}>>")
+        out.append((op, body))
+    return out
+
+
+def _reads(d: Domain, obj: str, creating: Any) -> set[str]:
+    """Field and param names an expression may read on objects of `obj`: in the creating
+    action, in any action on `obj`, and in `obj`'s invariants. A param no expression reads
+    cannot change any step or check, so creation tries one value for it."""
+    texts = [p.check for p in creating.preconditions]
+    texts += [r.where for r in creating.actor if isinstance(r, ActorRule) and r.where]
+    texts += [v for e in creating.effects for v in (e.set or {}).values() if isinstance(v, str)]
+    for a in d.actions.values():
+        if a.object_type != obj:
+            continue
+        texts += [p.check for p in a.preconditions]
+        texts += [r.where for r in a.actor if isinstance(r, ActorRule) and r.where]
+        texts += [v for e in a.effects for v in (e.set or {}).values() if isinstance(v, str)]
+    texts += [i.check for i in d.invariants if i.on == obj]
+    words = set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", " ".join(texts)))
+    return {p for p in creating.params if p in words}
 
 
 def _set_fields(sf: str, sets: dict[str, str]) -> str:

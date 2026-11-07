@@ -237,6 +237,14 @@ approved, deployed and verified by the researcher (approval run 42363055975): Au
 `10-01b4e6464862bbf9`, its `tla` check passed in the approval (219312 states). It is the first
 deploy recorded with the commits (ADR-0045): the events after it carry `domain_version` 10.
 
+## TLC models creation (#PR, ADR-0043 follow-up, link: ③)
+
+Creating actions are steps of the exported model: one fresh id per created type, the empty world
+as one more start, a creating step only from it. A creating param no expression reads gets one
+value. Actions for `system` (a handoff) run as that actor. The self domains now leave out only
+Authoring's `elements-cite-a-source` (a link path). A second seeded break, made by creation alone,
+must be found by the `tla` job.
+
 ## M0b, M2 to M5
 
 Not started. Plans: [`roadmap.md`](roadmap.md).
@@ -272,8 +280,8 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    `confirmed_at` and `review_by` warnings; in the M4 spec, goals, expected outcomes and the
    outcome-to-decision link.
 7. ADR-0043's follow-ups: make `tla` a required check on `develop` once the umbrella is in
-   (maintainer); model links, time and object creation, each shrinking what the model leaves out
-   (the self domains leave out their creating actions and one link invariant).
+   (maintainer); model links and time, each shrinking what the model leaves out (the self
+   domains leave out one link invariant; creation is modeled, #PR).
 
 ## Left from reviews
 

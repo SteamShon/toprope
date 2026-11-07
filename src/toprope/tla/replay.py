@@ -91,7 +91,7 @@ def parse_trace(tlc_output: str) -> tuple[str | None, list[Step]]:
     for block in re.split(r"\n(?=State \d+:)", tlc_output):
         if not block.startswith("State "):
             continue
-        lm = re.search(r"/\\ last = (.*?)(?=\n/\\ |\n\n|\Z)", block, re.S)
+        lm = re.search(r"/\\ last = (.*?)(?=\n/\\ |\n\n|\Z)", block, re.DOTALL)
         if not lm:
             continue
         last = parse_value(" ".join(lm.group(1).split()))
@@ -107,8 +107,8 @@ def replay(d: Domain, steps: list[Step]) -> list[dict[str, Any]]:
     """Take the steps on the model level, from the fixtures; return each outcome."""
     from ..harness.run import NOW
     from ..harness.surfaces import ModelSurface
-    from ..harness.world import world_actors
-    actors = world_actors(d)
+    from . import model_actors
+    actors = model_actors(d)
     s = ModelSurface(d, lambda: NOW)
     for fx in d.world.fixtures:
         for obj, data in fx.items():

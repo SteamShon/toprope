@@ -52,11 +52,25 @@ def test_what_the_model_cannot_hold_is_left_out_and_named():
     assert "Next == FALSE" in e.module                                   # nothing modeled: nothing to step
 
 
-def test_self_domains_leave_out_only_what_creates_objects_or_follows_links():
+def test_self_domains_leave_out_only_what_follows_links():
     for f in ("domains/authoring/authoring.domain.yaml", "domains/delivery/delivery.domain.yaml"):
         e = export(load_domain(ROOT / f))
-        assert all(v == "it creates an object" or "link path" in v for v in e.left_out.values()), e.left_out
+        assert all("link path" in v for v in e.left_out.values()), e.left_out    # creation is modeled now
         assert e.steps
+
+
+def test_creation_is_modeled_from_the_empty_world():
+    """ADR-0043's follow-up: creating actions, left out before, are steps now. A creating step
+    runs only from the empty world and makes one object, so a run still follows one object."""
+    e = export(load_domain(ROOT / "domains/delivery/delivery.domain.yaml"))
+    assert "Create_request_delivery_system" in e.steps                 # the `system` actor a handoff is
+    assert 'Ids_DeliveryRequest == {"R1", "R2", "R3", "R4", "R5", "R6", "new-DeliveryRequest"}' in e.module
+    init = e.module[e.module.index("Init =="):e.module.index('/\\ last = <<"init">>')]
+    assert "obj = [x \\in {} |-> N]" in init                           # the empty world is a start
+    create = e.module[e.module.index("Create_request_delivery_system =="):]
+    create = create[:create.index("\n\n") if "\n\n" in create else len(create)]
+    assert "DOMAIN obj = {}" in create and '("stage" :> S("requested"))' in create
+    assert 'p_commit \\in {S("x")}' in create                       # nothing reads it: one value
 
 
 def test_the_cli_writes_the_module_its_config_and_what_it_left_out(tmp_path, capsys):
