@@ -210,6 +210,14 @@ M0b's UI), checking the non-developer claim (M1 Phase B, M2), TLC modeling creat
   verifications blocked. They are on finished requests, so they are now warnings (the
   researcher's choice); a block on an object in flight stays an error.
 
+- ✅ Integrated review of the umbrella (#149)
+  Two gaps, fixed: the probes read the deploy environment's store, which is fresh in every
+  approval run, so for the self domains they checked no object in use; and a new invariant that
+  objects in use already break went unreported (Delivery's four verified requests from before
+  the probes). The probes now read the domain's own log when the kernel has it, and the change
+  check's `in_flight` tests every object in use against the new invariants: an object in flight
+  that breaks one is an error, a finished one a warning, as in log replay.
+
 ## M0b, M2 to M5
 
 Not started. Plans: [`roadmap.md`](roadmap.md).
@@ -270,8 +278,10 @@ it; each release's cleanup PR handles items older than one release.
 - Neither the validator nor the harness catches a creating action that leaves a required
   property unset (`record_commit` made Commits without `domain_id`; found running the loop)
   (#86, 2026-11-06)
-- `propose_element` on a path that is not an element (for example `glossary.<term>`) writes the
-  value without provenance instead of failing (#86, 2026-11-06)
+- `propose_element` on a path that is not an element (for example `glossary.<term>`,
+  `scenarios.<id>`, `world.fixtures`) writes the value without provenance instead of failing, so
+  such a change shows only in the commit's review diff; #147's Delivery change has three
+  (#86, 2026-11-06; again in #147, 2026-11-07)
 - `toprope-run` reads `git config` twice per command (once to check the caller, once in
   `submit`) (#85, 2026-11-06)
 - `identity/git.py` repeats the git lookup in `Workspace.identity`, and the two name a person
