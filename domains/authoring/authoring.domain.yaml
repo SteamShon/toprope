@@ -497,7 +497,7 @@ actions:
       source:
         kind: record
         ref: records:docs/commits.md#L128-L142
-      status: proposed
+      status: confirmed
   approve_commit:
     description: 'Approve a commit: merge it into main and tag it. Only a person approves.'
     actor:

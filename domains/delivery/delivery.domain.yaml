@@ -113,7 +113,7 @@ actions:
       source:
         kind: record
         ref: records:docs/harness.md#L76-L94
-      status: proposed
+      status: confirmed
   record_build:
     description: Record the build and its harness result.
     actor:
@@ -301,7 +301,7 @@ transitions:
           source:
             kind: interview
             ref: interview:domains/delivery/interview.jsonl#L5
-          status: proposed
+          status: confirmed
         record_build: n/a
         deploy:
           to: deploying

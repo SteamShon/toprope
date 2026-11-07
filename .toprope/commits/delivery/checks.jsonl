@@ -24,3 +24,12 @@
 {"at": "2026-11-07T04:02:06+00:00", "base": "1-584aaeea5e686ee8", "check": "nl", "commit": "3-95bd46e6842f9d74", "ok": null, "run": "24c126e5a2db", "summary": "skipped: no natural-language checker configured"}
 {"at": "2026-11-07T04:02:06+00:00", "base": "1-584aaeea5e686ee8", "check": "change-check", "commit": "3-95bd46e6842f9d74", "ok": true, "run": "24c126e5a2db", "summary": "passes; 0 error(s), 0 warning(s)"}
 {"at": "2026-11-07T04:02:06+00:00", "base": "1-584aaeea5e686ee8", "check": "confirmed", "commit": "3-95bd46e6842f9d74", "ok": false, "run": "24c126e5a2db", "summary": "2 proposed element(s): actions.preview.preconditions.not-deployed, transitions.DeliveryRequest.matrix.done.preview"}
+{"at": "2026-11-07T04:12:32+00:00", "base": "1-584aaeea5e686ee8", "check": "structural", "commit": "4-3e90586c40faf7d7", "ok": true, "run": "7a90dbfb2cac", "summary": "0 error(s), 0 warning(s)"}
+{"at": "2026-11-07T04:12:32+00:00", "base": "1-584aaeea5e686ee8", "check": "semantic", "commit": "4-3e90586c40faf7d7", "ok": true, "run": "7a90dbfb2cac", "summary": "0 error(s), 0 warning(s)"}
+{"at": "2026-11-07T04:12:32+00:00", "base": "1-584aaeea5e686ee8", "check": "scenarios", "commit": "4-3e90586c40faf7d7", "ok": true, "run": "7a90dbfb2cac", "summary": "0 error(s), 0 warning(s); 3/3 scenarios pass"}
+{"at": "2026-11-07T04:12:32+00:00", "base": "1-584aaeea5e686ee8", "check": "harness", "commit": "4-3e90586c40faf7d7", "ok": true, "run": "7a90dbfb2cac", "summary": "0 error(s), 0 warning(s); 74 tests: 74 run, 0 from cache, 0.255 s"}
+{"at": "2026-11-07T04:12:32+00:00", "base": "1-584aaeea5e686ee8", "check": "log_replay", "commit": "4-3e90586c40faf7d7", "ok": null, "run": "7a90dbfb2cac", "summary": "skipped: no event store (nothing deployed)"}
+{"at": "2026-11-07T04:12:32+00:00", "base": "1-584aaeea5e686ee8", "check": "in_flight", "commit": "4-3e90586c40faf7d7", "ok": null, "run": "7a90dbfb2cac", "summary": "skipped: no event store (nothing deployed)"}
+{"at": "2026-11-07T04:12:32+00:00", "base": "1-584aaeea5e686ee8", "check": "nl", "commit": "4-3e90586c40faf7d7", "ok": null, "run": "7a90dbfb2cac", "summary": "skipped: no natural-language checker configured"}
+{"at": "2026-11-07T04:12:32+00:00", "base": "1-584aaeea5e686ee8", "check": "change-check", "commit": "4-3e90586c40faf7d7", "ok": true, "run": "7a90dbfb2cac", "summary": "passes; 0 error(s), 0 warning(s)"}
+{"at": "2026-11-07T04:12:32+00:00", "base": "1-584aaeea5e686ee8", "check": "confirmed", "commit": "4-3e90586c40faf7d7", "ok": true, "run": "7a90dbfb2cac", "summary": "0 proposed element(s)"}
