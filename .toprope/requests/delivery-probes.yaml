@@ -1,0 +1,46 @@
+summary: Confirm, approve, deploy and verify Delivery's probes (verify needs probes
+  that passed)
+steps:
+- run:
+    member: authoring
+    workspace: toprope.delivery.workspace.yaml
+    action: confirm_all_proposed
+    target: delivery
+- run:
+    member: authoring
+    workspace: toprope.delivery.workspace.yaml
+    action: commit_draft
+    target: delivery
+- run:
+    member: authoring
+    workspace: toprope.delivery.workspace.yaml
+    action: check_commit
+    target: $commit
+- run:
+    member: authoring
+    workspace: toprope.delivery.workspace.yaml
+    action: approve_commit
+    target: $commit
+- run:
+    member: authoring
+    workspace: toprope.delivery.workspace.yaml
+    action: deliver
+    target: $commit
+    params:
+      environment: local
+- run:
+    member: delivery
+    action: preview
+    target: delivery:$commit:local
+- run:
+    member: delivery
+    action: deploy
+    target: delivery:$commit:local
+- run:
+    member: delivery
+    action: run_probes
+    target: delivery:$commit:local
+- run:
+    member: delivery
+    action: verify
+    target: delivery:$commit:local
