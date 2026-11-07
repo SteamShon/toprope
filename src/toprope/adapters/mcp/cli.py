@@ -125,16 +125,17 @@ def main(argv: list[str] | None = None) -> None:
         with open(args.harness_report) as f:
             harness = json.load(f)
     from . import build_server
+    sources = getattr(services, "workspace", None)       # with --workspace: the read_source tool
     if args.transport == "stdio":
         token = os.environ.get("TOPROPE_TOKEN")
         if ex.identity.resolve(token) is None:
             print("error: TOPROPE_TOKEN is missing or does not resolve to a caller", file=sys.stderr)
             raise SystemExit(1)
-        build_server(ex, lambda: token, harness=harness).run("stdio")
+        build_server(ex, lambda: token, harness=harness, sources=sources).run("stdio")
     else:
         from .http import run_http
         issuer = os.environ.get("TOPROPE_JWT_ISSUER") if args.identity == "jwt" else None
-        run_http(ex, args.host, args.port, args.public_url, issuer, harness=harness)
+        run_http(ex, args.host, args.port, args.public_url, issuer, harness=harness, sources=sources)
 
 
 def _kernel(args):

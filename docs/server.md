@@ -64,6 +64,10 @@ uv run toprope-server --composition self.composition.yaml --member domain-author
   All but `describe_domain` need a resolved caller.
 - `world_map` and `how_to_reach` (see [`world-map.md`](world-map.md)). Pass
   `--harness-report` to show the harness status of each edge.
+- `read_source` (`source_id`, `offset`, `limit` up to 50), with `--kernel-root` and
+  `--workspace`: a source's chunks, redacted (secrets, personal data), each with the ref a
+  proposal cites. A local-only source is refused. It needs a resolved caller, and it is a read,
+  not an action: what it serves goes into the workspace's usage log, never into an event log.
 
 A denial is a normal result, `{"status": "denied", "code": ..., "reason": ...}`, with the
 reason in domain terms. The tool schema advertises each param's type, but values pass to
