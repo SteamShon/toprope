@@ -31,6 +31,32 @@ def _commands() -> list[tuple[str, Callable[[], argparse.ArgumentParser], str]]:
     ]
 
 
+def _actions(p: argparse.ArgumentParser) -> list[argparse.Action]:
+    """A parser's arguments. argparse has no public way to list them, so this, and `_sub_help`,
+    are the only places that read its internals; everything else goes by the arguments' public
+    attributes, so a renamed private class changes nothing (#89)."""
+    try:
+        return list(p._actions)
+    except AttributeError:
+        raise RuntimeError("argparse no longer has ArgumentParser._actions: update "
+                           "toprope.kernel.reference._actions") from None
+
+
+def _sub_help(sp: argparse.Action) -> dict[str, str | None]:
+    """Each subcommand's one-line help (`add_parser(help=...)`), which argparse keeps only on
+    pseudo-actions. Empty when they are gone: the reference then shows no help line."""
+    return {c.dest: c.help for c in getattr(sp, "_choices_actions", [])}
+
+
+def _is_help(a: argparse.Action) -> bool:
+    return a.nargs == 0 and "-h" in a.option_strings
+
+
+def _is_subcommands(a: argparse.Action) -> bool:
+    return isinstance(a.choices, dict) and bool(a.choices) and \
+        all(isinstance(v, argparse.ArgumentParser) for v in a.choices.values())
+
+
 def _cell(text: str) -> str:
     return " ".join(str(text or "").split()).replace("|", "\\|")
 
@@ -39,8 +65,7 @@ def _usage(a: argparse.Action) -> str:
     if not a.option_strings:
         return f"`{a.metavar or a.dest.upper()}`"
     flags = ", ".join(f"`{f}`" for f in a.option_strings)
-    takes = a.nargs != 0 and not isinstance(a, (argparse._StoreTrueAction, argparse._StoreFalseAction,
-                                                    argparse._HelpAction))
+    takes = a.nargs != 0
     if takes:
         meta = a.metavar or (a.dest.upper() if not a.choices else "{" + ",".join(map(str, a.choices)) + "}")
         flags += f" `{meta}`"
@@ -49,8 +74,8 @@ def _usage(a: argparse.Action) -> str:
 
 def _options(p: argparse.ArgumentParser) -> list[str]:
     rows = []
-    for a in p._actions:
-        if isinstance(a, (argparse._HelpAction, argparse._SubParsersAction)):
+    for a in _actions(p):
+        if _is_help(a) or _is_subcommands(a):
             continue
         help_ = _cell(a.help)
         if a.required and a.option_strings:
@@ -81,9 +106,9 @@ def build_reference() -> str:
         if note:
             out += [note, ""]
         out += _options(p) + [""]
-        subs = [a for a in p._actions if isinstance(a, argparse._SubParsersAction)]
+        subs = [a for a in _actions(p) if _is_subcommands(a)]
         for sp in subs:
-            helps = {c.dest: c.help for c in sp._choices_actions}
+            helps = _sub_help(sp)
             for cmd, sub in sp.choices.items():
                 out += [f"### `{name} {cmd}`", ""]
                 if helps.get(cmd):

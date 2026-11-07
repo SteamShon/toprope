@@ -30,3 +30,22 @@ def test_check_reports_a_stale_file(tmp_path, capsys):
     assert e.value.code == 1 and "stale" in capsys.readouterr().err
     main(["--out", str(stale)])
     main(["--check", str(stale)])
+
+
+def test_the_reference_does_not_depend_on_argparse_private_classes(monkeypatch):
+    """#89: it read `argparse._StoreTrueAction`, `_HelpAction` and `_SubParsersAction`; a Python
+    release that renames them broke it. It goes by the arguments' public attributes now, and the
+    one read argparse gives no public way to make says what to update when it goes."""
+    import argparse
+
+    from toprope.kernel import reference
+    built = [(name, make(), note) for name, make, note in reference._commands()]   # argparse builds with them
+    monkeypatch.setattr(reference, "_commands", lambda: [(n, (lambda p=p: p), note) for n, p, note in built])
+    for name in ("_StoreTrueAction", "_StoreFalseAction", "_HelpAction", "_SubParsersAction"):
+        monkeypatch.delattr(argparse, name, raising=False)        # then a Python that renamed them
+    assert reference.build_reference() == DOC.read_text()
+
+    class Bare:
+        description = ""
+    with pytest.raises(RuntimeError, match="toprope.kernel.reference._actions"):
+        reference._actions(Bare())
