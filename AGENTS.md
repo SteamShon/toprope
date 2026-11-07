@@ -152,7 +152,9 @@ state; they link here. The README claim-status table stays in the README, becaus
   table above.
 - Do not change the claim-status table, ADR decisions or gold sets on your own initiative.
   Propose them in the PR description instead.
-- Do not put model identifiers in commits, PRs or code.
+- Do not put model identifiers in commits, PRs or code. The one exception is an experiment's
+  run records (for example `experiments/m1/runs/`), where the model is a variable of the
+  experiment; they still stay out of commit messages and PRs.
 - Update `docs/STATUS.md` in the same PR as the work it describes (see Progress).
 - **Real tests only.** A new test must fail against the code before your change (or cover
   behavior the change adds). Never write a test that already passes against the old code
@@ -180,7 +182,7 @@ check starts enforcing a rule, and drop a rule from the text once its mistake ca
 | The researcher's own steps from a cloud session run after their approval | `human-request` workflow (ADR-0039) |
 | Gold sets and sealed files are human-only | text only: review |
 | Real tests only; no skipped or weakened tests | text only: review |
-| No model identifiers in commits, PRs or code | text only: review |
+| No model identifiers in commits, PRs or code (run records excepted) | text only: review |
 
 ## Self domains: one loop at a time
 

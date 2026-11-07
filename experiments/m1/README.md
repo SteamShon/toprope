@@ -12,7 +12,8 @@ A guide for writing them (coverage areas, what makes a good question, and a sess
 plan) is in [`interview-guide.md`](interview-guide.md). It holds no content.
 
 How Phase B's arms are run and graded (blinding, repeated runs, the run log):
-[`run-protocol.md`](run-protocol.md), a **draft** until the researcher freezes it.
+[`instruments/run-protocol.md`](instruments/run-protocol.md), frozen with the instruments before
+any arm runs.
 
 ## What to fill, and when
 
@@ -24,6 +25,7 @@ How Phase B's arms are run and graded (blinding, repeated runs, the run log):
 | `change-key.yaml` (seeded problems) | **sealed**: no arm, agent or reviewer during the experiment | M0a | M0a |
 | `verdict-rules.yaml` (start from the draft template) | everyone | M0a | M0a |
 | `binding.yaml` (intent → element names; may be drafted by an agent on request, ADR-0038) | the harness | after Phase A, before any arm runs | then |
+| `run-protocol.md` (how the arms are run and graded; drafted on request, decided by the researcher) | everyone running or grading an arm | before any arm runs | then, by hash (`freeze-protocol`) |
 
 The order matters. Freeze everything except the binding **before the change-check pipeline
 is built**, so the seeded problems cannot be written around what the checks catch.
@@ -42,9 +44,11 @@ is built**, so the seeded problems cannot be written around what the checks catc
    commit**.
 4. After Phase A, write `binding.yaml`, set it `frozen`, and run `freeze-binding`
    (stage 2). This requires stage 1. Commit again.
-5. The harness runs `verify --run` before every arm run. It fails if any frozen file changed,
-   if any stage-1 file is not frozen, or if the binding is not frozen. Refreezing a changed
-   file is refused.
+5. Before any arm runs, set `Status: **frozen**` in `run-protocol.md` and run
+   `freeze-protocol`. It records the file's hash only; Markdown is not validated.
+6. The harness runs `verify --run` before every arm run. It fails if any frozen file changed,
+   if any stage-1 file is not frozen, or if the binding or the run protocol is not frozen.
+   Refreezing a changed file is refused.
 
 ## Keeping the key sealed
 `change-key.yaml` lives in the repository for provenance, but no agent run (arm, probe or

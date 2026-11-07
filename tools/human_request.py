@@ -9,7 +9,7 @@ A request is a file `.toprope/requests/<id>.yaml` on a work branch:
       - run: {member: authoring, action: confirm_all_proposed, target: authoring}
 
 Steps, from a fixed set:
-- `freeze: DIR`, `freeze-binding: DIR`: `experiments/tools/instruments.py`
+- `freeze: DIR`, `freeze-binding: DIR`, `freeze-protocol: DIR`: `experiments/tools/instruments.py`
 - `amend: {dir: DIR, file: FILE, reason: TEXT}`: the same, on the record
 - `run: {member, action, target, params}`: a self-domain action through `toprope-run`, as the
   approver (`--identity github`)
@@ -40,7 +40,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 REQUESTS = ".toprope/requests"
 APPROVAL_RUNS = ".toprope/approval-runs.jsonl"
-INSTRUMENT_STEPS = ("freeze", "freeze-binding", "amend")
+INSTRUMENT_STEPS = ("freeze", "freeze-binding", "freeze-protocol", "amend")
 COMPOSITION = "domains/toprope-self.composition.yaml"
 
 
@@ -67,7 +67,7 @@ def check(req: object) -> list[str]:
             errors.append(f"step {i}: one of {', '.join(INSTRUMENT_STEPS)} or run")
             continue
         (kind, arg), = st.items()
-        if kind in ("freeze", "freeze-binding"):
+        if kind in ("freeze", "freeze-binding", "freeze-protocol"):
             if not isinstance(arg, str) or not arg:
                 errors.append(f"step {i}: {kind} takes the instruments directory")
         elif kind == "amend":
@@ -108,7 +108,7 @@ def commands(req: dict) -> list[list[str]]:
     out = []
     for st in req["steps"]:
         (kind, arg), = st.items()
-        if kind in ("freeze", "freeze-binding"):
+        if kind in ("freeze", "freeze-binding", "freeze-protocol"):
             out.append(tool + [kind, arg])
         elif kind == "amend":
             out.append(tool + ["amend", arg["dir"], arg["file"], "--reason", arg["reason"]])
