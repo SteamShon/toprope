@@ -38,7 +38,7 @@ def test_preconditions_actor_rules_and_effects_become_the_step():
     assert '\\E mv \\in {<<"proposed", "none">>}' in approve                 # the matrix cell
     assert ('Pass(OpNe(Attr(R(o), "proposed_by"), Attr(Attr(Actor_media_lead, "principal"), "id")))'
             in approve)                                                    # not-the-proposer
-    assert '("daily_budget" :> Attr(R(o), "proposed_budget"))' in approve   # a set effect, on the old state
+    assert '("daily_budget" :> Store(Attr(R(o), "proposed_budget")))' in approve   # a set effect, on the old state
     assert 'last\' = <<"approve_budget_change", "media_lead", i, <<>>>>' in approve
     propose = m[m.index("Step_propose_budget_change_analyst =="):m.index("Step_reject_budget_change_media_lead ==")]
     assert "OpLe(OpSub(p_daily_budget, Attr(R(o), \"daily_budget\")), I(500))" in propose   # step-limit, over params
@@ -47,8 +47,14 @@ def test_preconditions_actor_rules_and_effects_become_the_step():
 
 def test_what_the_model_cannot_hold_is_left_out_and_named():
     e = export(Domain.model_validate(schema_doc_domain()))
-    assert e.left_out == {"launch_experiment": "it uses the function now()"}     # time is not modeled
-    assert "Step_approve_experiment_approver" in e.steps                 # its link path is (count of many)
+    assert e.left_out == {}                                              # links (#156) and time are modeled
+    assert "Step_approve_experiment_approver" in e.steps                 # its link path (count of many)
+    assert "Step_launch_experiment_eng" in e.steps                       # its `started_at: now()`
+    raw = schema_doc_domain()
+    raw["actions"]["approve_experiment"]["preconditions"].append(
+        {"id": "budget", "check": "target.planned_days + 1 > 0", "reason": "Planned."})
+    raw["actions"]["approve_experiment"]["effects"].append({"set": {"target.note": "unknown_fn()"}})
+    assert export(Domain.model_validate(raw)).left_out == {"approve_experiment": "it uses the function unknown_fn()"}
 
 
 def test_self_domains_leave_nothing_out():
@@ -122,3 +128,19 @@ def test_each_run_of_the_model_starts_from_one_fixture():
     assert init.count("obj = (") == 2 and init.count("\\/ obj =") == 2      # C-search, C-holdout: each alone
     assert "\\E i \\in Ids_Campaign \\cap DOMAIN obj" in e.module
     assert "\\A i \\in Ids_Campaign \\cap DOMAIN obj" in e.module
+
+
+def test_time_is_the_harness_clock_frozen():
+    """`now()` is the harness's clock (replay uses the same); every ISO time the model can hold
+    has its offset (`Secs`), and its whole days for `days_since` (`Days`); an effect stores
+    `now()` as its ISO string, as the interpreter does."""
+    raw = schema_doc_domain()
+    raw["actions"]["approve_experiment"]["preconditions"].append(
+        {"id": "fresh", "check": "not exists(target.started_at) or days_since(target.started_at) < 30",
+         "reason": "A recent start."})
+    e = export(Domain.model_validate(raw))
+    assert e.left_out == {}
+    assert 'NowIso == "2026-01-01T00:00:00+00:00"' in e.module
+    assert '("2025-11-02T00:00:00+00:00" :> 60)' in e.module             # Days: 60 days before the clock
+    assert 'DaysSince(Attr(R(o), "started_at"))' in e.module
+    assert '("started_at" :> Store(T(0)))' in e.module

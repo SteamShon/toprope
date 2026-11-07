@@ -162,7 +162,7 @@ def test_a_change_inside_a_confirmed_element_proposes_the_element_again(ws):
                "docs:docs/process.md#L4-L6")
     ws.propose("actions.approve", {"description": "Approve.", "actor": ["approver"], "target": "Experiment",
                                    "effects": [{"set": {"target.ok": True}}]}, "docs:docs/process.md#L4-L6")
-    ws.confirm(["actions.approve"], via="cli", who="ana")
+    ws.confirm(["actions.approve"], via="terminal", who="ana")
     assert ws.draft()["actions"]["approve"]["status"] == "confirmed"
     ws.propose("actions.approve.effects", [{"set": {"target.ok": False}}], "docs:docs/process.md#L7-L8")
     el = ws.draft()["actions"]["approve"]
@@ -263,11 +263,11 @@ def test_only_a_human_channel_confirms(ws):
     with pytest.raises(AuthoringError, match="only a person"):
         ws.confirm(["objects.Readout"], via="agent")
     with pytest.raises(AuthoringError, match="not a drafted element"):
-        ws.confirm(["roles"], via="cli")
-    ws.confirm(["objects.Readout"], via="cli", who="owner")
+        ws.confirm(["roles"], via="terminal")
+    ws.confirm(["objects.Readout"], via="terminal", who="owner")
     assert ws.draft()["objects"]["Readout"]["status"] == "confirmed"
     log = [json.loads(line) for line in ws.log_path.read_text().splitlines()]
-    assert log[-1] == {**log[-1], "kind": "confirm", "paths": ["objects.Readout"], "via": "cli"}
+    assert log[-1] == {**log[-1], "kind": "confirm", "paths": ["objects.Readout"], "via": "terminal"}
 
 
 def test_check_runs_the_harness_on_the_draft(ws):
@@ -359,7 +359,7 @@ def test_a_workspace_may_be_named_by_its_file(tmp_path):
     assert one.chunks("docs")
 
 
-def test_a_cli_confirmation_records_the_git_identity(tmp_path):
+def test_a_terminal_confirmation_records_the_git_identity(tmp_path):
     """Who confirmed comes from the terminal's git identity, without anyone typing it."""
     import json
     import subprocess
@@ -374,12 +374,56 @@ def test_a_cli_confirmation_records_the_git_identity(tmp_path):
     (tmp_path / "d.domain.yaml").write_text(yaml.safe_dump(schema_doc_domain(), sort_keys=False))
     ws = Workspace(tmp_path)
     ws.propose("actions.approve_experiment", ws.draft()["actions"]["approve_experiment"], "docs:docs/a.md#L1-L2")
-    ws.confirm(["actions.approve_experiment"], via="cli")
+    ws.confirm(["actions.approve_experiment"], via="terminal")
     entry = json.loads(ws.log_path.read_text().splitlines()[-1])
     assert entry["who"] == "Ana Owner <ana@example.org>"
-    ws.confirm(["actions.approve_experiment"], via="cli", who="eli")              # an explicit name wins
+    ws.confirm(["actions.approve_experiment"], via="terminal", who="eli")              # an explicit name wins
     assert json.loads(ws.log_path.read_text().splitlines()[-1])["who"] == "eli"
 
+
+
+def test_the_terminal_is_named_as_the_identity_file_names_it(tmp_path):
+    """#85: `Workspace.identity` used git's `user.name`, the git identity adapter the file's name,
+    so one person had two names in the logs. The file's name wins when it lists the email."""
+    import subprocess
+    from toprope.workspace import Workspace
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.name", "ana-laptop"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.email", "ana@example.org"], check=True)
+    (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump({"domain": "d.domain.yaml", "sources": []}))
+    ws = Workspace(tmp_path)
+    assert ws.identity() == "ana-laptop <ana@example.org>"                  # no identity file: git's name
+    (tmp_path / "toprope.identity.yaml").write_text(yaml.safe_dump(
+        {"people": {"ana@example.org": {"name": "Ana Kim", "roles": ["owner"]}}}))
+    assert ws.identity() == "Ana Kim <ana@example.org>"                     # the file's name, as GitIdentity
+
+
+def test_the_removed_channels_are_refused(ws):
+    """#89: the CLI confirm and the MCP elicitation are gone; a person confirms at the terminal
+    or through a declared action."""
+    _seed_example(ws)
+    ws.propose("objects.Readout", {"description": "Result."}, "docs:docs/process.md#L7-L8")
+    for old in ("cli", "elicitation"):
+        with pytest.raises(AuthoringError, match="only a person"):
+            ws.confirm(["objects.Readout"], via=old, who="owner")
+
+
+def test_the_git_identity_reads_git_once_per_command(tmp_path, monkeypatch):
+    """#85: a command resolved its caller twice and read `git config` each time."""
+    import toprope.identity.git as g
+    calls = []
+    monkeypatch.setattr(g, "git_email", lambda root: calls.append(root) or "ana@example.org")
+    (tmp_path / "ids.yaml").write_text(yaml.safe_dump({"people": {"ana@example.org": {"roles": ["owner"]}}}))
+    ident = g.GitIdentity(tmp_path / "ids.yaml", tmp_path, once=True)
+    assert ident.resolve() is not None and ident.resolve() is not None
+    ident.explain()
+    assert len(calls) == 1
+    live = g.GitIdentity(tmp_path / "ids.yaml", tmp_path)                 # a long-lived process: each time
+    live.resolve(), live.resolve()
+    assert len(calls) == 3
+    from toprope.adapters.cli import _identity
+    monkeypatch.chdir(tmp_path)
+    assert _identity("git:ids.yaml").once is True                          # toprope-run: one command
 
 def test_a_handoff_is_an_element_to_confirm(tmp_path):
     """A handoff is a decision about what crosses into another domain: drafted, then confirmed."""
@@ -394,7 +438,7 @@ def test_a_handoff_is_an_element_to_confirm(tmp_path):
                                     "to": {"domain": "delivery", "interface": "1.x", "action": "request_delivery"},
                                     "params": {}, "target": "target.id"}, "docs:docs/a.md#L1-L2")
     assert "handoffs.deliver" in ws._proposed(ws.draft())
-    ws.confirm(["handoffs.deliver"], via="cli", who="ana")
+    ws.confirm(["handoffs.deliver"], via="terminal", who="ana")
     assert ws.draft()["handoffs"]["deliver"]["status"] == "confirmed"
 
 

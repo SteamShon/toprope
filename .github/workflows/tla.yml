@@ -40,7 +40,8 @@ jobs:
             domains/authoring/authoring.domain.yaml domains/delivery/delivery.domain.yaml \
             "tests/tla/paid-media.no-holdout-guard.domain.yaml=breaks:Inv_holdouts_never_change" \
             "tests/tla/delivery.created-deployed.domain.yaml=breaks:Inv_deployed_builds_passed_their_harness" \
-            "tests/tla/authoring.origin-optional.domain.yaml=breaks:Inv_elements_cite_a_source"
+            "tests/tla/authoring.origin-optional.domain.yaml=breaks:Inv_elements_cite_a_source" \
+            "tests/tla/example.stale-draft.domain.yaml=breaks:Inv_approved_while_fresh"
       - if: always()
         uses: actions/upload-artifact@v4
         with:
