@@ -218,7 +218,7 @@ M0b's UI), checking the non-developer claim (M1 Phase B, M2), TLC modeling creat
   check's `in_flight` tests every object in use against the new invariants: an object in flight
   that breaks one is an error, a finished one a warning, as in log replay.
 
-## The self domains run their deployed commit (#PR, ADR-0045, link: ③ ①)
+## The self domains run their deployed commit (#150, ADR-0045, link: ③ ①)
 
 From the integrated review of #143. A deploy is recorded with the commits
 (`.toprope/commits/<domain>/deployments.jsonl`, in git). With `--kernel-root`, `toprope-run` and
@@ -255,7 +255,7 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    resolve, cited with `cite_evidence` (#124, in the pstack umbrella).
 6. ADR-0042's follow-up work (accepted 2026-11-07): done: `domain_version` with the deployment
    log gives the rule in force when an event was decided, documented, the self domains too
-   (ADR-0045, #PR); read visibility defined in the schema (`read`, refused
+   (ADR-0045, #150); read visibility defined in the schema (`read`, refused
    until M0b); in M0b, deadlines with timers, read visibility enforced by the query and MCP
    read tools, an observed time on facts from adapters, identity mappings on adapters; in M2,
    `confirmed_at` and `review_by` warnings; in the M4 spec, goals, expected outcomes and the
