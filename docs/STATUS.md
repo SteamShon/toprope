@@ -267,6 +267,13 @@ as its ISO string, and every ISO time the model can hold has its offset and whol
 tables, for comparisons and `days_since`. A fourth seeded break, through `days_since`, must be
 found by the `tla` job.
 
+## Scenarios are elements (#161)
+
+A review leftover (#86, #147), as the researcher chose: a scenario carries `source` and
+`status` like an action, so an agent's scenario is proposed until a person confirms it, and
+approval counts it. Fixtures and the glossary carry no provenance: proposing them writes an
+`unmarked-proposal` line to the interview log, and the change shows in the commit's review diff.
+
 ## The author does not approve, where a domain says so (#162, ADR-0046)
 
 A review leftover (#102), as the researcher chose: `approval: {distinct_from_author: true}` in a
@@ -312,10 +319,6 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 Each item names the PR it came from and the review date. The PR that resolves an item deletes
 it; each release's cleanup PR handles items older than one release.
 
-- `propose_element` on a path that is not an element (for example `glossary.<term>`,
-  `scenarios.<id>`, `world.fixtures`) writes the value without provenance instead of failing, so
-  such a change shows only in the commit's review diff; #147's Delivery change has three
-  (#86, 2026-11-06; again in #147, 2026-11-07)
 - The `human-request` workflow pushes its result with the workflow token, so no `pull_request`
   check runs on that head, and the ruleset does not accept the `status` run the workflow
   dispatches; the PR needs one more commit before it can merge. A push token that triggers

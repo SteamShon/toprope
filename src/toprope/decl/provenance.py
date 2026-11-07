@@ -23,6 +23,9 @@ def proposed_elements(doc: dict[str, Any]) -> list[str]:
     for inv in doc.get("invariants") or []:
         if isinstance(inv, dict) and inv.get("status") == "proposed":
             out.append(f"invariants.{inv.get('id')}")
+    for sc in doc.get("scenarios") or []:
+        if isinstance(sc, dict) and sc.get("status") == "proposed":
+            out.append(f"scenarios.{sc.get('id')}")
     for obj, tr in (doc.get("transitions") or {}).items():
         for state, cells in ((tr or {}).get("matrix") or {}).items():
             for name, c in (cells or {}).items():

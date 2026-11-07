@@ -238,7 +238,9 @@ class Step(Strict):
         return self
 
 
-class Scenario(Strict):
+class Scenario(Provenance):
+    """An example run the harness replays. An element (it carries provenance): an agent's
+    scenario is proposed until a person confirms it."""
     id: Ident
     given: dict[str, Any] = Field(default_factory=dict)
     steps: list[Step]
