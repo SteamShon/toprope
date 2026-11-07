@@ -19,6 +19,10 @@
     "binding.yaml": {
       "sha256": "0c5fcf0eecc711b98d978c050c796a6b1abad1a9e191aecd41c9481d47ac4e8d",
       "frozen_at": "2026-11-06T04:56:06+00:00"
+    },
+    "run-protocol.md": {
+      "sha256": "66e1abfdccd45bdb5305a9ed0c8a73131cacfe63bdc87cb155dc236546593cdd",
+      "frozen_at": "2026-11-07T01:49:17+00:00"
     }
   }
 }

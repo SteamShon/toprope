@@ -1,3 +1,0 @@
-summary: Freeze the M1 Phase B run protocol by its hash (decided 2026-11-07)
-steps:
-  - freeze-protocol: experiments/m1/instruments
