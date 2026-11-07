@@ -175,7 +175,7 @@ each changes only its own item below. Not here: a confirmation view for non-deve
 M0b's UI), checking the non-developer claim (M1 Phase B, M2), TLC modeling creation and links
 (Next).
 
-- ✅ 1. A late kernel reply is recorded, not applied (#PR)
+- ✅ 1. A late kernel reply is recorded, not applied (#148)
   Narrowed from "only for a call that is waiting for it": the review's gaps were late replies.
   A reply whose object someone other than the kernel moved out of its called-in state is
   refused with `late-reply`, its result kept in the outbox record.
