@@ -80,6 +80,11 @@ section gives the options considered and the recommendation, which the researche
 - **Recommendation: (b).** Document the first now; add the observed time with the adapters
   (M0b), where facts first arrive late. Rules that take effect at a future date stay out until a
   domain asks for them.
+- *Correction (2026-11-07, writing the doc):* the first step holds for a domain served from a
+  deployment, whose declaration carries its commit's sequence number as `version`. It does not
+  hold yet for the self domains: `toprope-run --composition` reads the working-copy files, whose
+  `version` stays 1, so their events cannot tell which approved commit decided them. Recorded
+  under *Left from reviews* in `docs/STATUS.md`.
 
 ### 6. Entity resolution
 - **Options.** (a) A resolution service in the kernel. (b) Each adapter maps its system's
