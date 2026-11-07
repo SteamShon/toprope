@@ -77,3 +77,4 @@
 {"at": "2026-11-07T04:12:28+00:00", "base": "7-92bcb1c921be21bd", "check": "nl", "commit": "9-b4ec65433222f096", "ok": null, "run": "75fd10d7e8cc", "summary": "skipped: no natural-language checker configured"}
 {"at": "2026-11-07T04:12:28+00:00", "base": "7-92bcb1c921be21bd", "check": "change-check", "commit": "9-b4ec65433222f096", "ok": true, "run": "75fd10d7e8cc", "summary": "passes; 0 error(s), 0 warning(s)"}
 {"at": "2026-11-07T04:12:28+00:00", "base": "7-92bcb1c921be21bd", "check": "confirmed", "commit": "9-b4ec65433222f096", "ok": true, "run": "75fd10d7e8cc", "summary": "0 proposed element(s)"}
+{"at": "2026-11-07T04:14:50+00:00", "base": null, "check": "preview-harness", "commit": "9-b4ec65433222f096", "ok": true, "run": "f47cd21c19a9", "summary": "build 59a45282c10eee81: harness passed"}
