@@ -142,6 +142,13 @@
                 },
                 "max": {
                   "type": "number"
+                },
+                "read": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "roles that may read it (ADR-0042); defined, M0b"
                 }
               },
               "required": [],
@@ -159,6 +166,13 @@
                 }
               ]
             }
+          },
+          "read": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "roles that may read objects of this type (ADR-0042); defined, M0b"
           },
           "source": {
             "$ref": "#/$defs/source"

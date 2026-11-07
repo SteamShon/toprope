@@ -31,7 +31,9 @@ def with_prov(props, required=(), **kw):
 typed = {"type": {"enum": SCALAR_TYPES}, "enum": {"type": "array", "items": {"type": "string"}},
          "ref": {"type": "string"}, "many": {"type": "boolean"}, "optional": {"type": "boolean"}}
 property_ = obj({"type": {"enum": SCALAR_TYPES}, "enum": {"type": "array", "items": {"type": "string"}},
-                 "optional": {"type": "boolean"}, "min": {"type": "number"}, "max": {"type": "number"}},
+                 "optional": {"type": "boolean"}, "min": {"type": "number"}, "max": {"type": "number"},
+                 "read": {"type": "array", "items": {"type": "string"},
+                          "description": "roles that may read it (ADR-0042); defined, M0b"}},
                 oneOf=[{"required": ["type"]}, {"required": ["enum"]}])
 param = obj(typed, oneOf=[{"required": ["type"]}, {"required": ["enum"]}, {"required": ["ref"]}])
 deny = with_prov({"deny": {"type": "string"}}, ["deny"])
@@ -93,7 +95,9 @@ domain = {
         "glossary": {"type": "object", "additionalProperties": {"type": "string"}},
         "roles": {"type": "array", "items": {"type": "string"}},
         "objects": {"type": "object", "additionalProperties": with_prov(
-            {"description": {"type": "string"}, "properties": {"type": "object", "additionalProperties": property_}})},
+            {"description": {"type": "string"}, "properties": {"type": "object", "additionalProperties": property_},
+             "read": {"type": "array", "items": {"type": "string"},
+                      "description": "roles that may read objects of this type (ADR-0042); defined, M0b"}})},
         "links": {"type": "object", "additionalProperties": with_prov(
             {"from": {"type": "string"}, "to": {"type": "string"},
              "cardinality": {"enum": ["one-to-one", "one-to-many", "many-to-one", "many-to-many"]},

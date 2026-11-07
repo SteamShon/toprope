@@ -20,6 +20,7 @@ readable schemas: [`schema/domain.v1.schema.json`](../schema/domain.v1.schema.js
 | `handoffs` | [Handoffs](#handoffs) | implemented (M0a, ADR-0024) |
 | composition files (`*.composition.yaml`: members and wiring) | [Handoffs](#handoffs) | implemented (M0a, ADR-0026) |
 | `approvals` on actions | [Approvals](#approvals) | defined; M0b |
+| `read` on objects and properties | [Read visibility](#read-visibility-adr-0042) | defined; M0b |
 | `invariants` with `scope: cross` + `reservations` | [Reservations](#cross-aggregate-invariants-and-reservations) | defined; M0b |
 | `timers`, scenario `advance` steps | [Timers](#timers) | defined; M0b |
 | `functions` | [Functions](#functions) | defined; M0b |
@@ -528,6 +529,31 @@ with actor rules: an agent must satisfy the rule both for itself and for its pri
 A check or an effect can read `actor.principal` (`id`, `kind`, `roles`, `role`): the person an
 agent acts for, or the actor itself when it is not an agent. Record and compare
 `actor.principal.id` to say "not the proposer, nor the proposer's agent" (ADR-0041).
+
+## Read visibility (ADR-0042)
+
+Who may *read* what, beside who may *do* what. Defined now so it is reviewed before any surface
+depends on it; the kernel refuses it until M0b, when the query tools let agents read history.
+
+```yaml
+objects:
+  Readout:
+    description: Metric results of an experiment after its planned duration.
+    read: [pm, analyst, approver]          # who may read a readout at all
+    properties:
+      primary_delta: {type: number}
+      guardrail_regressed: {type: boolean, read: [analyst, approver]}   # and this field
+```
+
+- `read` on an object type lists the roles that may read its objects; on a property, the roles
+  that may read that property. Without `read`, every role may read, as now.
+- It applies to every surface that reads: the MCP read tools, the command line's `get` and
+  `history`, the query tools and the guide's examples. An object an actor may not read is
+  reported as not found (like an action whose existence is hidden, ADR-0021); a property it may
+  not read is left out.
+- An agent must satisfy it both for itself and for its principal, like an actor rule.
+- It limits what is shown, never what is checked: the gate, invariants, the harness, `system`
+  and `external:kernel` read everything.
 
 ## Representation layer (ADR-0008)
 
