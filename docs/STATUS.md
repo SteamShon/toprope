@@ -148,7 +148,7 @@ only its own item below.
 - ✅ 4. Replay (`toprope.tla.replay`): each TLC counterexample is read from TLC's trace and taken
   again on the model level; a break the harness also reports is `known`, one it missed a `harness
   gap`, one the interpreter does not reproduce a `model mismatch`; the last two fail the `tla` job,
-  and the seeded break must be found and reproduced (PR)
+  and the seeded break must be found and reproduced (#138)
 
 - ⬜ 5. Every example and both self domains, under a state bound
 
