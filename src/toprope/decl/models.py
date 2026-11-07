@@ -47,17 +47,27 @@ class Property(Strict):
     optional: bool = False
     min: float | None = None
     max: float | None = None
+    read: list[str] | None = None          # roles that may read it (ADR-0042 §3): defined, M0b
 
     @model_validator(mode="after")
     def _one_kind(self) -> Property:
         if (self.type is None) == (self.enum is None):
             raise ValueError("a property has exactly one of `type` or `enum`")
+        if self.read is not None:
+            raise not_yet("read visibility (`read`)", "M0b")
         return self
 
 
 class ObjectType(Provenance):
     description: str | None = None
     properties: dict[str, Property] = Field(default_factory=dict)
+    read: list[str] | None = None          # roles that may read objects of this type (ADR-0042 §3)
+
+    @model_validator(mode="after")
+    def _read_not_yet(self) -> ObjectType:
+        if self.read is not None:
+            raise not_yet("read visibility (`read`)", "M0b")
+        return self
 
 
 class Link(Provenance):
