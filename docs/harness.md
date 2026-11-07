@@ -96,8 +96,13 @@ The `tla` job fails on a harness gap, a model mismatch, a model TLC cannot check
 state bound. It also requires a seeded break (`tests/tla/`) to be found and reproduced, so a
 silent pass cannot mean that TLC checks nothing: one break in a step on an existing object
 (paid-media without a precondition), one made by creation alone (Delivery creating a request
-already deployed). Actions that use time or follow links are left out of the model and listed
-with every run.
+already deployed), and one read through a link (Authoring creating an Element that cites no
+Source). Actions that use time, or read through a link a field some action changes, are left out
+of the model and listed with every run.
+
+A link path reads the linked objects from their fixtures, a constant (`Fix_<Object>`). It is
+sound only for what no modeled action changes, so that is all a link may read: whether the
+linked object exists, and fields no action sets. Then the instances stay independent.
 
 Creating actions are modeled: each created type gets one fresh id (`new-<Object>`), the empty
 world is one more start, and a creating step runs only from it, so a run follows one created

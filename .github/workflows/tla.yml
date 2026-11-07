@@ -39,7 +39,8 @@ jobs:
             examples/refunds/refunds.domain.yaml examples/refunds/refunds.30-days.domain.yaml \
             domains/authoring/authoring.domain.yaml domains/delivery/delivery.domain.yaml \
             "tests/tla/paid-media.no-holdout-guard.domain.yaml=breaks:Inv_holdouts_never_change" \
-            "tests/tla/delivery.created-deployed.domain.yaml=breaks:Inv_deployed_builds_passed_their_harness"
+            "tests/tla/delivery.created-deployed.domain.yaml=breaks:Inv_deployed_builds_passed_their_harness" \
+            "tests/tla/authoring.origin-optional.domain.yaml=breaks:Inv_elements_cite_a_source"
       - if: always()
         uses: actions/upload-artifact@v4
         with:
