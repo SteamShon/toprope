@@ -1,6 +1,0 @@
-summary: Deliver, preview, deploy and verify Authoring commit 7-92bcb1c921be21bd (citing evidence)
-steps:
-  - run: {member: authoring, action: deliver, target: 7-92bcb1c921be21bd, params: {environment: local}}
-  - run: {member: delivery, action: preview, target: "authoring:7-92bcb1c921be21bd:local"}
-  - run: {member: delivery, action: deploy, target: "authoring:7-92bcb1c921be21bd:local"}
-  - run: {member: delivery, action: verify, target: "authoring:7-92bcb1c921be21bd:local", params: {verified: "true"}}
