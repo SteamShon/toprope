@@ -27,6 +27,7 @@ uv run toprope-harness --composition self.composition.yaml --regen-check
 |---|---|
 | **Small world** | Grown from the fixtures by applying allowed transitions (bounded BFS). One person per role, named after `world.actors`. Matrix states never reached are reported as `unreachable`. |
 | **Cell tests** | Every (state, action, role) cell, from a world instance in that state. Expected outcomes come from the declared matrix, actor rules and preconditions, read directly rather than through the interpreter's decision, so these tests also check the oracle against the declaration. |
+| **Param tests** | Each allowed cell, on every instance in its state, with one param of a finite type (boolean, enum, integer) set to each other candidate value. Expected outcomes come from the declaration; an invariant guard is a finding. A cell test takes the default params only, so a move that breaks an invariant only with another value (a kernel reply with `false`) went unseen until TLC found two (ADR-0043). |
 | **Precondition tests** | For each precondition: an instance on which it is the first to fail (a boundary instance, such as `E-bare`). When no world instance is one, it is made from one by setting a single property or param the precondition reads to another value of its type, or to an actor's id, keeping every invariant. |
 | **Create tests** | Every create action, for every role. |
 | **Invariant checks** | After every step at every level. An `invariant-guard` outcome is reported as an invariant finding: the declaration allows a transition its invariants forbid. |
@@ -48,8 +49,12 @@ and do not fail it: they are the interview's next questions (ADR-0010 §2).
 ## Limits in M0a
 - Cell tests use one person per role. Agents (principal and grant) are covered by the
   Execution and MCP tests, but are not yet in the generated cells.
-- Each required param gets one default value (the first enum value, the first fixture of a
-  `ref`, or a type default). A precondition test may set one param to another value.
+- Cell tests give each required param one default value (the first enum value, the first fixture
+  of a `ref`, or a type default). Param tests set one finite param (boolean, enum, integer) to each
+  other value; a precondition test may set one param to another value. Strings and `ref`s keep
+  their default.
+- The small world grows one instance per (object, state), so a break that first needs a state it
+  never builds is TLC's to find ("What each one catches", above).
 - Clones carry their outgoing links. No other object links to a clone.
 - Exploration runs on the model level. A minimal flow it finds can be replayed on the other
   levels like any other flow.
@@ -72,6 +77,57 @@ Each must be caught by some finding. A survivor is a break the harness cannot se
 command exits 1. Either a case is missing, or the mutant behaves like the declaration in every
 state the harness can build (for example, a precondition that always holds).
 `toprope.harness.mutants.run_mutants(domain)` returns the same report.
+
+## Cross-check with TLC (ADR-0043)
+```bash
+uv run toprope-harness --domain my.domain.yaml --tla DIR    # the model level as TLA+, for TLC
+python tools/tla_check.py --jar tla2tools.jar DECLARATION... # what the `tla` CI job runs
+```
+Exploration samples action sequences. TLC enumerates every reachable state of the exported model
+and reports the shortest path to each broken invariant. Each path is replayed on the model level
+from the same fixtures (`toprope.tla.replay`):
+- **known**: reproduced, and the harness reports the same invariant broken. The harness fails on
+  it already.
+- **harness gap**: reproduced, and the harness missed it. Exploration did not reach the break.
+- **model mismatch**: not reproduced. The export and the interpreter disagree on what the
+  declaration says.
+
+The `tla` job fails on a harness gap, a model mismatch, a model TLC cannot check, or a reached
+state bound. It also requires a seeded break (`tests/tla/`) to be found and reproduced, so a
+silent pass cannot mean that TLC checks nothing. Actions that create objects, use time or
+follow links are left out of the model and listed with every run.
+
+TLC's model starts from one fixture at a time. No modeled step or invariant reads another instance
+(link paths are left out, and a `ref` param is only an id), so the instances are independent, and
+checking each alone reaches the same states in a sum instead of a product. Modeling links ends
+this.
+
+### What each one catches
+The harness builds a small world: from the fixtures, one grown instance per (object, state). Its
+cell and param tests take **one step** from those instances, and exploration samples short
+sequences from them. TLC follows **every** reachable state.
+
+| | Harness | TLC |
+|---|---|---|
+| Finds | a break one step away from an instance the small world holds, with any finite param value | also a break that first needs a state the small world never builds |
+| Runs | in the change check, on every commit, before approval (seconds) | in the `tla` CI job, on every pull request (minutes) |
+
+Two breaks TLC found in the self domains (#139, fixed in #140) show the line:
+
+- **One step, now the harness's.** In Authoring, the fixture commit `C1` is already approved, and
+  a kernel reply `record_check` with `passed: false` breaks
+  `approved-commits-passed-their-checks`. The start is in the small world, and the break is one
+  step away. A cell test takes the default params (`passed: true`) and missed it; param tests
+  take `false` too.
+- **Two steps, TLC's.** In Delivery, the fixture `R4` is deployed (`done`). `preview` takes it
+  to `previewing`, still deployed, and then `record_build` with `harness_ok: false` breaks
+  `deployed-builds-passed-their-harness`. The small world holds one `previewing` instance,
+  reached from a request that was never deployed. So the harness never starts from "previewing
+  and deployed", while TLC does.
+
+So a break of the second kind is not caught by the change check in the loop. It is caught by the
+`tla` job on the pull request that carries the change. Closing that gap would mean several
+instances per state in the small world, at the cost of the harness's speed.
 
 ## The mechanical layer (ADR-0035)
 Besides the examples, the harness generates objects from the declaration's types, enums and

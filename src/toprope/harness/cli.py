@@ -8,6 +8,7 @@ unknown receiver is an error, so every handoff's contract is checked before the 
 
   toprope-harness --composition self.composition.yaml   (members, wiring, then each member)
   toprope-harness --domain d.domain.yaml --mutants       (can the harness fail? see below)
+  toprope-harness --domain d.domain.yaml --tla DIR       (the model level for TLC, ADR-0043)
 
 Exit status 1 if there is any finding (a failing cell test, an invariant violation, a parity,
 replay or race failure, a failing flow, or an exploration counterexample).
@@ -41,6 +42,9 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--regen-check", action="store_true",
                     help="with --composition: the regeneration check (ADR-0028): serve from declarations, run, "
                          "regenerate, compare, and run every kernel call end to end")
+    ap.add_argument("--tla", metavar="DIR",
+                    help="with --domain: write the model level as a TLA+ module and TLC config (ADR-0043), "
+                         "with the actions left out of the model")
     ap.add_argument("--mutants", action="store_true",
                     help="with --domain: check that the harness catches each seeded break (exit 1 if one survives)")
     ap.add_argument("--receiver", action="append", default=[], metavar="FILE[@MAJOR]",
@@ -82,6 +86,13 @@ def main(argv: list[str] | None = None) -> None:
             for i in contract:
                 print(f"error {i.code} at {i.where}: {i.message}", file=sys.stderr)
             raise SystemExit(1)
+    if args.tla:
+        from ..tla import export, write
+        e = export(d)
+        write(e, args.tla)
+        print(f"wrote {args.tla}/{e.name}.tla: {len(e.steps)} step(s); left out: "
+              + (", ".join(f"{k} ({v})" for k, v in sorted(e.left_out.items())) or "nothing"))
+        raise SystemExit(0)
     if args.mutants:
         from .mutants import run_mutants
         out = run_mutants(d)

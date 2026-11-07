@@ -113,6 +113,7 @@ class Planner:
                 out += self._create_cases(name, a)
             elif a.target in self.d.transitions:
                 out += self._cell_cases(name, a)
+                out += self._param_cases(name, a)
                 out += self._precondition_cases(name, a)
         return out
 
@@ -135,6 +136,39 @@ class Planner:
                     if expect["status"] == "ok" and (pre := self.first_failing(a, inst.data, role)):
                         expect = {"status": "denied", "code": pre}
                 out.append(Case(cid, "cell", obj, state, name, role, inst, self.params(a), expect))
+        return out
+
+    def _param_cases(self, name: str, a: Action) -> list[Case]:
+        """Each allowed cell, on every instance in its state, with one param set to another value of
+        a finite type (boolean, enum, integer). A cell test takes the default params only, so a
+        move that breaks an invariant only with another value went unseen: TLC found two, a
+        failing kernel reply on an approved commit or a deployed request (ADR-0043). Expected
+        outcomes come from the declaration, as for cells; an invariant guard is a finding."""
+        out = []
+        obj = a.object_type
+        base = self.params(a)
+        finite = [(p, s) for p, s in a.params.items() if not s.optional and s.ref is None
+                  and (s.enum or s.type in ("boolean", "integer"))]
+        if not finite:
+            return out
+        for state in self.d.transitions[obj].matrix:
+            for role in self.w.actors:
+                cell = cell_expectation(raw_cell(self.d, obj, state, name, role), state)
+                if cell["status"] != "ok":
+                    continue
+                for k, inst in enumerate(self.w.in_state(obj, state)):
+                    if not self.actor_ok(name, a, role, inst):
+                        continue
+                    for p, spec in finite:
+                        for v in self._candidates(spec):
+                            v = [v] if spec.many else v
+                            if v == base[p]:
+                                continue
+                            params = {**base, p: v}
+                            pre = self.first_failing(a, inst.data, role, params)
+                            expect = {"status": "denied", "code": pre} if pre else cell
+                            out.append(Case(f"param:{obj}.{state}.{name}.{role}@{inst.data['id']}:{p}={v}", "param",
+                                            obj, state, name, role, inst, params, expect))
         return out
 
     def _precondition_cases(self, name: str, a: Action) -> list[Case]:

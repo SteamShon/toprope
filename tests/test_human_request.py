@@ -136,3 +136,16 @@ def test_a_request_can_freeze_the_run_protocol():
     req = {"summary": "Freeze the Phase B run protocol", "steps": [{"freeze-protocol": "experiments/m1/instruments"}]}
     assert hr.check(req) == []
     assert hr.commands(req)[0][-2:] == ["freeze-protocol", "experiments/m1/instruments"]
+
+
+def test_a_run_step_can_name_the_workspace_of_the_draft_it_acts_on():
+    # Confirming the Delivery declaration's draft is an Authoring action on Delivery's workspace.
+    step = {"run": {"member": "authoring", "action": "confirm_all_proposed", "target": "delivery",
+                    "workspace": "toprope.delivery.workspace.yaml"}}
+    req = {"summary": "Confirm Delivery's draft", "steps": [step]}
+    assert hr.check(req) == []
+    cmd = hr.commands(req)[0]
+    assert cmd[cmd.index("--workspace") + 1] == "toprope.delivery.workspace.yaml"
+    assert "(workspace `toprope.delivery.workspace.yaml`)" in hr.render(req)
+    bad = {"summary": "x", "steps": [{"run": {**step["run"], "workspace": "/etc/passwd"}}]}
+    assert "run takes" in hr.check(bad)[0]

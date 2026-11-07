@@ -111,7 +111,7 @@ each into `umbrella/pstack-lessons`. Each sub-PR changes only its own item below
 - ✅ 4. World map state charts show where the harness found a break: failed arrows, `breaks`,
   `mayBreak` and `unreachable` states, arrow conditions in brackets, and each minimal flow told
   step by step (`minimal-flows.md`; `docs/world-map.md`). A TLA+ export checked by TLC, as a
-  second oracle beside bounded exploration, would need an ADR; not proposed yet (#125)
+  second oracle beside bounded exploration: ADR-0043, umbrella #135 (#125)
 
 - ✅ 5. Harness mutants (`toprope-harness --mutants`, `docs/harness.md`): each seeded break given to
   the execution level must be caught. Three survived in the examples (paid-media's `step-limit`
@@ -123,6 +123,49 @@ each into `umbrella/pstack-lessons`. Each sub-PR changes only its own item below
   loop at the same time, and the `checks` workflow fails a PR whose head does not extend each of
   the base's append-only logs (`tools/logs_check.py`; it catches #124's first, diverged run)
   (#129)
+
+## TLA+ cross-check (umbrella #135, link: ③)
+
+The harness checks a declaration by bounded exploration. ADR-0043 adds a second, exhaustive
+oracle: the declaration exported to TLA+ and model-checked by TLC in CI, each counterexample
+replayed on the interpreter. One sub-PR each into `umbrella/tla-cross-check`; each changes
+only its own item below.
+
+- ✅ 1. ADR-0043 (accepted): one declaration's model level; TLC in a pinned `tla` CI job; each
+  counterexample replayed on the interpreter, a harness gap or a model mismatch fails; actions
+  using time, links or creation left out and reported; every example and both self domains under
+  a 1,000,000-state bound (#136)
+
+- ✅ 2. Exporter (`toprope.tla`; `toprope-harness --tla DIR`): a declaration's model level as a
+  TLA+ module and TLC config, values tagged so the check language stays fail closed; actions that
+  create objects, use time or follow links are left out and named (#137)
+
+- ✅ 3. A `tla` CI job (`.github/workflows/tla.yml`, `tools/tla_check.py`): TLC 1.8.0 pinned by
+  sha256. The four examples are checked (paid-media 133,686 states, no break), and a seeded break
+  (paid-media without `not-a-holdout`) must be found, so the job can fail; a model TLC cannot
+  check, or a reached state bound, fails (#137)
+
+- ✅ 4. Replay (`toprope.tla.replay`): each TLC counterexample is read from TLC's trace and taken
+  again on the model level; a break the harness also reports is `known`, one it missed a `harness
+  gap`, one the interpreter does not reproduce a `model mismatch`; the last two fail the `tla` job,
+  and the seeded break must be found and reproduced (#138)
+
+- ✅ 5. Every example and both self domains in the `tla` job, each fixture checked alone (the
+  modeled instances are independent). TLC first found a **harness gap** in each self domain (a
+  late kernel reply with a failing result on an approved commit, or on a deployed request); both
+  declarations now refuse those replies (item 6), and the harness finds the one-step kind itself
+  (item 7) (#139)
+
+- ✅ 6. The self domains refuse the late kernel replies TLC found: Authoring's `record_check` on an
+  approved commit (`settled`), and Delivery's `preview` of a deployed request (`not-deployed`; a
+  refused deploy can still be retried). Through the loop: proposed by the agent, confirmed,
+  approved, deployed and verified by the researcher (Authoring `main` `9-b4ec65433222f096`,
+  Delivery `main` `4-3e90586c40faf7d7`) (#140)
+
+- ✅ 7. Param tests: each allowed cell, on every instance in its state, with one finite param (boolean,
+  enum, integer) set to each other value; the harness now finds the Authoring break by itself.
+  A break that first needs a state the small world never builds (Delivery's) stays TLC's;
+  `docs/harness.md`, "What each one catches" (#141)
 
 ## M0b, M2 to M5
 
@@ -158,6 +201,9 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    read tools, an observed time on facts from adapters, identity mappings on adapters; in M2,
    `confirmed_at` and `review_by` warnings; in the M4 spec, goals, expected outcomes and the
    outcome-to-decision link.
+7. ADR-0043's follow-ups: make `tla` a required check on `develop` once the umbrella is in
+   (maintainer); model links, time and object creation, each shrinking what the model leaves out
+   (the self domains leave out their creating actions and one link invariant).
 
 ## Left from reviews
 

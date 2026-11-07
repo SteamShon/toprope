@@ -320,7 +320,7 @@ class Harness:
                 failed_cases |= set(f.case.split(" || "))
         out: dict[str, str] = {}
         for c in cases:
-            if c.kind not in ("cell", "create"):
+            if c.kind not in ("cell", "param", "create"):
                 continue
             e = _edge_of(c)
             if c.id in failed_cases:
@@ -357,7 +357,7 @@ class Harness:
 
 
 def _edge_of(c: Case) -> str:
-    return f"{c.obj}.{c.state}.{c.action}" if c.kind == "cell" else f"{c.obj}.(new).{c.action}"
+    return f"{c.obj}.{c.state}.{c.action}" if c.kind in ("cell", "param") else f"{c.obj}.(new).{c.action}"
 
 
 def run_harness(d: Domain, **kw: Any) -> Report:

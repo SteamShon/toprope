@@ -1,0 +1,376 @@
+"""Export a declaration's model level to TLA+, for TLC (ADR-0043).
+
+The model starts from one fixture at a time, as an instance (a function from field name to
+value): no step or invariant reads another instance, so the instances are independent. It takes a
+step whenever an actor (one per role, as the harness names them) may take an action on an
+instance with some param values: the actor rules, the matrix cell for the actor's role, the
+preconditions, and every `set` effect evaluating. Invariants are checked on every state, with
+no guard: a step that breaks one is the finding. Kernel calls and handoffs are outbox events,
+outside the state.
+
+Values are tagged, `<<"s", "x">>`, `<<"i", 3>>`, `<<"b", TRUE>>`, `<<"l", <<...>>>>`,
+`<<"r", record>>`, `<<"n">>` (null) and `<<"e">>` (an evaluation error), so TLC never compares two
+values of different types, and the check language's fail-closed rules hold: an operator on the
+wrong type gives `E`, and a check passes only when it gives `<<"b", TRUE>>`.
+
+Left out of the model, and named in `Export.left_out`: actions that create objects or whose
+object has no matrix, and any action whose guard or effect uses time (`now`, `days_since`), a
+path through a link, `new.`, an unknown function, a non-integer number, or a param of a type the
+model cannot enumerate.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from dataclasses import dataclass, field
+from typing import Any
+
+from ..decl.models import ActorRule, ByRole, Deny, Domain, Target
+from ..expr import parse
+from ..expr.ast import Arith, Call, Compare, ListLit, Literal, Logical, Neg, Not, Path
+from ..harness.world import world_actors
+
+KERNEL = "external:kernel"
+INTS = (0, 1, 2, 7, 30, 100, 1000, 10000)
+STRS = ("x", "example", "")
+DATES = ("2026-01-01T00:00:00+00:00", "2026-06-30T12:00:00+00:00")
+BOUND = 1_000_000
+
+PRELUDE = r"""
+N == <<"n">>
+E == <<"e">>
+S(x) == <<"s", x>>
+I(x) == <<"i", x>>
+B(x) == <<"b", x>>
+L(x) == <<"l", x>>
+R(x) == <<"r", x>>
+Tag(v) == v[1]
+Get(r, f) == IF f \in DOMAIN r THEN r[f] ELSE N
+Attr(v, f) == IF Tag(v) = "e" THEN E ELSE IF Tag(v) = "r" THEN Get(v[2], f) ELSE N
+Num(v) == IF Tag(v) = "b" THEN (IF v[2] THEN 1 ELSE 0) ELSE v[2]
+Eq(a, b) == IF Tag(a) = Tag(b) THEN a = b
+            ELSE IF {Tag(a), Tag(b)} = {"b", "i"} THEN Num(a) = Num(b) ELSE FALSE
+OpEq(a, b) == IF Tag(a) = "e" \/ Tag(b) = "e" THEN E ELSE B(Eq(a, b))
+OpNe(a, b) == IF Tag(a) = "e" \/ Tag(b) = "e" THEN E ELSE B(~Eq(a, b))
+Mem(a, l) == \E k \in 1..Len(l[2]) : Eq(a, l[2][k])
+OpIn(a, l) == IF Tag(a) = "e" \/ Tag(l) # "l" THEN E ELSE B(Mem(a, l))
+OpNotIn(a, l) == IF Tag(a) = "e" \/ Tag(l) # "l" THEN E ELSE B(~Mem(a, l))
+Ord(a, b) == Tag(a) \in {"i", "b"} /\ Tag(b) \in {"i", "b"}
+OpLt(a, b) == IF Ord(a, b) THEN B(Num(a) < Num(b)) ELSE E
+OpLe(a, b) == IF Ord(a, b) THEN B(Num(a) <= Num(b)) ELSE E
+OpGt(a, b) == IF Ord(a, b) THEN B(Num(a) > Num(b)) ELSE E
+OpGe(a, b) == IF Ord(a, b) THEN B(Num(a) >= Num(b)) ELSE E
+IsInt(v) == Tag(v) = "i"
+OpAdd(a, b) == IF Tag(a) = "s" /\ Tag(b) \in {"s", "i"} THEN S(a[2] \o (IF Tag(b) = "i" THEN ToString(b[2]) ELSE b[2]))
+               ELSE IF Tag(b) = "s" /\ Tag(a) = "i" THEN S(ToString(a[2]) \o b[2])
+               ELSE IF IsInt(a) /\ IsInt(b) THEN I(a[2] + b[2]) ELSE E
+OpSub(a, b) == IF IsInt(a) /\ IsInt(b) THEN I(a[2] - b[2]) ELSE E
+OpNeg(a) == IF IsInt(a) THEN I(-a[2]) ELSE E
+OpNot(a) == IF Tag(a) = "b" THEN B(~a[2]) ELSE E
+OpAnd(a, b) == IF Tag(a) # "b" THEN E ELSE IF ~a[2] THEN B(FALSE) ELSE IF Tag(b) # "b" THEN E ELSE b
+OpOr(a, b) == IF Tag(a) # "b" THEN E ELSE IF a[2] THEN B(TRUE) ELSE IF Tag(b) # "b" THEN E ELSE b
+OpExists(a) == IF Tag(a) = "e" THEN E ELSE B(Tag(a) # "n")
+OpCount(a) == IF Tag(a) = "n" THEN I(0) ELSE IF Tag(a) \in {"l", "s"} THEN I(Len(a[2]))
+              ELSE IF Tag(a) = "r" THEN I(Cardinality(DOMAIN a[2])) ELSE E
+Pass(v) == v = B(TRUE)
+"""
+
+
+class Unsupported(Exception):
+    """A construct the model does not cover yet; the action using it is left out."""
+
+
+@dataclass
+class Export:
+    module: str                       # the TLA+ module text
+    cfg: str                          # the TLC configuration
+    name: str                         # the module name
+    left_out: dict[str, str] = field(default_factory=dict)    # action → why it is not modeled
+    actors: dict[str, str] = field(default_factory=dict)      # role → the actor's id
+    steps: list[str] = field(default_factory=list)            # the modeled TLA+ step operators
+
+
+# -- values ------------------------------------------------------------------------------------
+_SAFE = re.compile(r"[A-Za-z0-9 _.:@<>/+\-=,;()\[\]{}!?#$%&*|~^']*")
+
+
+def tla_str(s: str) -> str:
+    """A TLA+ string literal. Text TLC may not read (quotes, backslashes, non-ASCII) becomes
+    `u:` and its UTF-8 bytes in hex, which keeps equality, the only thing strings are used for."""
+    if _SAFE.fullmatch(s):
+        return f'"{s}"'
+    return '"u:' + s.encode().hex() + '"'
+
+
+def value(v: Any) -> str:
+    """A Python value as a tagged TLA+ value."""
+    if v is None:
+        return "N"
+    if isinstance(v, bool):
+        return f"B({'TRUE' if v else 'FALSE'})"
+    if isinstance(v, int):
+        return f"I({v})"
+    if isinstance(v, float):
+        if v.is_integer():
+            return f"I({int(v)})"
+        raise Unsupported(f"the non-integer number {v}")
+    if isinstance(v, str):
+        return f"S({tla_str(v)})"
+    if isinstance(v, (list, tuple)):
+        return "L(<<" + ", ".join(value(x) for x in v) + ">>)"
+    if isinstance(v, dict):
+        return "R(" + record({k: value(x) for k, x in v.items()}) + ")"
+    raise Unsupported(f"the value {v!r}")
+
+
+def record(fields: dict[str, str]) -> str:
+    """A function from field name to (already rendered) value."""
+    if not fields:
+        return "[f \\in {} |-> N]"
+    return "(" + " @@ ".join(f"({tla_str(k)} :> {v})" for k, v in sorted(fields.items())) + ")"
+
+
+def ident(*parts: str) -> str:
+    return "_".join(re.sub(r"[^A-Za-z0-9]", "_", p) for p in parts)
+
+
+# -- expressions -------------------------------------------------------------------------------
+class Expr:
+    """Translate a check expression for one action (or invariant) on one object type."""
+
+    def __init__(self, d: Domain, obj: str, actor: str, params: dict[str, str]):
+        self.d, self.obj, self.actor, self.params = d, obj, actor, params
+        self.links = {n for n, l in d.links.items() if l.from_ == obj}
+
+    def __call__(self, src: str) -> str:
+        return self.node(parse(src))
+
+    def node(self, n: Any) -> str:
+        match n:
+            case Literal(v):
+                return value(v)
+            case ListLit(items):
+                return "L(<<" + ", ".join(self.node(i) for i in items) + ">>)"
+            case Path(root, attrs):
+                return self.path(root, attrs)
+            case Not(x):
+                return f"OpNot({self.node(x)})"
+            case Neg(x):
+                return f"OpNeg({self.node(x)})"
+            case Logical(op, a, b):
+                return f"Op{'And' if op == 'and' else 'Or'}({self.node(a)}, {self.node(b)})"
+            case Arith(op, a, b):
+                return f"Op{'Add' if op == '+' else 'Sub'}({self.node(a)}, {self.node(b)})"
+            case Compare(op, a, b):
+                name = {"==": "Eq", "!=": "Ne", "<": "Lt", "<=": "Le", ">": "Gt", ">=": "Ge",
+                        "in": "In", "not_in": "NotIn"}[op]
+                return f"Op{name}({self.node(a)}, {self.node(b)})"
+            case Call(name, args) if name in ("exists", "count") and len(args) == 1:
+                return f"Op{name.capitalize()}({self.node(args[0])})"
+            case Call(name, _):
+                raise Unsupported(f"the function {name}()")
+        raise Unsupported(f"the expression {n!r}")
+
+    def path(self, root: str, attrs: tuple[str, ...]) -> str:
+        if root == "target":
+            if not attrs:
+                raise Unsupported("the whole target")
+            if attrs[0] in self.links:
+                raise Unsupported(f"the link path target.{'.'.join(attrs)}")
+            base = "R(o)"
+        elif root == "actor":
+            base = self.actor
+        elif root == "params":
+            if not attrs:
+                raise Unsupported("the whole params")
+            if attrs[0] not in self.params:
+                base, attrs = "N", ()                     # an undeclared or optional param is null
+            else:
+                base, attrs = self.params[attrs[0]], attrs[1:]
+        else:
+            raise Unsupported(f"the root {root}")
+        out = base
+        for a in attrs:
+            out = f"Attr({out}, {tla_str(a)})"
+        return out
+
+
+# -- the module --------------------------------------------------------------------------------
+def _candidates(d: Domain, spec: Any, actor_ids: list[str]) -> list[Any]:
+    if spec.ref is not None:
+        return [data["id"] for fx in d.world.fixtures for obj, data in fx.items() if obj == spec.ref]
+    if spec.enum:
+        return list(spec.enum)
+    t = spec.type or "string"
+    if t in ("integer", "number"):
+        return list(INTS)
+    return {"boolean": [True, False], "datetime": list(DATES), "string": list(STRS) + actor_ids}[t]
+
+
+def export(d: Domain, name: str | None = None, bound: int = BOUND) -> Export:
+    mod = name or ident("Toprope", d.domain)
+    actors = world_actors(d)
+    ids = sorted({a.id for a in actors.values() if a.kind == "person"})
+    out = Export(module="", cfg="", name=mod, actors={r: a.id for r, a in actors.items()})
+
+    instances: dict[str, list[tuple[str, dict[str, str]]]] = {}
+    for fx in d.world.fixtures:
+        for obj, data in fx.items():
+            o = d.objects.get(obj)
+            if o is None:
+                continue
+            names = set(o.properties) | {n for n, l in d.links.items() if l.from_ == obj}
+            tr = d.transitions.get(obj)
+            if tr is not None:
+                names.add(tr.field)
+            fields = {k: value(data.get(k)) for k in sorted(names)}
+            fields["id"] = value(data["id"])
+            instances.setdefault(obj, []).append((data["id"], fields))
+
+    lines = [f"---- MODULE {mod} ----", "EXTENDS Integers, Sequences, FiniteSets, TLC",
+             "VARIABLES obj, last", "vars == <<obj, last>>", PRELUDE]
+    for obj, insts in sorted(instances.items()):
+        lines.append(f"Ids_{ident(obj)} == {{{', '.join(tla_str(i) for i, _ in insts)}}}")
+    for role, a in sorted(actors.items()):
+        env = {"id": value(a.id), "kind": value(a.kind), "roles": value(list(a.roles)),
+               "role": value(a.roles[0] if a.roles else None)}
+        env["principal"] = value({"id": a.id, "kind": a.kind, "roles": list(a.roles), "role": a.roles[0]})
+        lines.append(f"Actor_{ident(role)} == R({record(env)})")
+
+    # One fixture per run of the model: no step or invariant reads another instance (link paths
+    # are left out, a `ref` param is only an id), so the instances are independent, and checking
+    # each alone reaches the same states as checking them together, in a sum, not a product.
+    starts = [f"({tla_str(i)} :> {record(f)})" for insts in instances.values() for i, f in insts]
+    init = "\n          \\/ ".join(f"obj = {x}" for x in starts) if starts else "obj = [x \\in {} |-> N]"
+    lines.append(f"Init == /\\ \\/ {init}\n        /\\ last = <<\"init\">>")
+
+    for name_, a in d.actions.items():
+        obj = a.object_type
+        tr = d.transitions.get(obj)
+        if a.creates is not None:
+            out.left_out[name_] = "it creates an object"
+            continue
+        if tr is None:
+            out.left_out[name_] = f"{obj} has no matrix"
+            continue
+        if obj not in instances:
+            out.left_out[name_] = f"no fixture of {obj}"
+            continue
+        try:
+            steps = _action(d, name_, a, tr, actors, ids)
+        except Unsupported as e:
+            out.left_out[name_] = f"it uses {e}"
+            continue
+        lines += [s for _, s in steps]
+        out.steps += [op for op, _ in steps]
+
+    invs = []
+    for inv in d.invariants:
+        if inv.scope != "aggregate" or inv.on not in instances:
+            continue
+        try:
+            body = Expr(d, inv.on, "N", {})(inv.check)
+        except Unsupported as e:
+            out.left_out[f"invariant {inv.id}"] = f"it uses {e}"
+            continue
+        op = ident("Inv", inv.id)
+        lines.append(f"{op} == \\A i \\in Ids_{ident(inv.on)} \\cap DOMAIN obj : LET o == obj[i] IN Pass({body})")
+        invs.append(op)
+
+    nxt = " \\/ ".join(out.steps) if out.steps else "FALSE"
+    lines += [f"Next == {nxt}", "Spec == Init /\\ [][Next]_vars",
+              f"Bound == TLCGet(\"distinct\") < {bound}", "===="]
+    out.module = "\n".join(lines) + "\n"
+    out.cfg = "\n".join(["INIT Init", "NEXT Next", "CONSTRAINT Bound", "CHECK_DEADLOCK FALSE",
+                         *[f"INVARIANT {i}" for i in invs]]) + "\n"
+    return out
+
+
+def _action(d: Domain, name: str, a: Any, tr: Any, actors: dict[str, Any], ids: list[str]) -> list[tuple[str, str]]:
+    """One step operator per actor that some rule of the action may admit."""
+    obj = a.object_type
+    required = {p: s for p, s in a.params.items() if not s.optional}
+    pvars = {p: f"p_{ident(p)}" for p in required}
+    cands = {}
+    for p, s in required.items():
+        vals = _candidates(d, s, ids)
+        if not vals:
+            raise Unsupported(f"the param {p} with no candidate value")
+        cands[p] = [[v] if s.many else v for v in vals]
+    out = []
+    for role, actor in sorted(actors.items()):
+        if a.requires == "human" and actor.kind != "person":
+            continue
+        rules = [r for r in a.actor if (r.role if isinstance(r, ActorRule) else r) in actor.roles]
+        if not rules:
+            continue
+        ex = Expr(d, obj, f"Actor_{ident(role)}", {p: v for p, v in pvars.items()})
+        if any(isinstance(r, str) or not r.where for r in rules):
+            who = "TRUE"
+        else:
+            who = " \\/ ".join(f"Pass({ex(r.where)})" for r in rules)
+        moves = []
+        for state, cells in tr.matrix.items():
+            to = _resolve(cells.get(name, "undecided"), actor.roles)
+            if to is not None:
+                moves.append(f"<<{tla_str(state)}, {tla_str(to)}>>")
+        if not moves:
+            continue
+        pre = [f"Pass({ex(p.check)})" for p in a.preconditions]
+        sets = {}
+        for e in a.effects:
+            for key, v in (e.set or {}).items():
+                if key.startswith("new."):
+                    raise Unsupported("new.")
+                attr = key.split(".", 1)[1] if key.startswith("target.") else key
+                sets[attr] = ex(v) if isinstance(v, str) else value(v)
+        op = ident("Step", name, role)
+        args = ", ".join(f"{pvars[p]} \\in {{{', '.join(value(v) for v in cands[p])}}}" for p in required)
+        params_rec = "<<" + ", ".join(f"<<{tla_str(p)}, {pvars[p]}>>" for p in required) + ">>"
+        sf = tla_str(tr.field)
+        guard = [f"Get(o, {sf}) = S(mv[1])", who, *pre, *[f"Tag({v}) # \"e\"" for v in sets.values()]]
+        body = (f"{op} == \\E i \\in Ids_{ident(obj)} \\cap DOMAIN obj :" +
+                (f" \\E {args} :" if args else "") +
+                f" \\E mv \\in {{{', '.join(moves)}}} :\n    LET o == obj[i] IN\n    /\\ " +
+                "\n    /\\ ".join(guard) +
+                f"\n    /\\ obj' = [obj EXCEPT ![i] = {_set_fields(sf, sets)}]" +
+                f"\n    /\\ last' = <<{tla_str(name)}, {tla_str(role)}, i, {params_rec}>>")
+        out.append((op, body))
+    return out
+
+
+def _set_fields(sf: str, sets: dict[str, str]) -> str:
+    """The new instance: the state field moved, then each `set` effect, on fields present or
+    added (a function's domain grows with `@@`)."""
+    new = f"({sf} :> S(mv[2])) @@ o"
+    for attr, v in sorted(sets.items()):
+        new = f"({tla_str(attr)} :> {v}) @@ ({new})"
+    return new
+
+
+def _resolve(c: Any, roles: tuple[str, ...]) -> str | None:
+    """The target state a cell allows an actor with these roles, or None."""
+    if isinstance(c, Target):
+        return c.to
+    if isinstance(c, Deny) or c in ("n/a", "undecided"):
+        return None
+    if isinstance(c, ByRole):
+        listed = [c.by_role[r] for r in roles if r in c.by_role]
+        if not listed or any(isinstance(x, Deny) or x in ("n/a", "undecided") for x in listed):
+            return None
+        tos = {x.to if isinstance(x, Target) else x for x in listed}
+        return tos.pop() if len(tos) == 1 else None
+    return c
+
+
+def write(e: Export, out_dir: Any) -> None:
+    from pathlib import Path as P
+    d = P(out_dir)
+    d.mkdir(parents=True, exist_ok=True)
+    (d / f"{e.name}.tla").write_text(e.module)
+    (d / f"{e.name}.cfg").write_text(e.cfg)
+    (d / f"{e.name}.left-out.json").write_text(json.dumps(e.left_out, indent=2, sort_keys=True) + "\n")
+
+
+__all__ = ["BOUND", "Export", "Unsupported", "export", "value", "write"]
