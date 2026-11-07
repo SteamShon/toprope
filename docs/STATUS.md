@@ -306,11 +306,6 @@ it; each release's cleanup PR handles items older than one release.
   `scenarios.<id>`, `world.fixtures`) writes the value without provenance instead of failing, so
   such a change shows only in the commit's review diff; #147's Delivery change has three
   (#86, 2026-11-06; again in #147, 2026-11-07)
-- `toprope-run` reads `git config` twice per command (once to check the caller, once in
-  `submit`) (#85, 2026-11-06)
-- `identity/git.py` repeats the git lookup in `Workspace.identity`, and the two name a person
-  differently (the identity file's name vs git `user.name`); only the workspace API's
-  `confirm(via="cli")` still uses the latter (#85, 2026-11-06)
 - The `human-request` workflow pushes its result with the workflow token, so no `pull_request`
   check runs on that head, and the ruleset does not accept the `status` run the workflow
   dispatches; the PR needs one more commit before it can merge. A push token that triggers
@@ -321,8 +316,6 @@ it; each release's cleanup PR handles items older than one release.
   second one (#89, 2026-11-06)
 - The kernel reference generator reads private `argparse` attributes (`_actions`,
   `_SubParsersAction`); a Python release that renames them breaks it (#89, 2026-11-06)
-- `Workspace.confirm` and `approve_commit` still name the removed channels (`cli`,
-  `elicitation`) (#89, 2026-11-06)
 
 ## Open questions
 

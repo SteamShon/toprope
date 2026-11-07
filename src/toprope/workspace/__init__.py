@@ -5,9 +5,8 @@ Rules it enforces:
 - every drafted element cites a real source chunk (`source.ref`), so no rule is unsupported
 - agents write only `proposed`: `propose` and `answer` never set `confirmed`
 - only a person confirms: `confirm` is called with the channel the confirmation came
-  through (the CLI on the owner's terminal, an MCP elicitation shown to the user, or a
-  declared action the kernel checked was taken by that person), and each confirmation is
-  logged with that channel and who
+  through (`terminal`: the owner's own terminal; `kernel`: a declared action the kernel
+  checked was taken by that person), and each confirmation is logged with that channel and who
 - local-only sources are listed but their content is never served
 - the interview log records every question, answer quote and decision; the usage log
   records which source chunks were served (the drafter records which sources it used)
@@ -61,6 +60,9 @@ class Question:
         return {"id": self.id, "kind": self.kind, "text": self.text, "decides": self.decides,
                 "priority": self.priority}
 
+
+
+CHANNELS = ("terminal", "kernel")      # how a person confirms or approves (the MCP elicitation is gone)
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -354,11 +356,24 @@ class Workspace:
                      and (s.path == rel or rel.startswith(s.path.rstrip("/") + "/"))), "interview")
 
     def identity(self) -> str | None:
-        """Who is at this terminal: the repository's git identity (`user.name <user.email>`), else
-        the login name. Recorded with confirmations and approvals made on the CLI, so the log says
-        who decided without anyone typing it."""
+        """Who is at this terminal, named as the git identity adapter names them: `name <email>`
+        from the identity file when it lists this repository's git email, else git's
+        `user.name <user.email>`, else the login name. Recorded with confirmations and approvals
+        made at the terminal, so the log says who decided without anyone typing it."""
         import getpass
         import subprocess
+
+        from ..identity.git import FILE, git_email, load_table
+        table = self.root / FILE
+        email = git_email(self.root)
+        if email and table.exists():
+            try:
+                listed = load_table(table).get(email)
+            except ValueError:
+                listed = None
+            if listed is not None:
+                return listed.actor.id
+
         def git(key: str) -> str:
             try:
                 out = subprocess.run(["git", "-C", str(self.root), "config", key], capture_output=True,
@@ -375,14 +390,15 @@ class Workspace:
             return None
 
     def confirm(self, paths: list[str], via: str, who: str | None = None) -> dict[str, Any]:
-        """Mark elements confirmed. Call only with a human channel (`cli`, `elicitation`). On the
-        CLI, `who` defaults to the terminal's git identity."""
-        if via not in ("cli", "elicitation", "kernel"):
-            raise AuthoringError("only a person confirms, through the CLI, an MCP elicitation, or a declared "
-                                 "action the kernel checked was taken by that person")
+        """Mark elements confirmed. Only a person confirms: through a declared action the kernel
+        checked was taken by that person (`kernel`, naming them), or at their own terminal
+        (`terminal`, where `who` defaults to the terminal's identity)."""
+        if via not in CHANNELS:
+            raise AuthoringError("only a person confirms: at their own terminal, or through a declared action the "
+                                 "kernel checked was taken by that person")
         if via == "kernel" and not who:
             raise AuthoringError("a confirmation through the kernel names the person who took it")
-        if who is None and via == "cli":
+        if who is None and via == "terminal":
             who = self.identity()
         doc = self.draft()
         for p in paths:
@@ -672,8 +688,8 @@ class Workspace:
         """Approve a commit: merge it into `main` and tag the result (ADR-0033). Only a person,
         through a human channel (as `confirm`). Conflicts are an error that lists them; bring
         `main` into the branch with `merge_main`, resolve, commit, and approve again."""
-        if via not in ("cli", "elicitation"):
-            raise AuthoringError("only a person approves, through the CLI or an MCP elicitation")
+        if via not in CHANNELS:
+            raise AuthoringError("only a person approves: at their own terminal, or through a declared action")
         d = self.draft().get("domain")
         if not isinstance(d, str) or not d:
             raise AuthoringError("the draft names no `domain`, so there is no commit log to approve in")
