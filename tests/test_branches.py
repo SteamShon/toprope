@@ -411,3 +411,30 @@ def test_a_checkout_abandons_a_merge_in_progress(tmp_path):
     raw["glossary"]["later"] = "L."
     write(tmp_path / "d.domain.yaml", raw)
     assert len(ws.commits.get("example", ws.commit()["commit"]).parents) == 1
+
+
+def test_a_commit_racing_merge_main_records_what_the_merge_wrote(tmp_path):
+    """#89: merge_main wrote the working copy, then recorded the merge in progress, and commit
+    read the working copy before taking the lock. A commit landing between them made a merge
+    commit (two parents) whose content dropped main's change. Both now run under the lock."""
+    from toprope.commits import CommitStore
+    raw = schema_doc_domain()
+    decl = write(tmp_path / "d.domain.yaml", raw)
+    st, other_process = CommitStore(tmp_path / "commits"), CommitStore(tmp_path / "commits")
+    c0, _ = st.commit(decl)
+    st.approve("example", c0.id, "ana")
+    theirs = copy.deepcopy(raw)
+    theirs["glossary"]["o"] = "O."                                       # landed on main elsewhere
+    (tmp_path / "other").mkdir()
+    co, _ = st.commit(write(tmp_path / "other" / "o.domain.yaml", theirs), branch="other")
+    st.approve("example", co.id, "ana")
+    real, ran = st._lock, []
+
+    def lock_after_a_merge(domain):                                      # the commit, just before its lock
+        if not ran:
+            ran.append(other_process.merge_main("example", decl, "work"))
+        return real(domain)
+    st._lock = lock_after_a_merge
+    c, created = st.commit(decl, branch="work")
+    assert created and c.parents == [c0.id, co.id]
+    assert st.domain("example", c.id).glossary.get("o") == "O."          # main's change is in the merge
