@@ -312,8 +312,15 @@ def test_the_schema_lists_every_kernel_service():
     assert set(enum) == set(CATALOG)
 
 
-def test_an_optional_service_input_may_be_left_out_or_null():
+def test_an_optional_service_input_may_be_left_out_or_null(monkeypatch):
     from toprope.decl import Domain, validate_domain
+    from toprope.kernel import Service
+    # No catalog service has an optional input since commit's free-string evidence went (ADR-0041);
+    # the mechanism stays, so this test declares one.
+    commit = CATALOG["commit"]
+    monkeypatch.setitem(CATALOG, "commit", Service(commit.name, commit.description,
+                                                   {**commit.inputs, "evidence": "strings"}, commit.result,
+                                                   optional=frozenset({"evidence"})))
     raw = {"domain": "d", "version": 1, "roles": ["owner"],
            "objects": {"Draft": {"properties": {"declaration": {"type": "string"}, "status": {"enum": ["open"]}}}},
            "actions": {

@@ -22,9 +22,9 @@ uv run toprope-commits log DOMAIN action:launch_experiment   # an element's hist
 ```
 
 ## Commits
-- **Evidence.** A commit may cite what the change rests on (ADR-0041): interview lines, events,
-  check records. The `commit` service takes it as an optional input, and the commit keeps it.
-  Committing content identical to the head makes no new commit, so its evidence is not kept.
+- **Evidence.** A commit cites what the change rests on after it is made, with `cite_evidence`
+  (see *Evidence* below). Commit `5-c8fd1b8fc98be17c` of the Authoring domain still carries the
+  free strings the `commit` service took before (#117), as `evidence` on its record.
 - **Content-addressed and append-only.** A commit's content is the hash of the canonical
   declaration without `version`, plus its representations: the `*.representation.yaml` files
   next to the declaration whose `targets.domain` is this domain. Its id is `<seq>-<content>`, and
@@ -102,6 +102,28 @@ included, except provenance (`source`, `status`). Confirming an element changes 
 ## Check records (ADR-0032)
 `change-check` runs the change check on a commit and records the result on it, one record
 per check plus the whole; a preview records its harness. See [`change-check.md`](change-check.md).
+
+## Evidence (ADR-0041)
+A commit may cite the evidence for its change, through the kernel's `cite_evidence` service
+or `CommitStore.cite`. Evidence is a pointer that must resolve, never prose. A claim with no
+pointer is refused. Each kind has a strength, which says how far the evidence goes:
+
+| Kind | Ref | Must resolve to | Strength |
+|---|---|---|---|
+| `interview` | a chunk of an interview-log source | a line the owner said | pointed |
+| `source` | a chunk of any other source | a line in the code or the records | pointed |
+| `check` | a check name, e.g. `change-check` | a check recorded on this commit | ran |
+| `event` | `<stream>@<version>` | an event in the deployed domain's store | observed |
+| `approval-run` | a GitHub Actions run URL | a human request approved in that run (ADR-0039), recorded in `.toprope/approval-runs.jsonl` | approved |
+
+The `human-request` workflow appends each approved run to `.toprope/approval-runs.jsonl` with
+the result it pushes, so the record outlives the branch and a squash merge.
+Citations are appended to `evidence.jsonl` next to the commit log, with who cited and when,
+and are never rewritten. `toprope-commits evidence DOMAIN COMMIT` lists them. Nothing requires
+evidence yet. In the Authoring domain, the owner or their agent cites with the action
+`cite_evidence` on a commit that is not approved yet. Its reply `record_evidence` keeps the
+last strength, or why the ref was refused, on the Commit. A rule such as "approve only with
+evidence that ran" is a later decision.
 
 ## Approval
 An approval is an immutable tag on a commit `main` points to. Tagging again is a no-op. A

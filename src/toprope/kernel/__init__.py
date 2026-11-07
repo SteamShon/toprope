@@ -70,12 +70,18 @@ CATALOG: dict[str, Service] = {s.name: s for s in (
     Service("skip_stage", "Record that an optional stage has nothing, with the owner's reason.",
             {"stage": "string", "reason": "string"}, {"skipped": "boolean"}),
     # Commits (ADR-0029). `commit` returns an `id`, so a reply may create the Commit object.
-    Service("commit", "Snapshot a working copy as an immutable commit (no new commit if unchanged); "
-            "`evidence` cites what the change rests on (ADR-0041).",
-            {"declaration": "string", "evidence": "strings"},
+    Service("commit", "Snapshot a working copy as an immutable commit (no new commit if unchanged). "
+            "Cite its evidence with `cite_evidence` (ADR-0041).",
+            {"declaration": "string"},
             {"id": "string", "seq": "integer", "content": "string", "created": "boolean", "parent": "string",
              "interface": "string", "to_review": "strings", "last_approved": "string", "domain": "string",
-             "branch": "string", "author": "string"}, optional=frozenset({"evidence"})),
+             "branch": "string", "author": "string"}),
+    Service("cite_evidence", "Cite evidence for a commit (ADR-0041): `kind` is interview or source (a chunk "
+            "ref), check (a check recorded on the commit), event (`<stream>@<version>` in the domain's "
+            "environment) or approval-run (a GitHub Actions run that approved a human request). The ref "
+            "must resolve; a claim with no pointer is refused.",
+            {"domain": "string", "commit": "string", "kind": "string", "ref": "string"},
+            {"strength": "string"}),
     Service("diff", "The semantic diff between two commits: what changed directly.",
             {"domain": "string", "from": "string", "to": "string"},
             {"changed": "strings", "added": "strings", "removed": "strings", "to_review": "strings"}),

@@ -20,6 +20,10 @@ it waits for the approval, and `run` after it.
   python tools/human_request.py check REQUEST
   python tools/human_request.py render REQUEST
   python tools/human_request.py run REQUEST --approver LOGIN [--identity toprope.identity.yaml]
+  python tools/human_request.py record REQUEST --approver LOGIN --as PERSON --run-url URL
+
+`record` appends the approved run to `.toprope/approval-runs.jsonl`, committed with the result,
+so a commit can cite the run as evidence (`cite_evidence --kind approval-run`) after any merge.
 """
 
 from __future__ import annotations
@@ -35,6 +39,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 REQUESTS = ".toprope/requests"
+APPROVAL_RUNS = ".toprope/approval-runs.jsonl"
 INSTRUMENT_STEPS = ("freeze", "freeze-binding", "amend")
 COMPOSITION = "domains/toprope-self.composition.yaml"
 
@@ -136,12 +141,26 @@ def run(req: dict, approver: str, identity: str = "toprope.identity.yaml", cwd: 
     return done
 
 
+def record(req: dict, approver: str, person: str, run_url: str, cwd: str | Path = ".") -> dict:
+    """Append the approved run, its approver and its steps to the approval-run log."""
+    from datetime import datetime, timezone
+    entry = {"run": run_url, "approver": approver, "as": person, "summary": req["summary"],
+             "steps": req["steps"], "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+    path = Path(cwd) / APPROVAL_RUNS
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a") as f:
+        f.write(json.dumps(entry, sort_keys=True) + "\n")
+    return entry
+
+
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=["check", "render", "run"])
+    ap.add_argument("cmd", choices=["check", "render", "run", "record"])
     ap.add_argument("request")
     ap.add_argument("--approver", help="the GitHub login that approved the run (for run)")
     ap.add_argument("--identity", default="toprope.identity.yaml")
+    ap.add_argument("--as", dest="person", help="the person the approver acted as (for record)")
+    ap.add_argument("--run-url", help="the approved workflow run (for record)")
     args = ap.parse_args(argv)
     try:
         req = load(args.request)
@@ -151,6 +170,10 @@ def main(argv: list[str] | None = None) -> None:
         print("ok")
     elif args.cmd == "render":
         print(render(req), end="")
+    elif args.cmd == "record":
+        if not (args.approver and args.person and args.run_url):
+            raise SystemExit("record needs --approver, --as and --run-url")
+        record(req, args.approver, args.person, args.run_url)
     else:
         if not args.approver:
             raise SystemExit("run needs --approver")
