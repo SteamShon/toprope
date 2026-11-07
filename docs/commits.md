@@ -150,3 +150,7 @@ stranded), it refuses a commit that is:
 - **superseded**: not what `main` points to
 - a **downgrade**: the deployed commit or one of its ancestors (rollback comes in M2)
 - not yet built: preview it first
+
+A deploy is also recorded with the commits, in `deployments.jsonl` (ADR-0045). With
+`--kernel-root`, `toprope-run` and `toprope-server --composition` run each member's deployed
+commit, else its approved `main`; `--working-copy` runs the files instead.

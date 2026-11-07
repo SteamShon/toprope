@@ -69,13 +69,18 @@ class Composition:
         return out
 
 
-def load_composition(path: str | Path) -> Composition:
+def load_composition(path: str | Path, commits: Any = None) -> Composition:
+    """Each member's declaration. With a commit store, a member that has a running commit (its
+    deployed one, else its approved `main`, ADR-0045) runs from it, with `version` its commit's
+    sequence number; only a member with neither runs from its working-copy file."""
     p = Path(path)
     spec = CompositionSpec.model_validate(load_yaml(p.read_text()))
     domains = {}
     for name, m in spec.members.items():
+        running = commits.running(name) if commits is not None else None
         try:
-            domains[name] = Domain.model_validate(load_yaml((p.parent / m.declaration).read_text()))
+            domains[name] = (commits.domain(name, running.id) if running is not None
+                             else Domain.model_validate(load_yaml((p.parent / m.declaration).read_text())))
         except (OSError, ValidationError) as e:
             raise ValueError(f"member {name}: {m.declaration}: {e}") from None
     return Composition(spec, domains, p.parent)

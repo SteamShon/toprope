@@ -53,6 +53,8 @@ def _base_parser(add_help: bool) -> argparse.ArgumentParser:
     ap.add_argument("--env", help="local deploy environment, for the preview and deploy services")
     ap.add_argument("--seed", action="store_true", help="load the declaration's example fixtures first")
     ap.add_argument("--key", help="idempotency key (default: a new one); reuse it to retry safely")
+    ap.add_argument("--working-copy", action="store_true", help="with --composition and --kernel-root: run "
+                    "each member from its working-copy file, not from its deployed commit (ADR-0045)")
     return ap
 
 
@@ -195,7 +197,8 @@ def _domain(args: Any) -> Domain:
         d = load_domain(args.domain)
     else:
         from ...compose import load_composition
-        d = load_composition(args.composition).domains[args.member]
+        from ..mcp.cli import running_commits
+        d = load_composition(args.composition, running_commits(args)).domains[args.member]
     errors = [i for i in validate_domain(d) if i.severity == "error"]
     if errors:
         for i in errors:
