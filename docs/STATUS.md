@@ -189,7 +189,10 @@ M0b's UI), checking the non-developer claim (M1 Phase B, M2), TLC modeling creat
   commit whose `tla` check passed. The human-request workflow installs the pinned TLC; a request
   runs `check_commit` before `approve_commit`.
 
-- ⬜ 4. One change, one request: confirm, commit, check and approve in one declared step
+- ✅ 4. One change, one request: confirm, commit, check and approve in one declared step (#PR)
+  A request step's target may be `$commit`: the commit an earlier `commit_draft` step of the same
+  request made, read from its output. `human_request.py change` writes the four steps. A request
+  is tooling, not a declared action: the steps stay the Authoring declaration's own.
 
 - ⬜ 5. `verify` runs the domain's probes instead of taking a checkbox
 

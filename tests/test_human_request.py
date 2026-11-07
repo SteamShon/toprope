@@ -94,6 +94,44 @@ def test_a_step_whose_kernel_call_failed_fails_the_request(tmp_path, monkeypatch
     assert hr.run(req, "ana-gh", identity="ids.yaml", cwd=tmp_path)[0]["returncode"] == 0
 
 
+def test_one_request_takes_a_change_from_proposed_to_approved():
+    req = hr.change("authoring")
+    assert [(st["run"]["action"], st["run"]["target"]) for st in req["steps"]] == [
+        ("confirm_all_proposed", "authoring"), ("commit_draft", "authoring"),
+        ("check_commit", hr.MADE), ("approve_commit", hr.MADE)]
+    assert hr.check(req) == []
+    assert "**approve_commit** the commit made above" in hr.render(req)
+    early = {"summary": "x", "steps": [req["steps"][2], *req["steps"]]}
+    assert hr.check(early)[0].startswith("step 1: $commit names the commit a commit_draft step before it makes")
+    stale = {"summary": "x", "steps": [*req["steps"][:3], req["steps"][1], req["steps"][3]]}
+    assert any("step 5: approve_commit $commit needs a check_commit" in e for e in hr.check(stale))  # a newer commit
+
+
+def test_the_commit_a_step_made_is_the_target_of_the_next(tmp_path, monkeypatch):
+    (tmp_path / "ids.yaml").write_text(yaml.safe_dump(IDS))
+    monkeypatch.setenv(hr.TLC_ENV, "tla2tools.jar")
+    cmds = []
+
+    def run(cmd, **kw):
+        cmds.append(cmd)
+        then = [{"kernel": "commit", "reply": "record_commit", "status": "ok", "object": "7-c0ffee"}] \
+            if cmd[-2] == "commit_draft" else []
+        return subprocess.CompletedProcess(cmd, 0, json.dumps({"status": "ok", "then": then}), "")
+    monkeypatch.setattr(hr.subprocess, "run", run)
+    done = hr.run(hr.change("authoring"), "ana-gh", identity="ids.yaml", cwd=tmp_path)
+    assert [c[-2:] for c in cmds] == [["confirm_all_proposed", "authoring"], ["commit_draft", "authoring"],
+                                      ["check_commit", "7-c0ffee"], ["approve_commit", "7-c0ffee"]]
+    assert done[1]["commit"] == "7-c0ffee"
+
+
+def test_change_writes_the_request(tmp_path):
+    out = tmp_path / ".toprope/requests/c.yaml"
+    hr.main(["change", str(out), "--draft", "delivery", "--workspace", "toprope.delivery.workspace.yaml"])
+    req = hr.load(out)
+    assert req["steps"][0]["run"] == {"member": "authoring", "workspace": "toprope.delivery.workspace.yaml",
+                                      "action": "confirm_all_proposed", "target": "delivery"}
+
+
 def test_the_approval_job_has_the_tla_job_s_pinned_tlc():
     import re
     act = (ROOT / ".github/workflows/human-request.yml").read_text()
@@ -142,6 +180,13 @@ def test_an_approved_request_runs_its_steps_as_the_approver(tmp_path, monkeypatc
     assert added["status"] == "confirmed"
     entry = json.loads((tmp_path / "domains/authoring/interview.jsonl").read_text().splitlines()[-1])
     assert entry["who"] == "ana <ana@example.com>" and entry["via"] == "kernel"
+    nxt = hr.run({"summary": "Commit and check it", "steps": hr.change("authoring")["steps"][1:3]},
+                 "ANA-GH", cwd=tmp_path)                                 # commit_draft, check_commit $commit
+    made = nxt[0]["commit"]
+    assert made and nxt[1]["step"]["run"]["target"] == hr.MADE
+    assert json.loads(nxt[1]["stdout"])["then"][0]["kernel"] == "change_check"
+    from toprope.commits import CommitStore
+    assert "change-check" in CommitStore(tmp_path / ".toprope/commits").check_status("authoring", made)
 
 
 def test_an_approved_request_freezes_instruments(tmp_path, monkeypatch):
