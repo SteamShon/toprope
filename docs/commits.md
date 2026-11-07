@@ -140,6 +140,10 @@ holds proposed elements as a backstop. Drafts and previews still compile and tes
 `commit` also reports `last_approved`, so a declaration can ask `diff` what changed since
 the last approved commit.
 
+A domain that sets `approval: {distinct_from_author: true}` refuses an approval by the commit's
+own author, on every path (ADR-0046); the rule in force is `main`'s, so a commit cannot switch it
+off for itself. Off by default: in M1 one owner commits and approves.
+
 ## Delivery
 `LocalEnvironment.deploy_commit` (or the `deploy` kernel service, which Delivery's `deploy` action calls) is
 the only way to move an environment's ref to a commit, under a per-environment lock. Only

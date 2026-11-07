@@ -274,6 +274,13 @@ A review leftover (#86, #147), as the researcher chose: a scenario carries `sour
 approval counts it. Fixtures and the glossary carry no provenance: proposing them writes an
 `unmarked-proposal` line to the interview log, and the change shows in the commit's review diff.
 
+## The author does not approve, where a domain says so (#162, ADR-0046)
+
+A review leftover (#102), as the researcher chose: `approval: {distinct_from_author: true}` in a
+declaration makes the commit store refuse an approval by the commit's author, with the rule read
+from `main`. Off by default, and off for the self domains in M1 (one owner); turn it on with a
+second owner.
+
 ## M0b, M2 to M5
 
 Not started. Plans: [`roadmap.md`](roadmap.md).
@@ -312,10 +319,6 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 Each item names the PR it came from and the review date. The PR that resolves an item deletes
 it; each release's cleanup PR handles items older than one release.
 
-- Nothing keeps the author of a commit from approving it: `approve_commit` checks only that a
-  person approves (`requires: human`) a commit whose checks passed. Charter §5 says "no
-  self-approval"; ADR-0032 keeps one approver in M1. Decide whether to enforce author ≠
-  approver before M2, when a domain gets more than one owner (#102, 2026-11-06)
 - The `human-request` workflow pushes its result with the workflow token, so no `pull_request`
   check runs on that head, and the ruleset does not accept the `status` run the workflow
   dispatches; the PR needs one more commit before it can merge. A push token that triggers

@@ -284,6 +284,13 @@ class Handoff(Provenance):
     target: str                                              # expression: the receiver's target id
 
 
+class Approval(Strict):
+    """How a commit of this domain is approved (ADR-0046)."""
+    # The commit's author may not approve it (charter §5, no self-approval). Off by default: in
+    # M1 each self domain has one owner, who both commits and approves (ADR-0032).
+    distinct_from_author: bool = False
+
+
 class Domain(Strict):
     domain: Ident
     version: Annotated[int, Field(ge=1)]
@@ -303,6 +310,7 @@ class Domain(Strict):
     invariants: list[Invariant] = Field(default_factory=list)
     world: World = Field(default_factory=World)
     scenarios: list[Scenario] = Field(default_factory=list)
+    approval: Approval = Field(default_factory=Approval)
 
     @model_validator(mode="after")
     def _not_yet(self) -> Domain:

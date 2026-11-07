@@ -439,3 +439,33 @@ def test_the_commit_service_takes_no_evidence_a_declaration_passing_it_is_refuse
                "done": {"description": "x", "actor": ["external:kernel"], "target": "Draft"}},
            "transitions": {"Draft": {"field": "status", "matrix": {"open": {"commit_draft": "open", "done": "open"}}}}}
     assert [i.code for i in validate_domain(Domain.model_validate(raw)) if i.code == "unknown-input"] == ["unknown-input"]
+
+
+def test_where_the_rule_says_so_the_author_does_not_approve(tmp_path):
+    """ADR-0046 (charter §5): with `approval.distinct_from_author`, the commit's author may not
+    approve it. The rule in force is main's, so a commit cannot switch it off for itself."""
+    st = CommitStore(tmp_path / "commits")
+    raw = schema_doc_domain()
+    raw["approval"] = {"distinct_from_author": True}
+    c1, _ = st.commit(write(tmp_path / "d.domain.yaml", raw), author="ana")
+    with pytest.raises(CommitError, match="must not be the commit's author"):
+        st.approve("example", c1.id, "ana")
+    st.approve("example", c1.id, "eli")                                  # another person approves
+    off = copy.deepcopy(raw)
+    off["approval"] = {"distinct_from_author": False}
+    c2, _ = st.commit(write(tmp_path / "d.domain.yaml", off), author="ana")
+    with pytest.raises(CommitError, match="must not be the commit's author"):
+        st.approve("example", c2.id, "ana")                              # main's rule holds for it
+    st.approve("example", c2.id, "eli")
+    c3, _ = st.commit(write(tmp_path / "d.domain.yaml", {**off, "glossary": {**off["glossary"], "x": "X."}}), author="ana")
+    assert st.approve("example", c3.id, "ana").id == c3.id               # now off: ana may
+    nameless = CommitStore(tmp_path / "other")
+    c, _ = nameless.commit(write(tmp_path / "d.domain.yaml", raw))
+    with pytest.raises(CommitError, match="names no author"):
+        nameless.approve("example", c.id, "eli")
+
+
+def test_by_default_one_owner_commits_and_approves(tmp_path):
+    st = CommitStore(tmp_path / "commits")
+    c, _ = st.commit(write(tmp_path / "d.domain.yaml", schema_doc_domain()), author="ana")
+    assert st.approve("example", c.id, "ana").id == c.id                # M1: one owner (ADR-0032)
