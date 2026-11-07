@@ -338,7 +338,16 @@ def _domain_streams(events: EventStore) -> list[tuple[str, list[Event]]]:
 
 
 def in_flight(new: Domain, events: EventStore) -> CheckResult:
-    """Objects whose type, or current state, the new declaration lacks (stranded)."""
+    """Objects whose type, or current state, the new declaration lacks (stranded), and objects
+    as they are now that break the new declaration's invariants (`in_use`)."""
+    res = stranded(new, events)
+    lost = {p.where for p in res.problems}
+    res.problems += [p for p in in_use(new, events).problems if p.where not in lost]
+    return res
+
+
+def stranded(new: Domain, events: EventStore) -> CheckResult:
+    """Objects whose type, or current state, the new declaration lacks: the deploy floor's rule."""
     res = CheckResult("in_flight")
     n = 0
     for stream, evs in _domain_streams(events):
@@ -359,7 +368,9 @@ def in_flight(new: Domain, events: EventStore) -> CheckResult:
 
 def in_use(d: Domain, events: EventStore) -> CheckResult:
     """Every object in a deployed store, as it is now, against every invariant of `d`. The
-    harness checks the moves a declaration allows; this checks the state real use left."""
+    harness checks the moves a declaration allows; this checks the state real use left. A break
+    on a finished object (its state allows no action) is a warning, as in log replay: a new
+    rule does not rewrite finished history. On an object in flight it is an error."""
     from ..semantics.interpreter import Interpreter
     res = CheckResult("in_use")
     states = {s: (evs[0].aggregate, project(evs) or {}) for s, evs in _domain_streams(events)}
@@ -368,8 +379,10 @@ def in_use(d: Domain, events: EventStore) -> CheckResult:
         if obj not in d.objects:
             res.add("error", stream, f"{obj} is not in the deployed declaration")
             continue
+        done = _finished(d, obj, st)
         for inv in interp.violated_invariants(obj, st, states.get):
-            res.add("error", stream, f"breaks {inv.id}: {inv.reason}")
+            res.add("warning" if done else "error", stream,
+                    f"breaks {inv.id}: {inv.reason}" + (" The object is finished." if done else ""))
     res.note = f"{len(states)} object(s) checked"
     return res
 

@@ -160,6 +160,19 @@ def test_a_stricter_rule_on_a_finished_object_is_a_warning(base):
     assert r.checks["log_replay"].note.endswith("; 0 would be blocked; 1 on finished objects (warnings)")
 
 
+def test_a_new_invariant_that_objects_in_use_break_is_reported(base):
+    """Delivery's probes invariant held for no verified request in its log, and no check said so.
+    An object in flight that breaks a new rule is an error; a finished one, a warning."""
+    st = history(base)                                                  # E-onboarding: running, can end
+    raw = copy.deepcopy(base)
+    raw["invariants"].append({"id": "running-is-long", "on": "Experiment",
+                              "check": "target.status != 'running' or target.planned_days >= 100",
+                              "reason": "A running experiment runs at least 100 days."})
+    r = change_check(dom(raw), dom(base), events=st, examples=10)
+    assert ("error", "E-onboarding") in problems(r, "in_flight")
+    assert not r.checks["in_flight"].ok
+
+
 def test_one_blocked_action_does_not_cascade(base):
     """The replay keeps the recorded history, so the launch after a blocked approval is judged
     from the state the approval really left."""

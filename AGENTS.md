@@ -180,6 +180,7 @@ check starts enforcing a rule, and drop a rule from the text once its mistake ca
 | One line of history for the self domains (below) | `checks` workflow (`tools/logs_check.py`) |
 | The harness misses no invariant break TLC can reach in the modeled part of a declaration (ADR-0043) | `tla` workflow (`tools/tla_check.py`), with a seeded break it must find |
 | A commit approved where TLC is configured passed TLC's check first (ADR-0044) | the kernel (`approve_commit` with `TOPROPE_TLC_JAR`), `human_request.py` |
+| A kernel reply after someone moved its object on changes no state (#148) | the kernel (`late-reply`) |
 | Agents write only `proposed`; only a person confirms or approves | the kernel (`requires: human`, `_demote`) |
 | The researcher's own steps from a cloud session run after their approval | `human-request` workflow (ADR-0039) |
 | Gold sets and sealed files are human-only | text only: review |
