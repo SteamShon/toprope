@@ -210,7 +210,7 @@ M0b's UI), checking the non-developer claim (M1 Phase B, M2), TLC modeling creat
   verifications blocked. They are on finished requests, so they are now warnings (the
   researcher's choice); a block on an object in flight stays an error.
 
-- ✅ Integrated review of the umbrella (#PR)
+- ✅ Integrated review of the umbrella (#149)
   Two gaps, fixed: the probes read the deploy environment's store, which is fresh in every
   approval run, so for the self domains they checked no object in use; and a new invariant that
   objects in use already break went unreported (Delivery's four verified requests from before
