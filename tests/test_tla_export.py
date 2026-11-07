@@ -79,3 +79,13 @@ def test_the_seeded_break_for_the_tla_job_is_paid_media_without_one_precondition
     assert seeded == example
     workflow = (ROOT / ".github/workflows/tla.yml").read_text()
     assert "paid-media.no-holdout-guard.domain.yaml=breaks:Inv_holdouts_never_change" in workflow
+
+
+def test_each_run_of_the_model_starts_from_one_fixture():
+    # No modeled step or invariant reads another instance (link paths are left out), so checking
+    # the fixtures one at a time reaches what checking them together would, in a sum, not a product.
+    e = export(load_domain(PAID))
+    init = e.module[e.module.index("Init =="):e.module.index("/\\ last = <<\"init\">>")]
+    assert init.count("obj = (") == 2 and init.count("\\/ obj =") == 2      # C-search, C-holdout: each alone
+    assert "\\E i \\in Ids_Campaign \\cap DOMAIN obj" in e.module
+    assert "\\A i \\in Ids_Campaign \\cap DOMAIN obj" in e.module

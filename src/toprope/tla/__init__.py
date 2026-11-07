@@ -1,6 +1,7 @@
 """Export a declaration's model level to TLA+, for TLC (ADR-0043).
 
-The model holds every fixture as an instance (a function from field name to value) and takes a
+The model starts from one fixture at a time, as an instance (a function from field name to
+value): no step or invariant reads another instance, so the instances are independent. It takes a
 step whenever an actor (one per role, as the harness names them) may take an action on an
 instance with some param values: the actor rules, the matrix cell for the actor's role, the
 preconditions, and every `set` effect evaluating. Invariants are checked on every state, with
@@ -237,8 +238,12 @@ def export(d: Domain, name: str | None = None, bound: int = BOUND) -> Export:
         env["principal"] = value({"id": a.id, "kind": a.kind, "roles": list(a.roles), "role": a.roles[0]})
         lines.append(f"Actor_{ident(role)} == R({record(env)})")
 
-    init = " @@ ".join(f"({tla_str(i)} :> {record(f)})" for insts in instances.values() for i, f in insts)
-    lines.append(f"Init == /\\ obj = {init or '[x \\in {} |-> N]'}\n        /\\ last = <<\"init\">>")
+    # One fixture per run of the model: no step or invariant reads another instance (link paths
+    # are left out, a `ref` param is only an id), so the instances are independent, and checking
+    # each alone reaches the same states as checking them together, in a sum, not a product.
+    starts = [f"({tla_str(i)} :> {record(f)})" for insts in instances.values() for i, f in insts]
+    init = "\n          \\/ ".join(f"obj = {x}" for x in starts) if starts else "obj = [x \\in {} |-> N]"
+    lines.append(f"Init == /\\ \\/ {init}\n        /\\ last = <<\"init\">>")
 
     for name_, a in d.actions.items():
         obj = a.object_type
@@ -270,7 +275,7 @@ def export(d: Domain, name: str | None = None, bound: int = BOUND) -> Export:
             out.left_out[f"invariant {inv.id}"] = f"it uses {e}"
             continue
         op = ident("Inv", inv.id)
-        lines.append(f"{op} == \\A i \\in Ids_{ident(inv.on)} : LET o == obj[i] IN Pass({body})")
+        lines.append(f"{op} == \\A i \\in Ids_{ident(inv.on)} \\cap DOMAIN obj : LET o == obj[i] IN Pass({body})")
         invs.append(op)
 
     nxt = " \\/ ".join(out.steps) if out.steps else "FALSE"
@@ -325,7 +330,7 @@ def _action(d: Domain, name: str, a: Any, tr: Any, actors: dict[str, Any], ids: 
         params_rec = "<<" + ", ".join(f"<<{tla_str(p)}, {pvars[p]}>>" for p in required) + ">>"
         sf = tla_str(tr.field)
         guard = [f"Get(o, {sf}) = S(mv[1])", who, *pre, *[f"Tag({v}) # \"e\"" for v in sets.values()]]
-        body = (f"{op} == \\E i \\in Ids_{ident(obj)} :" +
+        body = (f"{op} == \\E i \\in Ids_{ident(obj)} \\cap DOMAIN obj :" +
                 (f" \\E {args} :" if args else "") +
                 f" \\E mv \\in {{{', '.join(moves)}}} :\n    LET o == obj[i] IN\n    /\\ " +
                 "\n    /\\ ".join(guard) +
