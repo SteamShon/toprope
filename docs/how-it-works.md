@@ -59,7 +59,8 @@ Resolved 1 and 4).
 **A vocabulary for the context graph.** The [Decision ontology](https://w3id.org/do) (v0.2.0)
 names the parts of a decision the context graph keeps. It defines a premise as a precondition a
 decision *uses without checking*: the same line as between the two graphs, since Toprope's
-preconditions are checked and its evidence is not.
+preconditions are checked and its evidence is not: a cited ref must resolve, but what it says is
+not checked.
 
 | Decision ontology | Toprope today |
 |---|---|
@@ -67,7 +68,7 @@ preconditions are checked and its evidence is not.
 | `inContext` | the domain, the Draft |
 | `hasOption`, `chooses` | Authoring's `request_decision` and `decide` (`choice`) |
 | `hasArgument` | `rationale` |
-| `hasPremise` | a commit's `evidence` |
+| `hasPremise` | the evidence a commit cites (`cite_evidence`; `toprope-commits evidence`) |
 | `hasUnconfirmedPremise` | elements with `status: proposed` |
 | `revises` | none: a newer approval supersedes an older one without naming it |
 | `triggeredBy` | in part: a handoff's `causation` |

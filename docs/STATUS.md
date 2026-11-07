@@ -147,10 +147,9 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    elements, and the change check records how many are left (#110); every decision action takes
    an optional `rationale` (#111); a check can read `actor.principal` (#113);
    `examples/paid-media/` shows the exception pattern (#115); every event records the
-   permissions it ran under (#116); a commit may cite its evidence (#117), and Authoring's
-   `commit_draft` passes it, changed through the self domains' own loop and approved and
-   deployed by the researcher in GitHub (#118: commit `5-c8fd1b8fc98be17c`, deployed and
-   verified).
+   permissions it ran under (#116); a commit may cite its evidence (#117, #118: free strings
+   on `commit`, Authoring commit `5-c8fd1b8fc98be17c`), replaced by typed evidence that must
+   resolve, cited with `cite_evidence` (#124, in the pstack umbrella).
 6. ADR-0042's follow-up work (accepted 2026-11-07): done: `domain_version` with the deployment
    log gives the rule in force when an event was decided, documented (the self domains are the
    exception, see *Left from reviews*); read visibility defined in the schema (`read`, refused

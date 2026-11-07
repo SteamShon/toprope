@@ -34,3 +34,18 @@ def test_a_branch_that_ran_the_loop_apart_from_the_base_is_refused(tmp_path, mon
     log.write_text(log.read_text() + '{"seq": 6}\n')
     git(tmp_path, "commit", "-qam", "6")
     assert logs_check.check("base", "grown") == []
+
+
+def test_the_approval_run_log_only_grows_too(tmp_path, monkeypatch):
+    runs = tmp_path / ".toprope/approval-runs.jsonl"
+    runs.parent.mkdir(parents=True)
+    runs.write_text('{"run": "https://github.com/o/r/actions/runs/1"}\n')
+    git(tmp_path, "init", "-q", "-b", "base")
+    git(tmp_path, "add", "-A")
+    git(tmp_path, "commit", "-qm", "run 1")
+    git(tmp_path, "switch", "-qc", "rewritten")
+    runs.write_text('{"run": "https://github.com/o/r/actions/runs/2"}\n')     # an approval record replaced
+    git(tmp_path, "commit", "-qam", "run 2 instead")
+    monkeypatch.chdir(tmp_path)
+    (err,) = logs_check.check("base", "rewritten")
+    assert err.startswith(".toprope/approval-runs.jsonl: line 1 differs")
