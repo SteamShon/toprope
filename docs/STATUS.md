@@ -161,7 +161,7 @@ only its own item below.
 - ✅ 7. Param tests: each allowed cell, on every instance in its state, with one finite param (boolean,
   enum, integer) set to each other value; the harness now finds the Authoring break by itself.
   A break that first needs a state the small world never builds (Delivery's) stays TLC's;
-  `docs/harness.md`, "What each one catches" (PR)
+  `docs/harness.md`, "What each one catches" (#141)
 
 ## M0b, M2 to M5
 
