@@ -59,3 +59,12 @@
 {"at": "2026-11-07T00:06:13+00:00", "base": "5-c8fd1b8fc98be17c", "check": "change-check", "commit": "7-92bcb1c921be21bd", "ok": true, "run": "2a380e966136", "summary": "passes; 0 error(s), 0 warning(s)"}
 {"at": "2026-11-07T00:06:13+00:00", "base": "5-c8fd1b8fc98be17c", "check": "confirmed", "commit": "7-92bcb1c921be21bd", "ok": true, "run": "2a380e966136", "summary": "0 proposed element(s)"}
 {"at": "2026-11-07T00:57:30+00:00", "base": null, "check": "preview-harness", "commit": "7-92bcb1c921be21bd", "ok": true, "run": "eda75a805ff5", "summary": "build 81951214be7639d9: harness passed"}
+{"at": "2026-11-07T04:01:15+00:00", "base": "7-92bcb1c921be21bd", "check": "structural", "commit": "8-12d551bf1fdd1d7f", "ok": true, "run": "23f1edce8bea", "summary": "0 error(s), 0 warning(s)"}
+{"at": "2026-11-07T04:01:15+00:00", "base": "7-92bcb1c921be21bd", "check": "semantic", "commit": "8-12d551bf1fdd1d7f", "ok": true, "run": "23f1edce8bea", "summary": "0 error(s), 0 warning(s)"}
+{"at": "2026-11-07T04:01:15+00:00", "base": "7-92bcb1c921be21bd", "check": "scenarios", "commit": "8-12d551bf1fdd1d7f", "ok": true, "run": "23f1edce8bea", "summary": "0 error(s), 0 warning(s); 4/4 scenarios pass"}
+{"at": "2026-11-07T04:01:15+00:00", "base": "7-92bcb1c921be21bd", "check": "harness", "commit": "8-12d551bf1fdd1d7f", "ok": true, "run": "23f1edce8bea", "summary": "0 error(s), 0 warning(s); 178 tests: 178 run, 0 from cache, 0.455 s"}
+{"at": "2026-11-07T04:01:15+00:00", "base": "7-92bcb1c921be21bd", "check": "log_replay", "commit": "8-12d551bf1fdd1d7f", "ok": null, "run": "23f1edce8bea", "summary": "skipped: no event store (nothing deployed)"}
+{"at": "2026-11-07T04:01:15+00:00", "base": "7-92bcb1c921be21bd", "check": "in_flight", "commit": "8-12d551bf1fdd1d7f", "ok": null, "run": "23f1edce8bea", "summary": "skipped: no event store (nothing deployed)"}
+{"at": "2026-11-07T04:01:15+00:00", "base": "7-92bcb1c921be21bd", "check": "nl", "commit": "8-12d551bf1fdd1d7f", "ok": null, "run": "23f1edce8bea", "summary": "skipped: no natural-language checker configured"}
+{"at": "2026-11-07T04:01:15+00:00", "base": "7-92bcb1c921be21bd", "check": "change-check", "commit": "8-12d551bf1fdd1d7f", "ok": true, "run": "23f1edce8bea", "summary": "passes; 0 error(s), 0 warning(s)"}
+{"at": "2026-11-07T04:01:15+00:00", "base": "7-92bcb1c921be21bd", "check": "confirmed", "commit": "8-12d551bf1fdd1d7f", "ok": false, "run": "23f1edce8bea", "summary": "1 proposed element(s): actions.record_check.preconditions.settled"}

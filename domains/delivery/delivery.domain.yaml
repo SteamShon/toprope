@@ -106,6 +106,14 @@ actions:
       ref: interview:domains/delivery/interview.jsonl#L4
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: confirmed
+    preconditions:
+    - id: not-deployed
+      check: target.deployed != true
+      reason: Already deployed; deliver again with a new request.
+      source:
+        kind: record
+        ref: records:docs/harness.md#L76-L94
+      status: proposed
   record_build:
     description: Record the build and its harness result.
     actor:
@@ -293,8 +301,7 @@ transitions:
           source:
             kind: interview
             ref: interview:domains/delivery/interview.jsonl#L5
-            quote: 전부 다 추천한 거 동의.
-          status: confirmed
+          status: proposed
         record_build: n/a
         deploy:
           to: deploying
