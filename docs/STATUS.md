@@ -152,6 +152,12 @@ only its own item below.
 
 - ⬜ 5. Every example and both self domains, under a state bound
 
+- ✅ 6. The self domains refuse the late kernel replies TLC found: Authoring's `record_check` on an
+  approved commit (`settled`), and Delivery's `preview` of a deployed request (`not-deployed`; a
+  refused deploy can still be retried). Through the loop: proposed by the agent, confirmed,
+  approved, deployed and verified by the researcher (Authoring `main` `9-b4ec65433222f096`,
+  Delivery `main` `4-3e90586c40faf7d7`) (#140)
+
 ## M0b, M2 to M5
 
 Not started. Plans: [`roadmap.md`](roadmap.md).
