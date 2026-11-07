@@ -107,6 +107,12 @@ exists.
    adopted it (the element log), a decision to its action and target (the event). One edge is
    added: a commit may cite its evidence (interview lines, events, check records). An exception to
    the rule it bends waits for exceptions (6).
+   *Note (2026-11-07, decided by the maintainer in the review of #124):* evidence is a typed pointer that must
+   resolve, never a free string. A commit cites it after it is made, one citation at a time,
+   through the kernel's `cite_evidence`: `interview`, `source`, `check`, `event` or
+   `approval-run`, each with a strength (pointed, ran, observed, approved) and who cited it.
+   The free-string `evidence` input of `commit` (#117, #118) is removed; the commit that used it
+   keeps its record.
 4. **Whose agent acted, and who approves.**
    - A check can read `actor.principal`: the principal's id and roles for an agent, the actor
      itself otherwise. Rules can then say "not the proposer, nor the proposer's agent".
