@@ -218,6 +218,15 @@ M0b's UI), checking the non-developer claim (M1 Phase B, M2), TLC modeling creat
   check's `in_flight` tests every object in use against the new invariants: an object in flight
   that breaks one is an error, a finished one a warning, as in log replay.
 
+## A creating action sets every required property (#PR)
+
+A review leftover from #86. The validator warns (`unset-on-create`) when a create action leaves a
+required property to an optional param or to nothing. It is a warning, not an error, so a
+declaration already running with it can still be fixed through the loop. It found one:
+Authoring's `add_source` leaves `Source.local_only` unset when the param is left out. The fix,
+`local_only` optional (absent means not local-only, as the source spec reads it), is proposed
+for the researcher to confirm and approve.
+
 ## M0b, M2 to M5
 
 Not started. Plans: [`roadmap.md`](roadmap.md).
@@ -275,9 +284,6 @@ it; each release's cleanup PR handles items older than one release.
   another stream (for example by a newly created object) is not shown (#86, 2026-11-06)
 - The effect-resolution summary is written twice, in `toprope-run` (`followed`) and in the
   regeneration check (`_one`); factor one helper onto `Outbox` (#86, 2026-11-06)
-- Neither the validator nor the harness catches a creating action that leaves a required
-  property unset (`record_commit` made Commits without `domain_id`; found running the loop)
-  (#86, 2026-11-06)
 - `propose_element` on a path that is not an element (for example `glossary.<term>`,
   `scenarios.<id>`, `world.fixtures`) writes the value without provenance instead of failing, so
   such a change shows only in the commit's review diff; #147's Delivery change has three

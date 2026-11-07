@@ -56,7 +56,9 @@ Evaluation stops at the first failure, and each failure has its own outcome:
    - Here, step 8 only checks that the claim is held. Failure → `denied: reservation`.
 9. **Effects** are computed on a copy. Functions may be called here and in steps 4–6 and 10;
    they are pure (ADR-0023). the state field from the matrix (or `initial` for a
-   create action, which takes only declared params), then `set` in order. Functions are
+   create action, which takes only declared params), then `set` in order. The validator warns
+   (`unset-on-create`) when a create action leaves a required property to an optional param or
+   to nothing. Functions are
    called here and must be pure. `create:` effects are not supported yet
    (`rejected: unsupported-effect`, ADR-0021).
 10. **Invariant guard** on the resulting state (ADR-0012). Failure →
