@@ -40,7 +40,19 @@ external events (`fired_by` is empty until M0b), and the map diff in impact repo
 
 ## Mermaid
 `to_mermaid(map)` gives a flowchart of the structure layer and a state diagram per stateful
-object. Undecided cells appear as notes.
+object. Undecided cells appear as notes. Each arrow reads as the action, who takes it, and its
+conditions in brackets: precondition ids, and `a person` for `requires: human`.
+
+With harness results, the diagram shows where the declaration goes wrong:
+- an arrow whose cases failed ends in `✗ failed in the harness`, and the state it leads to is
+  marked `mayBreak`;
+- a state that a minimal flow breaks an invariant in is marked `breaks`, with a note naming the
+  invariant;
+- a state no example reaches is drawn, though no arrow leads to it, and marked `unreachable`.
+
+`flows` tells each minimal flow as the shortest path to the broken rule, one numbered step per
+action. `--mermaid DIR` writes it to `minimal-flows.md`. To check that a minimal flow is a real
+bug, replay it at the other levels, as the harness does with any flow.
 
 ## The domain guide
 Next to `world-map.json`, a preview writes `domain-guide.md`: the same domain told for people,
