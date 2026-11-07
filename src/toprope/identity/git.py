@@ -96,12 +96,20 @@ def load_table(path: str | Path) -> dict[str, Caller]:
 class GitIdentity(Identity):
     """Resolves the repository's git identity through the identity file. Credentials are not used."""
 
-    def __init__(self, path: str | Path, root: str | Path = "."):
-        self.path, self.root = Path(path), Path(root)
+    def __init__(self, path: str | Path, root: str | Path = ".", once: bool = False):
+        """`once`: read `git config` once, for a process that runs one command (`toprope-run`
+        resolves its caller more than once, #85). A long-lived process reads it each time, so a
+        changed git email takes effect."""
+        self.path, self.root, self.once = Path(path), Path(root), once
         self._table = load_table(self.path)
+        self._email: str | None = None
 
     def email(self) -> str:
-        return git_email(self.root)
+        if not self.once:
+            return git_email(self.root)
+        if self._email is None:
+            self._email = git_email(self.root)
+        return self._email
 
     def resolve(self, credentials: str | None = None) -> Caller | None:
         email = self.email()

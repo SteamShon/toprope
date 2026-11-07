@@ -183,12 +183,12 @@ def test_a_merge_resolution_is_not_credited_with_mains_changes(tmp_path):
     raw = schema_doc_domain()
     write(tmp_path / "d.domain.yaml", raw)
     ws = Workspace(tmp_path)
-    ws.approve_commit(ws.commit(author="ana")["commit"], via="cli", who="ana")
+    ws.approve_commit(ws.commit(author="ana")["commit"], via="terminal", who="ana")
     other = copy.deepcopy(raw)
     other["actions"]["launch_experiment"]["description"] = "Turn it on."
     (tmp_path / "o").mkdir()
     co = ws.commits.commit(write(tmp_path / "o" / "o.domain.yaml", other), branch="eli", author="eli")[0]
-    ws.approve_commit(co.id, via="cli", who="eli")
+    ws.approve_commit(co.id, via="terminal", who="eli")
     raw["actions"]["launch_experiment"]["description"] = "Start traffic."
     write(tmp_path / "d.domain.yaml", raw)
     ws.commit(author="ana")
@@ -198,7 +198,7 @@ def test_a_merge_resolution_is_not_credited_with_mains_changes(tmp_path):
     resolved["glossary"]["mine"] = "M."
     write(tmp_path / "d.domain.yaml", resolved)
     r = ws.commit(merge=co.id, author="ana")["commit"]
-    ws.approve_commit(r, via="cli", who="ana")
+    ws.approve_commit(r, via="terminal", who="ana")
     log = ws.element_log("action:launch_experiment")
     assert [(e["author"], e["change"]) for e in log] == [("ana", "added"), ("eli", "changed"), ("ana", "changed")]
     assert r not in [e["commit"] for e in log]                        # ana's own edit is her branch commit
