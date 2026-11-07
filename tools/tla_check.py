@@ -8,9 +8,10 @@ cannot check the model (a parse or semantic error, exit status other than 0 or 1
 reaches the state bound: a bound reached is never a pass. `DECLARATION=breaks:INVARIANT` names a
 seeded break: that run fails unless TLC finds the invariant broken, so the job shows it can fail.
 
-An invariant violation (TLC exit status 12) is not judged here: replaying the counterexample on
-the interpreter decides whether it is a harness gap, a model mismatch or a break the harness
-already reports (ADR-0043, Decision 3). TLC writes it as JSON to `<out>/<module>.trace.json`.
+An invariant violation (TLC exit status 12) is replayed on the interpreter (`toprope.tla.replay`,
+ADR-0043, Decision 3): a break the harness already reports passes here (the harness fails on it);
+a harness gap or a model mismatch fails. A seeded break passes only when TLC finds it and the
+replay reproduces it.
 """
 from __future__ import annotations
 
@@ -44,7 +45,13 @@ def run(decl: Path, jar: Path, out: Path) -> dict:
                else f"error (exit {r.returncode})")
     if distinct is not None and distinct >= BOUND - 1:
         verdict = "not checked: the state bound was reached"
-    return {"declaration": str(decl), "module": e.name, "dir": d.name, "verdict": verdict, "distinct_states": distinct,
+    judged = None
+    if r.returncode == VIOLATION:
+        from toprope.tla.replay import harness_broken, judge, parse_trace
+        decl_d = load_domain(decl)
+        inv, steps = parse_trace(r.stdout)
+        judged = judge(decl_d, inv, steps, harness_broken(decl_d))
+    return {"declaration": str(decl), "module": e.name, "dir": d.name, "replay": judged, "verdict": verdict, "distinct_states": distinct,
             "broken": broken, "steps": len(e.steps), "left_out": e.left_out,
             "trace": str(trace) if trace.exists() else None}
 
@@ -59,18 +66,29 @@ def main(argv: list[str] | None = None) -> int:
     for spec in a.declarations:
         path, _, expect = spec.partition("=breaks:")
         r = run(Path(path), a.jar.resolve(), a.out.resolve())
+        rep = r["replay"]
         if expect:
             r["expected_break"] = expect
             if expect not in r["broken"]:
                 r["verdict"] = f"seeded break not found: {expect} (TLC: {r['verdict']})"
+            elif rep["verdict"] == "model mismatch":
+                r["verdict"] = f"seeded break not reproduced: {rep['why']}"
+            else:
+                r["verdict"] = f"seeded break found and reproduced ({rep['verdict']})"
+        elif rep is not None:
+            r["verdict"] = f"violation: {rep['verdict']}" + (f" ({rep['why']})" if rep.get("why") else "")
         results.append(r)
     for r in results:
         print(f"{r['declaration']}: {r['verdict']}; {r['distinct_states']} distinct states; "
               f"{r['steps']} step(s) modeled" + (f"; broken: {', '.join(r['broken'])}" if r["broken"] else ""))
         for k, v in sorted(r["left_out"].items()):
             print(f"  left out {k}: {v}")
+        for st in (r["replay"] or {}).get("steps", []):
+            print(f"  replayed {st['role']} {st['action']} {st['target']} {st['params']}: "
+                  f"{st['status']} {st['code'] or ''}")
     (a.out / "summary.json").write_text(json.dumps(results, indent=2) + "\n")
-    bad = [r for r in results if r["verdict"] not in ("checked", "violation")]
+    passing = ("checked", "violation: known")
+    bad = [r for r in results if not (r["verdict"] in passing or r["verdict"].startswith("seeded break found"))]
     for r in bad:
         print(f"error: {r['declaration']}: {r['verdict']} (see {a.out}/{r['dir']}/tlc.out)", file=sys.stderr)
     return 1 if bad else 0
