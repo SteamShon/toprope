@@ -134,7 +134,7 @@ only its own item below.
 - ✅ 1. ADR-0043 (accepted): one declaration's model level; TLC in a pinned `tla` CI job; each
   counterexample replayed on the interpreter, a harness gap or a model mismatch fails; actions
   using time, links or creation left out and reported; every example and both self domains under
-  a 1,000,000-state bound (PR)
+  a 1,000,000-state bound (#136)
 
 - ⬜ 2. Exporter: a declaration's model level as a TLA+ spec and TLC config
 
