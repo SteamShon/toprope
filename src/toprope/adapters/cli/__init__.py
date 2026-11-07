@@ -152,42 +152,11 @@ def _execution(args: Any, d: Domain) -> Execution:
     return ex
 
 
-HANDOFF_STATUS = {"HandoffDelivered": "ok", "HandoffDenied": "denied", "HandoffFailed": "failed"}
-
-
 def followed(ex: Execution, d: Domain, target: str, before: int) -> list[dict[str, Any]]:
-    """What the command set off: each kernel call with its reply (and the object a creating reply
-    made, such as the new Commit), and each handoff, so you know what to do next."""
-    from ...handoff import Outbox, effect_id, handoff_id
-    out: list[dict[str, Any]] = []
-    for e in ex.store.read(target)[before:]:
-        if e.type == "EffectRequested":
-            res = Outbox(ex).resolution(effect_id(e), "effect")
-            entry: dict[str, Any] = {"kernel": e.payload["service"], "reply": e.payload["reply"]}
-            if res is None:
-                entry["status"] = "pending"
-            else:
-                result = res.payload.get("result") or {}
-                reply = d.actions.get(e.payload["reply"])
-                # the service's own failure first: a failed call still replies (ADR-0028)
-                entry["status"] = "failed" if result.get("ok") is False else res.payload.get("status") or res.type
-                if entry["status"] == "ok":       # a refused reply made nothing
-                    entry["object"] = result.get("id") if reply is not None and reply.creates \
-                        else res.payload.get("object")
-                if result.get("error") or res.payload.get("reason"):
-                    entry["error"] = result.get("error") or res.payload.get("reason")
-            out.append(entry)
-        elif e.type == "HandoffRequested":
-            res = Outbox(ex).resolution(handoff_id(e), "handoff")
-            to = e.payload.get("to") or {}
-            h = {"handoff": e.payload.get("handoff"), "to": f"{to.get('domain')}.{to.get('action')}",
-                 "status": HANDOFF_STATUS.get(res.type, res.type) if res else "pending"}
-            if h["status"] == "ok":
-                h["object"] = e.payload.get("target")
-            elif res is not None and (res.payload.get("reason") or res.payload.get("error")):
-                h["error"] = res.payload.get("reason") or res.payload.get("error")
-            out.append(h)
-    return out
+    """What the command set off (`Outbox.followed`), as `then` shows it."""
+    from ...handoff import Outbox
+    return [{k: v for k, v in e.items() if k not in ("resolution", "reply_status")}
+            for e in Outbox(ex).followed(target, before)]
 
 
 def _domain(args: Any) -> Domain:

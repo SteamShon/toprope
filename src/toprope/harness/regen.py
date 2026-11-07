@@ -35,7 +35,7 @@ def _run(path: Path, levels, examples) -> tuple[list[Any], dict[str, Any]]:
 
 def effects_end_to_end(path: Path) -> list[dict[str, Any]]:
     from ..compose import assemble, load_composition
-    from ..handoff import Outbox, effect_id
+    from ..handoff import Outbox
     from ..kernel.services import RecordingKernel
     from ..store import MemoryEventStore
     from .surfaces import _Identities
@@ -69,13 +69,9 @@ def effects_end_to_end(path: Path) -> list[dict[str, Any]]:
                 o = ex.receive_kernel_reply("e2e", action, oid, case.params)
             else:
                 o = ex.submit(ids.add(actor), action, oid, case.params, "e2e")
-            effects = [e for e in ex.history(oid) if e.type == "EffectRequested"]
-            results = []
-            for e in effects:
-                eid = effect_id(e)
-                res = Outbox(ex).resolution(eid, "effect")
-                results.append({"service": e.payload["service"], "resolution": res.type if res else None,
-                                "reply": res.payload.get("status") if res else None})
+            results = [{"service": f["kernel"], "resolution": f["resolution"], "reply": f["reply_status"]}
+                       for f in Outbox(ex).followed(oid) if "kernel" in f]
+            effects = results
             # A reply that is denied or rejected drops the service's result: the wiring is broken.
             ok = o.ok and bool(effects) and all(r["resolution"] and r["reply"] == "ok" for r in results)
             out.append({"domain": name, "action": action, "ok": ok, "outcome": o.status,

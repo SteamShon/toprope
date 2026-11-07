@@ -270,6 +270,13 @@ class Harness:
         return None
 
     # -- everything --------------------------------------------------------------------------
+    def unreachable_from_creation(self) -> dict[str, list[str]]:
+        """States no declared move reaches from creation (ADR-0035), computed once per harness."""
+        if getattr(self, "_unreachable", None) is None:
+            from .mechanical import unreachable_from_creation
+            self._unreachable = unreachable_from_creation(self.d)
+        return self._unreachable
+
     def mechanical(self, samples: int = 3, actions: set[str] | None = None) -> Any:
         """The mechanical layer (ADR-0035): every cell on objects generated from the types, at
         every level, with no examples needed."""
@@ -277,7 +284,7 @@ class Harness:
         surfaces = {lv: self.surface(lv) for lv in self.levels}
         try:
             m = run_mechanical(self.d, surfaces, self.clock, samples=samples, actions=actions,
-                               actors=self.world.actors)
+                               actors=self.world.actors, unreachable=self.unreachable_from_creation())
         finally:
             for s in surfaces.values():
                 s.close()

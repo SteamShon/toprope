@@ -237,7 +237,14 @@ approved, deployed and verified by the researcher (approval run 42363055975): Au
 `10-01b4e6464862bbf9`, its `tla` check passed in the approval (219312 states). It is the first
 deploy recorded with the commits (ADR-0045): the events after it carry `domain_version` 10.
 
-## TLC models creation (#PR, ADR-0043 follow-up, link: ③)
+## The kernel's server reads sources (#154)
+
+Formerly Next 3, before M2. With `--kernel-root` and `--workspace`, `toprope-server` has a
+`read_source` tool: a source's chunks, redacted, each with its ref; a local-only source is
+refused; a read, not an action, so what it serves goes into the workspace's usage log, never into
+an event log.
+
+## TLC models creation (#155, ADR-0043 follow-up, link: ③)
 
 Creating actions are steps of the exported model: one fresh id per created type, the empty world
 as one more start, a creating step only from it. A creating param no expression reads gets one
@@ -254,17 +261,12 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 1. M1 Phase B: the change sequence on the three arms (every M1 instrument is frozen; the
    harness runs `instruments.py verify --run` before each arm run), then the M1 report.
 2. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
-3. Before M2 (a domain whose sources may be private): a kernel `read_source` MCP tool that
-   serves source text with redaction and refuses local-only sources, as the removed authoring
-   MCP did. A read, not an action: the text never goes into an event log (decided 2026-11-06).
-   Until then agents get references from `search` and read files directly, which is safe for
-   the self domains (no local-only sources; the agent already sees the repository).
-4. When a domain is shared by several people or agents (M2, or a hosted server): its event
+3. When a domain is shared by several people or agents (M2, or a hosted server): its event
    log moves from git to a database (`--store postgres:DSN` for a composition, one schema per
    member), through a new ADR superseding decision 29A for that case; an export to git can
    keep the audit trail (decided 2026-11-06). Until then the self domains keep their logs in
    git (`domains/<domain>/events/`).
-5. ADR-0041's follow-up work (decided 2026-11-06), the third on in
+4. ADR-0041's follow-up work (decided 2026-11-06), the third on in
    `umbrella/adr-0041-follow-ups` (#114). Done: approval refuses commits with proposed
    elements, and the change check records how many are left (#110); every decision action takes
    an optional `rationale` (#111); a check can read `actor.principal` (#113);
@@ -272,16 +274,16 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    permissions it ran under (#116); a commit may cite its evidence (#117, #118: free strings
    on `commit`, Authoring commit `5-c8fd1b8fc98be17c`), replaced by typed evidence that must
    resolve, cited with `cite_evidence` (#124, in the pstack umbrella).
-6. ADR-0042's follow-up work (accepted 2026-11-07): done: `domain_version` with the deployment
+5. ADR-0042's follow-up work (accepted 2026-11-07): done: `domain_version` with the deployment
    log gives the rule in force when an event was decided, documented, the self domains too
    (ADR-0045, #150); read visibility defined in the schema (`read`, refused
    until M0b); in M0b, deadlines with timers, read visibility enforced by the query and MCP
    read tools, an observed time on facts from adapters, identity mappings on adapters; in M2,
    `confirmed_at` and `review_by` warnings; in the M4 spec, goals, expected outcomes and the
    outcome-to-decision link.
-7. ADR-0043's follow-ups: make `tla` a required check on `develop` once the umbrella is in
+6. ADR-0043's follow-ups: make `tla` a required check on `develop` once the umbrella is in
    (maintainer); model links and time, each shrinking what the model leaves out (the self
-   domains leave out one link invariant; creation is modeled, #PR).
+   domains leave out one link invariant; creation is modeled, #155).
 
 ## Left from reviews
 
@@ -292,10 +294,6 @@ it; each release's cleanup PR handles items older than one release.
   person approves (`requires: human`) a commit whose checks passed. Charter §5 says "no
   self-approval"; ADR-0032 keeps one approver in M1. Decide whether to enforce author ≠
   approver before M2, when a domain gets more than one owner (#102, 2026-11-06)
-- `then` in `toprope-run` reads only the target's stream, so a call or handoff set off on
-  another stream (for example by a newly created object) is not shown (#86, 2026-11-06)
-- The effect-resolution summary is written twice, in `toprope-run` (`followed`) and in the
-  regeneration check (`_one`); factor one helper onto `Outbox` (#86, 2026-11-06)
 - `propose_element` on a path that is not an element (for example `glossary.<term>`,
   `scenarios.<id>`, `world.fixtures`) writes the value without provenance instead of failing, so
   such a change shows only in the commit's review diff; #147's Delivery change has three
@@ -310,7 +308,6 @@ it; each release's cleanup PR handles items older than one release.
   dispatches; the PR needs one more commit before it can merge. A push token that triggers
   workflows (a GitHub App or a fine-grained token, set up by the maintainer) would remove the
   step (#96, 2026-11-06)
-- The mechanical layer computes `unreachable_from_creation` twice per run (#71, 2026-11-05)
 - `merge_main` writes the working copy and records the merge in progress in two steps; a
   commit from another process between them gets one parent, and the next commit a stale
   second one (#89, 2026-11-06)
