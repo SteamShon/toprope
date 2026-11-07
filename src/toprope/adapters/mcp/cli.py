@@ -190,6 +190,8 @@ def _member(args, identity, services):
                 raise SystemExit("error: --seed loads example objects; use it with --store memory or --store-dir")
             args.no_seed = True
         stores = {n: open_store(f"jsonl:{p}") for n, p in logs.items()}
+    if hasattr(services, "domain_events"):   # the change check replays each member's own history
+        services.domain_events.update({c.domains[n].domain: st for n, st in stores.items()})
     exs = assemble(c, stores, identity, services=services)
     if not args.no_seed:
         for ex in exs.values():

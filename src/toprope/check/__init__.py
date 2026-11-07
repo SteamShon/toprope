@@ -336,10 +336,13 @@ def log_replay(new: Domain, old: Domain | None, events: EventStore,
     """Re-decide every past action with the new model, in order, at its original time. The
     replayed store takes the recorded events, not the new ones, so one blocked action does
     not cascade into the rest of history. `only` limits the re-decided actions to the affected
-    ones (ADR-0013); the others still advance the replayed state."""
+    ones (ADR-0013); the others still advance the replayed state. A past action the base model
+    blocks too is not this change's doing: it is counted, not reported, so a change approved
+    once does not fail every later check."""
     res = CheckResult("log_replay")
     clock_at: list[datetime] = [EPOCH]
     interp = Interpreter(new, lambda: clock_at[0])
+    before = Interpreter(old, lambda: clock_at[0]) if old is not None else None
     replay = MemoryEventStore()
 
     def lookup(oid: str):
@@ -350,7 +353,7 @@ def log_replay(new: Domain, old: Domain | None, events: EventStore,
     # By time; ties keep each stream's own order (the sort is stable). Across streams with equal
     # times the true order is unknown: a coarse clock can misorder cross-object lookups.
     history.sort(key=lambda e: e.at or EPOCH)
-    replayed = blocked = 0
+    replayed = blocked = already = 0
     for ev in history:
         action = (ev.payload or {}).get("action")
         if action is not None and ev.actor is not None and (only is None or action in only):
@@ -361,7 +364,9 @@ def log_replay(new: Domain, old: Domain | None, events: EventStore,
             state = None if found is None else found[1]
             dec = interp.decide(cmd, state, lookup)
             when = ev.at.isoformat() if ev.at else "?"
-            if not dec.outcome.ok:
+            if not dec.outcome.ok and before is not None and not before.decide(cmd, state, lookup).outcome.ok:
+                already += 1
+            elif not dec.outcome.ok:
                 blocked += 1
                 res.add("error", f"{ev.stream}@{ev.version}",
                         f"{action} by {ev.actor.get('id')} at {when} would now be "
@@ -375,7 +380,8 @@ def log_replay(new: Domain, old: Domain | None, events: EventStore,
                     res.add("warning", f"{ev.stream}@{ev.version}", f"{action} at {when} would now set {differ} differently")
         replay.append(ev.stream, replay.version(ev.stream), [_copy(ev)])
     total = sum(1 for ev in history if (ev.payload or {}).get("action") is not None and ev.actor is not None)
-    res.note = f"{replayed} of {total} past action(s) re-decided; {blocked} would be blocked"
+    res.note = f"{replayed} of {total} past action(s) re-decided; {blocked} would be blocked" + (
+        f"; {already} blocked by the base too" if already else "")
     return res
 
 

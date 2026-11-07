@@ -82,6 +82,9 @@ class LocalKernel(KernelServices):
         self.environment = environment      # toprope.deploy.LocalEnvironment, for preview and deploy
         self.examples = harness_examples
         self.commits = commits or CommitStore(self.root / ".toprope" / "commits")
+        # A domain's own event log, by domain (ADR-0037): the self domains keep theirs in git,
+        # so a change check replays their real history even with nothing deployed.
+        self.domain_events: dict[str, Any] = {}
 
     def _path(self, rel: str) -> Path:
         p = (self.root / str(rel)).resolve()
@@ -237,7 +240,10 @@ class LocalKernel(KernelServices):
         from ..check import check_commit
         from ..incremental import ResultCache
         rc = ResultCache(self.root / ".toprope" / "cache")
-        if self.environment is not None:
+        own = self.domain_events.get(domain)
+        if own is not None:
+            r = check_commit(self.commits, domain, commit, events=own, examples=self.examples, cache=rc)
+        elif self.environment is not None:
             with self.environment.events(domain) as store:
                 r = check_commit(self.commits, domain, commit, events=store, examples=self.examples, cache=rc)
         else:
