@@ -18,8 +18,10 @@ Steps, from a fixed set:
   An `approve_commit` step needs a `check_commit` step on the same commit before it: the
   workflow sets `TOPROPE_TLC_JAR`, so that check model-checks with TLC, and the kernel approves
   only a commit whose TLC check passed (ADR-0043)
-- `target: $commit`: the commit the request's last `commit_draft` step before it made. So one
-  request takes a change from proposed to approved: `change` writes it.
+- `target: $commit`: the commit the request's last `commit_draft` step before it made, also
+  inside a target (`delivery:$commit:local`, the delivery request of that commit). So one
+  request takes a change from proposed to approved, and on to verified: `change` writes the
+  first part.
 
   python tools/human_request.py change REQUEST --draft DRAFT [--member authoring] [--workspace W]
 
@@ -99,16 +101,16 @@ def check(req: object) -> list[str]:
                               "(a *.workspace.yaml)")
         else:
             errors.append(f"step {i}: {kind!r} is not a step (one of {', '.join(INSTRUMENT_STEPS)} or run)")
-    checked, drafted = set(), set()
+    checked, drafted = set(), False
     for i, st in enumerate(steps, 1):        # TLC runs only in the workflow: check where you approve
         arg = st.get("run") if isinstance(st, dict) else None
         if not isinstance(arg, dict):
             continue
         key = (arg.get("member"), arg.get("target"))
-        if arg.get("target") == MADE and arg.get("member") not in drafted:
+        if MADE in str(arg.get("target")) and not drafted:
             errors.append(f"step {i}: {MADE} names the commit a commit_draft step before it makes; there is none")
         if arg.get("action") == "commit_draft":
-            drafted.add(arg.get("member"))
+            drafted = True
             checked.discard((arg.get("member"), MADE))   # a new commit: check it again
         if arg.get("action") == "check_commit":
             checked.add(key)
@@ -128,7 +130,8 @@ def render(req: dict) -> str:
             params = " ".join(f"--{k.replace('_', '-')} {json.dumps(v) if not isinstance(v, str) else v}"
                               for k, v in (arg.get("params") or {}).items())
             where = f" (workspace `{arg['workspace']}`)" if arg.get("workspace") else ""
-            target = "the commit made above" if arg["target"] == MADE else f"`{arg['target']}`"
+            target = "the commit made above" if arg["target"] == MADE else \
+                f"`{arg['target']}`".replace(MADE, "<the commit made above>")
             lines.append(f"{i}. `{arg['member']}`: **{arg['action']}** {target} {params}".rstrip() + where)
         elif kind == "amend":
             lines.append(f"{i}. **amend** `{arg['file']}` in `{arg['dir']}`: {arg['reason']}")
@@ -149,7 +152,7 @@ def command(st: dict, made: str | None = None) -> list[str]:
         return tool + [kind, arg]
     if kind == "amend":
         return tool + ["amend", arg["dir"], arg["file"], "--reason", arg["reason"]]
-    target = made if arg["target"] == MADE and made else arg["target"]
+    target = arg["target"].replace(MADE, made) if made else arg["target"]
     cmd = ["toprope-run", "--composition", COMPOSITION, "--member", arg["member"],
            "--kernel-root", ".", "--workspace", arg.get("workspace") or f"toprope.{arg['member']}.workspace.yaml",
            "--env", ".toprope/env", "--identity", "github", arg["action"], target]
@@ -199,12 +202,12 @@ def run(req: dict, approver: str, identity: str = "toprope.identity.yaml", cwd: 
     if any((st.get("run") or {}).get("action") == "approve_commit" for st in req["steps"]) \
             and not env.get(TLC_ENV):
         raise SystemExit(f"approve_commit needs TLC: set {TLC_ENV} to a TLC jar (the workflow does)")
-    done, made = [], {}
+    done, made = [], None
     for st in req["steps"]:
         arg = st.get("run") or {}
-        if arg.get("target") == MADE and arg.get("member") not in made:
+        if MADE in str(arg.get("target")) and made is None:
             raise SystemExit(f"step {len(done) + 1}: {MADE}, but no commit_draft step before it made a commit")
-        cmd = command(st, made.get(arg.get("member")))
+        cmd = command(st, made)
         r = subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True, check=False)
         done.append({"step": st, "returncode": r.returncode, "stdout": r.stdout[-4000:], "stderr": r.stderr[-4000:]})
         unmet = _unmet(r.stdout) if r.returncode == 0 and "run" in st else []
@@ -213,10 +216,10 @@ def run(req: dict, approver: str, identity: str = "toprope.identity.yaml", cwd: 
             why = "; ".join(unmet) or r.stderr[-2000:]
             raise SystemExit(f"step {len(done)} failed: {' '.join(cmd[:6])} ...\n{why}")
         if arg.get("action") == "commit_draft" and (c := _made(r.stdout)):
-            made[arg.get("member")] = c
+            made = c
             done[-1]["commit"] = c
     print(json.dumps({"approver": approver, "as": person.actor.id, "steps": len(done),
-                      **({"commits": made} if made else {})}, indent=2))
+                      **({"commit": made} if made else {})}, indent=2))
     return done
 
 

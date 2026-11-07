@@ -155,6 +155,21 @@ def test_propose_cites_a_real_chunk_and_is_always_proposed(ws):
         ws.propose("objects.Ghost", {}, "nowhere:x#L1")
 
 
+def test_a_change_inside_a_confirmed_element_proposes_the_element_again(ws):
+    """Otherwise an agent could rewrite a confirmed action's effects while it reads `confirmed`."""
+    ws.propose("roles", ["approver"], "docs:docs/process.md#L4-L6")
+    ws.propose("objects.Experiment", {"description": "A test.", "properties": {"ok": {"type": "boolean"}}},
+               "docs:docs/process.md#L4-L6")
+    ws.propose("actions.approve", {"description": "Approve.", "actor": ["approver"], "target": "Experiment",
+                                   "effects": [{"set": {"target.ok": True}}]}, "docs:docs/process.md#L4-L6")
+    ws.confirm(["actions.approve"], via="cli", who="ana")
+    assert ws.draft()["actions"]["approve"]["status"] == "confirmed"
+    ws.propose("actions.approve.effects", [{"set": {"target.ok": False}}], "docs:docs/process.md#L7-L8")
+    el = ws.draft()["actions"]["approve"]
+    assert el["effects"] == [{"set": {"target.ok": False}}]
+    assert el["status"] == "proposed" and el["source"]["ref"] == "docs:docs/process.md#L7-L8"
+
+
 def test_propose_keeps_the_draft_parseable_and_returns_issues(ws):
     ws.propose("roles", ["approver"], "docs:docs/process.md#L4-L6")
     before = ws.domain_path.read_text()

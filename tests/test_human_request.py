@@ -118,9 +118,13 @@ def test_the_commit_a_step_made_is_the_target_of_the_next(tmp_path, monkeypatch)
             if cmd[-2] == "commit_draft" else []
         return subprocess.CompletedProcess(cmd, 0, json.dumps({"status": "ok", "then": then}), "")
     monkeypatch.setattr(hr.subprocess, "run", run)
-    done = hr.run(hr.change("authoring"), "ana-gh", identity="ids.yaml", cwd=tmp_path)
+    req = hr.change("authoring")
+    req["steps"].append({"run": {"member": "delivery", "action": "preview", "target": "authoring:$commit:local"}})
+    assert hr.check(req) == [] and "`authoring:<the commit made above>:local`" in hr.render(req)
+    done = hr.run(req, "ana-gh", identity="ids.yaml", cwd=tmp_path)
     assert [c[-2:] for c in cmds] == [["confirm_all_proposed", "authoring"], ["commit_draft", "authoring"],
-                                      ["check_commit", "7-c0ffee"], ["approve_commit", "7-c0ffee"]]
+                                      ["check_commit", "7-c0ffee"], ["approve_commit", "7-c0ffee"],
+                                      ["preview", "authoring:7-c0ffee:local"]]   # another member, inside a target
     assert done[1]["commit"] == "7-c0ffee"
 
 
