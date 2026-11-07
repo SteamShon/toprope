@@ -33,11 +33,13 @@ always means a bug in one of them.
      `invariant-guard`.
    - Params range over finite candidates, the same as the mechanical layer's: enum values, fixture
      ids for a `ref`, a few values per type, and the actors' ids for strings.
+   - Kernel calls and handoffs are outbox events, not state changes (the interpreter only
+     records them), so they are outside the model while the action that sets them off is in it. A
+     kernel's reply is an action of the `external:kernel` actor, modeled like any other.
    - **Not modeled at first:**
      - time (`now()`, `days_since`);
      - paths through links to another object;
-     - creating objects;
-     - kernel calls and handoffs.
+     - creating objects.
 
      An action whose guard or effect uses one of these is **left out of the model**. The report
      names it. So every counterexample TLC finds is a path the declaration allows, but a break
