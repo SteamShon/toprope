@@ -160,3 +160,20 @@ def test_composition_schema_and_kernel_agree():
     bad = copy.deepcopy(block)
     bad["wiring"][0]["from"] = "no-dot"
     assert errors(COMP, bad)
+
+
+# -- ADR-0042 §3: read visibility is defined now, built with the query tools (M0b) ----------------
+def test_read_visibility_is_defined_in_the_schema_and_refused_by_the_kernel_until_m0b():
+    from pydantic import ValidationError
+    from toprope.decl import Domain
+    fragment = next(b for b in BLOCKS if any("read" in (o or {}) for o in (b.get("objects") or {}).values()))
+    doc = merged(BLOCKS[0], fragment)
+    assert errors(DOMAIN, doc) == []                                     # the schema accepts it
+    with pytest.raises(ValidationError, match="read visibility.*not implemented until M0b"):
+        Domain.model_validate(doc)
+    only_property = merged(BLOCKS[0], {"objects": {"Note": {"properties": {"text": {"type": "string", "read": ["pm"]}}}}})
+    assert errors(DOMAIN, only_property) == []
+    with pytest.raises(ValidationError, match="read visibility.*not implemented until M0b"):
+        Domain.model_validate(only_property)
+    bad = merged(BLOCKS[0], {"objects": {"Note": {"read": "pm", "properties": {}}}})
+    assert errors(DOMAIN, bad)                                           # a list of roles, not a string

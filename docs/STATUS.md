@@ -111,11 +111,11 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    verified).
 6. ADR-0042's follow-up work (accepted 2026-11-07): done: `domain_version` with the deployment
    log gives the rule in force when an event was decided, documented (the self domains are the
-   exception, see *Left from reviews*); now, define read visibility in the schema; in M0b,
-   deadlines with timers, read visibility enforced by the query and MCP read tools, an observed
-   time on facts from adapters, identity mappings on adapters; in M2, `confirmed_at` and
-   `review_by` warnings; in the M4 spec, goals, expected outcomes and the outcome-to-decision
-   link.
+   exception, see *Left from reviews*); read visibility defined in the schema (`read`, refused
+   until M0b); in M0b, deadlines with timers, read visibility enforced by the query and MCP
+   read tools, an observed time on facts from adapters, identity mappings on adapters; in M2,
+   `confirmed_at` and `review_by` warnings; in the M4 spec, goals, expected outcomes and the
+   outcome-to-decision link.
 
 ## Left from reviews
 
