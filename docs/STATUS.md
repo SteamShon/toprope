@@ -38,7 +38,7 @@ replay and in-flight check, incremental analysis, commits and branches (ADR-0029
 | Probe suite (P01–P08) and verdict rules, frozen (`experiments/m1/instruments/FROZEN.json`) | ✅ | #56–#58, #61 |
 | Change requests (20) and the sealed change key (options drafted on request and selected by the researcher, ADR-0034), frozen | ✅ | #92 |
 | Binding (intent → element names; drafted on request, ADR-0038), frozen | ✅ | #93, #94 |
-| Phase B run protocol (drafted on request, decided by the researcher), frozen | 🟡 decided; freeze pending | #123, #133 |
+| Phase B run protocol (drafted on request, decided by the researcher), frozen | ✅ | #123, #133 |
 | Phase A: the Authoring and Delivery self domains, built and confirmed | ✅ | #69, #73, #74 |
 | First self-domain commits approved | ✅ | #77 |
 | Domain guide at preview | ✅ | #67 |
