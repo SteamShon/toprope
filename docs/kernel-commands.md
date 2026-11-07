@@ -24,6 +24,7 @@ Its subcommands are the domain's actions, one per action, plus `get`, `history`,
 | `--env` `ENV` | local deploy environment, for the preview and deploy services |
 | `--seed` | load the declaration's example fixtures first |
 | `--key` `KEY` | idempotency key (default: a new one); reuse it to retry safely |
+| `--working-copy` | with --composition and --kernel-root: run each member from its working-copy file, not from its deployed commit (ADR-0045) |
 
 ## `toprope-server`
 
@@ -46,6 +47,7 @@ Its subcommands are the domain's actions, one per action, plus `get`, `history`,
 | `--public-url` `PUBLIC_URL` | URL clients use to reach this server (default http://HOST:PORT) |
 | `--no-seed` | do not load the declaration's example fixtures (never loaded into a composition member's own event log) |
 | `--harness-report` `HARNESS_REPORT` | harness report JSON (toprope-harness --json) shown in the world map |
+| `--working-copy` | with --composition and --kernel-root: run each member from its working-copy file, not from its deployed commit (ADR-0045) |
 
 ## `toprope-harness`
 

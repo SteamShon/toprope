@@ -8,6 +8,7 @@ Layout under `<root>/<domain>/`:
   approvals.jsonl                     one line per approval: commit, approver, at (never removed)
   checks.jsonl                        one line per check run on a commit (ADR-0032): commit, check,
                                       ok, summary, base, at (append-only, like approvals)
+  deployments.jsonl                   one line per deploy: commit, environment, at (ADR-0045)
 
 - **Content-addressed.** `content` is the hash of the canonical declaration without
   `version`, plus its representations. A commit's id is `<seq>-<content>`. Reading a commit
@@ -337,6 +338,23 @@ class CommitStore:
         p = Path(out)
         p.write_text(yaml.safe_dump(self.declaration(domain, commit_id), sort_keys=False, allow_unicode=True))
         return p
+
+    # -- deployments (ADR-0045) ----------------------------------------------------------------------
+    def record_deployment(self, domain: str, commit_id: str, environment: str) -> None:
+        """The deploy floor moved an environment to this commit. Kept with the commits, in git,
+        so what runs survives the environment (the self domains' is rebuilt every run)."""
+        with self._lock(domain) as dirp:
+            self.get(domain, commit_id)
+            self._append(dirp / "deployments.jsonl", {"commit": commit_id, "environment": environment, "at": _now()})
+
+    def deployed(self, domain: str) -> Commit | None:
+        """The commit deployed last, in any environment."""
+        rows = self._lines(self._dir(domain) / "deployments.jsonl")
+        return self.get(domain, rows[-1]["commit"]) if rows else None
+
+    def running(self, domain: str) -> Commit | None:
+        """What a domain runs from (ADR-0045): its deployed commit, else its approved `main`."""
+        return self.deployed(domain) or self.main(domain)
 
     def approvals(self, domain: str) -> list[dict[str, Any]]:
         return self._lines(self._dir(domain) / "approvals.jsonl")

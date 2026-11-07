@@ -93,6 +93,8 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--no-seed", action="store_true", help="do not load the declaration's example fixtures "
                     "(never loaded into a composition member's own event log)")
     ap.add_argument("--harness-report", help="harness report JSON (toprope-harness --json) shown in the world map")
+    ap.add_argument("--working-copy", action="store_true", help="with --composition and --kernel-root: run "
+                    "each member from its working-copy file, not from its deployed commit (ADR-0045)")
     return ap
 
 
@@ -151,6 +153,16 @@ def _kernel(args):
                        tlc_jar=os.environ.get("TOPROPE_TLC_JAR") or None)
 
 
+def running_commits(args):
+    """The commit store members run from (ADR-0045): the kernel's, unless --working-copy."""
+    if not getattr(args, "kernel_root", None) or getattr(args, "working_copy", False):
+        return None
+    from pathlib import Path
+
+    from ...commits import CommitStore
+    return CommitStore(Path(args.kernel_root) / ".toprope" / "commits")
+
+
 def member_events(c, name: str):
     """A member's event log: `<the member declaration's directory>/events` (ADR-0037)."""
     return (c.root / c.spec.members[name].declaration).parent / "events"
@@ -163,7 +175,7 @@ def _member(args, identity, services):
 
     from ...compose import assemble, check_composition, load_composition
     try:
-        c = load_composition(args.composition)
+        c = load_composition(args.composition, running_commits(args))
     except ValueError as e:
         raise SystemExit(f"error {e}") from None
     issues = check_composition(c)

@@ -218,6 +218,14 @@ M0b's UI), checking the non-developer claim (M1 Phase B, M2), TLC modeling creat
   check's `in_flight` tests every object in use against the new invariants: an object in flight
   that breaks one is an error, a finished one a warning, as in log replay.
 
+## The self domains run their deployed commit (#PR, ADR-0045, link: ③ ①)
+
+From the integrated review of #143. A deploy is recorded with the commits
+(`.toprope/commits/<domain>/deployments.jsonl`, in git). With `--kernel-root`, `toprope-run` and
+`toprope-server --composition` run each member's deployed commit, else its approved `main`, so
+a working-copy edit changes nothing that runs until it is deployed, and events carry the
+commit's sequence number as `domain_version`. `--working-copy` runs the files.
+
 ## M0b, M2 to M5
 
 Not started. Plans: [`roadmap.md`](roadmap.md).
@@ -246,8 +254,8 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    on `commit`, Authoring commit `5-c8fd1b8fc98be17c`), replaced by typed evidence that must
    resolve, cited with `cite_evidence` (#124, in the pstack umbrella).
 6. ADR-0042's follow-up work (accepted 2026-11-07): done: `domain_version` with the deployment
-   log gives the rule in force when an event was decided, documented (the self domains are the
-   exception, see *Left from reviews*); read visibility defined in the schema (`read`, refused
+   log gives the rule in force when an event was decided, documented, the self domains too
+   (ADR-0045, #PR); read visibility defined in the schema (`read`, refused
    until M0b); in M0b, deadlines with timers, read visibility enforced by the query and MCP
    read tools, an observed time on facts from adapters, identity mappings on adapters; in M2,
    `confirmed_at` and `review_by` warnings; in the M4 spec, goals, expected outcomes and the
@@ -260,12 +268,6 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 
 Each item names the PR it came from and the review date. The PR that resolves an item deletes
 it; each release's cleanup PR handles items older than one release.
-
-- The self domains run from their working-copy declarations (`toprope-run --composition` reads
-  `domains/*/…domain.yaml`, `version: 1`), not from the deployed commit. Their events all carry
-  `domain_version` 1, so they cannot tell which approved commit decided them, and a change takes
-  effect in the files before it is approved. Running the composition from each member's deployed
-  commit would close both (found documenting ADR-0042 §5, 2026-11-07)
 
 - Nothing keeps the author of a commit from approving it: `approve_commit` checks only that a
   person approves (`requires: human`) a commit whose checks passed. Charter §5 says "no
