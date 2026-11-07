@@ -407,3 +407,25 @@ def test_the_kernel_confirms_every_proposed_element_at_once(tmp_path):
     assert not again["ok"] and "nothing to confirm" in again["error"]
 
 
+
+
+def test_a_committed_domain_refuses_a_proposal_that_breaks_its_declaration(tmp_path):
+    # #124: an action proposed before the reply it names made the working copy invalid, and the
+    # generated tools then refused to load it at all, so nothing could undo the proposal.
+    (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump(
+        {"domain": "d.domain.yaml", "sources": [{"id": "docs", "kind": "records", "path": "docs"}]}))
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "a.md").write_text("# A\nrules\n")
+    (tmp_path / "d.domain.yaml").write_text(yaml.safe_dump(schema_doc_domain(), sort_keys=False))
+    ws = Workspace(tmp_path)
+    ws.commit()
+    cite = {"description": "Cite.", "actor": ["pm"], "target": "Experiment",
+            "effects": [{"call": "validate", "with": {"declaration": "target.name"}, "reply": "record_it"}]}
+    before = ws.domain_path.read_text()
+    with pytest.raises(AuthoringError, match="unknown-reply"):
+        ws.propose("actions.cite", cite, "docs:docs/a.md#L1-L2")
+    assert ws.domain_path.read_text() == before                          # nothing written
+    ws.propose("actions.record_it", {"description": "Record.", "actor": ["external:kernel"],
+                                     "target": "Experiment"}, "docs:docs/a.md#L1-L2")
+    out = ws.propose("actions.cite", cite, "docs:docs/a.md#L1-L2")       # in dependency order
+    assert not [i for i in out["issues"] if i["code"] == "unknown-reply"]
