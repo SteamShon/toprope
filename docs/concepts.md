@@ -60,6 +60,15 @@ flowchart LR
   enforces. Toprope's own Authoring and Delivery are declared domains, so the change loop is
   itself a run loop of those domains.
 
+## Time
+
+Every event records when it was recorded (`at`) and which version of the declaration decided it
+(`domain_version`); a deployment records when each version went live. So "was this decided under
+the rule in force then?" has an answer for a deployed domain, without a second clock on every
+event (ADR-0042). The self domains do not have it yet, because they run from their working-copy
+declarations. Facts that come from outside will carry the time they were observed (adapters,
+M0b); rules that take effect at a future date are not supported.
+
 ## How the parts depend on each other
 
 - The **gate** needs the declaration and the state, and nothing else. It does not read the

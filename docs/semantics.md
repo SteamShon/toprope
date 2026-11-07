@@ -111,6 +111,15 @@ Recording:
   handoff issued it; ADR-0024), `domain_version`, `payload`, and `permissions`: the actor's
   roles, the principal's, and the grant's scope (actions, targets, expiry) in force when it ran
   (ADR-0041). Events written before it have no `permissions`.
+- **Which rule decided an event.** `at` is when the event was recorded. `domain_version` is the
+  version of the declaration that decided it. A domain served from a deployment
+  (`toprope-server`, from the environment's current build) runs the declaration of an approved
+  commit with `version` set to the commit's sequence number, and the environment's
+  `deployments.jsonl` records when each build, and so each commit, went live. Together they say
+  which rule was in force when an event was decided (ADR-0042). The self domains are the
+  exception for now: `toprope-run --composition` reads their working-copy declarations, whose
+  `version` stays 1. A fact's time in the world, as distinct from when Toprope recorded it,
+  arrives with the adapters (M0b).
 - Projection is a pure fold over events. Replaying the same events yields the same state
   (replay parity).
 - Old events are read through upcasters (ADR-0012). They are never rewritten.
