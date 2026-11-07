@@ -318,8 +318,6 @@ it; each release's cleanup PR handles items older than one release.
   dispatches; the PR needs one more commit before it can merge. A push token that triggers
   workflows (a GitHub App or a fine-grained token, set up by the maintainer) would remove the
   step (#96, 2026-11-06)
-- The kernel reference generator reads private `argparse` attributes (`_actions`,
-  `_SubParsersAction`); a Python release that renames them breaks it (#89, 2026-11-06)
 
 ## Open questions
 
