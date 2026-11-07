@@ -27,6 +27,7 @@ uv run toprope-harness --composition self.composition.yaml --regen-check
 |---|---|
 | **Small world** | Grown from the fixtures by applying allowed transitions (bounded BFS). One person per role, named after `world.actors`. Matrix states never reached are reported as `unreachable`. |
 | **Cell tests** | Every (state, action, role) cell, from a world instance in that state. Expected outcomes come from the declared matrix, actor rules and preconditions, read directly rather than through the interpreter's decision, so these tests also check the oracle against the declaration. |
+| **Param tests** | Each allowed cell, on every instance in its state, with one param of a finite type (boolean, enum, integer) set to each other candidate value. Expected outcomes come from the declaration; an invariant guard is a finding. A cell test takes the default params only, so a move that breaks an invariant only with another value (a kernel reply with `false`) went unseen until TLC found two (ADR-0043). |
 | **Precondition tests** | For each precondition: an instance on which it is the first to fail (a boundary instance, such as `E-bare`). When no world instance is one, it is made from one by setting a single property or param the precondition reads to another value of its type, or to an actor's id, keeping every invariant. |
 | **Create tests** | Every create action, for every role. |
 | **Invariant checks** | After every step at every level. An `invariant-guard` outcome is reported as an invariant finding: the declaration allows a transition its invariants forbid. |
