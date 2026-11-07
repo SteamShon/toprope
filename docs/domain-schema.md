@@ -20,6 +20,7 @@ readable schemas: [`schema/domain.v1.schema.json`](../schema/domain.v1.schema.js
 | `handoffs` | [Handoffs](#handoffs) | implemented (M0a, ADR-0024) |
 | composition files (`*.composition.yaml`: members and wiring) | [Handoffs](#handoffs) | implemented (M0a, ADR-0026) |
 | `approvals` on actions | [Approvals](#approvals) | defined; M0b |
+| `approval: {distinct_from_author}` | the commit's author may not approve it (ADR-0046) | implemented; off by default |
 | `read` on objects and properties | [Read visibility](#read-visibility-adr-0042) | defined; M0b |
 | `invariants` with `scope: cross` + `reservations` | [Reservations](#cross-aggregate-invariants-and-reservations) | defined; M0b |
 | `timers`, scenario `advance` steps | [Timers](#timers) | defined; M0b |

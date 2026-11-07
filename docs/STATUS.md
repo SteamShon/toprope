@@ -260,6 +260,13 @@ exists, fields no action sets), so the instances stay independent. Nothing of th
 is left out now. A third seeded break, read through a link (an Element citing no Source), must be
 found by the `tla` job.
 
+## The author does not approve, where a domain says so (#PR, ADR-0046)
+
+A review leftover (#102), as the researcher chose: `approval: {distinct_from_author: true}` in a
+declaration makes the commit store refuse an approval by the commit's author, with the rule read
+from `main`. Off by default, and off for the self domains in M1 (one owner); turn it on with a
+second owner.
+
 ## M0b, M2 to M5
 
 Not started. Plans: [`roadmap.md`](roadmap.md).
@@ -298,10 +305,6 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 Each item names the PR it came from and the review date. The PR that resolves an item deletes
 it; each release's cleanup PR handles items older than one release.
 
-- Nothing keeps the author of a commit from approving it: `approve_commit` checks only that a
-  person approves (`requires: human`) a commit whose checks passed. Charter §5 says "no
-  self-approval"; ADR-0032 keeps one approver in M1. Decide whether to enforce author ≠
-  approver before M2, when a domain gets more than one owner (#102, 2026-11-06)
 - `propose_element` on a path that is not an element (for example `glossary.<term>`,
   `scenarios.<id>`, `world.fixtures`) writes the value without provenance instead of failing, so
   such a change shows only in the commit's review diff; #147's Delivery change has three

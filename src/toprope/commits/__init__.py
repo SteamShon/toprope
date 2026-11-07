@@ -356,6 +356,20 @@ class CommitStore:
         """What a domain runs from (ADR-0045): its deployed commit, else its approved `main`."""
         return self.deployed(domain) or self.main(domain)
 
+    def _not_self_approved(self, domain: str, c: Commit, main: Commit | None, approver: str) -> None:
+        """ADR-0046: where the domain's rule in force says so (its approved `main`; before the
+        first approval, the commit's own declaration), the commit's author may not approve it.
+        A commit that names no author cannot be told apart from its approver: refused."""
+        rule = self.domain(domain, (main or c).id).approval
+        if not rule.distinct_from_author:
+            return
+        if not c.author:
+            raise CommitError(f"{c.id} names no author, so its approver cannot be told apart: this "
+                              "domain's approver must not be the commit's author (ADR-0046)")
+        if c.author == approver:
+            raise CommitError(f"{approver} wrote {c.id}: this domain's approver must not be the "
+                              "commit's author (ADR-0046); ask another approver")
+
     def approvals(self, domain: str) -> list[dict[str, Any]]:
         return self._lines(self._dir(domain) / "approvals.jsonl")
 
@@ -534,6 +548,7 @@ class CommitStore:
             if main is not None and self.is_ancestor(domain, c.id, main.id):
                 raise CommitError(f"{c.id} is already in main at {main.id}, which supersedes it; "
                                   "approve a newer commit")
+            self._not_self_approved(domain, c, main, approver)
             if main is None or self.is_ancestor(domain, main.id, c.id):
                 body = self._body(domain, c.id)               # fast-forward: main takes this commit
                 self._check(c.id, body["domain"])               # (a resolved merge comes this way too)
