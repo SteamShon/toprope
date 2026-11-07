@@ -426,7 +426,7 @@ actions:
     source:
       kind: record
       ref: records:docs/commits.md#L106-L125
-    status: proposed
+    status: confirmed
   record_commit:
     description: Record the commit the kernel made.
     actor:
@@ -855,7 +855,7 @@ actions:
     source:
       kind: record
       ref: records:docs/commits.md#L106-L125
-    status: proposed
+    status: confirmed
   cite_evidence:
     description: 'Cite evidence for a commit''s change: an interview line, a source
       chunk, a check recorded on the commit, a stored event, or an approval run. The
@@ -888,7 +888,7 @@ actions:
     source:
       kind: record
       ref: records:docs/commits.md#L106-L125
-    status: proposed
+    status: confirmed
 transitions:
   Source:
     field: stage
@@ -1122,13 +1122,13 @@ transitions:
           source:
             kind: record
             ref: records:docs/commits.md#L106-L125
-          status: proposed
+          status: confirmed
         cite_evidence:
           to: recorded
           source:
             kind: record
             ref: records:docs/commits.md#L106-L125
-          status: proposed
+          status: confirmed
   Answer:
     field: stage
     initial: recorded
