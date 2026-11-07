@@ -15,7 +15,8 @@ import argparse
 import subprocess
 import sys
 
-PATTERNS = (".toprope/commits/*/*.jsonl", "domains/*/*.jsonl", "domains/*/events/*.jsonl")
+PATTERNS = (".toprope/commits/*/*.jsonl", ".toprope/approval-runs.jsonl", "domains/*/*.jsonl",
+            "domains/*/events/*.jsonl")
 
 
 def _git(*args: str) -> subprocess.CompletedProcess:
@@ -23,7 +24,7 @@ def _git(*args: str) -> subprocess.CompletedProcess:
 
 
 def files(rev: str) -> set[str]:
-    out = _git("ls-tree", "-r", "--name-only", rev, "--", ".toprope/commits", "domains")
+    out = _git("ls-tree", "-r", "--name-only", rev, "--", ".toprope", "domains")
     import fnmatch
     return {p for p in out.stdout.splitlines() if any(fnmatch.fnmatch(p, pat) for pat in PATTERNS)}
 
