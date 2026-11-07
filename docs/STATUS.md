@@ -226,6 +226,17 @@ From the integrated review of #143. A deploy is recorded with the commits
 a working-copy edit changes nothing that runs until it is deployed, and events carry the
 commit's sequence number as `domain_version`. `--working-copy` runs the files.
 
+## A creating action sets every required property (#151)
+
+A review leftover from #86. The validator warns (`unset-on-create`) when a create action leaves a
+required property to an optional param or to nothing. It is a warning, not an error, so a
+declaration already running with it can still be fixed through the loop. It found one:
+Authoring's `add_source` leaves `Source.local_only` unset when the param is left out. The fix,
+`local_only` optional (absent means not local-only, as the source spec reads it), was confirmed,
+approved, deployed and verified by the researcher (approval run 42363055975): Authoring
+`10-01b4e6464862bbf9`, its `tla` check passed in the approval (219312 states). It is the first
+deploy recorded with the commits (ADR-0045): the events after it carry `domain_version` 10.
+
 ## M0b, M2 to M5
 
 Not started. Plans: [`roadmap.md`](roadmap.md).
@@ -277,9 +288,6 @@ it; each release's cleanup PR handles items older than one release.
   another stream (for example by a newly created object) is not shown (#86, 2026-11-06)
 - The effect-resolution summary is written twice, in `toprope-run` (`followed`) and in the
   regeneration check (`_one`); factor one helper onto `Outbox` (#86, 2026-11-06)
-- Neither the validator nor the harness catches a creating action that leaves a required
-  property unset (`record_commit` made Commits without `domain_id`; found running the loop)
-  (#86, 2026-11-06)
 - `propose_element` on a path that is not an element (for example `glossary.<term>`,
   `scenarios.<id>`, `world.fixtures`) writes the value without provenance instead of failing, so
   such a change shows only in the commit's review diff; #147's Delivery change has three

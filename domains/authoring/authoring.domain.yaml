@@ -27,6 +27,7 @@ objects:
         type: string
       local_only:
         type: boolean
+        optional: true
       sha256:
         type: string
         optional: true
@@ -35,9 +36,8 @@ objects:
         - added
         - fetched
     source:
-      kind: interview
-      ref: interview:domains/authoring/interview.jsonl#L5
-      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+      kind: record
+      ref: records:docs/adr/0014-interview-design.md#L11-L41
     status: confirmed
   Question:
     description: A question in a stage's bundle, for the owner to answer.

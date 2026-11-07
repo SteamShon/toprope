@@ -131,6 +131,8 @@ def validate_domain(d: Domain) -> list[Issue]:
                     add(Issue("unknown-path", f"{where}.effects", f"{key}: {msg}"))
                 if isinstance(value, str):  # effect values are check-language expressions
                     issues += _check_expr(d, value, f"{where}.effects.{key}", a.object_type, set(a.params))
+        if a.creates is not None and a.creates in d.objects:
+            issues += _unset_on_create(d, name, a, where)
         states = _states(d, a.object_type)
         if a.applies_in and states is not None:
             for s in a.applies_in:
@@ -294,6 +296,26 @@ def _compatible(t: str, spec) -> bool:
     if spec.ref is not None or spec.enum is not None:
         return t == "string"
     return t == spec.type or (t == "integer" and spec.type == "number")
+
+
+def _unset_on_create(d: Domain, name: str, a: Any, where: str) -> list[Issue]:
+    """A creating action must set every required property: from a required param of the same
+    name, or an effect. Otherwise it makes objects without it (#86: Commits without
+    `domain_id`). A warning, so a declaration already running with it can still be fixed."""
+    tr = d.transitions.get(a.creates)
+    set_by_effects = {k.split(".", 1)[1] if k.startswith(("target.", "new.")) else k
+                      for e in a.effects for k in (e.set or {})}
+    out = []
+    for prop, spec in d.objects[a.creates].properties.items():
+        if spec.optional or prop == "id" or (tr is not None and prop == tr.field):
+            continue
+        given = prop in a.params and not a.params[prop].optional
+        if not given and prop not in set_by_effects:
+            how = "an optional param" if prop in a.params else "nothing"
+            out.append(Issue("unset-on-create", f"{where}.params", f"{name} creates a {a.creates} without its "
+                             f"required `{prop}` ({how} sets it): make the param required, set it in an "
+                             "effect, or make the property optional", severity="warning"))
+    return out
 
 
 def _check_call(d: Domain, name: str, a, k: int, e) -> list[Issue]:
