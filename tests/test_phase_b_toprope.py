@@ -12,6 +12,9 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "experiments/m1"))
+from phase_b.agent import ToolError  # noqa: E402
+from phase_b.baseline import baseline_root  # noqa: E402
+from toprope.commits import CommitStore  # noqa: E402
 
 from phase_b.backend import Backend
 from phase_b.toolserver import ToolSpec, build_tools
@@ -45,7 +48,7 @@ class Editor(Backend):
 
 @pytest.fixture(scope="module")
 def materials(tmp_path_factory):
-    return build_sandbox(ROOT, tmp_path_factory.mktemp("m") / "toprope")
+    return build_sandbox(baseline_root(ROOT), tmp_path_factory.mktemp("m") / "toprope")
 
 
 def test_the_sandbox_holds_the_approved_domains_and_two_callers(materials):
@@ -54,7 +57,7 @@ def test_the_sandbox_holds_the_approved_domains_and_two_callers(materials):
     assert editor["grant"]["actions"] == ["propose_element"]                    # the editor only proposes
     assert next(c for c in ids.values() if c["kind"] == "person")["id"] == STANDIN
     from toprope.commits import CommitStore
-    store = CommitStore(ROOT / ".toprope/commits")
+    store = CommitStore(baseline_root(ROOT) / ".toprope/commits")
     for d in ("authoring", "delivery"):
         approved = store.declaration(d, store.main(d).id)                     # the commit the binding names
         assert yaml.safe_load((materials / f"domains/{d}/{d}.domain.yaml").read_text()) == approved
@@ -92,9 +95,44 @@ def test_a_passing_change_goes_through_the_declared_actions(materials, tmp_path)
     assert Sandbox(arm.sb.root).commits().approvals("delivery")[-1]["approver"] == STANDIN
 
 
+class Writer(Editor):
+    """Writes the change into the working copy directly, as a person editing the file would:
+    since #124 the editor's tools refuse a proposal that adds an error, so only this way does a
+    declaration with errors reach the check."""
+
+    def converse(self, system, user, tools, transcript, max_turns=40):
+        path = self.arm.sb.declaration("delivery")
+        doc = yaml.safe_load(path.read_text())
+        self.change(doc["actions"]["verify"])
+        path.write_text(yaml.safe_dump(doc, sort_keys=False))
+        return "written"
+
+
+def test_a_proposal_that_adds_an_error_is_refused_to_the_editor(materials, tmp_path):
+    refused = []
+
+    class Refused(Editor):
+        def converse(self, system, user, tools, transcript, max_turns=40):
+            try:
+                return super().converse(system, user, tools, transcript, max_turns)
+            except ToolError as e:                   # the agent loop hands a tool error to the model
+                refused.append(str(e))
+                return "refused"
+
+    bad = {"id": "x", "check": "target.nonexistent == true", "reason": "r"}
+    arm = TopropeArm(materials, tmp_path / "w", Refused(lambda a: a.update(preconditions=[bad])))
+    out = tmp_path / "w/seq-01"
+    arm.edit(REQ, out)
+    assert refused and "refuse a declaration with errors" in refused[0] and "nonexistent" in refused[0]
+    assert arm.check(REQ, out).data["changed_domains"] == []
+    assert "nonexistent" not in arm.sb.declaration("delivery").read_text()
+
+
 def test_a_flagged_change_is_overridden_and_the_build_floor_still_holds(materials, tmp_path):
     bad = {"id": "x", "check": "target.nonexistent == true", "reason": "r"}
-    arm = TopropeArm(materials, tmp_path / "w", Editor(lambda a: a.update(preconditions=[bad])))
+    writer = Writer(lambda a: a.update(preconditions=[bad]))
+    arm = TopropeArm(materials, tmp_path / "w", writer)
+    writer.arm = arm
     out = tmp_path / "w/seq-01"
     before = arm.sb.env("delivery").current()["commit"]
     arm.edit(REQ, out)
@@ -189,10 +227,33 @@ def test_the_materials_command_builds_both_arms_from_the_approved_commits(tmp_pa
 
     from toprope.commits import CommitStore
     runner.main(["materials", "--out", str(tmp_path / "arms")])
-    store = CommitStore(ROOT / ".toprope/commits")
+    store = CommitStore(baseline_root(ROOT) / ".toprope/commits")
     for d in ("authoring", "delivery"):
         approved = store.declaration(d, store.main(d).id)
         assert yaml.safe_load((tmp_path / f"arms/structured/{d}/{d}.domain.yaml").read_text()) == approved
         assert yaml.safe_load((tmp_path / f"arms/toprope/domains/{d}/{d}.domain.yaml").read_text()) == approved
     assert (tmp_path / "arms/structured/toprope-self.composition.yaml").exists()
     assert not list((tmp_path / "arms").rglob(".lock"))
+
+
+def test_every_element_the_binding_names_exists_at_the_baseline():
+    """The binding was written against authoring@4; the arms start from the baseline in
+    `phase_b.baseline`. Scoring matches findings to these names, so each must exist there."""
+    from phase_b.baseline import BASELINE
+    store = CommitStore(baseline_root(ROOT) / ".toprope/commits")
+    keys = {f"{d}/{k}" for d, c in BASELINE.items() for k in store.diff(d, None, c)["added"]}
+    binding = yaml.safe_load((ROOT / "experiments/m1/instruments/binding.yaml").read_text())
+    assert binding["domain_version"] == ", ".join(f"{d}@{c}" for d, c in BASELINE.items())
+    assert [e for b in binding["bindings"] for e in b.get("elements", []) if e not in keys] == []
+
+
+def test_the_committed_materials_are_built_from_the_baseline(tmp_path):
+    """`experiments/m1/arms/` is what `materials` builds from the baseline revisions, whatever the
+    repository's self domains are now."""
+    from phase_b.arms import tree_hash
+    from phase_b.toprope_arm import export_toolchain
+    base = baseline_root(ROOT)
+    build_sandbox(base, tmp_path / "toprope")
+    export_toolchain(base, tmp_path / "structured")
+    for arm in ("toprope", "structured"):
+        assert tree_hash(tmp_path / arm) == tree_hash(ROOT / "experiments/m1/arms" / arm), arm

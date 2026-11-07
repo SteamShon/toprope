@@ -30,6 +30,7 @@ from phase_b.arms import (
     parse_findings,
     render_skill,
     structured_arm,
+    tree_hash,
 )
 from phase_b.backend import (
     ApiBackend,
@@ -66,8 +67,9 @@ def instruments(tmp: Path, keep: int | None = None) -> Path:
         {"seq": s, "problem": "none", "note": f"{SEALED} key {s}"} for s in seqs]}))
     (d / "binding.yaml").write_text(yaml.safe_dump({"bindings": [
         {"seq": s, "elements": [f"{SEALED}/action:x{s}"]} for s in seqs]}))
+    shutil.copy(real / "run-protocol.md", d / "run-protocol.md")
     files = {f.name: {"sha256": hashlib.sha256(f.read_bytes()).hexdigest(), "frozen_at": "t"}
-             for f in d.glob("*.yaml")}
+             for f in [*d.glob("*.yaml"), d / "run-protocol.md"]}
     (d / "FROZEN.json").write_text(json.dumps({"files": files}))
     return d
 
@@ -454,3 +456,38 @@ def test_a_tool_spec_names_its_root_absolutely(tmp_path, monkeypatch):
     from phase_b.toolserver import build_tools
     (listing,) = [t for t in build_tools(ToolSpec.loads(spec.dumps())) if t.name == "list_files"]
     assert listing.fn() == ["f.md"]
+
+
+def test_the_nl_arm_refuses_a_skill_rendered_from_other_declarations(tmp_path, monkeypatch):
+    m1 = tmp_path / "m1"
+    (m1 / "arms/structured/authoring").mkdir(parents=True)
+    (m1 / "arms/structured/authoring/authoring.domain.yaml").write_text("domain: authoring\n")
+    monkeypatch.setattr(runner, "M1", m1)
+    inst = instruments(tmp_path)
+    args = ["arm", "nl", "--model", "m", "--out", str(tmp_path / "run"), "--instruments", str(inst),
+            "--no-probes", "--seqs", "1"]
+    with pytest.raises(SystemExit, match="no NL skill"):
+        runner.main(args, backend=api()[0])
+    materials(m1 / "arms").rename(m1 / "arms/nl")
+    with pytest.raises(SystemExit, match="not rendered from"):            # no stamp: rendered before stamps
+        runner.main(args, backend=api()[0])
+    (m1 / "arms/nl.rendered-from").write_text(tree_hash(m1 / "arms/structured") + "\n")
+    (m1 / "arms/structured/authoring/authoring.domain.yaml").write_text("domain: authoring\nversion: 9\n")
+    with pytest.raises(SystemExit, match="not rendered from"):            # the declarations moved on
+        runner.main(args, backend=api()[0])
+    (m1 / "arms/nl.rendered-from").write_text(tree_hash(m1 / "arms/structured") + "\n")
+    runner.main(args, backend=api()[0])
+    assert json.loads((tmp_path / "run/nl/manifest.json").read_text())["done"] == [1]
+
+
+def test_rendering_stamps_the_declarations_it_read(tmp_path, monkeypatch):
+    decl = tmp_path / "decl"
+    (decl / "authoring").mkdir(parents=True)
+    (decl / "authoring/authoring.domain.yaml").write_text("domain: authoring\n")
+    b, _ = api([tool_use("write_file", {"path": "SKILL.md", "content": "# Skill"}, "a"),
+                tool_use("write_file", {"path": "EXAMPLES.md", "content": "# Examples"}, "b"), "written"])
+    monkeypatch.setattr(runner, "user_memory", lambda: None)
+    runner.main(["render", "--declarations", str(decl), "--out", str(tmp_path / "arms/nl")], backend=b)
+    assert (tmp_path / "arms/nl.rendered-from").read_text().strip() == tree_hash(decl)
+    assert sorted(p.name for p in (tmp_path / "arms/nl").iterdir()) == ["EXAMPLES.md", "SKILL.md"]
+

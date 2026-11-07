@@ -104,6 +104,13 @@ def export_toolchain(root: Path, out: Path) -> Path:
     return out
 
 
+def unmet(out: dict[str, Any]) -> list[str]:
+    """What an accepted action set off and did not get done: a kernel call that failed or was
+    refused, or a handoff that did not go through (`toprope-run` exits 0 for the action itself)."""
+    return [f"{t.get('kernel') or t.get('to')}: {t.get('status')}" + (f" ({t['error']})" if t.get("error") else "")
+            for t in out.get("then") or [] if t.get("status") != "ok"]
+
+
 def toprope_run() -> list[str]:
     exe = Path(sys.executable).parent / "toprope-run"
     if exe.exists():
@@ -134,7 +141,7 @@ class Sandbox:
 
     def ok(self, who: str, member: str, domain: str, *args: str) -> dict[str, Any]:
         out = self.run(who, member, domain, *args)
-        if out.get("status") != "ok":
+        if out.get("status") != "ok" or unmet(out):
             raise RuntimeError(f"{args[0]} {args[1] if len(args) > 1 else ''} failed: {json.dumps(out)[:1500]}")
         return out
 
@@ -185,6 +192,10 @@ def toprope_tools(root: Path, ctx: dict[str, Any]) -> list[Tool]:
                      "--cites", cites[d], "--value", value)
         if out.get("status") != "ok":
             raise ToolError(json.dumps(out, ensure_ascii=False)[:3000])
+        if failed := unmet(out):
+            # The action was accepted, but the kernel refused to write the proposal (for example, a
+            # committed domain's tools refuse a declaration with errors, #124): the editor is told.
+            raise ToolError("the proposal was not written: " + "; ".join(failed))
         return {"proposed": eid, "path": path, "element": sb.get("authoring", d, eid)}
 
     s = {"type": "string"}

@@ -40,7 +40,10 @@ def instruments(tmp: Path) -> Path:
     (d / "change-requests.yaml").write_text(yaml.safe_dump(cr))
     (d / "change-key.yaml").write_text(yaml.safe_dump({"entries": list(KEY.values())}))
     (d / "binding.yaml").write_text(yaml.safe_dump({"bindings": list(BINDING.values())}))
-    files = {f.name: {"sha256": hashlib.sha256(f.read_bytes()).hexdigest(), "frozen_at": "t"} for f in d.glob("*.yaml")}
+    shutil.copy(real / "run-protocol.md", d / "run-protocol.md")
+    shutil.copy(real / "run-protocol.md", d / "run-protocol.md")
+    files = {f.name: {"sha256": hashlib.sha256(f.read_bytes()).hexdigest(), "frozen_at": "t"}
+             for f in [*d.glob("*.yaml"), d / "run-protocol.md"]}
     (d / "FROZEN.json").write_text(json.dumps({"files": files}))
     return d
 

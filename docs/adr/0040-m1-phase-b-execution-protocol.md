@@ -52,8 +52,11 @@ and the key is in git.
      and every conversation is written as it happens.
    - **The results come back as a PR.** The researcher commits the run directory in their own
      PR.
-3. **The arms start from the same approved models**, `authoring@4-b0c8834e25d9bbc7` and
-   `delivery@1-584aaeea5e686ee8`:
+3. **The arms start from the same approved models**, `authoring@9-b4ec65433222f096` and
+   `delivery@1-584aaeea5e686ee8` (amended 2026-11-07 by SteamShon: first `authoring@4`, which
+   today's harness finds an invariant break in, so the deploy floor refuses it; `@9` is the first
+   approved commit after the fix, and from `@4` to `@9` elements were only added. The binding's
+   `domain_version` was amended to match):
    - **NL arm:** a SKILL.md with examples, rendered from the declarations by a fresh agent
      that has never seen the key.
    - **Structured-spec arm:** the declarations and the composition's handoffs, as text.

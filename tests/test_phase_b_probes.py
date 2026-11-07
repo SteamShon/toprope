@@ -15,6 +15,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "experiments/m1"))
+from phase_b.baseline import baseline_root  # noqa: E402
 
 from phase_b import run as runner
 from phase_b.agent import ToolError, Transcript
@@ -37,7 +38,7 @@ INSTRUMENTS = ROOT / "experiments/m1/instruments"
 @pytest.fixture(scope="module")
 def worlds(tmp_path_factory):
     base = tmp_path_factory.mktemp("worlds")
-    situations = build_worlds(ROOT, export_toolchain(ROOT, base / "toolchain"), base / "worlds")
+    situations = build_worlds(baseline_root(ROOT), export_toolchain(baseline_root(ROOT), base / "toolchain"), base / "worlds")
     return base / "worlds", situations, base / "toolchain"
 
 
