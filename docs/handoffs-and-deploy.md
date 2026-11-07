@@ -73,6 +73,17 @@ enforces the **fixed floor** (ADR-0022, ADR-0029), which no declaration can weak
 
 Refusals are logged in `deployments.jsonl` next to the deploys.
 
+### Probes: the deployed commit in use
+After a deploy, the kernel's `probe` service (`domain`, `commit`) checks the commit where it
+runs, and records the result on the commit as the `probes` check:
+- the environment runs this commit's build, and the floor's taint checks still hold (the same
+  declaration, the same toolchain);
+- the deployed declaration's scenarios pass at the execution level;
+- every object in the deployed store, as real use left it, meets every invariant (`in_use`).
+
+A person verifies a deployment only after its probes passed: a verification acts on what the
+probes found, not on a checkbox. A new deploy clears the earlier result.
+
 ## Limits (ADR-0024)
 - Delivery is in-process only: `toprope-server` does not send handoffs yet (M0b).
 - `--approver` is self-declared in the local adapter. After the M1 switch-over, approval is a

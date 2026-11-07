@@ -125,3 +125,31 @@ def test_a_terminal_state_without_a_matrix_row_is_not_stranded(tmp_path):
     del raw["transitions"]["Experiment"]["matrix"]["decided"]         # still a valid state, just no row
     st, env, c, b = committed(tmp_path, raw)
     assert env.stranded(Domain.model_validate(raw)) == []
+
+
+def test_probes_check_the_deployed_commit_in_use(tmp_path):
+    """`verify` acts on what the probes found, not on a checkbox: the environment runs this
+    commit's build, its scenarios pass there, and the objects in use meet every invariant."""
+    st, env, c, b = committed(tmp_path, schema_doc_domain())
+    before = env.probe_commit(st, "example", c.id)                      # nothing deployed yet
+    assert before["passed"] is False and "not what this environment runs" in before["summary"]
+    env.deploy_commit(st, "example", c.id, ANA)
+    ok = env.probe_commit(st, "example", c.id)
+    n = len(schema_doc_domain()["scenarios"])
+    assert ok == {"passed": True, "summary": f"passed: {n} of {n} scenario(s) pass; no store yet"}
+    assert st.check_status("example", c.id)["probes"]["ok"] is True
+    m = ReferenceModel(Domain.model_validate(schema_doc_domain()), SQLiteEventStore(str(env.store_path)))
+    m.seed("Experiment", {"id": "E-bad", "status": "running", "planned_days": 1, "guardrails": []})  # no started_at
+    bad = env.probe_commit(st, "example", c.id)
+    assert bad["passed"] is False and bad["summary"].startswith("E-bad: breaks ")
+    assert st.check_status("example", c.id)["probes"]["ok"] is False
+
+
+def test_probe_through_the_kernel(tmp_path):
+    from toprope.kernel import CATALOG
+    from toprope.kernel.services import LocalKernel
+    st, env, c, b = committed(tmp_path, schema_doc_domain())
+    env.deploy_commit(st, "example", c.id, ANA)
+    k = LocalKernel(tmp_path, environment=env, commits=st)
+    assert set(CATALOG["probe"].result) == {"passed", "summary"}
+    assert k.call("probe", {"domain": "example", "commit": c.id})["passed"] is True

@@ -357,6 +357,23 @@ def in_flight(new: Domain, events: EventStore) -> CheckResult:
     return res
 
 
+def in_use(d: Domain, events: EventStore) -> CheckResult:
+    """Every object in a deployed store, as it is now, against every invariant of `d`. The
+    harness checks the moves a declaration allows; this checks the state real use left."""
+    from ..semantics.interpreter import Interpreter
+    res = CheckResult("in_use")
+    states = {s: (evs[0].aggregate, project(evs) or {}) for s, evs in _domain_streams(events)}
+    interp = Interpreter(d, lambda: EPOCH)
+    for stream, (obj, st) in states.items():
+        if obj not in d.objects:
+            res.add("error", stream, f"{obj} is not in the deployed declaration")
+            continue
+        for inv in interp.violated_invariants(obj, st, states.get):
+            res.add("error", stream, f"breaks {inv.id}: {inv.reason}")
+    res.note = f"{len(states)} object(s) checked"
+    return res
+
+
 def log_replay(new: Domain, old: Domain | None, events: EventStore,
                roles_of: Callable[[dict[str, Any], str], tuple[str, ...]] | None = None,
                only: set[str] | None = None) -> CheckResult:
