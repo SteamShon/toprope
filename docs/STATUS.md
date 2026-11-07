@@ -260,7 +260,7 @@ exists, fields no action sets), so the instances stay independent. Nothing of th
 is left out now. A third seeded break, read through a link (an Element citing no Source), must be
 found by the `tla` job.
 
-## Scenarios are elements (#PR)
+## Scenarios are elements (#161)
 
 A review leftover (#86, #147), as the researcher chose: a scenario carries `source` and
 `status` like an action, so an agent's scenario is proposed until a person confirms it, and
