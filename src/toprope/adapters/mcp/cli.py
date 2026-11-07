@@ -146,7 +146,9 @@ def _kernel(args):
     if args.env:
         from ...deploy import LocalEnvironment
         env = LocalEnvironment(args.env)
-    return LocalKernel(args.kernel_root, workspace=ws, environment=env)
+    # TOPROPE_TLC_JAR: the human-request workflow sets it, so approvals there need TLC (ADR-0043)
+    return LocalKernel(args.kernel_root, workspace=ws, environment=env,
+                       tlc_jar=os.environ.get("TOPROPE_TLC_JAR") or None)
 
 
 def member_events(c, name: str):

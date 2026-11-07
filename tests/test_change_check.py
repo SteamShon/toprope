@@ -43,7 +43,7 @@ def history(raw):
 def test_an_unchanged_declaration_passes_every_check_that_runs(base):
     r = change_check(dom(base), dom(copy.deepcopy(base)), events=history(base), examples=10)
     assert r.ok and r.diff["to_review"] == [] and r.diff["interface_bump"] == "none"
-    assert [n for n, c in r.checks.items() if not c.ran] == ["nl"]
+    assert [n for n, c in r.checks.items() if not c.ran] == ["tla", "nl"]     # no TLC jar here
     assert r.checks["log_replay"].note == "0 of 2 past action(s) re-decided; 0 would be blocked"   # nothing affected
     assert problems(r, "log_replay") == []                         # recorded timestamps are not differences
 
@@ -53,7 +53,7 @@ def test_structural_errors_stop_the_checks_that_need_a_valid_model(base):
     raw["transitions"]["Experiment"]["matrix"]["draft"]["approve_experiment"] = "aproved"
     r = change_check(dom(raw), dom(base), events=history(base), examples=10)
     assert not r.ok and ("error", "transitions.Experiment.matrix.draft.approve_experiment") in problems(r, "structural")
-    assert [n for n, c in r.checks.items() if not c.ran] == ["semantic", "scenarios", "harness", "log_replay", "nl"]
+    assert [n for n, c in r.checks.items() if not c.ran] == ["semantic", "scenarios", "harness", "tla", "log_replay", "nl"]
 
 
 def test_semantic_conflicts_newly_unreachable_states_and_dead_actions(base):
@@ -284,3 +284,43 @@ def test_a_served_composition_gives_the_kernel_each_member_s_own_log(tmp_path):
                            store="memory", store_dir=None, no_seed=True)
     _member(args, StaticIdentity({}), k)
     assert sorted(k.domain_events) == ["authoring", "delivery"]
+
+
+@pytest.fixture
+def fake_tlc(monkeypatch):
+    """TLC's run replaced: the (exit status, stdout) it gives, and the commands it got."""
+    import toprope.tla.tlc as tlc
+    given = {"out": (0, "37 distinct states found, 0 states left on queue.\n"), "cmds": []}
+    real = subprocess.run
+
+    def run(cmd, *a, **kw):
+        if cmd[0] != "java":
+            return real(cmd, *a, **kw)
+        given["cmds"].append(cmd)
+        code, out = given["out"]
+        return subprocess.CompletedProcess(cmd, code, out, "")
+    monkeypatch.setattr(tlc.subprocess, "run", run)
+    return given
+
+
+def test_with_a_tlc_jar_the_change_check_model_checks(base, fake_tlc):
+    r = change_check(dom(base), dom(copy.deepcopy(base)), examples=10, tlc="tla2tools.jar")
+    assert r.checks["tla"].ran and r.checks["tla"].ok and fake_tlc["cmds"][0][3] == "tla2tools.jar"
+    assert r.checks["tla"].note.startswith("checked; 37 distinct states")
+    fake_tlc["out"] = (255, "Parse error\n")
+    bad = change_check(dom(base), dom(copy.deepcopy(base)), examples=10, tlc="tla2tools.jar")
+    assert not bad.ok and [p.message for p in bad.checks["tla"].problems] == ["error (exit 255)"]
+    fake_tlc["out"] = (0, "1000000 distinct states found\n")                # a bound reached is no pass
+    assert not change_check(dom(base), None, examples=10, tlc="tla2tools.jar").checks["tla"].ok
+
+
+def test_a_kernel_with_tlc_approves_only_a_commit_tlc_checked(tmp_path, base, fake_tlc):
+    from toprope.kernel.services import LocalKernel
+    st = CommitStore(tmp_path / ".toprope" / "commits")
+    c, _ = st.commit(write(tmp_path / "d.yaml", base))
+    LocalKernel(tmp_path, commits=st, harness_examples=10).call("change_check", {"domain": "example", "commit": c.id})
+    k = LocalKernel(tmp_path, commits=st, harness_examples=10, tlc_jar="tla2tools.jar")
+    with pytest.raises(Exception, match="no passing TLC check"):              # checked, but not by TLC
+        k.run("approve_commit", {"domain": "example", "commit": c.id, "approver": "ana"})
+    assert k.call("change_check", {"domain": "example", "commit": c.id})["passed"] is True
+    assert k.run("approve_commit", {"domain": "example", "commit": c.id, "approver": "ana"})["approved"] is True

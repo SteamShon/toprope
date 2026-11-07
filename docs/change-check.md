@@ -24,6 +24,7 @@ is deployed. It exits 1 when a check reports an error. The report is printed, wr
 | `semantic` | states the small world can no longer reach, actions no matrix cell allows, `undecided` cells | newly lost: error; already so: warning; undecided: info |
 | `scenarios` | scenario regression: the base's scenarios and the new ones, run on the new model. A scenario the new version dropped still runs | a failing scenario is an error |
 | `harness` | the generated harness at the model level: cells, invariants, gate-tier exploration | any finding is an error |
+| `tla` | with a TLC jar (`tlc=`, or `TOPROPE_TLC_JAR` for the kernel), TLC on the model level, its violation replayed (ADR-0043, ADR-0044) | a harness gap, a model mismatch, an error or a reached bound: error |
 | `log_replay` | every past action in the domain's event store, re-decided by the new model at its original time: "with this change, 1 past action would have been blocked" | blocked by the new model but not the base: error; blocked by the base too: counted in the note; would now set fields differently: warning |
 | `in_flight` | objects in that store whose type or current state the new version lacks (stranded; migration plans come in M0b) | error |
 | `nl` | natural-language conflicts in descriptions and judgment rules, by an `NLChecker` (an LLM adapter) | warnings only; skipped when none is configured |

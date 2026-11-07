@@ -75,7 +75,7 @@ class RecordingKernel(KernelServices):
 
 class LocalKernel(KernelServices):
     def __init__(self, root: str | Path, workspace: Any = None, environment: Any = None,
-                 harness_examples: int = 50, commits: Any = None):
+                 harness_examples: int = 50, commits: Any = None, tlc_jar: Any = None):
         from ..commits import CommitStore
         self.root = Path(root).resolve()
         self.workspace = workspace          # toprope.workspace.Workspace: sources and the interview
@@ -85,6 +85,8 @@ class LocalKernel(KernelServices):
         # A domain's own event log, by domain (ADR-0037): the self domains keep theirs in git,
         # so a change check replays their real history even with nothing deployed.
         self.domain_events: dict[str, Any] = {}
+        # With a TLC jar, the change check model-checks too, and approval needs it passed (ADR-0043).
+        self.tlc_jar = tlc_jar
 
     def _path(self, rel: str) -> Path:
         p = (self.root / str(rel)).resolve()
@@ -233,6 +235,11 @@ class LocalKernel(KernelServices):
         return getattr(self, f"_{service}")(**inputs)
 
     def _approve_commit(self, domain, commit, approver):
+        if self.tlc_jar:
+            tla = self.commits.check_status(domain, commit).get("tla") or {}
+            if tla.get("ok") is not True:
+                raise ValueError(f"{commit} has no passing TLC check ({tla.get('summary') or 'never run with TLC'}):"
+                                 " run check_commit here, where TLC is configured, then approve")
         self.commits.approve(domain, commit, approver)   # conflicts fail the call, as any error does
         return {"approved": True, "main": self.commits.main(domain).id}
 
@@ -242,12 +249,14 @@ class LocalKernel(KernelServices):
         rc = ResultCache(self.root / ".toprope" / "cache")
         own = self.domain_events.get(domain)
         if own is not None:
-            r = check_commit(self.commits, domain, commit, events=own, examples=self.examples, cache=rc)
+            r = check_commit(self.commits, domain, commit, events=own, examples=self.examples, cache=rc,
+                             tlc=self.tlc_jar)
         elif self.environment is not None:
             with self.environment.events(domain) as store:
-                r = check_commit(self.commits, domain, commit, events=store, examples=self.examples, cache=rc)
+                r = check_commit(self.commits, domain, commit, events=store, examples=self.examples, cache=rc,
+                                 tlc=self.tlc_jar)
         else:
-            r = check_commit(self.commits, domain, commit, examples=self.examples, cache=rc)
+            r = check_commit(self.commits, domain, commit, examples=self.examples, cache=rc, tlc=self.tlc_jar)
         from ..decl.provenance import proposed_elements
         left = proposed_elements(self.commits.declaration(domain, commit))
         failing = [n for n, c in r.checks.items() if not c.ok] + (["confirmed"] if left else [])
