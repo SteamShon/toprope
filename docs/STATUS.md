@@ -111,7 +111,7 @@ each into `umbrella/pstack-lessons`. Each sub-PR changes only its own item below
 - ✅ 4. World map state charts show where the harness found a break: failed arrows, `breaks`,
   `mayBreak` and `unreachable` states, arrow conditions in brackets, and each minimal flow told
   step by step (`minimal-flows.md`; `docs/world-map.md`). A TLA+ export checked by TLC, as a
-  second oracle beside bounded exploration, would need an ADR; not proposed yet (#125)
+  second oracle beside bounded exploration: ADR-0043, umbrella #135 (#125)
 
 - ✅ 5. Harness mutants (`toprope-harness --mutants`, `docs/harness.md`): each seeded break given to
   the execution level must be caught. Three survived in the examples (paid-media's `step-limit`
@@ -131,7 +131,10 @@ oracle: the declaration exported to TLA+ and model-checked by TLC in CI, each co
 replayed on the interpreter. One sub-PR each into `umbrella/tla-cross-check`; each changes
 only its own item below.
 
-- ⬜ 1. ADR-0043: what is modeled, where TLC runs, what a finding is
+- ✅ 1. ADR-0043 (accepted): one declaration's model level; TLC in a pinned `tla` CI job; each
+  counterexample replayed on the interpreter, a harness gap or a model mismatch fails; actions
+  using time, links or creation left out and reported; every example and both self domains under
+  a 1,000,000-state bound (#136)
 
 - ✅ 2. Exporter (`toprope.tla`; `toprope-harness --tla DIR`): a declaration's model level as a
   TLA+ module and TLC config, values tagged so the check language stays fail closed; actions that
