@@ -252,6 +252,14 @@ value. Actions for `system` (a handoff) run as that actor. The self domains now 
 Authoring's `elements-cite-a-source` (a link path). A second seeded break, made by creation alone,
 must be found by the `tla` job.
 
+## TLC models link paths (#156, ADR-0043 follow-up, link: ③)
+
+A link path reads the linked objects from their fixtures, a constant: the linked object or null
+(a list for a link to many). It may read only what no modeled action changes (whether the object
+exists, fields no action sets), so the instances stay independent. Nothing of the self domains
+is left out now. A third seeded break, read through a link (an Element citing no Source), must be
+found by the `tla` job.
+
 ## M0b, M2 to M5
 
 Not started. Plans: [`roadmap.md`](roadmap.md).
@@ -282,8 +290,8 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    `confirmed_at` and `review_by` warnings; in the M4 spec, goals, expected outcomes and the
    outcome-to-decision link.
 6. ADR-0043's follow-ups: make `tla` a required check on `develop` once the umbrella is in
-   (maintainer); model links and time, each shrinking what the model leaves out (the self
-   domains leave out one link invariant; creation is modeled, #155).
+   (maintainer); model time. Creation (#155) and link paths to what no action changes (#156) are
+   modeled; the self domains and the examples leave out nothing but time (`now()`).
 
 ## Left from reviews
 

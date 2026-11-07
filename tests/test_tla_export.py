@@ -47,16 +47,35 @@ def test_preconditions_actor_rules_and_effects_become_the_step():
 
 def test_what_the_model_cannot_hold_is_left_out_and_named():
     e = export(Domain.model_validate(schema_doc_domain()))
-    assert e.left_out == {"approve_experiment": "it uses the link path target.guardrails",
-                          "launch_experiment": "it uses the function now()"}
-    assert "Next == FALSE" in e.module                                   # nothing modeled: nothing to step
+    assert e.left_out == {"launch_experiment": "it uses the function now()"}     # time is not modeled
+    assert "Step_approve_experiment_approver" in e.steps                 # its link path is (count of many)
 
 
-def test_self_domains_leave_out_only_what_follows_links():
+def test_self_domains_leave_nothing_out():
     for f in ("domains/authoring/authoring.domain.yaml", "domains/delivery/delivery.domain.yaml"):
         e = export(load_domain(ROOT / f))
-        assert all("link path" in v for v in e.left_out.values()), e.left_out    # creation is modeled now
+        assert e.left_out == {}, e.left_out           # creation (#155) and link paths are modeled now
         assert e.steps
+
+
+def test_a_link_reads_fixtures_and_only_what_no_action_changes():
+    """A link path reads the linked fixtures from a constant. That is sound only for what no
+    modeled action changes, so a field that changes stays left out, named."""
+    e = export(load_domain(ROOT / "domains/authoring/authoring.domain.yaml"))
+    assert 'Pass(OpExists(LinkOne(Fix_Source, Get(o, "origin"))))' in e.module      # elements-cite-a-source
+    assert e.module.count("Fix_Source ==") == 1 and '"S-docs" :>' in e.module
+    raw = schema_doc_domain()
+    raw["actions"]["approve_experiment"]["preconditions"].append(
+        {"id": "metric-named", "check": "exists(target.primary_metric.name)", "reason": "A named metric."})
+    ok = export(Domain.model_validate(raw))
+    assert "approve_experiment" not in ok.left_out                        # Metric.name: no action sets it
+    assert 'Attr(LinkOne(Fix_Metric, Get(o, "primary_metric")), "name")' in ok.module
+    raw["actions"]["approve_experiment"]["preconditions"][-1]["check"] = "target.primary_metric.stage == 'x'"
+    raw["objects"]["Metric"]["properties"]["stage"] = {"enum": ["x", "y"]}
+    raw["actions"]["retire_metric"] = {"description": "Retire.", "actor": ["approver"], "target": "Metric",
+                                       "effects": [{"set": {"target.stage": "'y'"}}]}
+    bad = export(Domain.model_validate(raw))
+    assert "a field that changes" in bad.left_out["approve_experiment"]
 
 
 def test_creation_is_modeled_from_the_empty_world():

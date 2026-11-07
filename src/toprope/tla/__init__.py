@@ -19,9 +19,14 @@ params, its initial state, its `set` effects), so a run still follows one object
 param no expression reads gets one value. The `system` actor a handoff acts as is in the model
 when an action is for it.
 
+A link path reads the linked objects from their fixtures, a constant (`Fix_<Object>`): `target.l`
+is the linked object or null, a list of them for a link to many. That is sound only for what no
+modeled action changes, so a field read through a link must be one no action sets; then the
+instances stay independent.
+
 Left out of the model, and named in `Export.left_out`: actions whose object has no matrix, any
-action whose guard or effect uses time (`now`, `days_since`), a path through a link, `new.` on a
-non-creating action, an unknown function, a non-integer number, or a param of a type the model
+action whose guard or effect uses time (`now`, `days_since`), a link path to a field some action
+changes or through a second link, `new.` on a non-creating action, an unknown function, a non-integer number, or a param of a type the model
 cannot enumerate, and an action no actor of the model may take.
 """
 
@@ -77,6 +82,11 @@ OpNot(a) == IF Tag(a) = "b" THEN B(~a[2]) ELSE E
 OpAnd(a, b) == IF Tag(a) # "b" THEN E ELSE IF ~a[2] THEN B(FALSE) ELSE IF Tag(b) # "b" THEN E ELSE b
 OpOr(a, b) == IF Tag(a) # "b" THEN E ELSE IF a[2] THEN B(TRUE) ELSE IF Tag(b) # "b" THEN E ELSE b
 OpExists(a) == IF Tag(a) = "e" THEN E ELSE B(Tag(a) # "n")
+LinkTo(F, x) == IF Tag(x) = "s" /\ x[2] \in DOMAIN F THEN R(F[x[2]]) ELSE N
+Kept(x) == Tag(x) # "n"
+LinkOne(F, v) == IF Tag(v) = "e" THEN E ELSE LinkTo(F, v)
+LinkMany(F, v) == IF Tag(v) = "l" THEN L(SelectSeq([k \in 1..Len(v[2]) |-> LinkTo(F, v[2][k])], Kept))
+                  ELSE IF Tag(v) = "n" THEN N ELSE E
 OpCount(a) == IF Tag(a) = "n" THEN I(0) ELSE IF Tag(a) \in {"l", "s"} THEN I(Len(a[2]))
               ELSE IF Tag(a) = "r" THEN I(Cardinality(DOMAIN a[2])) ELSE E
 Pass(v) == v = B(TRUE)
@@ -183,7 +193,7 @@ class Expr:
             if not attrs:
                 raise Unsupported("the whole target")
             if attrs[0] in self.links:
-                raise Unsupported(f"the link path target.{'.'.join(attrs)}")
+                return self.link(attrs)
             base = "R(o)"
         elif root == "actor":
             base = self.actor
@@ -200,6 +210,41 @@ class Expr:
         for a in attrs:
             out = f"Attr({out}, {tla_str(a)})"
         return out
+
+
+    def link(self, attrs: tuple[str, ...]) -> str:
+        """`target.<link>[.<field>]`: the linked objects are fixtures, read from the constant
+        `Fix_<type>`. Sound only for what no modeled action changes, so a field read through the
+        link must be one no action sets (the instances stay independent, ADR-0043)."""
+        lk = self.d.links[attrs[0]]
+        many = lk.cardinality in ("one-to-many", "many-to-many")
+        out = f"Link{'Many' if many else 'One'}(Fix_{ident(lk.to)}, Get(o, {tla_str(attrs[0])}))"
+        if len(attrs) > 1:
+            if many:
+                raise Unsupported(f"the link path target.{'.'.join(attrs)} (a field of many)")
+            if attrs[1] in changed_fields(self.d).get(lk.to, set()) or \
+                    any(l.from_ == lk.to and n == attrs[1] for n, l in self.d.links.items()):
+                raise Unsupported(f"the link path target.{'.'.join(attrs)} (a field that changes, or a link)")
+            for a in attrs[1:]:
+                out = f"Attr({out}, {tla_str(a)})"
+        return out
+
+
+def changed_fields(d: Domain) -> dict[str, set[str]]:
+    """Fields some modeled action may change, per object type: `set` effects and the state field
+    of a type whose matrix moves. A created object is new, not a change to a fixture."""
+    out: dict[str, set[str]] = {}
+    for a in d.actions.values():
+        if a.creates is not None or a.object_type is None:
+            continue
+        f = out.setdefault(a.object_type, set())
+        for e in a.effects:
+            for key in (e.set or {}):
+                f.add(key.split(".", 1)[1].split(".")[0] if key.startswith("target.") else key)
+        tr = d.transitions.get(a.object_type)
+        if tr is not None:
+            f.add(tr.field)
+    return out
 
 
 # -- the module --------------------------------------------------------------------------------
@@ -254,6 +299,10 @@ def export(d: Domain, name: str | None = None, bound: int = BOUND) -> Export:
     for obj in modeled:
         ids_ = [i for i, _ in instances.get(obj, [])] + ([fresh[obj]] if obj in fresh else [])
         lines.append(f"Ids_{ident(obj)} == {{{', '.join(tla_str(i) for i in ids_)}}}")
+    for to in sorted({l.to for l in d.links.values()}):
+        fx = instances.get(to, [])
+        fix = " @@ ".join(f"({tla_str(i)} :> {record(f)})" for i, f in fx) if fx else "[x \\in {} |-> N]"
+        lines.append(f"Fix_{ident(to)} == {fix}")
     for role, a in sorted(actors.items()):
         env = {"id": value(a.id), "kind": value(a.kind), "roles": value(list(a.roles)),
                "role": value(a.roles[0] if a.roles else None)}

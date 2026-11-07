@@ -122,3 +122,31 @@ def test_a_break_made_by_creation_is_replayed_too():
     assert judge(plain, inv, steps, set())["verdict"] == MISMATCH    # without the seeded effect
     workflow = (ROOT / ".github/workflows/tla.yml").read_text()
     assert "delivery.created-deployed.domain.yaml=breaks:Inv_deployed_builds_passed_their_harness" in workflow
+
+
+ORIGINLESS = ROOT / "tests/tla/authoring.origin-optional.domain.yaml"
+LINK_TRACE = '''Error: Invariant Inv_elements_cite_a_source is violated.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\\ last = <<"init">>
+/\\ obj = <<>>
+
+State 2: <Create_propose_element_owner line 300, col 1 to line 306, col 9 of module Toprope_authoring>
+/\\ last = << "propose_element",
+   "owner",
+   "new-Element",
+   << <<"path", <<"s", "x">>>>, <<"cites", <<"s", "x">>>>, <<"value", <<"s", "x">>>> >> >>
+/\\ obj = <<>>
+'''
+
+
+def test_a_break_read_through_a_link_is_replayed_too():
+    """The seeded link break: an Element created citing no Source breaks elements-cite-a-source,
+    whose check follows the `origin` link. Replay reproduces it; Authoring itself refuses the
+    step, since its `origin` is required."""
+    seeded, plain = load_domain(ORIGINLESS), load_domain(ROOT / "domains/authoring/authoring.domain.yaml")
+    inv, steps = parse_trace(LINK_TRACE)
+    assert judge(seeded, inv, steps, harness_broken(seeded))["verdict"] in (KNOWN, GAP)
+    assert judge(plain, inv, steps, set())["verdict"] == MISMATCH
+    workflow = (ROOT / ".github/workflows/tla.yml").read_text()
+    assert "authoring.origin-optional.domain.yaml=breaks:Inv_elements_cite_a_source" in workflow
