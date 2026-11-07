@@ -94,10 +94,17 @@ from the same fixtures (`toprope.tla.replay`):
 
 The `tla` job fails on a harness gap, a model mismatch, a model TLC cannot check, or a reached
 state bound. It also requires a seeded break (`tests/tla/`) to be found and reproduced, so a
-silent pass cannot mean that TLC checks nothing. Actions that create objects, use time or
-follow links are left out of the model and listed with every run.
+silent pass cannot mean that TLC checks nothing: one break in a step on an existing object
+(paid-media without a precondition), one made by creation alone (Delivery creating a request
+already deployed). Actions that use time or follow links are left out of the model and listed
+with every run.
 
-TLC's model starts from one fixture at a time. No modeled step or invariant reads another instance
+Creating actions are modeled: each created type gets one fresh id (`new-<Object>`), the empty
+world is one more start, and a creating step runs only from it, so a run follows one created
+object as it follows one fixture. A creating param that no expression reads gets one value. A
+receiving domain's actions for `system` (what a handoff acts as) run as that actor.
+
+TLC's model starts from one fixture at a time, or from the empty world. No modeled step or invariant reads another instance
 (link paths are left out, and a `ref` param is only an id), so the instances are independent, and
 checking each alone reaches the same states in a sum instead of a product. Modeling links ends
 this.

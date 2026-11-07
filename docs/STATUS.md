@@ -237,12 +237,20 @@ approved, deployed and verified by the researcher (approval run 42363055975): Au
 `10-01b4e6464862bbf9`, its `tla` check passed in the approval (219312 states). It is the first
 deploy recorded with the commits (ADR-0045): the events after it carry `domain_version` 10.
 
-## The kernel's server reads sources (#PR)
+## The kernel's server reads sources (#154)
 
 Formerly Next 3, before M2. With `--kernel-root` and `--workspace`, `toprope-server` has a
 `read_source` tool: a source's chunks, redacted, each with its ref; a local-only source is
 refused; a read, not an action, so what it serves goes into the workspace's usage log, never into
 an event log.
+
+## TLC models creation (#155, ADR-0043 follow-up, link: ③)
+
+Creating actions are steps of the exported model: one fresh id per created type, the empty world
+as one more start, a creating step only from it. A creating param no expression reads gets one
+value. Actions for `system` (a handoff) run as that actor. The self domains now leave out only
+Authoring's `elements-cite-a-source` (a link path). A second seeded break, made by creation alone,
+must be found by the `tla` job.
 
 ## M0b, M2 to M5
 
@@ -274,8 +282,8 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    `confirmed_at` and `review_by` warnings; in the M4 spec, goals, expected outcomes and the
    outcome-to-decision link.
 6. ADR-0043's follow-ups: make `tla` a required check on `develop` once the umbrella is in
-   (maintainer); model links, time and object creation, each shrinking what the model leaves out
-   (the self domains leave out their creating actions and one link invariant).
+   (maintainer); model links and time, each shrinking what the model leaves out (the self
+   domains leave out one link invariant; creation is modeled, #155).
 
 ## Left from reviews
 
