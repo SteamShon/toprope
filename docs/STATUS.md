@@ -112,7 +112,11 @@ each into `umbrella/pstack-lessons`. Each sub-PR changes only its own item below
   step by step (`minimal-flows.md`; `docs/world-map.md`). A TLA+ export checked by TLC, as a
   second oracle beside bounded exploration, would need an ADR; not proposed yet (#125)
 
-- ⬜ 5. Harness mutants: the harness must catch a seeded break in each level
+- ✅ 5. Harness mutants (`toprope-harness --mutants`, `docs/harness.md`): each seeded break given to
+  the execution level must be caught. Three survived in the examples (paid-media's `step-limit`
+  and `not-the-proposer`, refunds' `within-window`), so precondition tests now make a boundary
+  instance when the world has none, including for preconditions that read `params`. Every
+  mutant of the examples and both self domains is caught (Authoring 61, Delivery 29) (#126)
 
 ## M0b, M2 to M5
 

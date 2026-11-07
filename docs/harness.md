@@ -27,7 +27,7 @@ uv run toprope-harness --composition self.composition.yaml --regen-check
 |---|---|
 | **Small world** | Grown from the fixtures by applying allowed transitions (bounded BFS). One person per role, named after `world.actors`. Matrix states never reached are reported as `unreachable`. |
 | **Cell tests** | Every (state, action, role) cell, from a world instance in that state. Expected outcomes come from the declared matrix, actor rules and preconditions, read directly rather than through the interpreter's decision, so these tests also check the oracle against the declaration. |
-| **Precondition tests** | For each non-state precondition that does not read `params`: a world instance on which it is the first to fail (a boundary instance, such as `E-bare`). |
+| **Precondition tests** | For each precondition: an instance on which it is the first to fail (a boundary instance, such as `E-bare`). When no world instance is one, it is made from one by setting a single property or param the precondition reads to another value of its type, or to an actor's id, keeping every invariant. |
 | **Create tests** | Every create action, for every role. |
 | **Invariant checks** | After every step at every level. An `invariant-guard` outcome is reported as an invariant finding: the declaration allows a transition its invariants forbid. |
 | **Parity** | Each outcome, each allowed-actions list and each stored event stream must equal the model level's. |
@@ -49,12 +49,29 @@ and do not fail it: they are the interview's next questions (ADR-0010 §2).
 - Cell tests use one person per role. Agents (principal and grant) are covered by the
   Execution and MCP tests, but are not yet in the generated cells.
 - Each required param gets one default value (the first enum value, the first fixture of a
-  `ref`, or a type default). Preconditions that read `params` are exercised only with it.
+  `ref`, or a type default). A precondition test may set one param to another value.
 - Clones carry their outgoing links. No other object links to a clone.
 - Exploration runs on the model level. A minimal flow it finds can be replayed on the other
   levels like any other flow.
 - Results are not cached yet. Incremental selection and the result cache come with
   sub-PR 9 (ADR-0013).
+
+## Mutants: can the harness fail?
+```bash
+uv run toprope-harness --domain my.domain.yaml --mutants
+```
+A check never seen failing proves nothing. `--mutants` runs the harness once per seeded break,
+given to the execution level only, while the model level and every expectation read the real
+declaration. So each mutant stands for an implementation that drifted from the declaration:
+- a skipped precondition;
+- a role that may no longer act;
+- a skipped `set` effect;
+- a cell refused, retargeted to another state, or allowed where it was denied.
+
+Each must be caught by some finding. A survivor is a break the harness cannot see, and the
+command exits 1. Either a case is missing, or the mutant behaves like the declaration in every
+state the harness can build (for example, a precondition that always holds).
+`toprope.harness.mutants.run_mutants(domain)` returns the same report.
 
 ## The mechanical layer (ADR-0035)
 Besides the examples, the harness generates objects from the declaration's types, enums and
