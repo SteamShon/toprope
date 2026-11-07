@@ -1,11 +1,12 @@
 """Model-check declarations with TLC (ADR-0043). Run by .github/workflows/tla.yml.
 
-    python tools/tla_check.py --jar tla2tools.jar [--out DIR] DECLARATION...
+    python tools/tla_check.py --jar tla2tools.jar [--out DIR] DECLARATION[=breaks:INVARIANT]...
 
 For each declaration: export its model level (`toprope.tla`), run TLC on it with one worker,
 and report the distinct states, the actions left out, and TLC's verdict. A run fails when TLC
 cannot check the model (a parse or semantic error, exit status other than 0 or 12), or when it
-reaches the state bound: a bound reached is never a pass.
+reaches the state bound: a bound reached is never a pass. `DECLARATION=breaks:INVARIANT` names a
+seeded break: that run fails unless TLC finds the invariant broken, so the job shows it can fail.
 
 An invariant violation (TLC exit status 12) is not judged here: replaying the counterexample on
 the interpreter decides whether it is a harness gap, a model mismatch or a break the harness
@@ -29,7 +30,7 @@ def run(decl: Path, jar: Path, out: Path) -> dict:
     from toprope.decl import load_domain
     from toprope.tla import BOUND, export, write
     e = export(load_domain(decl))
-    d = out / e.name
+    d = out / decl.name.removesuffix(".domain.yaml")       # several declarations can share a domain name
     write(e, d)
     trace = d / f"{e.name}.trace.json"
     cmd = ["java", "-XX:+UseParallelGC", "-cp", str(jar), "tlc2.TLC", "-workers", "1", "-metadir",
@@ -43,7 +44,7 @@ def run(decl: Path, jar: Path, out: Path) -> dict:
                else f"error (exit {r.returncode})")
     if distinct is not None and distinct >= BOUND - 1:
         verdict = "not checked: the state bound was reached"
-    return {"declaration": str(decl), "module": e.name, "verdict": verdict, "distinct_states": distinct,
+    return {"declaration": str(decl), "module": e.name, "dir": d.name, "verdict": verdict, "distinct_states": distinct,
             "broken": broken, "steps": len(e.steps), "left_out": e.left_out,
             "trace": str(trace) if trace.exists() else None}
 
@@ -52,9 +53,17 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--jar", type=Path, required=True)
     ap.add_argument("--out", type=Path, default=Path("tla-out"))
-    ap.add_argument("declarations", nargs="+", type=Path)
+    ap.add_argument("declarations", nargs="+")
     a = ap.parse_args(argv)
-    results = [run(p, a.jar.resolve(), a.out.resolve()) for p in a.declarations]
+    results = []
+    for spec in a.declarations:
+        path, _, expect = spec.partition("=breaks:")
+        r = run(Path(path), a.jar.resolve(), a.out.resolve())
+        if expect:
+            r["expected_break"] = expect
+            if expect not in r["broken"]:
+                r["verdict"] = f"seeded break not found: {expect} (TLC: {r['verdict']})"
+        results.append(r)
     for r in results:
         print(f"{r['declaration']}: {r['verdict']}; {r['distinct_states']} distinct states; "
               f"{r['steps']} step(s) modeled" + (f"; broken: {', '.join(r['broken'])}" if r["broken"] else ""))
@@ -63,7 +72,7 @@ def main(argv: list[str] | None = None) -> int:
     (a.out / "summary.json").write_text(json.dumps(results, indent=2) + "\n")
     bad = [r for r in results if r["verdict"] not in ("checked", "violation")]
     for r in bad:
-        print(f"error: {r['declaration']}: {r['verdict']} (see {a.out}/{r['module']}/tlc.out)", file=sys.stderr)
+        print(f"error: {r['declaration']}: {r['verdict']} (see {a.out}/{r['dir']}/tlc.out)", file=sys.stderr)
     return 1 if bad else 0
 
 

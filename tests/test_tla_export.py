@@ -66,3 +66,16 @@ def test_the_cli_writes_the_module_its_config_and_what_it_left_out(tmp_path, cap
     assert {p.name for p in tmp_path.iterdir()} == {"Toprope_paid_media.tla", "Toprope_paid_media.cfg",
                                                     "Toprope_paid_media.left-out.json"}
     assert "left out: nothing" in capsys.readouterr().out
+
+
+def test_the_seeded_break_for_the_tla_job_is_paid_media_without_one_precondition():
+    # The `tla` job requires TLC to find holdouts-never-change broken here (ADR-0043): a model
+    # never seen failing proves nothing. Keep the fixture one change away from the example.
+    import yaml
+    seeded = yaml.safe_load((ROOT / "tests/tla/paid-media.no-holdout-guard.domain.yaml").read_text())
+    example = yaml.safe_load(PAID.read_text())
+    pre = example["actions"]["propose_budget_change"]["preconditions"]
+    example["actions"]["propose_budget_change"]["preconditions"] = [p for p in pre if p["id"] != "not-a-holdout"]
+    assert seeded == example
+    workflow = (ROOT / ".github/workflows/tla.yml").read_text()
+    assert "paid-media.no-holdout-guard.domain.yaml=breaks:Inv_holdouts_never_change" in workflow
