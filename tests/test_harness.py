@@ -237,3 +237,26 @@ def test_races_pair_cases_on_the_same_example():
         row["rename"] = state if state == "draft" else "n/a"
     r = run_harness(Domain.model_validate(raw), levels=("model", "execution"), explore_examples=0)
     assert [f for f in r.findings if f.kind == "race"] == []
+
+
+# -- a move that breaks an invariant only with another param value (ADR-0043) -----------------
+def test_a_cell_is_also_tried_with_each_other_value_of_a_finite_param():
+    # TLC found this shape in Authoring: a kernel reply that is fine with its default (`true`)
+    # and breaks an invariant with `false`. Cell tests take the default params only.
+    def health(raw):
+        raw["objects"]["Experiment"]["properties"]["healthy"] = {"type": "boolean", "optional": True}
+        raw["invariants"].append({"id": "approved-are-healthy", "on": "Experiment",
+                                  "check": "target.status != 'approved' or target.healthy != false",
+                                  "reason": "An approved experiment is healthy."})
+        raw["actions"]["report_health"] = {"description": "Report health.", "actor": ["eng"],
+                                           "target": "Experiment", "params": {"healthy": {"type": "boolean"}},
+                                           "effects": [{"set": {"target.healthy": "params.healthy"}}]}
+        for state, cells in raw["transitions"]["Experiment"]["matrix"].items():
+            cells["report_health"] = state if state == "approved" else "n/a"
+    r = run_harness(dom(health), levels=("model",), races=False, explore_examples=0)
+    broken = [f for f in r.findings if f.kind == "invariant"]
+    assert len(broken) == 1
+    assert broken[0].case.startswith("param:Experiment.approved.report_health.eng@")      # @<instance>:<param>=<value>
+    assert broken[0].case.endswith(":healthy=False")
+    assert broken[0].detail["observed"]["code"] == "invariant-guard"
+    assert run_harness(dom(), levels=("model",), races=False, explore_examples=0).ok   # the unchanged toy still passes

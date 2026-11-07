@@ -11,8 +11,9 @@ A request is a file `.toprope/requests/<id>.yaml` on a work branch:
 Steps, from a fixed set:
 - `freeze: DIR`, `freeze-binding: DIR`, `freeze-protocol: DIR`: `experiments/tools/instruments.py`
 - `amend: {dir: DIR, file: FILE, reason: TEXT}`: the same, on the record
-- `run: {member, action, target, params}`: a self-domain action through `toprope-run`, as the
-  approver (`--identity github`)
+- `run: {member, action, target, params, workspace}`: a self-domain action through `toprope-run`, as
+  the approver (`--identity github`). `workspace` defaults to `toprope.<member>.workspace.yaml`;
+  an Authoring action on the Delivery declaration's draft names `toprope.delivery.workspace.yaml`
 
 `.github/workflows/human-request.yml` calls `check` (and shows `render` on the run page) before
 it waits for the approval, and `run` after it.
@@ -76,10 +77,13 @@ def check(req: object) -> list[str]:
                 errors.append(f"step {i}: amend takes dir, file and reason")
         elif kind == "run":
             if not isinstance(arg, dict) or not {"member", "action", "target"} <= set(arg) \
-                    or set(arg) - {"member", "action", "target", "params"} \
+                    or set(arg) - {"member", "action", "target", "params", "workspace"} \
+                    or not isinstance(arg.get("workspace", "x.workspace.yaml"), str) \
+                    or not str(arg.get("workspace", "x.workspace.yaml")).endswith(".workspace.yaml") \
                     or not all(isinstance(arg[k], str) and arg[k] for k in ("member", "action", "target")) \
                     or not isinstance(arg.get("params", {}), dict):
-                errors.append(f"step {i}: run takes member, action, target and optional params")
+                errors.append(f"step {i}: run takes member, action, target, and optional params and workspace "
+                              "(a *.workspace.yaml)")
         else:
             errors.append(f"step {i}: {kind!r} is not a step (one of {', '.join(INSTRUMENT_STEPS)} or run)")
     return errors
@@ -94,7 +98,8 @@ def render(req: dict) -> str:
         if kind == "run":
             params = " ".join(f"--{k.replace('_', '-')} {json.dumps(v) if not isinstance(v, str) else v}"
                               for k, v in (arg.get("params") or {}).items())
-            lines.append(f"{i}. `{arg['member']}`: **{arg['action']}** `{arg['target']}` {params}".rstrip())
+            where = f" (workspace `{arg['workspace']}`)" if arg.get("workspace") else ""
+            lines.append(f"{i}. `{arg['member']}`: **{arg['action']}** `{arg['target']}` {params}".rstrip() + where)
         elif kind == "amend":
             lines.append(f"{i}. **amend** `{arg['file']}` in `{arg['dir']}`: {arg['reason']}")
         else:
@@ -114,7 +119,7 @@ def commands(req: dict) -> list[list[str]]:
             out.append(tool + ["amend", arg["dir"], arg["file"], "--reason", arg["reason"]])
         else:
             cmd = ["toprope-run", "--composition", COMPOSITION, "--member", arg["member"],
-                   "--kernel-root", ".", "--workspace", f"toprope.{arg['member']}.workspace.yaml",
+                   "--kernel-root", ".", "--workspace", arg.get("workspace") or f"toprope.{arg['member']}.workspace.yaml",
                    "--env", ".toprope/env", "--identity", "github", arg["action"], arg["target"]]
             for k, v in (arg.get("params") or {}).items():
                 cmd += [f"--{k.replace('_', '-')}", v if isinstance(v, str) else json.dumps(v)]

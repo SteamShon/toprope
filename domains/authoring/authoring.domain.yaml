@@ -490,6 +490,14 @@ actions:
       ref: interview:domains/authoring/interview.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: confirmed
+    preconditions:
+    - id: settled
+      check: target.approved != true
+      reason: An approved commit's check is settled; a late result is not recorded.
+      source:
+        kind: record
+        ref: records:docs/commits.md#L128-L142
+      status: confirmed
   approve_commit:
     description: 'Approve a commit: merge it into main and tag it. Only a person approves.'
     actor:

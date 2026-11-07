@@ -26,7 +26,7 @@ An approved domain version must become working software in an environment, and n
 | action | who | on | needs first | changes | starts | event |
 | --- | --- | --- | --- | --- | --- | --- |
 | `request_delivery` | system | creates **DeliveryRequest**; params `domain_id` (string), `commit` (string), `interface` (string), `environment` (string), `approver` (string) | — | — | — | `DeliveryRequestCreated` |
-| `preview` | approver | **DeliveryRequest** | — | the stage (per the matrix) | kernel `preview` → `record_build` | `DeliveryRequestPreview` |
+| `preview` | approver | **DeliveryRequest** | `not-deployed`: Already deployed; deliver again with a new request. | the stage (per the matrix) | kernel `preview` → `record_build` | `DeliveryRequestPreview` |
 | `record_build` | the kernel | **DeliveryRequest**; params `build` (string), `harness_ok` (boolean) | — | the stage (per the matrix); `target.build` ← `params.build`, `target.harness_ok` ← `params.harness_ok` | — | `DeliveryRequestRecordBuild` |
 | `deploy` 🔒 📝 | approver | **DeliveryRequest**; params `rationale` (string, optional) | `harness-passed`: Deploy only a build whose harness passed. | the stage (per the matrix) | kernel `deploy` → `record_deployment` | `DeliveryRequestDeploy` |
 | `record_deployment` | the kernel | **DeliveryRequest**; params `deployed` (boolean), `error` (string) | — | the stage (per the matrix); `target.deployed` ← `params.deployed`, `target.refusal` ← `params.error` | — | `DeliveryRequestRecordDeployment` |
@@ -71,7 +71,7 @@ Generated from the actions, their actors, the matrix and the kernel calls: for e
 
 **In `requested`:**
 
-- **preview** by `approver` → `previewing`. Then starts kernel `preview`, answered by `record_build`. Run: `toprope-run --domain delivery.domain.yaml preview ID`
+- **preview** by `approver` → `previewing`. Needs: Already deployed; deliver again with a new request. Then starts kernel `preview`, answered by `record_build`. Run: `toprope-run --domain delivery.domain.yaml preview ID`
 
 **In `previewing`:**
 
@@ -79,7 +79,7 @@ Generated from the actions, their actors, the matrix and the kernel calls: for e
 
 **In `previewed`:**
 
-- **preview** by `approver` → `previewing`. Then starts kernel `preview`, answered by `record_build`. Run: `toprope-run --domain delivery.domain.yaml preview ID`
+- **preview** by `approver` → `previewing`. Needs: Already deployed; deliver again with a new request. Then starts kernel `preview`, answered by `record_build`. Run: `toprope-run --domain delivery.domain.yaml preview ID`
 - **deploy** by `approver` — **a person only** — recorded as a decision → `deploying`. Needs: Deploy only a build whose harness passed. Then starts kernel `deploy`, answered by `record_deployment`. Run: `toprope-run --domain delivery.domain.yaml deploy ID`
 
 **In `deploying`:**
@@ -88,7 +88,7 @@ Generated from the actions, their actors, the matrix and the kernel calls: for e
 
 **In `done`:**
 
-- **preview** by `approver` → `previewing`. Then starts kernel `preview`, answered by `record_build`. Run: `toprope-run --domain delivery.domain.yaml preview ID`
+- **preview** by `approver` → `previewing`. Needs: Already deployed; deliver again with a new request. Then starts kernel `preview`, answered by `record_build`. Run: `toprope-run --domain delivery.domain.yaml preview ID`
 - **deploy** by `approver` — **a person only** — recorded as a decision → `deploying`. Needs: Deploy only a build whose harness passed. Then starts kernel `deploy`, answered by `record_deployment`. Run: `toprope-run --domain delivery.domain.yaml deploy ID`
 - **verify** by `approver` — **a person only** → `verified`. Needs: Only a deployment that happened can be verified. Run: `toprope-run --domain delivery.domain.yaml verify ID --verified VERIFIED`
 
