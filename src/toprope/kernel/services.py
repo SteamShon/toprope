@@ -183,9 +183,8 @@ class LocalKernel(KernelServices):
         return {"skipped": True}
 
     # -- commits (ADR-0029) -----------------------------------------------------------------
-    def _commit(self, declaration, evidence=None):
-        c, created = self.commits.commit(self._path(declaration), author=str((self.caller or {}).get("id") or ""),
-                                         evidence=list(evidence or []))
+    def _commit(self, declaration):
+        c, created = self.commits.commit(self._path(declaration), author=str((self.caller or {}).get("id") or ""))
         base = self.commits.review_base(c.domain, c.id)      # ADR-0033
         review = self.commits.diff(c.domain, base, c.id)["to_review"] if created else []
         approved = self.commits.latest_approved(c.domain)

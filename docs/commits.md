@@ -22,9 +22,9 @@ uv run toprope-commits log DOMAIN action:launch_experiment   # an element's hist
 ```
 
 ## Commits
-- **Evidence.** A commit may cite what the change rests on (ADR-0041): interview lines, events,
-  check records. The `commit` service takes it as an optional input, and the commit keeps it.
-  Committing content identical to the head makes no new commit, so its evidence is not kept.
+- **Evidence.** A commit cites what the change rests on after it is made, with `cite_evidence`
+  (see *Evidence* below). Commit `5-c8fd1b8fc98be17c` of the Authoring domain still carries the
+  free strings the `commit` service took before (#117), as `evidence` on its record.
 - **Content-addressed and append-only.** A commit's content is the hash of the canonical
   declaration without `version`, plus its representations: the `*.representation.yaml` files
   next to the declaration whose `targets.domain` is this domain. Its id is `<seq>-<content>`, and
@@ -120,8 +120,10 @@ The `human-request` workflow appends each approved run to `.toprope/approval-run
 the result it pushes, so the record outlives the branch and a squash merge.
 Citations are appended to `evidence.jsonl` next to the commit log, with who cited and when,
 and are never rewritten. `toprope-commits evidence DOMAIN COMMIT` lists them. Nothing requires
-evidence yet. The Authoring declaration can call `cite_evidence` once the owner confirms an
-action for it, and a rule such as "approve only with evidence that ran" is a later decision.
+evidence yet. In the Authoring domain, the owner or their agent cites with the action
+`cite_evidence` on a commit that is not approved yet. Its reply `record_evidence` keeps the
+last strength, or why the ref was refused, on the Commit. A rule such as "approve only with
+evidence that ran" is a later decision.
 
 ## Approval
 An approval is an immutable tag on a commit `main` points to. Tagging again is a no-op. A

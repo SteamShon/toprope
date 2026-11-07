@@ -410,27 +410,32 @@ def test_deploy_refuses_a_commit_approved_with_proposed_elements(tmp_path, monke
 
 
 # -- ADR-0041 Resolved 3: a commit may cite its evidence ---------------------------------------
-def test_a_commit_keeps_the_evidence_it_cites_and_old_records_still_load(store):
+def test_free_string_evidence_recorded_before_cite_evidence_still_loads(store):
     st, wc = store
-    c, _ = st.commit(write(wc, schema_doc_domain()), evidence=["interview:domains/x/interview.jsonl#L3"])
-    assert st.get("example", c.id).evidence == ["interview:domains/x/interview.jsonl#L3"]
+    c, _ = st.commit(write(wc, schema_doc_domain()))
     log = st._dir("example") / "log.jsonl"
     rows = [json.loads(line) for line in log.read_text().splitlines()]
+    rows[-1]["evidence"] = ["interview:domains/x/interview.jsonl#L3"]     # as #117 wrote it
+    log.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    assert st.get("example", c.id).evidence == ["interview:domains/x/interview.jsonl#L3"]
     for r in rows:
         r.pop("evidence")                                       # a record from before ADR-0041
     log.write_text("".join(json.dumps(r) + "\n" for r in rows))
     assert st.get("example", c.id).evidence == []
 
 
-def test_the_commit_service_takes_evidence_as_an_optional_input(tmp_path):
-    st = CommitStore(tmp_path / "commits")
-    k = LocalKernel(tmp_path, commits=st, harness_examples=0)
-    write(tmp_path / "d.domain.yaml", schema_doc_domain())
-    out = k.call("commit", {"declaration": "d.domain.yaml", "evidence": ["event:E-1#4"]})
-    assert out["ok"] and st.get("example", out["id"]).evidence == ["event:E-1#4"]
-    raw = schema_doc_domain()
-    raw["glossary"]["x"] = "y"
-    write(tmp_path / "d.domain.yaml", raw)
-    out = k.call("commit", {"declaration": "d.domain.yaml"})              # left out: still a commit
-    assert out["ok"] and st.get("example", out["id"]).evidence == []
-    assert not k.call("commit", {"evidence": []})["ok"]                   # the required input is still required
+def test_the_commit_service_takes_no_evidence_a_declaration_passing_it_is_refused():
+    from toprope.decl import Domain, validate_domain
+    from toprope.kernel import CATALOG
+    assert set(CATALOG["commit"].inputs) == {"declaration"}               # cite_evidence instead (ADR-0041)
+    raw = {"domain": "d", "version": 1, "roles": ["owner"],
+           "objects": {"Draft": {"properties": {"declaration": {"type": "string"}, "status": {"enum": ["open"]}}}},
+           "actions": {
+               "commit_draft": {"description": "x", "actor": ["owner"], "target": "Draft",
+                                "params": {"evidence": {"type": "string", "many": True, "optional": True}},
+                                "effects": [{"call": "commit", "with": {"declaration": "target.declaration",
+                                                                         "evidence": "params.evidence"},
+                                             "reply": "done"}]},
+               "done": {"description": "x", "actor": ["external:kernel"], "target": "Draft"}},
+           "transitions": {"Draft": {"field": "status", "matrix": {"open": {"commit_draft": "open", "done": "open"}}}}}
+    assert [i.code for i in validate_domain(Domain.model_validate(raw)) if i.code == "unknown-input"] == ["unknown-input"]
