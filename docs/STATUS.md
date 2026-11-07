@@ -124,6 +124,23 @@ each into `umbrella/pstack-lessons`. Each sub-PR changes only its own item below
   the base's append-only logs (`tools/logs_check.py`; it catches #124's first, diverged run)
   (#129)
 
+## TLA+ cross-check (umbrella, link: ③)
+
+The harness checks a declaration by bounded exploration. ADR-0043 adds a second, exhaustive
+oracle: the declaration exported to TLA+ and model-checked by TLC in CI, each counterexample
+replayed on the interpreter. One sub-PR each into `umbrella/tla-cross-check`; each changes
+only its own item below.
+
+- ⬜ 1. ADR-0043: what is modeled, where TLC runs, what a finding is
+
+- ⬜ 2. Exporter: a declaration's model level as a TLA+ spec and TLC config
+
+- ⬜ 3. A `tla` CI job: TLC, pinned by version and sha256
+
+- ⬜ 4. Replay: each counterexample on the interpreter; a harness gap or a model mismatch fails
+
+- ⬜ 5. Every example and both self domains, under a state bound
+
 ## M0b, M2 to M5
 
 Not started. Plans: [`roadmap.md`](roadmap.md).
