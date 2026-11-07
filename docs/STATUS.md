@@ -118,6 +118,11 @@ each into `umbrella/pstack-lessons`. Each sub-PR changes only its own item below
   instance when the world has none, including for preconditions that read `params`. Every
   mutant of the examples and both self domains is caught (Authoring 61, Delivery 29) (#126)
 
+- ✅ 6. The self domains' logs advance on one line: `AGENTS.md` says two branches never run the
+  loop at the same time, and the `checks` workflow fails a PR whose head does not extend each of
+  the base's append-only logs (`tools/logs_check.py`; it catches #124's first, diverged run)
+  (#129)
+
 ## M0b, M2 to M5
 
 Not started. Plans: [`roadmap.md`](roadmap.md).
