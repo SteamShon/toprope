@@ -75,7 +75,7 @@ def element_path(path: str) -> list[str]:
 
 def is_element(segs: list[str]) -> bool:
     """Paths whose value carries `source` and `status` (Provenance in decl/models.py)."""
-    return ((len(segs) == 2 and segs[0] in ("objects", "links", "actions", "invariants", "handoffs"))
+    return ((len(segs) == 2 and segs[0] in ("objects", "links", "actions", "invariants", "handoffs", "scenarios"))
             or (len(segs) == 4 and segs[0] == "actions" and segs[2] == "preconditions")
             or (len(segs) == 5 and segs[0] == "transitions" and segs[2] == "matrix"))
 
@@ -321,7 +321,13 @@ class Workspace:
         _set(doc, segs, self._with_provenance(segs, value, src))
         _demote_enclosing(doc, segs, src)
         issues = self._write(doc)
-        return {"path": path, "status": "proposed", "issues": issues}
+        marked = is_element(segs) or any(is_element(segs[:k]) for k in range(2, len(segs)))
+        if not marked:
+            # Fixtures and the glossary carry no provenance: the change is logged, so the person
+            # sees it with what is to confirm, and it shows in the commit's review diff.
+            self._append(self.log_path, {"at": _now(), "kind": "unmarked-proposal", "path": path,
+                                         "source": src.get("ref")})
+        return {"path": path, "status": "proposed", "marked": marked, "issues": issues}
 
     def answer(self, question_id: str, answer: str, decisions: list[dict[str, Any]],
                question: str | None = None) -> dict[str, Any]:

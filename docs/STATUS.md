@@ -260,6 +260,13 @@ exists, fields no action sets), so the instances stay independent. Nothing of th
 is left out now. A third seeded break, read through a link (an Element citing no Source), must be
 found by the `tla` job.
 
+## Scenarios are elements (#PR)
+
+A review leftover (#86, #147), as the researcher chose: a scenario carries `source` and
+`status` like an action, so an agent's scenario is proposed until a person confirms it, and
+approval counts it. Fixtures and the glossary carry no provenance: proposing them writes an
+`unmarked-proposal` line to the interview log, and the change shows in the commit's review diff.
+
 ## M0b, M2 to M5
 
 Not started. Plans: [`roadmap.md`](roadmap.md).
@@ -302,10 +309,6 @@ it; each release's cleanup PR handles items older than one release.
   person approves (`requires: human`) a commit whose checks passed. Charter §5 says "no
   self-approval"; ADR-0032 keeps one approver in M1. Decide whether to enforce author ≠
   approver before M2, when a domain gets more than one owner (#102, 2026-11-06)
-- `propose_element` on a path that is not an element (for example `glossary.<term>`,
-  `scenarios.<id>`, `world.fixtures`) writes the value without provenance instead of failing, so
-  such a change shows only in the commit's review diff; #147's Delivery change has three
-  (#86, 2026-11-06; again in #147, 2026-11-07)
 - `toprope-run` reads `git config` twice per command (once to check the caller, once in
   `submit`) (#85, 2026-11-06)
 - `identity/git.py` repeats the git lookup in `Workspace.identity`, and the two name a person
