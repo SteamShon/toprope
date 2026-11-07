@@ -83,7 +83,7 @@ command reference are generated.
 
 ## Lessons from pstack (umbrella #121, link: ① ② ③ and none)
 
-Five changes taken from a review of the pstack agent skills (`cursor/plugins`), one sub-PR
+Six changes taken from a review of the pstack agent skills (`cursor/plugins`), one sub-PR
 each into `umbrella/pstack-lessons`. Each sub-PR changes only its own item below.
 
 - ✅ 1. Rules enforced by checks, not text: a `checks` workflow runs the tests and
