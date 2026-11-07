@@ -386,13 +386,18 @@ class CommitStore:
         MERGE_HEAD), and is cleared once the commit is written."""
         if branch == MAIN:
             raise CommitError("`main` is protected: commit to a branch, and approving merges it into main")
-        raw = load_yaml(Path(declaration).read_text()) or {}
-        d = Domain.model_validate(raw)
-        if representations is None:   # a released UI is the pair (ADR-0008): take this domain's own
-            representations = self.representations_for(d.domain, Path(declaration).parent)
-        reps = {Path(r).name: load_yaml(Path(r).read_text()) for r in representations}
-        cid = content_id(raw, reps)
-        with self._lock(d.domain) as dirp:
+        domain = Domain.model_validate(load_yaml(Path(declaration).read_text()) or {}).domain
+        with self._lock(domain) as dirp:
+            # Read the working copy under the lock (#89), so a merge_main in another process is
+            # either wholly before this commit (its content and its second parent) or after it.
+            raw = load_yaml(Path(declaration).read_text()) or {}
+            d = Domain.model_validate(raw)
+            if d.domain != domain:
+                raise CommitError("the working copy changed its domain while committing")
+            reps_paths = representations if representations is not None else \
+                self.representations_for(d.domain, Path(declaration).parent)   # a released UI is the pair (ADR-0008)
+            reps = {Path(r).name: load_yaml(Path(r).read_text()) for r in reps_paths}
+            cid = content_id(raw, reps)
             log = self.log(d.domain)
             # A new branch starts from `main`; before the first approval, from the domain's first
             # commit, so every branch shares a base (ADR-0033: main exists from the first commit).
@@ -446,17 +451,19 @@ class CommitStore:
         conflict the branch's value is kept; at an element conflict the element holds both
         sides' changes, field by field. The next commit on the branch records both parents.
         Refused when the working copy has changes not yet committed to the branch."""
-        main, head = self.main(domain), self.head(domain, branch)
-        if main is None or head is None:
-            raise CommitError(f"nothing to merge: {'main' if main is None else branch} has no commits")
-        if self.is_ancestor(domain, main.id, head.id):
-            return {"merge": main.id, "branch": branch, "up_to_date": True, "conflicts": []}
-        current, present = self.working_copy(domain, declaration)
-        if current != head.content:
-            raise CommitError(f"the working copy has changes not committed to {branch}: commit them first")
-        m = self.merge3(domain, head.id, main.id)
-        self.write_working_copy(domain, m.merged, declaration, version, present)
+        # One lock for all of it (#89): a commit from another process between writing the working
+        # copy and recording the merge in progress would get one parent, and the next a stale second.
         with self._lock(domain) as dirp:
+            main, head = self.main(domain), self.head(domain, branch)
+            if main is None or head is None:
+                raise CommitError(f"nothing to merge: {'main' if main is None else branch} has no commits")
+            if self.is_ancestor(domain, main.id, head.id):
+                return {"merge": main.id, "branch": branch, "up_to_date": True, "conflicts": []}
+            current, present = self.working_copy(domain, declaration)
+            if current != head.content:
+                raise CommitError(f"the working copy has changes not committed to {branch}: commit them first")
+            m = self.merge3(domain, head.id, main.id)
+            self._write_files(self._files_of(m.merged, declaration, version), present, m.merged)
             self._set_pending(dirp, branch, main.id)
         return {"merge": main.id, "branch": branch, "up_to_date": False,
                 "conflicts": [{"path": c.path, "base": c.base, "ours": c.ours, "theirs": c.theirs} for c in m.conflicts]}
@@ -708,6 +715,33 @@ class CommitStore:
         """Write a body (declaration and representations) into a working copy, under the domain
         lock: every file goes to a temporary name first, then all are renamed in place, then
         this domain's representations the body lacks are removed."""
+        files = self._files_of(body, declaration, version)
+        with self._lock(domain):
+            self._write_files(files, present, body)
+
+    @staticmethod
+    def _write_files(files: dict[Path, str], present: list[Path], body: dict[str, Any]) -> None:
+        """Write a working copy's files, each to a temporary name in its own folder (so the rename
+        is atomic), then rename all in place. The caller holds the domain lock."""
+        staged = []
+        try:
+            for target, text in files.items():
+                fd, tmp = tempfile.mkstemp(dir=target.parent, prefix=f".{target.name}.")
+                with os.fdopen(fd, "w") as f:
+                    f.write(text)
+                staged.append((tmp, target))
+        except BaseException:
+            for tmp, _ in staged:
+                os.unlink(tmp)
+            raise
+        for tmp, target in staged:
+            os.replace(tmp, target)
+        for p in present:
+            if p.name not in body["representations"] and p.exists():
+                p.unlink()
+
+    @staticmethod
+    def _files_of(body: dict[str, Any], declaration: str | Path, version: int) -> dict[Path, str]:
         path = Path(declaration)
         folder = path.parent
         folder.mkdir(parents=True, exist_ok=True)
@@ -716,23 +750,7 @@ class CommitStore:
         files = {path: yaml.safe_dump(out, sort_keys=False, allow_unicode=True)}
         files.update({folder / name: yaml.safe_dump(r, sort_keys=False, allow_unicode=True)
                       for name, r in body["representations"].items()})
-        with self._lock(domain):
-            staged = []
-            try:
-                for target, text in files.items():
-                    fd, tmp = tempfile.mkstemp(dir=folder, prefix=f".{target.name}.")  # same folder: rename is atomic
-                    with os.fdopen(fd, "w") as f:
-                        f.write(text)
-                    staged.append((tmp, target))
-            except BaseException:
-                for tmp, _ in staged:
-                    os.unlink(tmp)
-                raise
-            for tmp, target in staged:
-                os.replace(tmp, target)
-            for p in present:
-                if p.name not in body["representations"] and p.exists():
-                    p.unlink()
+        return files
 
     def checkout(self, domain: str, commit_id: str, declaration: str | Path, force: bool = False) -> Commit:
         """Load a commit's content into a working copy: its declaration and its representations,
