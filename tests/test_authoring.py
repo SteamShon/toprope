@@ -488,3 +488,24 @@ def test_a_committed_domain_refuses_a_proposal_that_breaks_its_declaration(tmp_p
                                      "target": "Experiment"}, "docs:docs/a.md#L1-L2")
     out = ws.propose("actions.cite", cite, "docs:docs/a.md#L1-L2")       # in dependency order
     assert not [i for i in out["issues"] if i["code"] == "unknown-reply"]
+
+
+def test_a_scenario_is_an_element_and_a_fixture_change_is_logged(ws):
+    """#86, #147: a proposed scenario was written without provenance, so no person confirmed it.
+    A scenario is an element now; fixtures and the glossary, which carry none, are logged."""
+    from toprope.decl.provenance import proposed_elements
+    _seed_example(ws)
+    sc = {"id": "approve-needs-a-guardrail", "given": {"from_world": "E-bare"},
+          "steps": [{"actor": {"role": "approver"}, "do": "approve_experiment", "target": "E-bare",
+                     "expect": {"denied_by": "has-guardrails"}}]}
+    out = ws.propose(f"scenarios.{sc['id']}", sc, "docs:docs/process.md#L4-L6")
+    assert out["marked"] is True
+    (added,) = [s for s in ws.draft()["scenarios"] if s["id"] == sc["id"]]
+    assert added["status"] == "proposed" and added["source"]["ref"] == "docs:docs/process.md#L4-L6"
+    assert f"scenarios.{sc['id']}" in proposed_elements(ws.draft())
+    ws.confirm([f"scenarios.{sc['id']}"], via="kernel", who="ana")
+    assert f"scenarios.{sc['id']}" not in proposed_elements(ws.draft())
+    fx = ws.draft()["world"]["fixtures"]
+    assert ws.propose("world.fixtures", fx, "docs:docs/process.md#L4-L6")["marked"] is False
+    last = json.loads(ws.log_path.read_text().splitlines()[-1])
+    assert last["kind"] == "unmarked-proposal" and last["path"] == "world.fixtures"

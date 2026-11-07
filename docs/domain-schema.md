@@ -148,7 +148,9 @@ world:                      # the expert's examples; the compiler grows a small 
 
 - Every element may carry `source` (`system` | `record` | `interview` | `use`, with a ref or
   quote) and `status` (`proposed` | `confirmed` | `unknown`). Agents write only `proposed`.
-  Only humans confirm. Unknowns stay explicit instead of being guessed.
+  Only humans confirm. Unknowns stay explicit instead of being guessed. The elements are
+  objects, links, actions, preconditions, matrix cells, invariants, handoffs and scenarios;
+  world fixtures and the glossary carry no provenance, so proposing them is logged instead.
 - `description`, `reason` and `glossary` are written once and reused by every surface.
 - **Effect values** in `set` are check-language expressions: `actor.id`, `"now()"`,
   `params.note`. A string literal is quoted inside the expression: `"'manual'"`.

@@ -267,6 +267,13 @@ as its ISO string, and every ISO time the model can hold has its offset and whol
 tables, for comparisons and `days_since`. A fourth seeded break, through `days_since`, must be
 found by the `tla` job.
 
+## Scenarios are elements (#161)
+
+A review leftover (#86, #147), as the researcher chose: a scenario carries `source` and
+`status` like an action, so an agent's scenario is proposed until a person confirms it, and
+approval counts it. Fixtures and the glossary carry no provenance: proposing them writes an
+`unmarked-proposal` line to the interview log, and the change shows in the commit's review diff.
+
 ## M0b, M2 to M5
 
 Not started. Plans: [`roadmap.md`](roadmap.md).
@@ -309,10 +316,6 @@ it; each release's cleanup PR handles items older than one release.
   person approves (`requires: human`) a commit whose checks passed. Charter §5 says "no
   self-approval"; ADR-0032 keeps one approver in M1. Decide whether to enforce author ≠
   approver before M2, when a domain gets more than one owner (#102, 2026-11-06)
-- `propose_element` on a path that is not an element (for example `glossary.<term>`,
-  `scenarios.<id>`, `world.fixtures`) writes the value without provenance instead of failing, so
-  such a change shows only in the commit's review diff; #147's Delivery change has three
-  (#86, 2026-11-06; again in #147, 2026-11-07)
 - The `human-request` workflow pushes its result with the workflow token, so no `pull_request`
   check runs on that head, and the ruleset does not accept the `status` run the workflow
   dispatches; the PR needs one more commit before it can merge. A push token that triggers
