@@ -260,7 +260,7 @@ exists, fields no action sets), so the instances stay independent. Nothing of th
 is left out now. A third seeded break, read through a link (an Element citing no Source), must be
 found by the `tla` job.
 
-## The author does not approve, where a domain says so (#PR, ADR-0046)
+## The author does not approve, where a domain says so (#162, ADR-0046)
 
 A review leftover (#102), as the researcher chose: `approval: {distinct_from_author: true}` in a
 declaration makes the commit store refuse an approval by the commit's author, with the rule read
