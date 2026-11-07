@@ -260,6 +260,13 @@ exists, fields no action sets), so the instances stay independent. Nothing of th
 is left out now. A third seeded break, read through a link (an Element citing no Source), must be
 found by the `tla` job.
 
+## TLC models time (#157, ADR-0043 follow-up, link: ③)
+
+Time is the harness's clock, frozen, as in replay: `now()` is that instant, an effect stores it
+as its ISO string, and every ISO time the model can hold has its offset and whole days in two
+tables, for comparisons and `days_since`. A fourth seeded break, through `days_since`, must be
+found by the `tla` job.
+
 ## The author does not approve, where a domain says so (#162, ADR-0046)
 
 A review leftover (#102), as the researcher chose: `approval: {distinct_from_author: true}` in a
@@ -296,9 +303,9 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    read tools, an observed time on facts from adapters, identity mappings on adapters; in M2,
    `confirmed_at` and `review_by` warnings; in the M4 spec, goals, expected outcomes and the
    outcome-to-decision link.
-6. ADR-0043's follow-ups: make `tla` a required check on `develop` once the umbrella is in
-   (maintainer); model time. Creation (#155) and link paths to what no action changes (#156) are
-   modeled; the self domains and the examples leave out nothing but time (`now()`).
+6. ADR-0043's follow-ups: make `tla` a required check on `develop` (maintainer). Creation
+   (#155), link paths to what no action changes (#156) and time, frozen at the harness's clock
+   (#157), are modeled; no declaration in the repository leaves anything out.
 
 ## Left from reviews
 
@@ -309,23 +316,13 @@ it; each release's cleanup PR handles items older than one release.
   `scenarios.<id>`, `world.fixtures`) writes the value without provenance instead of failing, so
   such a change shows only in the commit's review diff; #147's Delivery change has three
   (#86, 2026-11-06; again in #147, 2026-11-07)
-- `toprope-run` reads `git config` twice per command (once to check the caller, once in
-  `submit`) (#85, 2026-11-06)
-- `identity/git.py` repeats the git lookup in `Workspace.identity`, and the two name a person
-  differently (the identity file's name vs git `user.name`); only the workspace API's
-  `confirm(via="cli")` still uses the latter (#85, 2026-11-06)
 - The `human-request` workflow pushes its result with the workflow token, so no `pull_request`
   check runs on that head, and the ruleset does not accept the `status` run the workflow
   dispatches; the PR needs one more commit before it can merge. A push token that triggers
   workflows (a GitHub App or a fine-grained token, set up by the maintainer) would remove the
   step (#96, 2026-11-06)
-- `merge_main` writes the working copy and records the merge in progress in two steps; a
-  commit from another process between them gets one parent, and the next commit a stale
-  second one (#89, 2026-11-06)
 - The kernel reference generator reads private `argparse` attributes (`_actions`,
   `_SubParsersAction`); a Python release that renames them breaks it (#89, 2026-11-06)
-- `Workspace.confirm` and `approve_commit` still name the removed channels (`cli`,
-  `elicitation`) (#89, 2026-11-06)
 
 ## Open questions
 

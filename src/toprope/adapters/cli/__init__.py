@@ -106,7 +106,7 @@ def _identity(spec: str | None, token: str | None = None) -> Identity:
         raise SystemExit(f"--identity is required for this command (or put {FILE} here)")
     if spec == "git" or spec.startswith("git:"):
         try:
-            return GitIdentity(spec[4:] or FILE)
+            return GitIdentity(spec[4:] or FILE, once=True)        # one command per process
         except (OSError, ValueError) as e:
             raise SystemExit(f"identity file: {e}") from None
     if spec == "github" or spec.startswith("github:"):      # the approver of a GitHub run (ADR-0039)

@@ -247,7 +247,7 @@ def test_workspace_commit_diff_approve_and_the_diff_command(tmp_path):
     ws = Workspace(tmp_path)
     c1 = ws.commit("first")
     assert c1["created"] and c1["since"] is None and c1["to_review"]
-    ws.approve_commit(c1["commit"], via="cli", who="ana")
+    ws.approve_commit(c1["commit"], via="terminal", who="ana")
     raw["actions"]["launch_experiment"]["description"] = "Start traffic."
     write(tmp_path / "d.domain.yaml", raw)
     c2 = ws.commit()
@@ -263,10 +263,10 @@ def test_approving_without_a_domain_or_an_unknown_commit_is_an_authoring_error(t
     (tmp_path / "d.domain.yaml").write_text("version: 1\n")
     ws = Workspace(tmp_path)
     with pytest.raises(AuthoringError, match="names no `domain`"):
-        ws.approve_commit("1-x", via="cli", who="ana")
+        ws.approve_commit("1-x", via="terminal", who="ana")
     write(tmp_path / "d.domain.yaml", schema_doc_domain())
     with pytest.raises(AuthoringError, match="no commit"):
-        ws.approve_commit("1-x", via="cli", who="ana")
+        ws.approve_commit("1-x", via="terminal", who="ana")
 
 
 # -- gaps closed after review -------------------------------------------------------------------------
@@ -376,10 +376,10 @@ def test_a_proposed_per_role_part_of_a_cell_blocks_approval_until_the_cell_is_co
     ws = Workspace(tmp_path)
     c = ws.commit("by role")
     with pytest.raises(AuthoringError, match="transitions.Experiment.matrix.draft.launch_experiment"):
-        ws.approve_commit(c["commit"], via="cli", who="ana")
-    ws.confirm(["transitions.Experiment.matrix.draft.launch_experiment"], via="cli", who="ana")
+        ws.approve_commit(c["commit"], via="terminal", who="ana")
+    ws.confirm(["transitions.Experiment.matrix.draft.launch_experiment"], via="terminal", who="ana")
     c2 = ws.commit("confirmed")
-    ws.approve_commit(c2["commit"], via="cli", who="ana")
+    ws.approve_commit(c2["commit"], via="terminal", who="ana")
     assert ws.commits.main("example").id == c2["commit"]
 
 
