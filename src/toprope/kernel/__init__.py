@@ -109,6 +109,11 @@ CATALOG: dict[str, Service] = {s.name: s for s in (
             "The calling person must be the approver.",
             {"domain": "string", "commit": "string", "approver": "string"},
             {"deployed": "boolean"}),
+    Service("probe", "Check a deployed commit in use: the environment runs this commit's build and the "
+            "floor still holds, its scenarios pass at the execution level, and every object in the "
+            "deployed store meets every invariant. Recorded on the commit as the `probes` check.",
+            {"domain": "string", "commit": "string"},
+            {"passed": "boolean", "summary": "string"}),
 )}
 
 __all__ = ["CATALOG", "KERNEL", "Service"]

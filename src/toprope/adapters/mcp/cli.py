@@ -146,7 +146,9 @@ def _kernel(args):
     if args.env:
         from ...deploy import LocalEnvironment
         env = LocalEnvironment(args.env)
-    return LocalKernel(args.kernel_root, workspace=ws, environment=env)
+    # TOPROPE_TLC_JAR: the human-request workflow sets it, so approvals there need TLC (ADR-0043)
+    return LocalKernel(args.kernel_root, workspace=ws, environment=env,
+                       tlc_jar=os.environ.get("TOPROPE_TLC_JAR") or None)
 
 
 def member_events(c, name: str):
@@ -190,6 +192,8 @@ def _member(args, identity, services):
                 raise SystemExit("error: --seed loads example objects; use it with --store memory or --store-dir")
             args.no_seed = True
         stores = {n: open_store(f"jsonl:{p}") for n, p in logs.items()}
+    if hasattr(services, "domain_events"):   # the change check replays each member's own history
+        services.domain_events.update({c.domains[n].domain: st for n, st in stores.items()})
     exs = assemble(c, stores, identity, services=services)
     if not args.no_seed:
         for ex in exs.values():

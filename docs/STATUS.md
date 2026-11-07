@@ -167,6 +167,57 @@ only its own item below.
   A break that first needs a state the small world never builds (Delivery's) stays TLC's;
   `docs/harness.md`, "What each one catches" (#141)
 
+## Review follow-ups (umbrella #143, link: ① ③)
+
+From an integrated review of #135 (2026-11-07): the mechanical guarantee had gaps the self-compile
+showed, and the loop is heavy even for experts. One sub-PR each into `umbrella/review-follow-ups`;
+each changes only its own item below. Not here: a confirmation view for non-developers (needs
+M0b's UI), checking the non-developer claim (M1 Phase B, M2), TLC modeling creation and links
+(Next).
+
+- ✅ 1. A late kernel reply is recorded, not applied (#148)
+  Narrowed from "only for a call that is waiting for it": the review's gaps were late replies.
+  A reply whose object someone other than the kernel moved out of its called-in state is
+  refused with `late-reply`, its result kept in the outbox record.
+
+- ✅ 2. The change check replays past actions from the domain's own event log in git (#144)
+  `toprope-run`/`toprope-server` with `--composition` give the kernel each member's store, so
+  `change_check` replays a self domain's real history with nothing deployed. Only actions this
+  change newly blocks are errors; the base's own blocks are counted. On Authoring's log: 96 of 96
+  re-decided, 0 blocked, 2 blocked by the base too (the `commit_draft` calls with `evidence`
+  from before #124).
+
+- ✅ 3. Breaks that need several steps are caught before approval, not only in CI (#145, ADR-0044)
+  With `TOPROPE_TLC_JAR`, the change check runs TLC (`tla` check) and the kernel approves only a
+  commit whose `tla` check passed. The human-request workflow installs the pinned TLC; a request
+  runs `check_commit` before `approve_commit`.
+
+- ✅ 4. One change, one request: confirm, commit, check and approve in one declared step (#146)
+  A request step's target may be `$commit`: the commit an earlier `commit_draft` step of the same
+  request made, read from its output. `human_request.py change` writes the four steps. A request
+  is tooling, not a declared action: the steps stay the Authoring declaration's own.
+
+- ✅ 5. `verify` runs the domain's probes instead of taking a checkbox (#147)
+  The kernel's `probe` service checks a deployed commit in use: its build and the floor, its
+  scenarios at the execution level, and every object in the deployed store against every
+  invariant (`check.in_use`); recorded as the `probes` check. Delivery's change is proposed
+  (`run_probes`, `record_probes`, `verify` needs `probes-passed`, a new deploy clears probes);
+  The researcher confirmed, approved, deployed and verified it in one human request (approval run
+  42349530977): Delivery main `5-35b215f4a8901224`, its `tla` check passed in the approval
+  (ADR-0044, 8492 states), its probes passed.
+  A proposal inside an element (`actions.verify.effects`) now proposes the element again.
+  The first approval run stopped at the change check: log replay found the four past checkbox
+  verifications blocked. They are on finished requests, so they are now warnings (the
+  researcher's choice); a block on an object in flight stays an error.
+
+- ✅ Integrated review of the umbrella (#149)
+  Two gaps, fixed: the probes read the deploy environment's store, which is fresh in every
+  approval run, so for the self domains they checked no object in use; and a new invariant that
+  objects in use already break went unreported (Delivery's four verified requests from before
+  the probes). The probes now read the domain's own log when the kernel has it, and the change
+  check's `in_flight` tests every object in use against the new invariants: an object in flight
+  that breaks one is an error, a finished one a warning, as in log replay.
+
 ## M0b, M2 to M5
 
 Not started. Plans: [`roadmap.md`](roadmap.md).
@@ -227,8 +278,10 @@ it; each release's cleanup PR handles items older than one release.
 - Neither the validator nor the harness catches a creating action that leaves a required
   property unset (`record_commit` made Commits without `domain_id`; found running the loop)
   (#86, 2026-11-06)
-- `propose_element` on a path that is not an element (for example `glossary.<term>`) writes the
-  value without provenance instead of failing (#86, 2026-11-06)
+- `propose_element` on a path that is not an element (for example `glossary.<term>`,
+  `scenarios.<id>`, `world.fixtures`) writes the value without provenance instead of failing, so
+  such a change shows only in the commit's review diff; #147's Delivery change has three
+  (#86, 2026-11-06; again in #147, 2026-11-07)
 - `toprope-run` reads `git config` twice per command (once to check the caller, once in
   `submit`) (#85, 2026-11-06)
 - `identity/git.py` repeats the git lookup in `Workspace.identity`, and the two name a person

@@ -21,8 +21,12 @@ IDS = {"people": {"ana@example.com": {"name": "ana", "github": "Ana-GH", "roles"
 
 def test_a_request_is_checked_before_it_is_shown():
     ok = {"summary": "Freeze the binding", "steps": [{"freeze-binding": "experiments/m1/instruments"},
+          {"run": {"member": "authoring", "action": "check_commit", "target": "5-ab"}},
           {"run": {"member": "authoring", "action": "approve_commit", "target": "5-ab"}}]}
     assert hr.check(ok) == []
+    unchecked = {"summary": "x", "steps": [ok["steps"][2], ok["steps"][1]]}   # checked only after
+    (err,) = hr.check(unchecked)
+    assert err.startswith("step 1: approve_commit 5-ab needs a check_commit step on it before")
     assert hr.check({"summary": "", "steps": []}) == ["summary: say in one line what you approve",
                                                     "steps: a non-empty list"]
     assert "is not a step" in hr.check({"summary": "x", "steps": [{"shell": "rm -rf /"}]})[0]
@@ -66,6 +70,81 @@ def test_the_approver_is_the_person_and_only_inside_the_approval_job(tmp_path, m
         github_logins(f)
 
 
+def test_an_approval_does_not_run_without_tlc(tmp_path, monkeypatch):
+    (tmp_path / "ids.yaml").write_text(yaml.safe_dump(IDS))
+    monkeypatch.delenv(hr.TLC_ENV, raising=False)
+    req = {"summary": "x", "steps": [{"run": {"member": "authoring", "action": "check_commit", "target": "5-ab"}},
+                                     {"run": {"member": "authoring", "action": "approve_commit", "target": "5-ab"}}]}
+    with pytest.raises(SystemExit, match="approve_commit needs TLC"):
+        hr.run(req, "ana-gh", identity="ids.yaml", cwd=tmp_path)
+
+
+def test_a_step_whose_kernel_call_failed_fails_the_request(tmp_path, monkeypatch):
+    """The action was accepted, so toprope-run exits 0, but the approval it set off was refused
+    (no TLC check, ADR-0044): the request must not report success."""
+    (tmp_path / "ids.yaml").write_text(yaml.safe_dump(IDS))
+    monkeypatch.setenv(hr.TLC_ENV, "tla2tools.jar")
+    out = {"status": "ok", "then": [{"kernel": "approve_commit", "reply": "record_approval", "status": "failed",
+                                     "error": "5-ab has no passing TLC check (never run with TLC)"}]}
+    monkeypatch.setattr(hr.subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0, json.dumps(out), ""))
+    req = {"summary": "x", "steps": [{"run": {"member": "authoring", "action": "approve_commit", "target": "5-ab"}}]}
+    with pytest.raises(SystemExit, match="approve_commit: failed .5-ab has no passing TLC check"):
+        hr.run(req, "ana-gh", identity="ids.yaml", cwd=tmp_path)
+    out["then"][0] |= {"status": "ok"}
+    assert hr.run(req, "ana-gh", identity="ids.yaml", cwd=tmp_path)[0]["returncode"] == 0
+
+
+def test_one_request_takes_a_change_from_proposed_to_approved():
+    req = hr.change("authoring")
+    assert [(st["run"]["action"], st["run"]["target"]) for st in req["steps"]] == [
+        ("confirm_all_proposed", "authoring"), ("commit_draft", "authoring"),
+        ("check_commit", hr.MADE), ("approve_commit", hr.MADE)]
+    assert hr.check(req) == []
+    assert "**approve_commit** the commit made above" in hr.render(req)
+    early = {"summary": "x", "steps": [req["steps"][2], *req["steps"]]}
+    assert hr.check(early)[0].startswith("step 1: $commit names the commit a commit_draft step before it makes")
+    stale = {"summary": "x", "steps": [*req["steps"][:3], req["steps"][1], req["steps"][3]]}
+    assert any("step 5: approve_commit $commit needs a check_commit" in e for e in hr.check(stale))  # a newer commit
+
+
+def test_the_commit_a_step_made_is_the_target_of_the_next(tmp_path, monkeypatch):
+    (tmp_path / "ids.yaml").write_text(yaml.safe_dump(IDS))
+    monkeypatch.setenv(hr.TLC_ENV, "tla2tools.jar")
+    cmds = []
+
+    def run(cmd, **kw):
+        cmds.append(cmd)
+        then = [{"kernel": "commit", "reply": "record_commit", "status": "ok", "object": "7-c0ffee"}] \
+            if cmd[-2] == "commit_draft" else []
+        return subprocess.CompletedProcess(cmd, 0, json.dumps({"status": "ok", "then": then}), "")
+    monkeypatch.setattr(hr.subprocess, "run", run)
+    req = hr.change("authoring")
+    req["steps"].append({"run": {"member": "delivery", "action": "preview", "target": "authoring:$commit:local"}})
+    assert hr.check(req) == [] and "`authoring:<the commit made above>:local`" in hr.render(req)
+    done = hr.run(req, "ana-gh", identity="ids.yaml", cwd=tmp_path)
+    assert [c[-2:] for c in cmds] == [["confirm_all_proposed", "authoring"], ["commit_draft", "authoring"],
+                                      ["check_commit", "7-c0ffee"], ["approve_commit", "7-c0ffee"],
+                                      ["preview", "authoring:7-c0ffee:local"]]   # another member, inside a target
+    assert done[1]["commit"] == "7-c0ffee"
+
+
+def test_change_writes_the_request(tmp_path):
+    out = tmp_path / ".toprope/requests/c.yaml"
+    hr.main(["change", str(out), "--draft", "delivery", "--workspace", "toprope.delivery.workspace.yaml"])
+    req = hr.load(out)
+    assert req["steps"][0]["run"] == {"member": "authoring", "workspace": "toprope.delivery.workspace.yaml",
+                                      "action": "confirm_all_proposed", "target": "delivery"}
+
+
+def test_the_approval_job_has_the_tla_job_s_pinned_tlc():
+    import re
+    act = (ROOT / ".github/workflows/human-request.yml").read_text()
+    tla = (ROOT / ".github/workflows/tla.yml").read_text()
+    pins = [re.findall(r"TLC_(?:VERSION|SHA256): (\S+)", f) for f in (act, tla)]
+    assert pins[0] == pins[1] and len(pins[0]) == 2
+    assert 'TOPROPE_TLC_JAR=$RUNNER_TEMP/tla2tools.jar' in act
+
+
 def test_the_repository_names_the_researchers_github_login():
     assert github_logins(ROOT / "toprope.identity.yaml")["steamshon"].actor.id == "steamshon <steamshon@apache.org>"
 
@@ -105,6 +184,13 @@ def test_an_approved_request_runs_its_steps_as_the_approver(tmp_path, monkeypatc
     assert added["status"] == "confirmed"
     entry = json.loads((tmp_path / "domains/authoring/interview.jsonl").read_text().splitlines()[-1])
     assert entry["who"] == "ana <ana@example.com>" and entry["via"] == "kernel"
+    nxt = hr.run({"summary": "Commit and check it", "steps": hr.change("authoring")["steps"][1:3]},
+                 "ANA-GH", cwd=tmp_path)                                 # commit_draft, check_commit $commit
+    made = nxt[0]["commit"]
+    assert made and nxt[1]["step"]["run"]["target"] == hr.MADE
+    assert json.loads(nxt[1]["stdout"])["then"][0]["kernel"] == "change_check"
+    from toprope.commits import CommitStore
+    assert "change-check" in CommitStore(tmp_path / ".toprope/commits").check_status("authoring", made)
 
 
 def test_an_approved_request_freezes_instruments(tmp_path, monkeypatch):

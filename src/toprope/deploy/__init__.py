@@ -176,6 +176,44 @@ class LocalEnvironment:
                 raise
             return self._deploy_locked(build_id, approver, {"commit": c.id, "seq": c.seq, "commit_domain": domain})
 
+    def probe_commit(self, commits: Any, domain: str, commit_id: str, events: Any = None) -> dict[str, Any]:
+        """The deployed commit, checked in use: this environment runs its build and the floor
+        still holds; its scenarios pass at the execution level, on the current toolchain; every
+        object in use meets every invariant (a break on a finished object is a warning). `events`
+        is the domain's own store, when it keeps one (the self domains' logs in git); else the
+        environment's. Recorded as the `probes` check."""
+        c = commits.get(domain, commit_id)
+        cur = self.current() or {}
+        problems: list[str] = []
+        if cur.get("commit_domain") != domain or cur.get("commit") != c.id:
+            problems.append(f"{c.id} is not what this environment runs ({cur.get('commit') or 'nothing'})")
+        else:
+            build = self.build(cur["build"])
+            decl = (self.root / "builds" / cur["build"] / "domain.yaml").read_bytes()
+            if build is None or _sha(decl) != build.declaration_sha256:
+                problems.append("the deployed build's declaration changed after preview")
+            elif build.toolchain != toolchain_hash():
+                problems.append("the toolchain changed since the deploy: preview and deploy again")
+            d = Domain.model_validate(load_yaml(decl.decode()))
+            from ..harness.run import Harness
+            h = Harness(d, levels=("execution",))
+            passed = h.flows("execution")
+            problems += [f"scenario {f.case}: {f.detail.get('why')}" for f in h.findings if f.kind == "flow"]
+            from ..check import in_use
+            if events is not None:
+                use = in_use(d, events)
+            else:
+                with self.events(domain) as store:
+                    use = in_use(d, store) if store is not None else None
+            problems += [f"{p.where}: {p.message}" for p in (use.problems if use else []) if p.severity == "error"]
+            warned = sum(p.severity == "warning" for p in (use.problems if use else []))
+            checked = (f"{passed} of {len(d.scenarios)} scenario(s) pass; " + (use.note if use else "no store yet")
+                       + (f"; {warned} warning(s) on finished objects" if warned else ""))
+        summary = ("passed: " + checked) if not problems else "; ".join(problems[:5])
+        if hasattr(commits, "record_check"):
+            commits.record_check(domain, c.id, "probes", not problems, summary)
+        return {"passed": not problems, "summary": summary}
+
     # -- the build floor (reached only through deploy_commit, ADR-0029) -----------------------
     def _deploy_locked(self, build_id: str, approver: Actor, extra: dict[str, Any]) -> dict[str, Any]:
         try:
@@ -213,11 +251,11 @@ class LocalEnvironment:
     def stranded(self, d: Domain) -> list[str]:
         """Objects in this environment whose type, or state, the new declaration lacks (the
         change check's in-flight check, ADR-0018)."""
-        from ..check import in_flight
+        from ..check import stranded
         with self.events() as store:
             if store is None:
                 return []
-            return [f"{p.where} ({p.message})" for p in in_flight(d, store).problems]
+            return [f"{p.where} ({p.message})" for p in stranded(d, store).problems]
 
     @contextmanager
     def events(self, domain: str | None = None):

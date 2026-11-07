@@ -177,6 +177,40 @@ def test_without_services_calls_stay_pending_and_only_the_kernel_can_reply():
         Caller(Actor("external:kernel", "system", ("external:kernel",)))
 
 
+def test_a_reply_after_the_object_moved_on_is_recorded_not_applied():
+    """TLC found late replies breaking invariants (#139); #140 guarded the self domains by hand.
+    The kernel now refuses any reply whose target left the state it was called in."""
+    def moves_on(r):
+        r["actions"]["approve_version"].pop("preconditions")
+        r["transitions"]["DomainVersion"]["matrix"]["approved"].update(
+            record_validation="approved", record_harness="approved")    # the declaration would take it
+    e = ex(mutate=moves_on)
+    assert e.submit("t", "check_version", "V1", idempotency_key="k1").ok    # called while draft
+    assert e.submit("t", "approve_version", "V1", idempotency_key="k2").state["status"] == "approved"
+    kernel = RecordingKernel({"validate": {"ok": True, "errors": 3}, "run_harness": {"ok": False, "findings": 2}})
+    Outbox(e).dispatch(services=kernel)
+    assert len(kernel.calls) == 2                                           # the calls still ran
+    st = e.state("V1")
+    assert st.get("harness_ok") is None and st.get("conflicts") is None     # nothing applied
+    res = resolution(e, "V1", "run_harness")
+    assert res.payload["status"] == "denied" and res.payload["code"] == "late-reply"
+    assert "was draft when the kernel was called; approve_version moved it to approved" in res.payload["reason"]
+    assert res.payload["result"]["findings"] == 2                           # the result is on record
+
+
+def test_a_reply_that_moves_the_object_does_not_make_its_sibling_late():
+    def first_reply_moves(r):
+        m = r["transitions"]["DomainVersion"]["matrix"]
+        m["draft"]["record_validation"] = "approved"
+        m["approved"]["record_harness"] = "approved"
+    kernel = RecordingKernel({"validate": {"ok": True, "errors": 0}, "run_harness": {"ok": True, "findings": 0}})
+    e = ex(kernel, mutate=first_reply_moves)
+    e.submit("t", "check_version", "V1", idempotency_key="k1")
+    st = e.state("V1")
+    assert st["status"] == "approved" and st["harness_ok"] is True        # both results applied
+    assert resolution(e, "V1", "run_harness").payload["status"] == "ok"
+
+
 def test_the_harness_covers_kernel_replies_and_scenarios_state_results():
     from toprope.harness import run_harness
     r = run_harness(dom(), explore_examples=20, races=False)

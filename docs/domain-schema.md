@@ -451,6 +451,7 @@ works. The catalog is the kernel itself (ADR-0027):
 | `approve_commit` | `domain`, `commit`, `approver` | `approved`, `main` (merges into `main` and tags it, ADR-0033) |
 | `preview` | `domain`, `commit` | `build`, `harness_ok` |
 | `deploy` | `domain`, `commit`, `approver` | `deployed` (under the fixed floor, ADR-0022, ADR-0029) |
+| `probe` | `domain`, `commit` | `passed`, `summary` (the deployed commit in use: its build, its scenarios at the execution level, every object in the deployed store against every invariant; recorded as the `probes` check) |
 
 `changed`, `added`, `removed` and `to_review` are lists of element keys: a reply param that
 receives one is `{type: string, many: true}`. `approve_commit` and `deploy` record a person's
@@ -483,6 +484,12 @@ Rules:
 - **The reply.** It is a command from `external:kernel` to the `reply` action on the same
   object, keyed by the effect id, so it is applied at most once. It goes through the matrix,
   preconditions and invariants like any other command.
+- **A late reply is recorded, not applied.** If, after the call, someone other than the
+  kernel (a person, an agent, a handoff) moved the object out of the state it was called in,
+  the reply is refused with `late-reply`; its result stays in the outbox record. Another reply
+  of the same action may move the object without making its siblings late. The model level
+  (harness, TLC) still treats a reply as any action, so it finds what a missing guard allows;
+  this is the runtime's backstop for it (#139, #140).
 - **Every field, every time.** A result always has every field: `ok`, `error` (`""` when
   ok), and the service's fields, with defaults when it failed. A failed call (including
   inputs of the wrong type) still replies, so the declaration decides what a failure means,
