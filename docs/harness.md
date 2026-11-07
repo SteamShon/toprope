@@ -93,6 +93,38 @@ state bound. It also requires a seeded break (`tests/tla/`) to be found and repr
 silent pass cannot mean that TLC checks nothing. Actions that create objects, use time or
 follow links are left out of the model and listed with every run.
 
+TLC's model starts from one fixture at a time. No modeled step or invariant reads another instance
+(link paths are left out, and a `ref` param is only an id), so the instances are independent, and
+checking each alone reaches the same states in a sum instead of a product. Modeling links ends
+this.
+
+### What each one catches
+The harness builds a small world: from the fixtures, one grown instance per (object, state). Its
+cell and param tests take **one step** from those instances, and exploration samples short
+sequences from them. TLC follows **every** reachable state.
+
+| | Harness | TLC |
+|---|---|---|
+| Finds | a break one step away from an instance the small world holds, with any finite param value | also a break that first needs a state the small world never builds |
+| Runs | in the change check, on every commit, before approval (seconds) | in the `tla` CI job, on every pull request (minutes) |
+
+Two breaks TLC found in the self domains (#139, fixed in #140) show the line:
+
+- **One step, now the harness's.** In Authoring, the fixture commit `C1` is already approved, and
+  a kernel reply `record_check` with `passed: false` breaks
+  `approved-commits-passed-their-checks`. The start is in the small world, and the break is one
+  step away. A cell test takes the default params (`passed: true`) and missed it; param tests
+  take `false` too.
+- **Two steps, TLC's.** In Delivery, the fixture `R4` is deployed (`done`). `preview` takes it
+  to `previewing`, still deployed, and then `record_build` with `harness_ok: false` breaks
+  `deployed-builds-passed-their-harness`. The small world holds one `previewing` instance,
+  reached from a request that was never deployed. So the harness never starts from "previewing
+  and deployed", while TLC does.
+
+So a break of the second kind is not caught by the change check in the loop. It is caught by the
+`tla` job on the pull request that carries the change. Closing that gap would mean several
+instances per state in the small world, at the cost of the harness's speed.
+
 ## The mechanical layer (ADR-0035)
 Besides the examples, the harness generates objects from the declaration's types, enums and
 links, in every stage, keeping only those that satisfy every invariant, and runs every
