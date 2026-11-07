@@ -1,6 +1,6 @@
 # M1 Phase B run protocol
 
-Status: **draft**
+Status: **frozen**
 
 Link: ① iterate safely (pilot, no verdict; ADR-0034). An agent drafted this at the maintainer's
 request (#123); the researcher decided its open questions on 2026-11-07 (*Decisions*, below).
