@@ -57,7 +57,7 @@ A domain owner's workflow lives in people's heads; turning it into a declared do
 | `commit_draft` | owner | **Draft** | — | the stage (per the matrix) | kernel `commit` → `record_commit` | `DraftCommitDraft` |
 | `record_commit` | the kernel | creates **Commit**; params `seq` (integer), `content` (string), `interface` (string), `domain` (string), `branch` (string), `author` (string) | — | `target.domain_id` ← `params.domain` | — | `CommitCreated` |
 | `check_commit` | owner | **Commit** | `not-approved`: An approved commit passed its check; check a new commit instead. | the stage (per the matrix) | kernel `change_check` → `record_check` | `CommitCheckCommit` |
-| `record_check` | the kernel | **Commit**; params `passed` (boolean), `summary` (string) | — | the stage (per the matrix); `target.checks_passed` ← `params.passed`, `target.failing` ← `params.summary` | — | `CommitRecordCheck` |
+| `record_check` | the kernel | **Commit**; params `passed` (boolean), `summary` (string) | `settled`: An approved commit's check is settled; a late result is not recorded. | the stage (per the matrix); `target.checks_passed` ← `params.passed`, `target.failing` ← `params.summary` | — | `CommitRecordCheck` |
 | `approve_commit` 🔒 📝 | owner | **Commit**; params `rationale` (string, optional) | `checks-pass`: Run the change check, and approve only a commit that passes it.; `not-approved`: Already approved; approve a newer commit. | the stage (per the matrix) | kernel `approve_commit` → `record_approval` | `CommitApproveCommit` |
 | `record_approval` | the kernel | **Commit**; params `approved` (boolean), `main` (string) | `approved-only-if-checked`: A commit is recorded as approved only if its change check passed. | the stage (per the matrix); `target.approved` ← `params.approved`, `target.main` ← `params.main` | — | `CommitRecordApproval` |
 | `deliver` | owner | **Commit**; params `environment` (one of local) | `approved`: Only an approved commit is delivered. | the stage (per the matrix) | handoff `deliver_approved_commit` → delivery.request_delivery | `CommitDeliver` |
@@ -162,7 +162,7 @@ Generated from the actions, their actors, the matrix and the kernel calls: for e
 **In `recorded`:**
 
 - **check_commit** by `owner`. Needs: An approved commit passed its check; check a new commit instead. Then starts kernel `change_check`, answered by `record_check`. Run: `toprope-run --domain authoring.domain.yaml check_commit ID`
-- **record_check** by the kernel, automatically (a reply)
+- **record_check** by the kernel, automatically (a reply). Needs: An approved commit's check is settled; a late result is not recorded
 - **approve_commit** by `owner` — **a person only** — recorded as a decision. Needs: Run the change check, and approve only a commit that passes it. Already approved; approve a newer commit. Then starts kernel `approve_commit`, answered by `record_approval`. Run: `toprope-run --domain authoring.domain.yaml approve_commit ID`
 - **record_approval** by the kernel, automatically (a reply). Needs: A commit is recorded as approved only if its change check passed
 - **deliver** by `owner`. Needs: Only an approved commit is delivered. Then hands over to delivery.`request_delivery`. Run: `toprope-run --domain authoring.domain.yaml deliver ID --environment ENVIRONMENT`
