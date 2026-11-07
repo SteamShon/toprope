@@ -167,7 +167,7 @@ only its own item below.
   A break that first needs a state the small world never builds (Delivery's) stays TLC's;
   `docs/harness.md`, "What each one catches" (#141)
 
-## Review follow-ups (umbrella, link: ① ③)
+## Review follow-ups (umbrella #143, link: ① ③)
 
 From an integrated review of #135 (2026-11-07): the mechanical guarantee had gaps the self-compile
 showed, and the loop is heavy even for experts. One sub-PR each into `umbrella/review-follow-ups`;
