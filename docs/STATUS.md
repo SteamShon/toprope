@@ -260,6 +260,13 @@ exists, fields no action sets), so the instances stay independent. Nothing of th
 is left out now. A third seeded break, read through a link (an Element citing no Source), must be
 found by the `tla` job.
 
+## TLC models time (#157, ADR-0043 follow-up, link: ③)
+
+Time is the harness's clock, frozen, as in replay: `now()` is that instant, an effect stores it
+as its ISO string, and every ISO time the model can hold has its offset and whole days in two
+tables, for comparisons and `days_since`. A fourth seeded break, through `days_since`, must be
+found by the `tla` job.
+
 ## M0b, M2 to M5
 
 Not started. Plans: [`roadmap.md`](roadmap.md).
@@ -289,9 +296,9 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    read tools, an observed time on facts from adapters, identity mappings on adapters; in M2,
    `confirmed_at` and `review_by` warnings; in the M4 spec, goals, expected outcomes and the
    outcome-to-decision link.
-6. ADR-0043's follow-ups: make `tla` a required check on `develop` once the umbrella is in
-   (maintainer); model time. Creation (#155) and link paths to what no action changes (#156) are
-   modeled; the self domains and the examples leave out nothing but time (`now()`).
+6. ADR-0043's follow-ups: make `tla` a required check on `develop` (maintainer). Creation
+   (#155), link paths to what no action changes (#156) and time, frozen at the harness's clock
+   (#157), are modeled; no declaration in the repository leaves anything out.
 
 ## Left from reviews
 

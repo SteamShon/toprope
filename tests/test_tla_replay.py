@@ -150,3 +150,34 @@ def test_a_break_read_through_a_link_is_replayed_too():
     assert judge(plain, inv, steps, set())["verdict"] == MISMATCH
     workflow = (ROOT / ".github/workflows/tla.yml").read_text()
     assert "authoring.origin-optional.domain.yaml=breaks:Inv_elements_cite_a_source" in workflow
+
+
+STALE = ROOT / "tests/tla/example.stale-draft.domain.yaml"
+TIME_TRACE = '''Error: Invariant Inv_approved_while_fresh is violated.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\\ last = <<"init">>
+/\\ obj = <<>>
+
+State 2: <Step_approve_experiment_approver line 90, col 1 to line 96, col 9 of module Toprope_example>
+/\\ last = <<"approve_experiment", "approver", "E-onboarding", <<>>>>
+/\\ obj = <<>>
+'''
+
+
+def test_a_break_through_time_is_replayed_on_the_same_clock():
+    """The seeded time break: a draft stamped 60 days before the clock is approved, and
+    approved-while-fresh (days_since <= 30) breaks. Replay runs on the harness's clock, as the
+    model does, so it reproduces it; without the stamp, it does not."""
+    import yaml
+    inv, steps = parse_trace(TIME_TRACE)
+    seeded = load_domain(STALE)
+    assert judge(seeded, inv, steps, harness_broken(seeded))["verdict"] in (KNOWN, GAP)
+    raw = yaml.safe_load(STALE.read_text())
+    for fx in raw["world"]["fixtures"]:
+        for data in fx.values():
+            data.pop("drafted_at", None)
+    from toprope.decl import Domain
+    assert judge(Domain.model_validate(raw), inv, steps, set())["verdict"] == MISMATCH
+    workflow = (ROOT / ".github/workflows/tla.yml").read_text()
+    assert "example.stale-draft.domain.yaml=breaks:Inv_approved_while_fresh" in workflow

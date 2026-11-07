@@ -24,9 +24,13 @@ is the linked object or null, a list of them for a link to many. That is sound o
 modeled action changes, so a field read through a link must be one no action sets; then the
 instances stay independent.
 
-Left out of the model, and named in `Export.left_out`: actions whose object has no matrix, any
-action whose guard or effect uses time (`now`, `days_since`), a link path to a field some action
-changes or through a second link, `new.` on a non-creating action, an unknown function, a non-integer number, or a param of a type the model
+Time is the harness's clock, frozen (replay runs on the same one): `now()` is that instant, an
+effect stores it as its ISO string, and every ISO time the model can hold has its offset
+(`Secs`), for comparisons, and its whole days (`Days`), for `days_since`; a time that is not a
+whole number of days from the clock gives `days_since` an error value, failing closed.
+
+Left out of the model, and named in `Export.left_out`: actions whose object has no matrix, a
+link path to a field some action changes or through a second link, `new.` on a non-creating action, an unknown function, a non-integer number, or a param of a type the model
 cannot enumerate, and an action no actor of the model may take.
 """
 
@@ -45,7 +49,7 @@ from ..harness.world import world_actors
 KERNEL = "external:kernel"
 INTS = (0, 1, 2, 7, 30, 100, 1000, 10000)
 STRS = ("x", "example", "")
-DATES = ("2026-01-01T00:00:00+00:00", "2026-06-30T12:00:00+00:00")
+DATES = ("2026-01-01T00:00:00+00:00", "2025-11-02T00:00:00+00:00")   # the clock, and 60 days before
 BOUND = 1_000_000
 
 PRELUDE = r"""
@@ -62,16 +66,27 @@ Attr(v, f) == IF Tag(v) = "e" THEN E ELSE IF Tag(v) = "r" THEN Get(v[2], f) ELSE
 Num(v) == IF Tag(v) = "b" THEN (IF v[2] THEN 1 ELSE 0) ELSE v[2]
 Eq(a, b) == IF Tag(a) = Tag(b) THEN a = b
             ELSE IF {Tag(a), Tag(b)} = {"b", "i"} THEN Num(a) = Num(b) ELSE FALSE
-OpEq(a, b) == IF Tag(a) = "e" \/ Tag(b) = "e" THEN E ELSE B(Eq(a, b))
-OpNe(a, b) == IF Tag(a) = "e" \/ Tag(b) = "e" THEN E ELSE B(~Eq(a, b))
+T(x) == <<"t", x>>
+IsTime(v) == Tag(v) = "t" \/ (Tag(v) = "s" /\ v[2] \in DOMAIN Secs)
+Sec(v) == IF Tag(v) = "t" THEN v[2] ELSE Secs[v[2]]
+OneTime(a, b) == (Tag(a) = "t") # (Tag(b) = "t")
+TimeEq(a, b) == IF Tag(a) = "s" \/ Tag(b) = "s" THEN (IF IsTime(a) /\ IsTime(b) THEN B(Sec(a) = Sec(b)) ELSE E)
+                ELSE B(FALSE)
+OpEq(a, b) == IF Tag(a) = "e" \/ Tag(b) = "e" THEN E ELSE IF OneTime(a, b) THEN TimeEq(a, b) ELSE B(Eq(a, b))
+OpNe(a, b) == IF Tag(a) = "e" \/ Tag(b) = "e" THEN E ELSE IF OneTime(a, b) THEN (LET r == TimeEq(a, b) IN IF Tag(r) = "b" THEN B(~r[2]) ELSE r)
+              ELSE B(~Eq(a, b))
 Mem(a, l) == \E k \in 1..Len(l[2]) : Eq(a, l[2][k])
 OpIn(a, l) == IF Tag(a) = "e" \/ Tag(l) # "l" THEN E ELSE B(Mem(a, l))
 OpNotIn(a, l) == IF Tag(a) = "e" \/ Tag(l) # "l" THEN E ELSE B(~Mem(a, l))
 Ord(a, b) == Tag(a) \in {"i", "b"} /\ Tag(b) \in {"i", "b"}
-OpLt(a, b) == IF Ord(a, b) THEN B(Num(a) < Num(b)) ELSE E
-OpLe(a, b) == IF Ord(a, b) THEN B(Num(a) <= Num(b)) ELSE E
-OpGt(a, b) == IF Ord(a, b) THEN B(Num(a) > Num(b)) ELSE E
-OpGe(a, b) == IF Ord(a, b) THEN B(Num(a) >= Num(b)) ELSE E
+TOrd(a, b) == (Tag(a) = "t" \/ Tag(b) = "t") /\ IsTime(a) /\ IsTime(b)
+OpLt(a, b) == IF Ord(a, b) THEN B(Num(a) < Num(b)) ELSE IF TOrd(a, b) THEN B(Sec(a) < Sec(b)) ELSE E
+OpLe(a, b) == IF Ord(a, b) THEN B(Num(a) <= Num(b)) ELSE IF TOrd(a, b) THEN B(Sec(a) <= Sec(b)) ELSE E
+OpGt(a, b) == IF Ord(a, b) THEN B(Num(a) > Num(b)) ELSE IF TOrd(a, b) THEN B(Sec(a) > Sec(b)) ELSE E
+OpGe(a, b) == IF Ord(a, b) THEN B(Num(a) >= Num(b)) ELSE IF TOrd(a, b) THEN B(Sec(a) >= Sec(b)) ELSE E
+DaysSince(v) == IF Tag(v) = "n" THEN N ELSE IF Tag(v) = "t" THEN I(0)
+                ELSE IF Tag(v) = "s" /\ v[2] \in DOMAIN Days THEN I(Days[v[2]]) ELSE E
+Store(v) == IF Tag(v) = "t" THEN S(NowIso) ELSE v
 IsInt(v) == Tag(v) = "i"
 OpAdd(a, b) == IF Tag(a) = "s" /\ Tag(b) \in {"s", "i"} THEN S(a[2] \o (IF Tag(b) = "i" THEN ToString(b[2]) ELSE b[2]))
                ELSE IF Tag(b) = "s" /\ Tag(a) = "i" THEN S(ToString(a[2]) \o b[2])
@@ -184,6 +199,10 @@ class Expr:
                 return f"Op{name}({self.node(a)}, {self.node(b)})"
             case Call(name, args) if name in ("exists", "count") and len(args) == 1:
                 return f"Op{name.capitalize()}({self.node(args[0])})"
+            case Call("now", []):
+                return "T(0)"                                # the harness's clock, frozen
+            case Call("days_since", [x]):
+                return f"DaysSince({self.node(x)})"
             case Call(name, _):
                 raise Unsupported(f"the function {name}()")
         raise Unsupported(f"the expression {n!r}")
@@ -294,7 +313,7 @@ def export(d: Domain, name: str | None = None, bound: int = BOUND) -> Export:
     fresh = {a.creates: f"new-{a.creates}" for a in d.actions.values()
              if a.creates is not None and a.creates in d.objects}
     lines = [f"---- MODULE {mod} ----", "EXTENDS Integers, Sequences, FiniteSets, TLC",
-             "VARIABLES obj, last", "vars == <<obj, last>>", PRELUDE]
+             "VARIABLES obj, last", "vars == <<obj, last>>", *_time_tables(d), PRELUDE]
     modeled = sorted(set(instances) | set(fresh))
     for obj in modeled:
         ids_ = [i for i, _ in instances.get(obj, [])] + ([fresh[obj]] if obj in fresh else [])
@@ -412,7 +431,7 @@ def _action(d: Domain, name: str, a: Any, tr: Any, actors: dict[str, Any], ids: 
                 if key.startswith("new."):
                     raise Unsupported("new.")
                 attr = key.split(".", 1)[1] if key.startswith("target.") else key
-                sets[attr] = ex(v) if isinstance(v, str) else value(v)
+                sets[attr] = f"Store({ex(v)})" if isinstance(v, str) else value(v)
         op = ident("Step", name, role)
         args = ", ".join(f"{pvars[p]} \\in {{{', '.join(value(v) for v in cands[p])}}}" for p in required)
         params_rec = "<<" + ", ".join(f"<<{tla_str(p)}, {pvars[p]}>>" for p in required) + ">>"
@@ -470,7 +489,7 @@ def _create(d: Domain, name: str, a: Any, actors: dict[str, Any], ids: list[str]
         for e in a.effects:
             for key, v in (e.set or {}).items():
                 attr = key.split(".", 1)[1] if key.startswith(("target.", "new.")) else key
-                sets[attr] = ex(v) if isinstance(v, str) else value(v)
+                sets[attr] = f"Store({ex(v)})" if isinstance(v, str) else value(v)
         new = record(base)
         for attr, v in sorted(sets.items()):
             new = f"({tla_str(attr)} :> {v}) @@ ({new})"
@@ -502,6 +521,40 @@ def _reads(d: Domain, obj: str, creating: Any) -> set[str]:
     texts += [i.check for i in d.invariants if i.on == obj]
     words = set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", " ".join(texts)))
     return {p for p in creating.params if p in words}
+
+
+def _time_tables(d: Domain) -> list[str]:
+    """Time, frozen at the harness's clock (replay uses the same one). Every ISO time the model
+    can hold (the fixtures' values, the datetime candidates, the clock's own) gets its offset in
+    seconds from the clock (`Secs`), and, when it is a whole number of days, `days_since` of it
+    (`Days`): the interpreter's `days_since` is fractional, so a time that is not whole days
+    from the clock fails closed (`E`) and is named as such."""
+    from datetime import datetime, timezone
+
+    from ..harness.run import NOW
+    now_iso = NOW.isoformat()
+
+    def walk(v: Any):
+        if isinstance(v, str):
+            yield v
+        elif isinstance(v, dict):
+            for x in v.values():
+                yield from walk(x)
+        elif isinstance(v, list):
+            for x in v:
+                yield from walk(x)
+    found: dict[str, int] = {}
+    for s_ in [now_iso, *DATES, *(x for fx in d.world.fixtures for data in fx.values() for x in walk(data))]:
+        try:
+            t = datetime.fromisoformat(s_)
+        except ValueError:
+            continue
+        t = t if t.tzinfo else t.replace(tzinfo=timezone.utc)
+        found[s_] = int((t - NOW).total_seconds())
+    secs = " @@ ".join(f"({tla_str(k)} :> {v})" for k, v in sorted(found.items())) or "[x \\in {} |-> 0]"
+    whole = {k: -v // 86400 for k, v in found.items() if v % 86400 == 0}
+    days = " @@ ".join(f"({tla_str(k)} :> {v})" for k, v in sorted(whole.items())) or "[x \\in {} |-> 0]"
+    return [f"NowIso == {tla_str(now_iso)}", f"Secs == {secs}", f"Days == {days}"]
 
 
 def _set_fields(sf: str, sets: dict[str, str]) -> str:

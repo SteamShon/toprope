@@ -97,8 +97,13 @@ state bound. It also requires a seeded break (`tests/tla/`) to be found and repr
 silent pass cannot mean that TLC checks nothing: one break in a step on an existing object
 (paid-media without a precondition), one made by creation alone (Delivery creating a request
 already deployed), and one read through a link (Authoring creating an Element that cites no
-Source). Actions that use time, or read through a link a field some action changes, are left out
-of the model and listed with every run.
+Source). Actions that read through a link a field some action changes are left out
+of the model and listed with every run. A fourth seeded break goes through time (an experiment
+approved 60 days after its draft, against a 30-day rule).
+
+Time is the harness's clock, frozen, as in replay: `now()` is that instant, an effect stores it
+as its ISO string, and every ISO time the model can hold (fixtures, the datetime candidates, the
+clock) has its offset and its whole days in two tables, for comparisons and `days_since`.
 
 A link path reads the linked objects from their fixtures, a constant (`Fix_<Object>`). It is
 sound only for what no modeled action changes, so that is all a link may read: whether the
