@@ -77,7 +77,8 @@ command reference are generated.
 | 5. Dry run (changes 1–2), run by the researcher: time and usage per change | ✅ | #109 |
 | 6. Full run, scoring confirmed by the researcher, M1 report. The first full run (#112) is superseded (`experiments/m1/runs/superseded/`): it ran before the run protocol was frozen, and from `authoring@4` | 🟡 | #112 |
 | 7. Re-baseline on `authoring@9` + `delivery@1` (researcher's decision, 2026-11-07): today's harness finds an invariant break in `authoring@4`, so the deploy floor refuses it. The harness reads the baseline from fixed repository revisions, never the working tree; materials rebuilt; the binding's `domain_version` amended; the NL skill removed until the researcher renders it again (the NL arm refuses a stale one); the editor is told when the kernel refuses its proposal | 🟡 | |
-| 8. The harness follows the frozen run protocol: five reviews and three probe runs per change, the Toprope arm's 3-change repeat, the decision log `phase-b-runs.tsv`, the experiment-word check, the noise floor | ⬜ | |
+| 8a. No experiment words (protocol §1): the harness's prompts, the change requests and probe requests as given, tool names and descriptions, and workspace file names are checked, and a run stops before showing one; tools never show the workspace's absolute path. The decision log (§4): `runs/phase-b-runs.tsv`, append-only, one row per edit, review or check, deploy and probe, with a pointer to its evidence; a change run again is superseded by a new row | 🟡 | |
+| 8b. Repeats and spread (protocol §3): five reviews and three probe runs per change, the Toprope arm's 3-change repeat, recall and precision per run with mean, minimum and maximum, the noise floor; flags graded under random labels per change | ⬜ | |
 
 How a run works: the researcher runs `python -m phase_b arm ARM --model M` (from
 `experiments/m1`) in an ordinary terminal. Each conversation is written as it happens, and

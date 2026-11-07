@@ -45,6 +45,7 @@ from phase_b.model import (
     Usage,
     tool_use,
 )
+from phase_b.blind import words_in
 from phase_b.toolserver import ToolSpec, make_server
 
 SEALED = "SEALED-MARKER-7f3a"     # appears only in the synthetic key and binding
@@ -231,6 +232,7 @@ def test_a_cli_conversation_is_blind_and_recorded(tmp_path, monkeypatch, fake_cl
     assert a[a.index("--system-prompt") + 1] == "the role" and a[a.index("--model") + 1] == "m-under-test"
     assert call["stdin"] == "the message" and not call["api_key"]                          # the subscription
     assert ROOT not in Path(call["cwd"]).parents and Path(call["cwd"]) != ROOT             # outside the repository
+    assert words_in(Path(call["cwd"]).name) == []                                          # an ordinary name
     kinds = [json.loads(x)["kind"] for x in (tmp_path / "t.jsonl").read_text().splitlines()]
     assert kinds == ["start", "init", "reply", "result"]
     assert b.report()["tokens"]["input"] == 50 and b.usd == pytest.approx(0.01)

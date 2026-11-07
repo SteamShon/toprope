@@ -53,6 +53,7 @@ from .baseline import BASELINE, baseline_root
 from .backend import ApiBackend, Backend, CliBackend, UsageLimit, user_memory
 from .model import AnthropicModel, Budget, BudgetExceeded
 from .probes import build_worlds, load_probes
+from .runlog import RunLog, log_path
 from .score import grade as grade_run
 from .score import score as score_run
 from .toprope_arm import build_sandbox, export_toolchain, toprope_arm
@@ -137,6 +138,8 @@ def run_arm(arm: Any, out: Path, requests: list[dict[str, Any]], backend: Backen
     manifest["sessions"].append(session)
     write = lambda: mpath.write_text(json.dumps(manifest, indent=2) + "\n")
     write()
+    log = RunLog(log_path(out.parent))
+    log.append(arm.name, "", "", "session-start", mpath, f"harness {session['harness_commit']}; model {model_id}")
     try:
         if worlds is not None and not manifest.get("baseline_probes"):
             # The probes before any change: a probe that passes here and fails after a change
@@ -148,6 +151,7 @@ def run_arm(arm: Any, out: Path, requests: list[dict[str, Any]], backend: Backen
             probes0 = arm.probe({"seq": 0, "intent": "(before any change)"}, d0, worlds, load_probes(instruments),
                                 jobs=jobs)
             d0.mkdir(parents=True, exist_ok=True)
+            _log_probes(log, arm.name, 0, 1, d0 / "probes", probes0)
             (d0 / "record.json").write_text(json.dumps({"seq": 0, "probes": probes0,
                                                         "seconds": {"probes": time.monotonic() - tp}},
                                                        indent=2, ensure_ascii=False) + "\n")
@@ -157,7 +161,9 @@ def run_arm(arm: Any, out: Path, requests: list[dict[str, Any]], backend: Backen
             if req["seq"] in manifest["done"]:
                 continue
             d = out / f"seq-{req['seq']:02d}"
-            shutil.rmtree(d, ignore_errors=True)                    # a change left half done
+            if d.exists():                                         # a change left half done
+                log.append(arm.name, req["seq"], 1, "superseded", d, "a stopped attempt: the change runs again")
+            shutil.rmtree(d, ignore_errors=True)
             stage = {"step": ""}
             backend.progress = lambda s, r=req, i=i, st=stage: _progress(arm.name, i, len(requests), r["seq"], st["step"], s)
             before = backend.report()
@@ -181,6 +187,7 @@ def run_arm(arm: Any, out: Path, requests: list[dict[str, Any]], backend: Backen
                       "tokens": {k: after["tokens"][k] - before["tokens"][k] for k in after["tokens"]},
                       "usd_estimate": round(after["usd_estimate"] - before["usd_estimate"], 4)}
             (d / "record.json").write_text(json.dumps(record, indent=2, ensure_ascii=False) + "\n")
+            _log_change(log, arm.name, req["seq"], d, record)
             manifest["done"].append(req["seq"])
             _line(f"{arm.name} · change {req['seq']} done · {len(check.data.get('findings', []))} finding(s) · "
                   f"{record['seconds']['edit_to_checked']:.0f}s", end="\n")
@@ -196,7 +203,33 @@ def run_arm(arm: Any, out: Path, requests: list[dict[str, Any]], backend: Backen
         session["finished_at"] = _now()
         session["usage"] = backend.report()
         write()
+        log.append(arm.name, "", "", "session-stop", mpath, session["stopped"] or "finished")
     return manifest
+
+
+def _log_change(log: RunLog, arm: str, seq: int, d: Path, record: dict[str, Any]) -> None:
+    """One change's rows in the decision log: what ran, where its evidence is, what came of it."""
+    edit, check, deploy = record["edit"], record["check"], record["deploy"]
+    log.append(arm, seq, 1, "edit", d / "edit.jsonl" if (d / "edit.jsonl").exists() else d / "record.json",
+               "changed" if edit.get("changed", edit.get("diff")) else "unchanged")
+    if arm == "toprope":
+        commits = check.get("commits") or {}
+        result = "; ".join(f"{dom} {c['commit']} {'passed' if c['passed'] else 'failed'}"
+                           for dom, c in sorted(commits.items())) or "no commit"
+        log.append(arm, seq, 1, "check", d / "record.json",
+                   f"{result}; {len(check.get('findings', []))} finding(s)")
+    else:
+        log.append(arm, seq, 1, "review", d / "review.jsonl",
+                   f"error: {check['error']}" if check.get("error") else f"{len(check.get('findings', []))} finding(s)")
+    log.append(arm, seq, 1, "deploy", d / "record.json", "deployed" if deploy.get("deployed") else "not deployed")
+    if record.get("probes") is not None:
+        _log_probes(log, arm, seq, 1, d / "probes", record["probes"])
+
+
+def _log_probes(log: RunLog, arm: str, seq: int, run: int, where: Path, probes: list[dict[str, Any]]) -> None:
+    for p in probes:
+        log.append(arm, seq, run, f"probe {p['probe']}", where / p.get("transcript", f"{p['probe']}.jsonl"),
+                   f"error: {p['error']}" if p.get("error") else "ran (graded later)")
 
 
 def probe_worlds(out: Path) -> Path:

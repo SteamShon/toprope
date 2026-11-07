@@ -397,6 +397,8 @@ def run_probe(backend: Any, worlds: Path, p: dict[str, Any], out: Path, how: str
         ctx["servers"] = servers(root)
     t = Transcript(out / f"{p['id']}.jsonl")
     result: dict[str, Any] = {"probe": p["id"]}
+    from .blind import check
+    check(f"probe {p['id']}'s request", _user(p, situation))     # stops the run: never a probe error
     try:
         result["answer"] = backend.converse(prompt("probe", how=how, materials=materials), _user(p, situation),
                                             ToolSpec("probe", str(root), json.dumps(ctx)), t)

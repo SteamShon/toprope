@@ -42,6 +42,28 @@ class ToolSpec:
 
 
 def build_tools(spec: ToolSpec) -> list[Tool]:
+    """A role's tools, checked for experiment words, with the workspace's absolute path kept out
+    of every result and error (run protocol §1)."""
+    from .blind import check_files, check_tools, redact
+    tools = _build(spec)
+    check_tools(tools)
+    root = Path(spec.root)
+    if spec.kind == "files" and root.is_dir():
+        check_files(root)
+
+    def guarded(fn):
+        @functools.wraps(fn)
+        def call(*a, **k):
+            try:
+                return redact(fn(*a, **k), root)
+            except ToolError as e:
+                raise ToolError(redact(str(e), root)) from None
+        return call
+
+    return [Tool(t.name, t.description, t.schema, guarded(t.fn)) for t in tools]
+
+
+def _build(spec: ToolSpec) -> list[Tool]:
     if spec.kind == "files":
         return file_tools(Path(spec.root))
     if spec.kind == "probe":

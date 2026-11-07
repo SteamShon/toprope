@@ -32,10 +32,16 @@ PROMPTS = Path(__file__).parent / "prompts"
 
 
 def prompt(name: str, **fill: str) -> str:
+    """A role's prompt. The harness's own text in it (the template, and every fill but the
+    domain's materials) is checked for experiment words (run protocol §1)."""
+    from .blind import check
     text = (PROMPTS / f"{name}.md").read_text()
     for k, v in fill.items():
-        text = text.replace("{" + k + "}", v)
-    return text
+        if k != "materials":
+            text = text.replace("{" + k + "}", v)
+    if not name.startswith("grade_"):              # the grader sees the key; it is not in an arm
+        check(f"prompt {name}", text)
+    return text.replace("{materials}", fill.get("materials", "{materials}"))
 
 
 def tree_hash(root: Path) -> str:
@@ -60,6 +66,7 @@ def diff(before: dict[str, str], after: dict[str, str]) -> str:
 
 
 def request_text(req: dict[str, Any]) -> str:
+    """A change request as the agents get it: the frozen intent and rationale, nothing else."""
     return f"Change request {req['seq']}: {req['intent']}\nWhy: {req.get('rationale', '').strip()}"
 
 

@@ -123,7 +123,7 @@ class CliBackend(Backend):
 
     def converse(self, system, user, tools, transcript, max_turns=40):
         # stderr goes to a file, not a pipe: a full pipe would block claude while we read stdout
-        with tempfile.TemporaryDirectory(prefix="m1-role-") as tmp, tempfile.TemporaryFile(mode="w+") as errfile:
+        with tempfile.TemporaryDirectory(prefix="work-") as tmp, tempfile.TemporaryFile(mode="w+") as errfile:
             cwd = Path(tmp)
             cfg = None
             if tools is not None:
