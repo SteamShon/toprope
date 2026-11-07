@@ -150,7 +150,11 @@ only its own item below.
   gap`, one the interpreter does not reproduce a `model mismatch`; the last two fail the `tla` job,
   and the seeded break must be found and reproduced (#138)
 
-- ⬜ 5. Every example and both self domains, under a state bound
+- ✅ 5. Every example and both self domains in the `tla` job, each fixture checked alone (the
+  modeled instances are independent). TLC first found a **harness gap** in each self domain (a
+  late kernel reply with a failing result on an approved commit, or on a deployed request); both
+  declarations now refuse those replies (item 6), and the harness finds the one-step kind itself
+  (item 7) (#139)
 
 - ✅ 6. The self domains refuse the late kernel replies TLC found: Authoring's `record_check` on an
   approved commit (`settled`), and Delivery's `preview` of a deployed request (`not-deployed`; a
