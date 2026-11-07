@@ -194,12 +194,14 @@ M0b's UI), checking the non-developer claim (M1 Phase B, M2), TLC modeling creat
   request made, read from its output. `human_request.py change` writes the four steps. A request
   is tooling, not a declared action: the steps stay the Authoring declaration's own.
 
-- 🟡 5. `verify` runs the domain's probes instead of taking a checkbox (#147)
+- ✅ 5. `verify` runs the domain's probes instead of taking a checkbox (#147)
   The kernel's `probe` service checks a deployed commit in use: its build and the floor, its
   scenarios at the execution level, and every object in the deployed store against every
   invariant (`check.in_use`); recorded as the `probes` check. Delivery's change is proposed
   (`run_probes`, `record_probes`, `verify` needs `probes-passed`, a new deploy clears probes);
-  the researcher confirms, approves, deploys and verifies it in one human request.
+  The researcher confirmed, approved, deployed and verified it in one human request (approval run
+  42349530977): Delivery main `5-35b215f4a8901224`, its `tla` check passed in the approval
+  (ADR-0044, 8492 states), its probes passed.
   A proposal inside an element (`actions.verify.effects`) now proposes the element again.
   The first approval run stopped at the change check: log replay found the four past checkbox
   verifications blocked. They are on finished requests, so they are now warnings (the
