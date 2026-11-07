@@ -111,18 +111,18 @@ def test_conflicts_are_resolved_in_the_working_copy_then_approved(tmp_path):
     write(tmp_path / "d.domain.yaml", raw)
     ws = Workspace(tmp_path)
     c0 = ws.commit()["commit"]
-    ws.approve_commit(c0, via="cli", who="ana")
+    ws.approve_commit(c0, via="terminal", who="ana")
     other = copy.deepcopy(raw)                                       # someone else lands a change on main
     other["actions"]["launch_experiment"]["description"] = "Turn it on."
     other["glossary"]["o"] = "O."
     (tmp_path / "other").mkdir()
     co = ws.commits.commit(write(tmp_path / "other" / "o.domain.yaml", other), branch="other")[0]
-    ws.approve_commit(co.id, via="cli", who="ana")
+    ws.approve_commit(co.id, via="terminal", who="ana")
     raw["actions"]["launch_experiment"]["description"] = "Start traffic."
     write(tmp_path / "d.domain.yaml", raw)
     mine = ws.commit()["commit"]
     with pytest.raises(AuthoringError, match="conflicts"):
-        ws.approve_commit(mine, via="cli", who="ana")
+        ws.approve_commit(mine, via="terminal", who="ana")
     raw["glossary"]["dirty"] = "not committed"
     write(tmp_path / "d.domain.yaml", raw)
     with pytest.raises(AuthoringError, match="not committed"):
@@ -137,7 +137,7 @@ def test_conflicts_are_resolved_in_the_working_copy_then_approved(tmp_path):
     write(tmp_path / "d.domain.yaml", resolved)
     r = ws.commit(merge=co.id)
     assert ws.commits.get("example", r["commit"]).parents == [mine, co.id]
-    a = ws.approve_commit(r["commit"], via="cli", who="ana")
+    a = ws.approve_commit(r["commit"], via="terminal", who="ana")
     assert a["main"] == r["commit"]                                  # a fast-forward: no new merge commit
     assert ws.merge_main()["up_to_date"]
 
@@ -178,7 +178,7 @@ def land_on_main(ws, tmp_path, raw, name="other"):
     """Someone else's change, approved into main from its own branch and folder."""
     (tmp_path / name).mkdir(exist_ok=True)
     c = ws.commits.commit(write(tmp_path / name / "o.domain.yaml", raw), branch=name, representations=[])[0]
-    ws.approve_commit(c.id, via="cli", who="ana")
+    ws.approve_commit(c.id, via="terminal", who="ana")
     return c
 
 
@@ -187,7 +187,7 @@ def test_a_resolved_merge_is_checked_before_main_takes_it(tmp_path):
     from toprope.workspace import AuthoringError
     raw = schema_doc_domain()
     ws = workspace(tmp_path, raw)
-    ws.approve_commit(ws.commit()["commit"], via="cli", who="ana")
+    ws.approve_commit(ws.commit()["commit"], via="terminal", who="ana")
     other = copy.deepcopy(raw)
     del other["objects"]["Experiment"]["properties"]["started_at"]
     other["actions"]["launch_experiment"]["effects"] = []
@@ -200,7 +200,7 @@ def test_a_resolved_merge_is_checked_before_main_takes_it(tmp_path):
     assert ws.merge_main()["conflicts"] == []
     r = ws.commit(merge=co.id)
     with pytest.raises(AuthoringError, match="does not validate"):
-        ws.approve_commit(r["commit"], via="cli", who="ana")
+        ws.approve_commit(r["commit"], via="terminal", who="ana")
     assert ws.commits.main("example").id == co.id
 
 
@@ -252,7 +252,7 @@ def test_a_branch_is_reviewed_from_its_merge_base_not_from_main(tmp_path):
     raw = schema_doc_domain()
     ws = workspace(tmp_path, raw)
     c0 = ws.commit()["commit"]
-    ws.approve_commit(c0, via="cli", who="ana")
+    ws.approve_commit(c0, via="terminal", who="ana")
     other = copy.deepcopy(raw)
     other["glossary"]["o"] = "O."
     land_on_main(ws, tmp_path, other)
@@ -268,7 +268,7 @@ def test_merging_main_removes_a_ui_that_main_removed(tmp_path):
     ui.write_text(yaml.safe_dump({"representation": "ui", "version": 1,
                                   "targets": {"domain": "example", "interface": "1.x"}, "views": {}}))
     ws = workspace(tmp_path, raw)
-    ws.approve_commit(ws.commit()["commit"], via="cli", who="ana")
+    ws.approve_commit(ws.commit()["commit"], via="terminal", who="ana")
     other = copy.deepcopy(raw)
     other["glossary"]["o"] = "O."
     land_on_main(ws, tmp_path, other)                                 # its folder has no UI: removed
@@ -282,7 +282,7 @@ def test_merge_reports_an_unreadable_ui_as_an_authoring_error(tmp_path):
     from toprope.workspace import AuthoringError
     raw = schema_doc_domain()
     ws = workspace(tmp_path, raw)
-    ws.approve_commit(ws.commit()["commit"], via="cli", who="ana")
+    ws.approve_commit(ws.commit()["commit"], via="terminal", who="ana")
     other = copy.deepcopy(raw)
     other["glossary"]["o"] = "O."
     land_on_main(ws, tmp_path, other)
@@ -336,7 +336,7 @@ def test_a_merge_in_progress_is_recorded_and_the_next_commit_uses_it(tmp_path):
     both parents, so the kernel's plain `commit` service finishes a merge (ADR-0037)."""
     raw = schema_doc_domain()
     ws = workspace(tmp_path, raw)
-    ws.approve_commit(ws.commit()["commit"], via="cli", who="ana")
+    ws.approve_commit(ws.commit()["commit"], via="terminal", who="ana")
     other = copy.deepcopy(raw)
     other["glossary"]["o"] = "O."
     main = land_on_main(ws, tmp_path, other)
@@ -355,7 +355,7 @@ def test_the_kernel_merges_main_into_a_working_copy(tmp_path):
     from toprope.kernel.services import LocalKernel
     raw = schema_doc_domain()
     ws = workspace(tmp_path, raw)
-    ws.approve_commit(ws.commit()["commit"], via="cli", who="ana")
+    ws.approve_commit(ws.commit()["commit"], via="terminal", who="ana")
     other = copy.deepcopy(raw)
     other["glossary"]["o"] = "O."
     land_on_main(ws, tmp_path, other)
@@ -383,7 +383,7 @@ def test_branches_merge_and_approve_and_the_read_command(tmp_path):
     assert c1["branch"] == "feat"
     with pytest.raises(AuthoringError, match="protected"):
         ws.commit(branch="main")
-    assert ws.approve_commit(c1["commit"], via="cli", who="ana")["main"] == c1["commit"]
+    assert ws.approve_commit(c1["commit"], via="terminal", who="ana")["main"] == c1["commit"]
     out = commits_cli(tmp_path, "branches", "example")
     assert out.returncode == 0 and json.loads(out.stdout) == {"feat": c1["commit"], "main": c1["commit"]}
     assert ws.merge_main("feat")["up_to_date"] is True
@@ -398,7 +398,7 @@ def test_branches_merge_and_approve_and_the_read_command(tmp_path):
 def test_a_checkout_abandons_a_merge_in_progress(tmp_path):
     raw = schema_doc_domain()
     ws = workspace(tmp_path, raw)
-    ws.approve_commit(ws.commit()["commit"], via="cli", who="ana")
+    ws.approve_commit(ws.commit()["commit"], via="terminal", who="ana")
     other = copy.deepcopy(raw)
     other["glossary"]["o"] = "O."
     land_on_main(ws, tmp_path, other)
