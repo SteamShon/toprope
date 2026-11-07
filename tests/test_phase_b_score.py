@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -53,24 +54,32 @@ def probes_at(seq: int, failing: tuple[str, ...] = ()) -> list[dict]:
              "messages_to_owner": [], "transcript": f"P0{i}.jsonl"} for i in range(1, 9)]
 
 
-def write_run(run: Path, arm: str, findings: dict[int, list[dict]], seconds: dict[int, float],
-              failing: dict[int, tuple[str, ...]] | None = None, done=(1, 2, 3), deployed=True) -> None:
+def write_run(run: Path, arm: str, findings: dict[int, list], seconds: dict[int, float],
+              failing: dict[int, tuple[str, ...]] | None = None, done=(1, 2, 3), deployed=True, runs: int = 1,
+              timed: dict[int, list[tuple[float, str]]] | None = None) -> None:
+    """`findings[seq]` is one run's findings, or with `runs` > 1 a list of each run's."""
     (run / arm).mkdir(parents=True)
     (run / arm / "manifest.json").write_text(json.dumps({"arm": arm, "done": list(done)}))
     for seq in (0, *done):
         d = run / arm / f"seq-{seq:02d}"
         d.mkdir()
-        rec = {"seq": seq, "probes": probes_at(seq, (failing or {}).get(seq, ())), "seconds": {}}
+        rec = {"seq": seq, "probes": [{"run": 1, "dir": "probes/run-1",
+                                       "results": probes_at(seq, (failing or {}).get(seq, ()))}], "seconds": {}}
         if seq:
-            rec.update(intent=f"intent {seq}", edit={"diff": f"diff {seq}"}, check={"findings": findings.get(seq, [])},
+            fs = findings.get(seq, [] if runs == 1 else [[]] * runs)
+            per_run = [fs] if runs == 1 else fs
+            check = {"runs": [{"run": k, "findings": f, "error": None} for k, f in enumerate(per_run, 1)]}
+            if timed and seq in timed:
+                check["timed"] = [{"seconds": t, "limiter": lim, "parts": {}} for t, lim in timed[seq]]
+            rec.update(intent=f"intent {seq}", edit={"diff": f"diff {seq}"}, check=check,
                        deploy={"deployed": deployed, **({"domains": {"x": {}}} if arm == "toprope" else {})},
                        seconds={"edit_to_checked": seconds[seq]})
         (d / "record.json").write_text(json.dumps(rec))
 
 
-def grader(labels: dict[tuple[str, int], list[str]]):
-    """A fake grader: findings labelled as given (by the arm named in the message and the seq); a
-    probe fails when the agent's answer says FAIL."""
+def grader(labels: dict[tuple[str, int], list[str]], run: Path | None = None):
+    """A fake grader: each arm's findings labelled as given, by index in every run (it looks the arm up in the
+    blind labels, which a real grader never sees); a probe fails when the agent's answer says FAIL."""
     calls = []
 
     def script(system, messages, tools):
@@ -79,11 +88,22 @@ def grader(labels: dict[tuple[str, int], list[str]]):
         if "grade one run of a probe" in system:
             return json.dumps({"passed": "FAIL" not in user, "why": "w"})
         seq = int(user.split("Change request ")[1].split(":")[0])
-        arm = user.split("The arm: ")[1].split("\n")[0]
-        ls = labels.get((arm, seq), [])
-        return json.dumps({"findings": [{"index": i, "label": x, "why": "w"} for i, x in enumerate(ls)],
-                           "edit_fidelity": "implements", "edit_why": "w"})
+        mapping = yaml.safe_load((run / "scoring/blind-labels.yaml").read_text())["labels"][seq] if run else {}
+        flags, edits = [], []
+        for letter, arm in mapping.items():
+            edits.append({"label": letter, "fidelity": "implements", "why": "w"})
+        for letter, k, i in re.findall(r"^([ABC])\.(\d+)\.(\d+)\. ", user, re.MULTILINE):
+            given = labels.get((mapping[letter], seq), [])          # by index, in every run
+            if int(i) < len(given):
+                flags.append({"id": f"{letter}.{k}.{i}", "label": given[int(i)], "why": "w"})
+        return json.dumps({"flags": flags, "edits": edits})
     return script, calls
+
+
+def flags_of(prop: dict, run: Path, arm: str, seq: int) -> list[dict]:
+    letter = {a: x for x, a in yaml.safe_load((run / "scoring/blind-labels.yaml").read_text())["labels"][seq].items()}[arm]
+    change = next(c for c in prop["changes"] if c["seq"] == seq)
+    return [f for f in change["flags"] if f["id"].startswith(letter + ".")]
 
 
 F = lambda where, domain="authoring": {"domain": domain, "where": where, "problem": "p"}
@@ -135,22 +155,42 @@ def test_the_key_opens_only_after_every_arm_has_run_every_change(tmp_path):
 def test_grading_labels_findings_edits_and_probes(tmp_path):
     inst, run = instruments(tmp_path), tmp_path / "run"
     three_arms(run)
-    script, calls = grader(LABELS)
+    script, calls = grader(LABELS, run)
     runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m"],
                 backend=ApiBackend(FakeModel(script)))
     prop = yaml.safe_load((run / "scoring/proposed.yaml").read_text())
     assert prop["status"] == "proposed" and not prop["partial"]
-    nl1 = prop["arms"]["nl"]["changes"][0]
-    assert [f["label"] for f in nl1["findings"]] == ["seeded", "false-alarm"] and nl1["edit"]["fidelity"] == "implements"
-    tp = prop["arms"]["toprope"]["changes"]
-    assert tp[0]["findings"][0]["binding_match"] is True and tp[1]["findings"][0]["binding_match"] is True
-    assert len(prop["arms"]["nl"]["probes"]) == 4 * 8                           # seq 0 to 3
-    failed = [p for p in prop["arms"]["nl"]["probes"] if p["passed"] is False]
+    assert [f["label"] for f in flags_of(prop, run, "nl", 1)] == ["seeded", "false-alarm"]
+    assert {e["fidelity"] for c in prop["changes"] for e in c["edits"].values()} == {"implements"}
+    tp1, tp2 = flags_of(prop, run, "toprope", 1), flags_of(prop, run, "toprope", 2)
+    assert tp1[0]["script_label"] == "seeded" and tp2[0]["script_label"] == "seeded"       # element matches
+    assert flags_of(prop, run, "nl", 1)[0]["script_label"] is None                         # prose: the grader's
+    assert len(prop["probes"]["nl"]) == 4 * 8                                               # seq 0 to 3, one run
+    failed = [p for p in prop["probes"]["nl"] if p["passed"] is False]
     assert [(p["seq"], p["probe"]) for p in failed] == [(2, "P05")]
     change1 = next(c for c in calls if c.startswith("Change request 1:"))
     assert "KEY-ONE" in change1 and "KEY-TWO" not in change1             # only that change's key entry
     must = yaml.safe_load((inst / "probe-suite.yaml").read_text())["probes"][0]["must"][0]
     assert any(must in c for c in calls)                                   # the grader sees what probes check
+
+
+def test_each_change_is_graded_once_under_random_labels_kept_apart(tmp_path):
+    """Run protocol §2: one pass per change over all three arms, under labels A, B, C in a
+    different random order per change; the mapping is a separate file."""
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    three_arms(run)
+    script, calls = grader(LABELS, run)
+    score.grade(run, inst, ApiBackend(FakeModel(script)), runner.change_requests(inst), seed=7)
+    labels = yaml.safe_load((run / "scoring/blind-labels.yaml").read_text())["labels"]
+    assert all(sorted(v) == ["A", "B", "C"] and sorted(v.values()) == ["nl", "structured", "toprope"]
+               for v in labels.values())
+    assert len({tuple(v.values()) for v in labels.values()}) > 1           # not one fixed order
+    change_calls = [c for c in calls if c.startswith("Change request")]
+    assert len(change_calls) == 3                                          # one sitting per change
+    for c in change_calls:
+        assert "=== A ===" in c and "=== B ===" in c and "=== C ===" in c
+        assert not re.search(r"\b(nl|structured|toprope|[Tt]he arm)\b", c)
+    assert not re.search(r"\b(nl|structured|toprope)\b", (run / "scoring/proposed.yaml").read_text().split("\nprobes:")[0])
 
 
 # -- the metrics and the verdicts ----------------------------------------------------------------------------
@@ -166,7 +206,7 @@ def test_score_needs_the_researchers_confirmation(tmp_path):
     inst, run = instruments(tmp_path), tmp_path / "run"
     three_arms(run)
     runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m"],
-                backend=ApiBackend(FakeModel(grader(LABELS)[0])))
+                backend=ApiBackend(FakeModel(grader(LABELS, run)[0])))
     with pytest.raises(SystemExit, match="confirms the grader's labels first"):
         runner.main(["score", "--out", str(run), "--instruments", str(inst)])
     prop = yaml.safe_load((run / "scoring/proposed.yaml").read_text())
@@ -174,7 +214,7 @@ def test_score_needs_the_researchers_confirmation(tmp_path):
     with pytest.raises(SystemExit, match="status: confirmed"):
         runner.main(["score", "--out", str(run), "--instruments", str(inst)])
     prop["status"] = "confirmed"
-    prop["arms"]["nl"]["changes"][0]["findings"][0]["label"] = None
+    flags_of(prop, run, "nl", 1)[0]["label"] = None
     (run / "scoring/confirmed.yaml").write_text(yaml.safe_dump(prop))
     with pytest.raises(SystemExit, match="still have no label"):
         runner.main(["score", "--out", str(run), "--instruments", str(inst)])
@@ -184,7 +224,7 @@ def test_the_metrics_follow_the_confirmed_labels(tmp_path):
     inst, run = instruments(tmp_path), tmp_path / "run"
     three_arms(run)
     runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m"],
-                backend=ApiBackend(FakeModel(grader(LABELS)[0])))
+                backend=ApiBackend(FakeModel(grader(LABELS, run)[0])))
     confirmed(run)
     m = score.score(run, inst)["metrics"]
     nl, st, tp = m["nl"], m["structured"], m["toprope"]
@@ -195,6 +235,7 @@ def test_the_metrics_follow_the_confirmed_labels(tmp_path):
     assert nl["recall_by_type"] == {"breaks-reference": 0.0, "conflicts-with-rule": 1.0}
     assert nl["recall_by_designed_for_checks"] == {"no": 0.0, "yes": 1.0}
     assert nl["breakages_found_only_after_deploy"] == 1.0 and tp["undeployable"] == []
+    assert nl["recall_spread"] == {"runs": [0.5], "mean": 0.5, "min": 0.5, "max": 0.5}
 
 
 def test_the_frozen_rules_decide_the_pilot_verdict():
@@ -240,7 +281,59 @@ def test_a_problem_that_surfaces_a_change_later_is_found_after_deploy(tmp_path):
     write_run(run, "structured", {}, {1: 1, 2: 1, 3: 1})
     write_run(run, "toprope", {}, {1: 1, 2: 1, 3: 1})
     runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m"],
-                backend=ApiBackend(FakeModel(grader({})[0])))
+                backend=ApiBackend(FakeModel(grader({}, run)[0])))
     confirmed(run)
     nl = score.score(run, inst)["metrics"]["nl"]
     assert nl["found_after_deploy"] == {1: ["P06"], 2: ["P06"]} and nl["silent"] == []
+
+
+def test_recall_is_reported_per_run_with_its_spread_and_the_noise_floor(tmp_path):
+    """Run protocol §3: five reviews per change; recall and precision per run, with the mean, the
+    minimum and the maximum; the noise floor is the largest spread of an arm's recall."""
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    write_run(run, "nl", {1: [[F("x")], [F("x")], [F("x")], [], []]}, {1: 1, 2: 1, 3: 1}, runs=5)
+    write_run(run, "structured", {}, {1: 1, 2: 1, 3: 1}, runs=5)
+    write_run(run, "toprope", {1: [F("actions.confirm_element.preconditions.p")],
+                               2: [F("state:DeliveryRequest.v", "delivery")]}, {1: 1, 2: 1, 3: 1})
+    runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m"],
+                backend=ApiBackend(FakeModel(grader({("nl", 1): ["seeded"]}, run)[0])))
+    confirmed(run)
+    out = score.score(run, inst)
+    nl, st, tp = (out["metrics"][a] for a in ("nl", "structured", "toprope"))
+    assert nl["recall_spread"] == {"runs": [0.5, 0.5, 0.5, 0.0, 0.0], "mean": 0.3, "min": 0.0, "max": 0.5}
+    assert nl["runs"] == 5 and nl["flagged"] == [1]                    # flagged in most runs: 3 of 5
+    assert nl["precision_spread"]["runs"] == [1.0, 1.0, 1.0, None, None]
+    assert st["recall_spread"]["runs"] == [0.0] * 5 and tp["recall_spread"]["runs"] == [1.0]
+    assert out["noise_floor"] == 0.5 and out["verdicts"]["numbers"]["noise_floor"] == 0.5
+
+
+def test_a_gap_within_the_noise_floor_is_marked_next_to_its_rule():
+    rules = yaml.safe_load((ROOT / "experiments/m1/instruments/verdict-rules.yaml").read_text())
+
+    def arm(recall, lo, hi):
+        return {"recall": recall, "recall_spread": {"min": lo, "max": hi}, "precision": 0.9,
+                "median_edit_to_checked_s": 30.0, "breakages_found_only_after_deploy": 0.0, "seeded": 10,
+                "handoff_probe_P07_passes_throughout": True, "handoff_breaking_caught": {}}
+    v = score.verdicts({"toprope": arm(0.9, 0.9, 0.9), "nl": arm(0.5, 0.2, 0.7), "structured": arm(0.85, 0.8, 0.9)},
+                       rules)
+    assert v["numbers"]["noise_floor"] == 0.5
+    assert "gap_structured" in v["within_noise"] and "structured_recall_gap_min" in v["within_noise"]["gap_structured"]
+    assert "gap_nl" in v["within_noise"]                                # 0.4 < 0.5
+    assert v["iterate"].startswith("narrowed")                          # the frozen rules, applied as they are
+    assert "0.1" in v["steps"]                                          # one run moves recall by 1/10
+
+
+def test_iteration_time_is_the_median_of_timed_repeats_with_its_limiter(tmp_path):
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    write_run(run, "nl", {}, {1: 1, 2: 1, 3: 1})
+    write_run(run, "structured", {}, {1: 1, 2: 1, 3: 1})
+    write_run(run, "toprope", {}, {1: 99, 2: 99, 3: 99}, timed={
+        1: [(10, "harness"), (30, "harness"), (20, "preview"), (25, "harness"), (15, "harness")],
+        2: [(5, "impact")] * 5, 3: [(40, "preview"), (50, "preview"), (45, "harness"), (41, "preview"), (60, "preview")]})
+    runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m"],
+                backend=ApiBackend(FakeModel(grader({}, run)[0])))
+    confirmed(run)
+    tp = score.score(run, inst)["metrics"]["toprope"]
+    assert tp["iteration_time_by_change"][1] == {"median_s": 20, "min_s": 10, "max_s": 30, "limiter": "harness"}
+    assert tp["iteration_time_by_change"][3]["limiter"] == "preview"
+    assert tp["median_edit_to_checked_s"] == 20                          # the median of 20, 5 and 45

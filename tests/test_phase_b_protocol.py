@@ -79,9 +79,10 @@ def test_a_run_writes_the_decision_log_beside_the_run_directory(tmp_path):
     assert log.path == tmp_path / "runs/phase-b-runs.tsv"
     assert log.path.read_text().splitlines()[0].split("\t") == list(COLUMNS)
     rows = log.rows()
+    per_change = lambda c: [(c, "edit"), *[(c, "review")] * 5, (c, "deploy")]   # noqa: E731
     assert [(r["change"], r["what"]) for r in rows] == [
-        ("", "session-start"), ("1", "edit"), ("1", "review"), ("1", "deploy"),
-        ("2", "edit"), ("2", "review"), ("2", "deploy"), ("", "session-stop")]
+        ("", "session-start"), *per_change("1"), *per_change("2"), ("", "session-stop")]
+    assert [r["run"] for r in rows if r["what"] == "review" and r["change"] == "1"] == ["1", "2", "3", "4", "5"]
     assert {r["arm"] for r in rows} == {"nl"} and rows[2]["result"] == "1 finding(s)"
     for r in rows:
         assert not Path(r["evidence"]).is_absolute() and (log.path.parent / r["evidence"]).exists(), r
@@ -101,3 +102,25 @@ def test_a_change_run_again_is_superseded_in_the_log_not_edited(tmp_path):
     after = log.path.read_text()
     assert after.startswith(before)                            # append-only
     assert [r["what"] for r in log.rows() if r["change"] == "2"][:2] == ["superseded", "edit"]
+
+
+# -- §3: repeats ---------------------------------------------------------------------------------------
+
+def test_the_probes_run_three_times_after_each_change_and_before_any(tmp_path, monkeypatch):
+    inst = instruments(tmp_path)
+    b, _ = api()
+    work = tmp_path / "runs/phase-b/nl"
+    arm = nl_arm(materials(tmp_path), work, b)
+    seen = []
+
+    def probe(req, out, worlds, probes, jobs=1):
+        seen.append((req["seq"], out.relative_to(work)))
+        out.mkdir(parents=True, exist_ok=True)
+        return [{"probe": "P01", "answer": "ok", "messages_to_owner": [], "transcript": "P01.jsonl"}]
+    monkeypatch.setattr(arm, "probe", probe)
+    runner.run_arm(arm, work, runner.change_requests(inst)[:1], b, "fake", inst, worlds=tmp_path)
+    assert seen == [(s, Path(f"seq-0{s}/probes/run-{k}")) for s in (0, 1) for k in (1, 2, 3)]
+    rec = json.loads((work / "seq-01/record.json").read_text())
+    assert [(r["run"], r["dir"]) for r in rec["probes"]] == [(k, f"probes/run-{k}") for k in (1, 2, 3)]
+    rows = [r for r in RunLog(log_path(work.parent)).rows() if r["what"] == "probe P01"]
+    assert [(r["change"], r["run"]) for r in rows] == [(c, k) for c in ("0", "1") for k in ("1", "2", "3")]

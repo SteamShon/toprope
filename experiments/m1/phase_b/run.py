@@ -23,6 +23,11 @@ Before an arm runs, the frozen instruments are verified (`instruments.py verify 
 Only the change requests are read from the instruments: the change key and the binding are
 opened by the scorer, after every arm has run (ADR-0040 §8).
 
+Each change follows the frozen run protocol: five reviews (`--reviews`), three runs of the probes
+(`--probe-runs`), and in the Toprope arm one derandomized check, run again uncached on the first
+three changes, and five timed repeats (`--timed`). Every row goes to the decision log
+`OUT/../phase-b-runs.tsv`. Nothing an agent sees names the experiment (`blind.py`).
+
 The run writes, under OUT/ARM:
   manifest.json      the instruments' and materials' hashes, the prompts' hashes, the model
                      under test, the harness commit, each session's start and stop, the tokens
@@ -113,9 +118,21 @@ def in_order(all_: list[int], done: list[int], chosen: list[int]) -> list[int]:
     return todo
 
 
+def probe_runs(arm: Any, req: dict[str, Any], d: Path, worlds: Path, probes: list[dict[str, Any]], jobs: int,
+               runs: int) -> list[dict[str, Any]]:
+    """Run protocol §3: every probe `runs` times after a change, each run on fresh copies of the
+    starting states, in its own directory."""
+    out = []
+    for k in range(1, runs + 1):
+        where = f"probes/run-{k}"
+        out.append({"run": k, "dir": where, "results": arm.probe(req, d / where, worlds, probes, jobs=jobs)})
+    return out
+
+
 def run_arm(arm: Any, out: Path, requests: list[dict[str, Any]], backend: Backend, model_id: str,
             instruments: Path = INSTRUMENTS, extra: dict[str, Any] | None = None,
-            total: int | None = None, worlds: Path | None = None, jobs: int = 1) -> dict[str, Any]:
+            total: int | None = None, worlds: Path | None = None, jobs: int = 1,
+            runs_of_probes: int = 3) -> dict[str, Any]:
     """Every request in order: edit, check, deploy (flagged or not), then the probes (with
     `worlds`, their starting states). Finished changes are skipped;
     a stop (the usage limit, the cost cap, Ctrl-C, an error) keeps them, and is recorded."""
@@ -148,10 +165,11 @@ def run_arm(arm: Any, out: Path, requests: list[dict[str, Any]], backend: Backen
             shutil.rmtree(d0, ignore_errors=True)
             backend.progress = lambda s: _line(f"{arm.name} · before any change · probes · {s}")
             tp = time.monotonic()
-            probes0 = arm.probe({"seq": 0, "intent": "(before any change)"}, d0, worlds, load_probes(instruments),
-                                jobs=jobs)
+            probes0 = probe_runs(arm, {"seq": 0, "intent": "(before any change)"}, d0, worlds,
+                                 load_probes(instruments), jobs, runs_of_probes)
             d0.mkdir(parents=True, exist_ok=True)
-            _log_probes(log, arm.name, 0, 1, d0 / "probes", probes0)
+            for pr in probes0:
+                _log_probes(log, arm.name, 0, pr["run"], d0 / pr["dir"], pr["results"])
             (d0 / "record.json").write_text(json.dumps({"seq": 0, "probes": probes0,
                                                         "seconds": {"probes": time.monotonic() - tp}},
                                                        indent=2, ensure_ascii=False) + "\n")
@@ -177,7 +195,7 @@ def run_arm(arm: Any, out: Path, requests: list[dict[str, Any]], backend: Backen
             if worlds is not None:
                 stage["step"] = "probes"
                 tp = time.monotonic()
-                probes = arm.probe(req, d, worlds, load_probes(instruments), jobs=jobs)
+                probes = probe_runs(arm, req, d, worlds, load_probes(instruments), jobs, runs_of_probes)
                 probe_seconds = time.monotonic() - tp
             after = backend.report()
             record = {"seq": req["seq"], "intent": req["intent"], "edit": edit.data, "check": check.data,
@@ -189,7 +207,8 @@ def run_arm(arm: Any, out: Path, requests: list[dict[str, Any]], backend: Backen
             (d / "record.json").write_text(json.dumps(record, indent=2, ensure_ascii=False) + "\n")
             _log_change(log, arm.name, req["seq"], d, record)
             manifest["done"].append(req["seq"])
-            _line(f"{arm.name} · change {req['seq']} done · {len(check.data.get('findings', []))} finding(s) · "
+            n = sum(len(r.get("findings", [])) for r in check.data.get("runs", []))
+            _line(f"{arm.name} · change {req['seq']} done · {n} finding(s) · "
                   f"{record['seconds']['edit_to_checked']:.0f}s", end="\n")
             write()
     except (UsageLimit, BudgetExceeded) as e:
@@ -218,12 +237,18 @@ def _log_change(log: RunLog, arm: str, seq: int, d: Path, record: dict[str, Any]
                            for dom, c in sorted(commits.items())) or "no commit"
         log.append(arm, seq, 1, "check", d / "record.json",
                    f"{result}; {len(check.get('findings', []))} finding(s)")
+        if "repeat" in check:
+            log.append(arm, seq, 2, "check repeat", d / "record.json",
+                       "same findings" if check["repeat"]["same"] else "different findings")
+        for k, t in enumerate(check.get("timed") or [], 1):
+            log.append(arm, seq, k, "timed", d / "record.json", f"{t['seconds']:.1f}s; limiter {t['limiter']}")
     else:
-        log.append(arm, seq, 1, "review", d / "review.jsonl",
-                   f"error: {check['error']}" if check.get("error") else f"{len(check.get('findings', []))} finding(s)")
+        for r in check.get("runs") or []:
+            log.append(arm, seq, r["run"], "review", d / r["transcript"],
+                       f"error: {r['error']}" if r.get("error") else f"{len(r.get('findings', []))} finding(s)")
     log.append(arm, seq, 1, "deploy", d / "record.json", "deployed" if deploy.get("deployed") else "not deployed")
-    if record.get("probes") is not None:
-        _log_probes(log, arm, seq, 1, d / "probes", record["probes"])
+    for pr in record.get("probes") or []:
+        _log_probes(log, arm, seq, pr["run"], d / pr["dir"], pr["results"])
 
 
 def _log_probes(log: RunLog, arm: str, seq: int, run: int, where: Path, probes: list[dict[str, Any]]) -> None:
@@ -339,6 +364,10 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     a.add_argument("--instruments", type=Path, default=INSTRUMENTS)
     a.add_argument("--jobs", type=int, default=4,
                    help="probes run at once after each change (default 4); they are independent")
+    a.add_argument("--reviews", type=int, default=5,
+                   help="reviews per change in the NL and structured arms (run protocol §3: 5)")
+    a.add_argument("--probe-runs", type=int, default=3, help="runs of the probes after each change (§3: 3)")
+    a.add_argument("--timed", type=int, default=5, help="timed repeats of the Toprope checks per change (§3: 5)")
     a.add_argument("--no-probes", action="store_true",
                    help="skip the probes (not for a real run: ADR-0040 §6 runs all of them after every change)")
     sb = sub.add_parser("materials", help="build the structured-spec and Toprope arms' materials from the "
@@ -411,8 +440,12 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
             raise SystemExit(f"the Toprope materials start from {got}, the repository from {extra['baseline']}: "
                              "rebuild them with `materials`")
     arm = ARMS[args.arm](materials, work, backend, resume)
+    arm.reviews, arm.timed = args.reviews, args.timed           # the runs a resume must keep (manifest)
+    extra["runs"] = {"reviews": args.reviews if args.arm != "toprope" else None, "probes": args.probe_runs,
+                     "timed": args.timed if args.arm == "toprope" else None}
     m = run_arm(arm, work, [r for r in reqs if r["seq"] in chosen], backend, args.model or "unnamed",
-                args.instruments, extra, total=len(reqs), worlds=worlds, jobs=max(1, args.jobs))
+                args.instruments, extra, total=len(reqs), worlds=worlds, jobs=max(1, args.jobs),
+                runs_of_probes=args.probe_runs)
     stopped = m["sessions"][-1]["stopped"]
     print(json.dumps({"arm": args.arm, "done": m["done"], "stopped": stopped, "usage": backend.report(),
                       "seconds": round(time.monotonic() - t, 1)}))

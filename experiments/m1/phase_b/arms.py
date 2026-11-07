@@ -97,6 +97,8 @@ class TextArm:
     deployed: an edit left half done when the run stopped is thrown away, and that change runs
     again from the start."""
 
+    reviews = 5                                   # run protocol §3: five reviews per change
+
     def __init__(self, name: str, described: str, materials: Path, work: Path, backend: Backend,
                  resume: bool = False):
         self.name, self.described, self.backend = name, described, backend
@@ -131,11 +133,17 @@ class TextArm:
         files = "\n\n".join(f"=== {name} ===\n{text}" for name, text in after.items())
         user = (f"{request_text(req)}\n\n--- The diff ---\n{diff(self._before, after) or '(no change)'}\n\n"
                 f"--- Every file after the change ---\n{files}")
-        t = time.monotonic()
-        answer = self.backend.converse(prompt("review", arm=self.described), user, None,
-                                       Transcript(out / "review.jsonl"))
-        findings, error = parse_findings(answer)
-        return StepResult(time.monotonic() - t, {"findings": findings, "error": error})
+        t0 = time.monotonic()
+        runs = []
+        for k in range(1, self.reviews + 1):
+            # Run protocol §3: the same prompt, model and settings, each a fresh conversation.
+            t = time.monotonic()
+            answer = self.backend.converse(prompt("review", arm=self.described), user, None,
+                                           Transcript(out / f"review-{k}.jsonl"))
+            findings, error = parse_findings(answer)
+            runs.append({"run": k, "findings": findings, "error": error, "seconds": time.monotonic() - t,
+                         "transcript": f"review-{k}.jsonl"})
+        return StepResult(time.monotonic() - t0, {"runs": runs})
 
     def deploy(self, req: dict[str, Any], out: Path) -> StepResult:
         t = time.monotonic()
@@ -147,7 +155,7 @@ class TextArm:
         """The probes after this change, with the deployed text as the rules to follow."""
         from .probes import run_probes
         materials = "\n\n".join(f"=== {name} ===\n{text}" for name, text in snapshot(self.deployed).items())
-        return run_probes(self.backend, worlds, probes, out / "probes", self.described, materials, jobs=jobs)
+        return run_probes(self.backend, worlds, probes, out, self.described, materials, jobs=jobs)
 
 
 def _replace(target: Path, source: Path) -> None:
