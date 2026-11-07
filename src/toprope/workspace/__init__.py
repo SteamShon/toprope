@@ -265,15 +265,28 @@ class Workspace:
         return load_yaml(self.domain_path.read_text()) or {}
 
     def _write(self, doc: dict[str, Any]) -> list[dict[str, Any]]:
-        """Write the draft only if it parses as a declaration; return the validation issues."""
+        """Write the draft only if it parses as a declaration; return the validation issues.
+        Once the domain has a commit, its working copy is what the generated tools run, and they
+        refuse a declaration with errors. So a change that adds an error is refused there, and
+        nothing is written: propose what it refers to first (#124)."""
         try:
             d = Domain.model_validate(doc)
         except ValidationError as e:
             raise AuthoringError(f"the draft would not parse: {e.errors()[0]['loc']}: {e.errors()[0]['msg']}") from None
+        issues = validate_domain(d)
+        if self.domain_path.exists() and self.commits.log(d.domain):
+            before = {(i.code, i.where) for i in validate_domain(Domain.model_validate(self.draft()))
+                      if i.severity == "error"}
+            new = [i for i in issues if i.severity == "error" and (i.code, i.where) not in before]
+            if new:
+                raise AuthoringError(
+                    f"{d.domain} is committed, and its tools refuse a declaration with errors; this change "
+                    "would add " + "; ".join(f"{i.code} at {i.where}: {i.message}" for i in new) +
+                    ". Propose what it refers to first.")
         self.domain_path.parent.mkdir(parents=True, exist_ok=True)
         self.domain_path.write_text(yaml.safe_dump(doc, sort_keys=False, allow_unicode=True))
         return [{"code": i.code, "where": i.where, "message": i.message, "severity": i.severity}
-                for i in validate_domain(d)]
+                for i in issues]
 
     def _with_provenance(self, segs: list[str], value: Any, source: dict[str, Any]) -> Any:
         if segs[0] != "glossary":
