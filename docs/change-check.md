@@ -24,13 +24,17 @@ is deployed. It exits 1 when a check reports an error. The report is printed, wr
 | `semantic` | states the small world can no longer reach, actions no matrix cell allows, `undecided` cells | newly lost: error; already so: warning; undecided: info |
 | `scenarios` | scenario regression: the base's scenarios and the new ones, run on the new model. A scenario the new version dropped still runs | a failing scenario is an error |
 | `harness` | the generated harness at the model level: cells, invariants, gate-tier exploration | any finding is an error |
-| `log_replay` | every past action in the environment's event store, re-decided by the new model at its original time: "with this change, 1 past action would have been blocked" | blocked: error; would now set fields differently: warning |
+| `log_replay` | every past action in the domain's event store, re-decided by the new model at its original time: "with this change, 1 past action would have been blocked" | blocked by the new model but not the base: error; blocked by the base too: counted in the note; would now set fields differently: warning |
 | `in_flight` | objects in that store whose type or current state the new version lacks (stranded; migration plans come in M0b) | error |
 | `nl` | natural-language conflicts in descriptions and judgment rules, by an `NLChecker` (an LLM adapter) | warnings only; skipped when none is configured |
 
 - **Without a structurally valid declaration**, the checks that need a model do not run.
-- **Without an environment** (`--env`), log replay and the in-flight check do not run:
-  nothing was deployed.
+- **Without an event store**, log replay and the in-flight check do not run: nothing was
+  deployed. The kernel uses the domain's own event log when it serves the domain (a self
+  domain's `domains/<domain>/events`, kept in git), else its deploy environment's store.
+- **Only what this change newly blocks is an error.** A past action the base model blocks
+  too was blocked by an earlier change, already checked and approved; it is counted in the
+  note ("2 blocked by the base too"), so it does not fail every later check.
 - **Log replay keeps the recorded history.** Each past action is decided against the state
   the recorded events left, so one blocked action does not cascade. A past actor is assumed
   to have held every role the base version allowed for that action, roles named by actor
@@ -81,6 +85,6 @@ each check is the commit's status (`CommitStore.check_status`). A preview append
 decision (ADR-0032 recommends yes).
 
 ## From a declaration
-The kernel service `change_check` (`domain`, `commit`) runs the same check, uses the kernel's
-deploy environment for log replay when it has one, records the result, and returns
+The kernel service `change_check` (`domain`, `commit`) runs the same check, uses the domain's
+own event log for log replay (or the kernel's deploy environment when it has none), records the result, and returns
 `passed`, `errors`, `warnings`, `failing` and `summary`.

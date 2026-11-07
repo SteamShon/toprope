@@ -2,6 +2,7 @@
 import copy
 import json
 import subprocess
+from pathlib import Path
 
 import pytest
 import yaml
@@ -99,6 +100,38 @@ def test_log_replay_reports_past_actions_the_change_would_block(base):
         {"id": "long-enough", "check": "target.planned_days >= 30", "reason": "Run at least a month."})
     r2 = change_check(dom(raw2), dom(base), events=st, examples=10)
     assert [p.where for p in r2.checks["log_replay"].problems if p.severity == "error"] == ["E-onboarding@2"]
+
+
+def test_log_replay_reports_only_what_this_change_newly_blocks(base):
+    """A past action the base model already blocks (an earlier change removed what it used) is
+    not this change's doing: it is counted, so one approved change does not fail every check."""
+    st = history(base)
+    old = copy.deepcopy(base)                                            # already approved: the past fails it
+    old["actions"]["approve_experiment"]["preconditions"].append(
+        {"id": "long-enough", "check": "target.planned_days >= 30", "reason": "Run at least a month."})
+    new = copy.deepcopy(old)
+    new["actions"]["approve_experiment"]["preconditions"].append(
+        {"id": "always", "check": "true", "reason": "Touches approve, so it is re-decided."})
+    new["actions"]["launch_experiment"]["actor"] = ["approver"]          # newly blocks eli's launch
+    r = change_check(dom(new), dom(old), events=st, examples=10)
+    assert [p.message.split(" by ")[0] for p in r.checks["log_replay"].problems
+            if p.severity == "error"] == ["launch_experiment"]
+    assert r.checks["log_replay"].note.endswith("; 1 would be blocked; 1 blocked by the base too")
+
+
+def test_the_kernel_replays_a_domain_s_own_log_with_nothing_deployed(tmp_path, base):
+    from toprope.kernel.services import LocalKernel
+    st = CommitStore(tmp_path / ".toprope" / "commits")
+    c0, _ = st.commit(write(tmp_path / "d.yaml", base))
+    st.approve("example", c0.id, "ana")
+    raw = copy.deepcopy(base)
+    raw["actions"]["launch_experiment"]["actor"] = ["approver"]
+    c1, _ = st.commit(write(tmp_path / "d.yaml", raw))
+    k = LocalKernel(tmp_path, commits=st, harness_examples=10)             # no environment
+    k.domain_events["example"] = history(base)
+    out = k.call("change_check", {"domain": "example", "commit": c1.id})
+    assert "log_replay" in out["failing"]
+    assert st.check_status("example", c1.id)["log_replay"]["ok"] is False
 
 
 def test_one_blocked_action_does_not_cascade(base):
@@ -237,3 +270,17 @@ def test_a_mistyped_environment_or_branch_is_an_error(tmp_path, base):
     assert not (tmp_path / "envs").exists()
     with pytest.raises(AuthoringError, match="no branch"):
         ws.change_check(branch="wrok", examples=5)
+
+
+def test_a_served_composition_gives_the_kernel_each_member_s_own_log(tmp_path):
+    from types import SimpleNamespace
+
+    from toprope.adapters.mcp.cli import _member
+    from toprope.identity import StaticIdentity
+    from toprope.kernel.services import LocalKernel
+    root = Path(__file__).resolve().parents[1]
+    k = LocalKernel(tmp_path, harness_examples=10)
+    args = SimpleNamespace(composition=str(root / "domains/toprope-self.composition.yaml"), member="authoring",
+                           store="memory", store_dir=None, no_seed=True)
+    _member(args, StaticIdentity({}), k)
+    assert sorted(k.domain_events) == ["authoring", "delivery"]
