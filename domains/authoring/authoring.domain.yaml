@@ -38,7 +38,7 @@ objects:
     source:
       kind: record
       ref: records:docs/adr/0014-interview-design.md#L11-L41
-    status: proposed
+    status: confirmed
   Question:
     description: A question in a stage's bundle, for the owner to answer.
     properties:
