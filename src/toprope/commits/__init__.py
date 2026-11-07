@@ -59,6 +59,14 @@ DEFAULT_BRANCH = "work"
 MERGING = "merging.json"          # a merge in progress per branch (not shared: kept out of git)
 
 
+# What a commit may cite as evidence, and how strong each kind is: a person's words or a source
+# line point at the reason; a check record shows a run against the real declaration; an event
+# shows the behavior in use; an approval run is a person's approval recorded in GitHub
+# (ADR-0039). A claim with no pointer is not evidence.
+EVIDENCE = {"interview": "pointed", "source": "pointed", "check": "ran", "event": "observed",
+            "approval-run": "approved"}
+
+
 class CommitError(Exception):
     pass
 
@@ -134,7 +142,9 @@ class Commit:
     message: str = ""
     branch: str = ""             # the branch it was made on (for reading; refs decide heads)
     author: str = ""             # who compiled it (ADR-0032); "" when not known
-    evidence: list[str] = field(default_factory=list)   # what the change cites (ADR-0041)
+    # Free-string evidence given at commit time, as #117 recorded it (commit 5 of the Authoring
+    # domain has some). Read only: a commit now cites typed evidence with `cite` (ADR-0041).
+    evidence: list[str] = field(default_factory=list)
 
 
 def _now() -> str:
@@ -350,7 +360,7 @@ class CommitStore:
     # -- writing ----------------------------------------------------------------------------------
     def commit(self, declaration: str | Path, representations: list[str | Path] | None = None,
                message: str = "", branch: str = DEFAULT_BRANCH, merge: str | None = None,
-               author: str = "", evidence: list[str] | None = None) -> tuple[Commit, bool]:
+               author: str = "") -> tuple[Commit, bool]:
         """Snapshot a working copy onto a branch. Returns (commit, created). A new branch starts
         from `main`. Identical content to the branch head returns the head, created False.
         `merge` names a second parent: the commit whose conflicts this working copy resolves.
@@ -381,7 +391,7 @@ class CommitStore:
                     self._move(dirp, branch, head.id)
                 return head, False
             parents = ([head.id] if head else []) + ([merge] if merge else [])
-            c = self._write(dirp, d, raw, reps, cid, parents, message, branch, author, evidence)
+            c = self._write(dirp, d, raw, reps, cid, parents, message, branch, author)
             if pending:
                 self._set_pending(dirp, branch, None)
             return c, True
@@ -434,8 +444,7 @@ class CommitStore:
                 "conflicts": [{"path": c.path, "base": c.base, "ours": c.ours, "theirs": c.theirs} for c in m.conflicts]}
 
     def _write(self, dirp: Path, d: Domain, raw: dict[str, Any], reps: dict[str, Any], cid: str,
-               parents: list[str], message: str, branch: str, author: str = "",
-               evidence: list[str] | None = None) -> Commit:
+               parents: list[str], message: str, branch: str, author: str = "") -> Commit:
         """Store a commit and move `branch` to it. Called under the domain lock."""
         domain = d.domain
         seq = max((c.seq for c in self.log(domain)), default=0) + 1
@@ -443,8 +452,7 @@ class CommitStore:
         if parents:
             first = self.get(domain, parents[0])
             iface = _bump(first.interface, diff_interface(interface(self.domain(domain, first.id)), interface(d)).bump)
-        c = Commit(f"{seq}-{cid}", seq, domain, cid, parents, _now(), iface, message, branch, author,
-                   list(evidence or []))
+        c = Commit(f"{seq}-{cid}", seq, domain, cid, parents, _now(), iface, message, branch, author)
         obj = dirp / "objects" / cid
         if not obj.exists():
             tmp = Path(tempfile.mkdtemp(dir=dirp, prefix=".obj-"))
@@ -584,6 +592,28 @@ class CommitStore:
         for r in self.checks(domain, commit_id):
             out[r["check"]] = r
         return out
+
+    # -- evidence (ADR-0041, Resolved 3) ----------------------------------------------------------
+    def cite(self, domain: str, commit_id: str, kind: str, ref: str, by: str = "") -> dict[str, Any]:
+        """Append one piece of evidence a commit cites. Evidence is a pointer that resolves, never
+        prose: the caller resolves interview, source and event refs; a `check` ref must name a check
+        recorded on this commit. Its strength follows from its kind (EVIDENCE). Never rewritten."""
+        if kind not in EVIDENCE:
+            raise CommitError(f"evidence kind {kind!r}: use one of {', '.join(EVIDENCE)}")
+        if not ref.strip():
+            raise CommitError("evidence needs a ref: a pointer, not prose")
+        with self._lock(domain) as dirp:
+            self.get(domain, commit_id)
+            if kind == "check" and ref not in self.check_status(domain, commit_id):
+                raise CommitError(f"no check {ref!r} recorded on {commit_id}: run it first, then cite it")
+            entry = {"commit": commit_id, "kind": kind, "ref": ref, "strength": EVIDENCE[kind],
+                     "by": by, "at": _now()}
+            self._append(dirp / "evidence.jsonl", entry)
+            return entry
+
+    def evidence(self, domain: str, commit_id: str | None = None) -> list[dict[str, Any]]:
+        rows = self._lines(self._dir(domain) / "evidence.jsonl")
+        return [r for r in rows if commit_id is None or r["commit"] == commit_id]
 
     # -- history and checkout (ADR-0032) --------------------------------------------------------
     def element_log(self, domain: str, key: str, at: str | None = None) -> list[dict[str, Any]]:
@@ -732,5 +762,5 @@ class CommitStore:
         return {"changed": r.changed, "added": r.added, "removed": r.removed, "to_review": r.to_review}
 
 
-__all__ = ["DEFAULT_BRANCH", "MAIN", "Commit", "CommitError", "CommitStore", "Conflict", "Merge", "MergeConflict",
+__all__ = ["DEFAULT_BRANCH", "EVIDENCE", "MAIN", "Commit", "CommitError", "CommitStore", "Conflict", "Merge", "MergeConflict",
            "content_id"]
