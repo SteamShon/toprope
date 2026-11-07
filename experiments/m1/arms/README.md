@@ -2,8 +2,17 @@
 
 Link: ① iterate safely, ⑥ (pilot, ADR-0034). How they are used: [ADR-0040](../../../docs/adr/0040-m1-phase-b-execution-protocol.md).
 
-Every arm starts from the same approved self-domain commits, `authoring@4-b0c8834e25d9bbc7` and
-`delivery@1-584aaeea5e686ee8` (each commit store's `main`; the binding names the same).
+Every arm starts from the same approved self-domain commits, `authoring@9-b4ec65433222f096` and
+`delivery@1-584aaeea5e686ee8` (the binding names the same). The harness reads them from the
+repository revisions in [`phase_b/baseline.py`](../phase_b/baseline.py), never from the working tree,
+whose self domains move on. The first baseline, `authoring@4`, was replaced on 2026-11-07 (the
+researcher's decision): today's harness finds an invariant break in it, which the deploy floor
+refuses.
+
+`nl/` is not here yet: the skill rendered from `authoring@4` was removed, and the researcher renders
+it again (`python -m phase_b render --model M`) and reviews it. `nl.rendered-from` records the hash
+of the declarations it was rendered from; the NL arm refuses to run when it does not match
+`structured/`.
 
 | Directory | Arm | Made by |
 |---|---|---|

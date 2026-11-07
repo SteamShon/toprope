@@ -4,10 +4,13 @@
 # The researcher chose seq 13 option A (2026-11-06). Reviewed and set to `frozen` by the
 # assistant at the researcher's instruction; the researcher runs `freeze-binding` in their own
 # commit, before any arm runs. Not shown to any arm.
+# Amended 2026-11-07 at the researcher's instruction (re-baseline Phase B on authoring@9; see
+# FROZEN.json and experiments/m1/phase_b/baseline.py): only domain_version changed. From @4 to @9
+# elements were only added, so every element named below still exists.
 instrument: binding
 experiment: M1
 status: frozen
-domain_version: authoring@4-b0c8834e25d9bbc7, delivery@1-584aaeea5e686ee8
+domain_version: authoring@9-b4ec65433222f096, delivery@1-584aaeea5e686ee8
 bindings:
 - seq: 1
   elements:

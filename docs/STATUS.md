@@ -75,7 +75,9 @@ command reference are generated.
 | 3. The three arms' materials (`experiments/m1/arms/`): structured and Toprope built from the approved commits, the NL skill rendered blind; reviewed side by side by the researcher | 🟡 | #105 |
 | 4. Scorer (`grade` proposes labels with a grader, `score` computes the metrics and pilot verdicts from the researcher's confirmed labels; the key opens only here and only after every arm ran every change), tested with a synthetic key; the probes now also run once before any change | 🟡 | #106 |
 | 5. Dry run (changes 1–2), run by the researcher: time and usage per change | ✅ | #109 |
-| 6. Full run, scoring confirmed by the researcher, M1 report | 🟡 | #112 |
+| 6. Full run, scoring confirmed by the researcher, M1 report. The first full run (#112) is superseded (`experiments/m1/runs/superseded/`): it ran before the run protocol was frozen, and from `authoring@4` | 🟡 | #112 |
+| 7. Re-baseline on `authoring@9` + `delivery@1` (researcher's decision, 2026-11-07): today's harness finds an invariant break in `authoring@4`, so the deploy floor refuses it. The harness reads the baseline from fixed repository revisions, never the working tree; materials rebuilt; the binding's `domain_version` amended; the NL skill removed until the researcher renders it again (the NL arm refuses a stale one); the editor is told when the kernel refuses its proposal | 🟡 | |
+| 8. The harness follows the frozen run protocol: five reviews and three probe runs per change, the Toprope arm's 3-change repeat, the decision log `phase-b-runs.tsv`, the experiment-word check, the noise floor | ⬜ | |
 
 How a run works: the researcher runs `python -m phase_b arm ARM --model M` (from
 `experiments/m1`) in an ordinary terminal. Each conversation is written as it happens, and
@@ -306,9 +308,10 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 
 ## Next
 
-1. M1 Phase B as ADR-0040 sets out (sub-PRs above): the arms' materials, the runner, the
-   scorer, a dry run, then the full run and the M1 report. The researcher runs both runs from
-   their own terminal, on their Claude Code login; nothing to set up in GitHub.
+1. M1 Phase B as ADR-0040 and the frozen run protocol set out (sub-PRs above): the harness
+   follows the protocol (8); the researcher renders the NL skill again and reviews the three arms
+   side by side; then the researcher runs a dry run and the full run from their own terminal, on
+   their Claude Code login; then scoring and the M1 report.
 2. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
 3. When a domain is shared by several people or agents (M2, or a hosted server): its event
    log moves from git to a database (`--store postgres:DSN` for a composition, one schema per

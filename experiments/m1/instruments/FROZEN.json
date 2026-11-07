@@ -17,8 +17,16 @@
       "frozen_at": "2026-11-06T04:36:25+00:00"
     },
     "binding.yaml": {
-      "sha256": "0c5fcf0eecc711b98d978c050c796a6b1abad1a9e191aecd41c9481d47ac4e8d",
-      "frozen_at": "2026-11-06T04:56:06+00:00"
+      "sha256": "808b45371a8851cf7a504fa81160ce55bc66330b3b4339a1f01a377c8f698805",
+      "frozen_at": "2026-11-07T22:57:13+00:00",
+      "history": [
+        {
+          "sha256": "0c5fcf0eecc711b98d978c050c796a6b1abad1a9e191aecd41c9481d47ac4e8d",
+          "frozen_at": "2026-11-06T04:56:06+00:00",
+          "replaced_at": "2026-11-07T22:57:13+00:00",
+          "reason": "Re-baseline Phase B on authoring@9-b4ec65433222f096 (researcher's instruction, 2026-11-07): today's harness finds an invariant break in authoring@4, so the deploy floor refuses it; @8 fixed it and @9 is the first approved commit after the fix. Only domain_version changed; @4 to @9 only added elements."
+        }
+      ]
     },
     "run-protocol.md": {
       "sha256": "66e1abfdccd45bdb5305a9ed0c8a73131cacfe63bdc87cb155dc236546593cdd",

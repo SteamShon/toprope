@@ -48,7 +48,8 @@ from typing import Any
 
 import yaml
 
-from .arms import PROMPTS, nl_arm, render_skill, structured_arm
+from .arms import PROMPTS, nl_arm, render_skill, structured_arm, tree_hash
+from .baseline import BASELINE, baseline_root
 from .backend import ApiBackend, Backend, CliBackend, UsageLimit, user_memory
 from .model import AnthropicModel, Budget, BudgetExceeded
 from .probes import build_worlds, load_probes
@@ -206,7 +207,8 @@ def probe_worlds(out: Path) -> Path:
         out.mkdir(parents=True, exist_ok=True)
         tmp = Path(tempfile.mkdtemp(prefix="worlds.building-", dir=out))      # one per process: no race
         try:
-            build_worlds(ROOT, export_toolchain(ROOT, tmp / "_toolchain"), tmp / "worlds")
+            base = baseline_root(ROOT)
+            build_worlds(base, export_toolchain(base, tmp / "_toolchain"), tmp / "worlds")
             try:
                 (tmp / "worlds").rename(worlds)
             except OSError:                                # another arm finished first: use its worlds
@@ -218,10 +220,10 @@ def probe_worlds(out: Path) -> Path:
 
 
 def baseline() -> dict[str, str]:
-    """The self-domain commits everything starts from: each commit store's `main`."""
-    from toprope.commits import CommitStore
-    store = CommitStore(ROOT / ".toprope/commits")
-    return {d: store.main(d).id for d in ("authoring", "delivery")}
+    """The self-domain commits everything starts from (ADR-0040 §3), whatever the repository's
+    self domains are now: `baseline.BASELINE`, checked at `baseline.BASELINE_REVS`."""
+    baseline_root(ROOT)
+    return dict(BASELINE)
 
 
 def _worlds_hash(worlds: Path) -> str:
@@ -251,6 +253,24 @@ def status(out: Path) -> list[dict[str, Any]]:
                      "last_stopped": last.get("stopped"), "sessions": len(man.get("sessions", [])),
                      "tokens": tokens})
     return rows
+
+
+def _stamp(nl: Path) -> Path:
+    """Beside the NL skill (not in it, so the arm never sees it): the hash of the declarations
+    it was rendered from."""
+    return nl.parent / f"{nl.name}.rendered-from"
+
+
+def rendered_from_other(nl: Path, structured: Path) -> str | None:
+    """Why the NL skill cannot run, if it was not rendered from the structured arm's declarations
+    as they are now (the arms must carry the same rules, ADR-0040 §3)."""
+    if not nl.is_dir():
+        return f"no NL skill at {nl}: render it (`python -m phase_b render --model M`), then review it"
+    stamp = _stamp(nl)
+    if not stamp.is_file() or stamp.read_text().strip() != tree_hash(structured):
+        return (f"the NL skill at {nl} was not rendered from {structured} as it is now: delete it, render it "
+                "again (`python -m phase_b render --model M`), and review it side by side")
+    return None
 
 
 def make_backend(args: argparse.Namespace) -> Backend:
@@ -311,8 +331,8 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
         return
     if args.cmd == "materials":
         print(json.dumps({"baseline": baseline(),
-                          "structured": str(export_toolchain(ROOT, args.out / "structured")),
-                          "toprope": str(build_sandbox(ROOT, args.out / "toprope"))}))
+                          "structured": str(export_toolchain(baseline_root(ROOT), args.out / "structured")),
+                          "toprope": str(build_sandbox(baseline_root(ROOT), args.out / "toprope"))}))
         return
     if backend is None:
         backend = make_backend(args)
@@ -329,6 +349,7 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     if args.cmd == "render":
         args.out.parent.mkdir(parents=True, exist_ok=True)
         render_skill(args.declarations, args.out, backend, args.out.parent / f"{args.out.name}.render.jsonl")
+        _stamp(args.out).write_text(tree_hash(args.declarations) + "\n")
         print(json.dumps({"rendered": str(args.out), "usage": backend.report(), **extra}))
         return
     errs = verify_instruments(args.instruments)
@@ -345,6 +366,10 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     extra["probes"] = None if worlds is None else _worlds_hash(worlds)
     extra["baseline"] = baseline()             # every arm and the probes start from these commits
     materials = args.materials or M1 / "arms" / args.arm
+    if args.arm == "nl" and args.materials is None:
+        stale = rendered_from_other(materials, M1 / "arms/structured")
+        if stale:
+            raise SystemExit(stale)
     if args.arm == "toprope":
         from toprope.commits import CommitStore
         store = CommitStore(materials / ".toprope/commits")
