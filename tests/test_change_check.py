@@ -363,3 +363,13 @@ def test_a_kernel_with_tlc_approves_only_a_commit_tlc_checked(tmp_path, base, fa
         k.run("approve_commit", {"domain": "example", "commit": c.id, "approver": "ana"})
     assert k.call("change_check", {"domain": "example", "commit": c.id})["passed"] is True
     assert k.run("approve_commit", {"domain": "example", "commit": c.id, "approver": "ana"})["approved"] is True
+
+
+def test_the_change_check_computes_unreachable_from_creation_once(base, monkeypatch):
+    """#71: the mechanical layer and the semantic check each computed it."""
+    import toprope.harness.mechanical as mech
+    calls = []
+    real = mech.unreachable_from_creation
+    monkeypatch.setattr(mech, "unreachable_from_creation", lambda d: calls.append(1) or real(d))
+    change_check(dom(base), dom(copy.deepcopy(base)), examples=10)
+    assert len(calls) == 1

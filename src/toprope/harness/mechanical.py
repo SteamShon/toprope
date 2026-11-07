@@ -137,14 +137,16 @@ def unreachable_from_creation(d: Domain) -> dict[str, list[str]]:
 
 def run_mechanical(d: Domain, surfaces: dict[str, Any], clock: Callable[[], datetime], *,
                    samples: int = 3, seed: int = 0, actions: set[str] | None = None,
-                   actors: dict[str, Any] | None = None) -> Mechanical:
+                   actors: dict[str, Any] | None = None,
+                   unreachable: dict[str, list[str]] | None = None) -> Mechanical:
     """Run every cell of `d` (or of `actions`) on generated objects, on each surface; the first
     surface is the reference for parity. `surfaces` maps a level to a fresh Surface. Each cell
     has its own seeded generator, so a cell's objects never depend on which other cells ran."""
     import hashlib
 
     from .run import Finding
-    res = Mechanical(unreachable_from_creation=unreachable_from_creation(d))
+    res = Mechanical(unreachable_from_creation=unreachable if unreachable is not None
+                     else unreachable_from_creation(d))
     interp = Interpreter(d, clock)
     actors = actors or world_actors(d)
     levels = list(surfaces)
