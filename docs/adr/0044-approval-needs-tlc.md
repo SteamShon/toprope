@@ -29,7 +29,8 @@ from a cloud session already runs in GitHub Actions, in the human-request workfl
 3. **The human-request workflow has TLC.** Its approval job installs the `tla` job's pinned TLC
    and sets `TOPROPE_TLC_JAR`. A request with `approve_commit` must run `check_commit` on the
    same commit before it, in the same request. `human_request.py` refuses an approval without the
-   jar.
+   jar, and fails a step whose kernel call or handoff did not succeed. The action itself was
+   accepted, so `toprope-run` exits 0; before this, a refused approval read as a request done.
 
 ## Consequences
 - An approval from a cloud session waits a few more minutes for TLC.

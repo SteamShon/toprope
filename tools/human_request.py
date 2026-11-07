@@ -143,6 +143,18 @@ def commands(req: dict) -> list[list[str]]:
     return out
 
 
+def _unmet(stdout: str) -> list[str]:
+    """What an accepted action set off and did not get done: a kernel call that failed or was
+    refused (an approval without TLC's check, ADR-0044), or a handoff that did not go through.
+    The action itself was accepted, so `toprope-run` exits 0; the request has still failed."""
+    try:
+        then = (json.loads(stdout) or {}).get("then") or []
+    except (ValueError, AttributeError):
+        return []
+    return [f"{t.get('kernel') or t.get('to')}: {t.get('status')}" + (f" ({t['error']})" if t.get("error") else "")
+            for t in then if t.get("status") != "ok"]
+
+
 def run(req: dict, approver: str, identity: str = "toprope.identity.yaml", cwd: str | Path = ".") -> list[dict]:
     """Run every step as the approver; stop at the first that fails."""
     sys.path.insert(0, str(ROOT / "src"))
@@ -158,9 +170,11 @@ def run(req: dict, approver: str, identity: str = "toprope.identity.yaml", cwd: 
     for st, cmd in zip(req["steps"], commands(req), strict=True):
         r = subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True, check=False)
         done.append({"step": st, "returncode": r.returncode, "stdout": r.stdout[-4000:], "stderr": r.stderr[-4000:]})
-        if r.returncode != 0:
+        unmet = _unmet(r.stdout) if r.returncode == 0 and "run" in st else []
+        if r.returncode != 0 or unmet:
             print(json.dumps(done, indent=2), file=sys.stderr)
-            raise SystemExit(f"step {len(done)} failed: {' '.join(cmd[:6])} ...\n{r.stderr[-2000:]}")
+            why = "; ".join(unmet) or r.stderr[-2000:]
+            raise SystemExit(f"step {len(done)} failed: {' '.join(cmd[:6])} ...\n{why}")
     print(json.dumps({"approver": approver, "as": person.actor.id, "steps": len(done)}, indent=2))
     return done
 

@@ -79,6 +79,21 @@ def test_an_approval_does_not_run_without_tlc(tmp_path, monkeypatch):
         hr.run(req, "ana-gh", identity="ids.yaml", cwd=tmp_path)
 
 
+def test_a_step_whose_kernel_call_failed_fails_the_request(tmp_path, monkeypatch):
+    """The action was accepted, so toprope-run exits 0, but the approval it set off was refused
+    (no TLC check, ADR-0044): the request must not report success."""
+    (tmp_path / "ids.yaml").write_text(yaml.safe_dump(IDS))
+    monkeypatch.setenv(hr.TLC_ENV, "tla2tools.jar")
+    out = {"status": "ok", "then": [{"kernel": "approve_commit", "reply": "record_approval", "status": "failed",
+                                     "error": "5-ab has no passing TLC check (never run with TLC)"}]}
+    monkeypatch.setattr(hr.subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0, json.dumps(out), ""))
+    req = {"summary": "x", "steps": [{"run": {"member": "authoring", "action": "approve_commit", "target": "5-ab"}}]}
+    with pytest.raises(SystemExit, match="approve_commit: failed .5-ab has no passing TLC check"):
+        hr.run(req, "ana-gh", identity="ids.yaml", cwd=tmp_path)
+    out["then"][0] |= {"status": "ok"}
+    assert hr.run(req, "ana-gh", identity="ids.yaml", cwd=tmp_path)[0]["returncode"] == 0
+
+
 def test_the_approval_job_has_the_tla_job_s_pinned_tlc():
     import re
     act = (ROOT / ".github/workflows/human-request.yml").read_text()
