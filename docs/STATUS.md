@@ -218,7 +218,7 @@ M0b's UI), checking the non-developer claim (M1 Phase B, M2), TLC modeling creat
   check's `in_flight` tests every object in use against the new invariants: an object in flight
   that breaks one is an error, a finished one a warning, as in log replay.
 
-## A creating action sets every required property (#PR)
+## A creating action sets every required property (#151)
 
 A review leftover from #86. The validator warns (`unset-on-create`) when a create action leaves a
 required property to an optional param or to nothing. It is a warning, not an error, so a
