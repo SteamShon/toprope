@@ -1,0 +1,190 @@
+# The `tla` job's seeded break for time (ADR-0043): the schema example, with drafts stamped 60
+# days before the model's clock and an invariant that an approved experiment was drafted within
+# 30 days. TLC must find approved-while-fresh broken, through days_since.
+domain: example
+version: 1
+owner: SteamShon
+glossary:
+  readout: The first analysis of an experiment's metrics after its planned duration.
+roles:
+- pm
+- analyst
+- approver
+- eng
+objects:
+  Hypothesis:
+    properties:
+      statement:
+        type: string
+  Metric:
+    properties:
+      name:
+        type: string
+  Experiment:
+    description: A controlled test of one hypothesis.
+    properties:
+      name:
+        type: string
+      status:
+        enum:
+        - draft
+        - approved
+        - running
+        - ended
+        - decided
+      planned_days:
+        type: integer
+      started_at:
+        type: datetime
+        optional: true
+      approved_by:
+        type: string
+        optional: true
+      drafted_at:
+        type: datetime
+        optional: true
+    source:
+      kind: system
+      ref: src/models/Experiment.ts
+    status: confirmed
+  Readout:
+    description: Metric results of an experiment after its planned duration.
+    properties:
+      primary_delta:
+        type: number
+      guardrail_regressed:
+        type: boolean
+links:
+  hypothesis:
+    from: Experiment
+    to: Hypothesis
+    cardinality: many-to-one
+    required: true
+    source:
+      kind: record
+      ref: docs/experiments.md
+      quote: Every experiment tests one hypothesis.
+    status: confirmed
+  primary_metric:
+    from: Experiment
+    to: Metric
+    cardinality: many-to-one
+    required: true
+  guardrails:
+    from: Experiment
+    to: Metric
+    cardinality: many-to-many
+  readout:
+    from: Experiment
+    to: Readout
+    cardinality: one-to-one
+actions:
+  approve_experiment:
+    description: Approve a drafted experiment for launch.
+    actor:
+    - approver
+    target: Experiment
+    params:
+      note:
+        type: string
+        optional: true
+    preconditions:
+    - id: has-guardrails
+      check: count(target.guardrails) >= 1
+      reason: An experiment needs at least one guardrail metric before approval.
+    effects:
+    - set:
+        target.approved_by: actor.id
+    records_decision: true
+  launch_experiment:
+    description: Start traffic to an approved experiment.
+    actor:
+    - eng
+    target: Experiment
+    effects:
+    - set:
+        target.started_at: now()
+transitions:
+  Experiment:
+    field: status
+    initial: draft
+    matrix:
+      draft:
+        approve_experiment: approved
+        launch_experiment:
+          deny: Launch requires approval.
+      approved:
+        approve_experiment:
+          deny: This experiment is already approved.
+        launch_experiment: running
+      running:
+        approve_experiment:
+          deny: Only drafted experiments can be approved.
+          source:
+            kind: interview
+            ref: interview/2026-11-20#q7
+          status: confirmed
+        launch_experiment: n/a
+      ended:
+        approve_experiment: n/a
+        launch_experiment: undecided
+      decided:
+        approve_experiment: n/a
+        launch_experiment: n/a
+invariants:
+- id: running-has-approver
+  'on': Experiment
+  check: target.status not in ['running', 'ended', 'decided'] or exists(target.approved_by)
+  reason: Nothing runs without someone having approved it.
+  source:
+    kind: interview
+    ref: interview/2026-11-20#q9
+  status: confirmed
+- id: running-has-start
+  'on': Experiment
+  check: target.status not in ['running', 'ended', 'decided'] or exists(target.started_at)
+  reason: A launched experiment records when it started.
+- id: approved-while-fresh
+  'on': Experiment
+  check: target.status != 'approved' or not exists(target.drafted_at) or days_since(target.drafted_at)
+    <= 30
+  reason: An experiment is approved within 30 days of its draft.
+world:
+  fixtures:
+  - Hypothesis:
+      id: H1
+      statement: A shorter signup raises activation.
+  - Metric:
+      id: M-activation
+      name: activation_rate
+  - Metric:
+      id: M-latency
+      name: p95_latency
+  - Experiment:
+      id: E-onboarding
+      name: New onboarding
+      status: draft
+      planned_days: 14
+      hypothesis: H1
+      primary_metric: M-activation
+      guardrails:
+      - M-latency
+      drafted_at: '2025-11-02T00:00:00+00:00'
+  - Experiment:
+      id: E-bare
+      name: No guardrails yet
+      status: draft
+      planned_days: 7
+      hypothesis: H1
+      primary_metric: M-activation
+      guardrails: []
+      drafted_at: '2025-11-02T00:00:00+00:00'
+  actors:
+    approver:
+    - ana
+    eng:
+    - eli
+    pm:
+    - pat
+    analyst:
+    - ann
