@@ -184,7 +184,10 @@ M0b's UI), checking the non-developer claim (M1 Phase B, M2), TLC modeling creat
   re-decided, 0 blocked, 2 blocked by the base too (the `commit_draft` calls with `evidence`
   from before #124).
 
-- ⬜ 3. Breaks that need several steps are caught before approval, not only in CI
+- ✅ 3. Breaks that need several steps are caught before approval, not only in CI (#PR, ADR-0044)
+  With `TOPROPE_TLC_JAR`, the change check runs TLC (`tla` check) and the kernel approves only a
+  commit whose `tla` check passed. The human-request workflow installs the pinned TLC; a request
+  runs `check_commit` before `approve_commit`.
 
 - ⬜ 4. One change, one request: confirm, commit, check and approve in one declared step
 

@@ -110,7 +110,7 @@ sequences from them. TLC follows **every** reachable state.
 | | Harness | TLC |
 |---|---|---|
 | Finds | a break one step away from an instance the small world holds, with any finite param value | also a break that first needs a state the small world never builds |
-| Runs | in the change check, on every commit, before approval (seconds) | in the `tla` CI job, on every pull request (minutes) |
+| Runs | in the change check, on every commit, before approval (seconds) | in the `tla` CI job, on every pull request; and in the change check where a TLC jar is configured, which an approval there requires (ADR-0044) (minutes) |
 
 Two breaks TLC found in the self domains (#139, fixed in #140) show the line:
 
@@ -125,8 +125,10 @@ Two breaks TLC found in the self domains (#139, fixed in #140) show the line:
   reached from a request that was never deployed. So the harness never starts from "previewing
   and deployed", while TLC does.
 
-So a break of the second kind is not caught by the change check in the loop. It is caught by the
-`tla` job on the pull request that carries the change. Closing that gap would mean several
+So a break of the second kind is not caught by the harness. Where a TLC jar is configured
+(`TOPROPE_TLC_JAR`), the change check runs TLC too, and the kernel approves only a commit whose
+`tla` check passed (ADR-0044). The human-request workflow, where approvals from a cloud session
+run, has one. Without a jar, the `tla` job on the pull request that carries the change catches it. Closing that gap would mean several
 instances per state in the small world, at the cost of the harness's speed.
 
 ## The mechanical layer (ADR-0035)

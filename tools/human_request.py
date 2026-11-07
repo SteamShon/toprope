@@ -5,6 +5,7 @@ A request is a file `.toprope/requests/<id>.yaml` on a work branch:
     summary: Freeze the M1 binding
     steps:
       - freeze-binding: experiments/m1/instruments
+      - run: {member: authoring, action: check_commit, target: 5-ab12cd34ef56ab78}
       - run: {member: authoring, action: approve_commit, target: 5-ab12cd34ef56ab78}
       - run: {member: authoring, action: confirm_all_proposed, target: authoring}
 
@@ -13,7 +14,10 @@ Steps, from a fixed set:
 - `amend: {dir: DIR, file: FILE, reason: TEXT}`: the same, on the record
 - `run: {member, action, target, params, workspace}`: a self-domain action through `toprope-run`, as
   the approver (`--identity github`). `workspace` defaults to `toprope.<member>.workspace.yaml`;
-  an Authoring action on the Delivery declaration's draft names `toprope.delivery.workspace.yaml`
+  an Authoring action on the Delivery declaration's draft names `toprope.delivery.workspace.yaml`.
+  An `approve_commit` step needs a `check_commit` step on the same commit before it: the
+  workflow sets `TOPROPE_TLC_JAR`, so that check model-checks with TLC, and the kernel approves
+  only a commit whose TLC check passed (ADR-0043)
 
 `.github/workflows/human-request.yml` calls `check` (and shows `render` on the run page) before
 it waits for the approval, and `run` after it.
@@ -43,6 +47,7 @@ REQUESTS = ".toprope/requests"
 APPROVAL_RUNS = ".toprope/approval-runs.jsonl"
 INSTRUMENT_STEPS = ("freeze", "freeze-binding", "freeze-protocol", "amend")
 COMPOSITION = "domains/toprope-self.composition.yaml"
+TLC_ENV = "TOPROPE_TLC_JAR"         # the kernel model-checks with it; approval needs it (ADR-0043)
 
 
 def load(path: str | Path) -> dict:
@@ -86,6 +91,17 @@ def check(req: object) -> list[str]:
                               "(a *.workspace.yaml)")
         else:
             errors.append(f"step {i}: {kind!r} is not a step (one of {', '.join(INSTRUMENT_STEPS)} or run)")
+    checked = set()
+    for i, st in enumerate(steps, 1):        # TLC runs only in the workflow: check where you approve
+        arg = st.get("run") if isinstance(st, dict) else None
+        if not isinstance(arg, dict):
+            continue
+        key = (arg.get("member"), arg.get("target"))
+        if arg.get("action") == "check_commit":
+            checked.add(key)
+        elif arg.get("action") == "approve_commit" and key not in checked:
+            errors.append(f"step {i}: approve_commit {arg.get('target')} needs a check_commit step on it before, "
+                          "in this request: approval needs the TLC check, which runs only here (ADR-0043)")
     return errors
 
 
@@ -135,6 +151,9 @@ def run(req: dict, approver: str, identity: str = "toprope.identity.yaml", cwd: 
     if person is None:
         raise SystemExit(f"GitHub user {approver} approved, but is not a person with `github:` in {identity}")
     env = {**os.environ, ENV: approver}
+    if any((st.get("run") or {}).get("action") == "approve_commit" for st in req["steps"]) \
+            and not env.get(TLC_ENV):
+        raise SystemExit(f"approve_commit needs TLC: set {TLC_ENV} to a TLC jar (the workflow does)")
     done = []
     for st, cmd in zip(req["steps"], commands(req), strict=True):
         r = subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True, check=False)

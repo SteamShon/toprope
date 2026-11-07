@@ -35,7 +35,9 @@ approve, deploy) can be done without your terminal: the agent commits a *human r
 `.toprope/requests/<id>.yaml`, listing the steps; the `human-request` workflow shows them on
 its run page and waits; you press **Approve and deploy** (web or the GitHub mobile app); the
 steps then run as you, the person `toprope.identity.yaml` lists with your `github:` login,
-and the result is pushed to the branch with the approver and the run in the commit. The run
+and the result is pushed to the branch with the approver and the run in the commit. A request
+that approves a commit runs `check_commit` on it first: the workflow installs TLC, so that check
+model-checks the commit, and the kernel approves only a commit TLC passed (ADR-0044). The run
 is also appended to `.toprope/approval-runs.jsonl`, so a commit can cite it as evidence
 (`cite_evidence --kind approval-run`) after any merge. The
 format is in `tools/human_request.py`. One-time setup (maintainer): Repository settings →

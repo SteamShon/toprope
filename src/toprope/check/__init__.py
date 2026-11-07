@@ -45,7 +45,7 @@ from ..semantics.types import Actor, Command, Event, Grant
 from ..store import EventStore, MemoryEventStore
 
 EPOCH = datetime.min.replace(tzinfo=timezone.utc)   # for events without a time
-CHECKS = ("structural", "semantic", "scenarios", "harness", "log_replay", "in_flight", "nl")
+CHECKS = ("structural", "semantic", "scenarios", "harness", "tla", "log_replay", "in_flight", "nl")
 
 
 @dataclass(frozen=True)
@@ -125,8 +125,11 @@ class NLChecker(Protocol):
 # -- the pipeline -------------------------------------------------------------------------------
 def change_check(new: Domain, old: Domain | None = None, *, events: EventStore | None = None,
                  nl: NLChecker | None = None, examples: int = 50, cache: Any = None, full: bool = False,
-                 roles_of: Callable[[dict[str, Any], str], tuple[str, ...]] | None = None) -> ChangeReport:
-    """Run every check of `new` against `old` (None: the first version). `events` is the
+                 roles_of: Callable[[dict[str, Any], str], tuple[str, ...]] | None = None,
+                 tlc: Any = None) -> ChangeReport:
+    """Run every check of `new` against `old` (None: the first version). `tlc` is the path of
+    a TLC jar: with it, TLC model-checks the model level too, which finds breaks that take
+    several steps (ADR-0043). `events` is the
     deployed environment's event store, for log replay and the in-flight check. `roles_of`
     resolves a past actor's roles (the Identity port); without it, an actor is assumed to have
     had every role the current version allowed for that action. `cache` (a ResultCache)
@@ -160,6 +163,12 @@ def change_check(new: Domain, old: Domain | None = None, *, events: EventStore |
     else:
         for name in ("semantic", "scenarios", "harness"):
             checks[name] = CheckResult(name, ran=False, note="the declaration has structural errors")
+    if tlc is None:
+        checks["tla"] = CheckResult("tla", ran=False, note="no TLC jar configured")
+    elif not structurally_ok:
+        checks["tla"] = CheckResult("tla", ran=False, note="the declaration has structural errors")
+    else:
+        checks["tla"] = _tla(new, tlc)
     if events is None:
         for name in ("log_replay", "in_flight"):
             checks[name] = CheckResult(name, ran=False, note="no event store (nothing deployed)")
@@ -180,7 +189,8 @@ def change_check(new: Domain, old: Domain | None = None, *, events: EventStore |
 def check_commit(commits: Any, domain: str, commit_id: str, base: str | None = "merge-base", *,
                  events: EventStore | None = None, nl: NLChecker | None = None, examples: int = 50,
                  cache: Any = None, full: bool = False,
-                 roles_of: Callable[[dict[str, Any], str], tuple[str, ...]] | None = None) -> ChangeReport:
+                 roles_of: Callable[[dict[str, Any], str], tuple[str, ...]] | None = None,
+                 tlc: Any = None) -> ChangeReport:
     """Run the change check on a commit of a commit store, and record the result on the commit
     (ADR-0032): one record per check, `ok: null` for one that did not run, plus `change-check`
     for the whole, appended together with one run id. The base is
@@ -192,7 +202,7 @@ def check_commit(commits: Any, domain: str, commit_id: str, base: str | None = "
         base = commits.review_base(domain, c.id)
     old = commits.domain(domain, base) if base else None
     report = change_check(commits.domain(domain, c.id), old, events=events, nl=nl, examples=examples,
-                          cache=cache, full=full, roles_of=roles_of)
+                          cache=cache, full=full, roles_of=roles_of, tlc=tlc)
     report.diff["from"], report.diff["to"] = base, c.id
     rows = [(name, res.ok if res.ran else None, res.summary()) for name, res in report.checks.items()]
     rows.append(("change-check", report.ok, report.summary()))
@@ -202,6 +212,23 @@ def check_commit(commits: Any, domain: str, commit_id: str, base: str | None = "
                  + (": " + ", ".join(left[:5]) if left else "")))   # approval needs none (ADR-0041)
     commits.record_checks(domain, c.id, rows, base)        # one run, one append: skipped checks too
     return report
+
+
+def _tla(new: Domain, jar: Any) -> CheckResult:
+    """TLC on the model level, its violation replayed on the interpreter (ADR-0043). A break
+    the harness already reports passes here: the harness check fails on it."""
+    import tempfile
+    from pathlib import Path
+
+    from ..tla.tlc import PASSING, model_check
+    res = CheckResult("tla")
+    with tempfile.TemporaryDirectory() as out:
+        r = model_check(new, Path(jar), Path(out), new.domain)
+    res.note = (f"{r['judged']}; {r['distinct_states']} distinct states; "
+                f"{len(r['left_out'])} action(s) left out of the model")
+    if r["judged"] not in PASSING:
+        res.add("error", r["module"], r["judged"] + (f": broken {', '.join(r['broken'])}" if r["broken"] else ""))
+    return res
 
 
 def _diff(new: Domain, old: Domain | None) -> dict[str, Any]:

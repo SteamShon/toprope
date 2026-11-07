@@ -21,8 +21,12 @@ IDS = {"people": {"ana@example.com": {"name": "ana", "github": "Ana-GH", "roles"
 
 def test_a_request_is_checked_before_it_is_shown():
     ok = {"summary": "Freeze the binding", "steps": [{"freeze-binding": "experiments/m1/instruments"},
+          {"run": {"member": "authoring", "action": "check_commit", "target": "5-ab"}},
           {"run": {"member": "authoring", "action": "approve_commit", "target": "5-ab"}}]}
     assert hr.check(ok) == []
+    unchecked = {"summary": "x", "steps": [ok["steps"][2], ok["steps"][1]]}   # checked only after
+    (err,) = hr.check(unchecked)
+    assert err.startswith("step 1: approve_commit 5-ab needs a check_commit step on it before")
     assert hr.check({"summary": "", "steps": []}) == ["summary: say in one line what you approve",
                                                     "steps: a non-empty list"]
     assert "is not a step" in hr.check({"summary": "x", "steps": [{"shell": "rm -rf /"}]})[0]
@@ -64,6 +68,24 @@ def test_the_approver_is_the_person_and_only_inside_the_approval_job(tmp_path, m
     f.write_text(yaml.safe_dump(IDS2))
     with pytest.raises(ValueError, match="listed twice"):
         github_logins(f)
+
+
+def test_an_approval_does_not_run_without_tlc(tmp_path, monkeypatch):
+    (tmp_path / "ids.yaml").write_text(yaml.safe_dump(IDS))
+    monkeypatch.delenv(hr.TLC_ENV, raising=False)
+    req = {"summary": "x", "steps": [{"run": {"member": "authoring", "action": "check_commit", "target": "5-ab"}},
+                                     {"run": {"member": "authoring", "action": "approve_commit", "target": "5-ab"}}]}
+    with pytest.raises(SystemExit, match="approve_commit needs TLC"):
+        hr.run(req, "ana-gh", identity="ids.yaml", cwd=tmp_path)
+
+
+def test_the_approval_job_has_the_tla_job_s_pinned_tlc():
+    import re
+    act = (ROOT / ".github/workflows/human-request.yml").read_text()
+    tla = (ROOT / ".github/workflows/tla.yml").read_text()
+    pins = [re.findall(r"TLC_(?:VERSION|SHA256): (\S+)", f) for f in (act, tla)]
+    assert pins[0] == pins[1] and len(pins[0]) == 2
+    assert 'TOPROPE_TLC_JAR=$RUNNER_TEMP/tla2tools.jar' in act
 
 
 def test_the_repository_names_the_researchers_github_login():
