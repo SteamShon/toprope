@@ -60,6 +60,7 @@ Its subcommands are the domain's actions, one per action, plus `get`, `history`,
 | `--depth` `DEPTH` | exploration depth (default `5`) |
 | `--json` `JSON` | write the full report as JSON to this path |
 | `--regen-check` | with --composition: the regeneration check (ADR-0028): serve from declarations, run, regenerate, compare, and run every kernel call end to end |
+| `--mutants` | with --domain: check that the harness catches each seeded break (exit 1 if one survives) |
 | `--receiver` `FILE[@MAJOR]` | a receiving domain's declaration, with its published interface major (default 1): checks this domain's handoffs against it (ADR-0024) (default `[]`) |
 
 ## `toprope-worldmap`
@@ -73,7 +74,7 @@ Its subcommands are the domain's actions, one per action, plus `get`, `history`,
 | `--out` `OUT` | (default `world-map.json`) |
 | `--harness` | run the harness and include its results |
 | `--harness-report` `HARNESS_REPORT` | use an existing harness report JSON instead (with --composition: the member → report map that `toprope-harness --composition --json` writes) |
-| `--mermaid` `MERMAID` | also write structure.mmd and <Object>.states.mmd here |
+| `--mermaid` `MERMAID` | also write structure.mmd, <Object>.states.mmd and, when the harness found any, minimal-flows.md here |
 | `--guide` `GUIDE` | also write the domain guide (Markdown) to this path |
 
 ## `toprope-commits`
@@ -114,6 +115,15 @@ What changed directly between two commits.
 ### `toprope-commits checks`
 
 The newest record of each check on a commit.
+
+| Argument | What |
+|---|---|
+| `DOMAIN` | the domain's name, as its declaration's `domain:` says |
+| `COMMIT` | a commit id, e.g. 4-b0c8834e25d9bbc7 |
+
+### `toprope-commits evidence`
+
+The evidence a commit cites, with its strength (ADR-0041).
 
 | Argument | What |
 |---|---|

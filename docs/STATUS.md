@@ -81,6 +81,48 @@ command reference are generated.
   shortcut any more); `confirm_all_proposed` confirms every proposed element at once. Reads
   are `toprope-commits` (branches, log, diff, checks, deployed).
 
+## Lessons from pstack (umbrella #121, link: ① ② ③ and none)
+
+Six changes taken from a review of the pstack agent skills (`cursor/plugins`), one sub-PR
+each into `umbrella/pstack-lessons`. Each sub-PR changes only its own item below.
+
+- ✅ 1. Rules enforced by checks, not text: a `checks` workflow runs the tests and
+  `instruments.py verify --run`; a workspace source that matches no file is reported
+  (`Workspace.stale_sources`, the mistake #91 fixed); `AGENTS.md` pairs each rule with what
+  enforces it. Three rules stay text only (gold sets, real tests, model identifiers): no past
+  mistake to prove a check on (#122)
+
+- 🟡 2. M1 Phase B run protocol: drafted (`experiments/m1/run-protocol.md`), with blinding,
+  grading by sanitized label, 3 runs per stochastic part, and the spread with every number.
+  It is left for the researcher to review and freeze before any arm runs. Its four questions
+  need answers first (#123)
+
+- ✅ 3. Commits cite evidence that must resolve, with how strong it is (ADR-0041, Resolved 3, with
+  a dated note). The kernel's `cite_evidence` refuses a ref that does not resolve (an interview
+  line, a source chunk, a check recorded on the commit, a stored event, or an approval run the
+  `human-request` workflow recorded in `.toprope/approval-runs.jsonl`) and records its strength
+  (pointed, ran, observed or approved); `toprope-commits evidence` lists it. One mechanism: the
+  `commit` service no longer takes free-string evidence. Authoring calls `cite_evidence` and
+  `commit_draft` dropped `evidence`, through the loop from develop's `main`: proposed by the
+  agent, confirmed, approved, deployed and verified by the researcher (Authoring `main` is
+  `7-92bcb1c921be21bd`) (#124)
+
+- ✅ 4. World map state charts show where the harness found a break: failed arrows, `breaks`,
+  `mayBreak` and `unreachable` states, arrow conditions in brackets, and each minimal flow told
+  step by step (`minimal-flows.md`; `docs/world-map.md`). A TLA+ export checked by TLC, as a
+  second oracle beside bounded exploration, would need an ADR; not proposed yet (#125)
+
+- ✅ 5. Harness mutants (`toprope-harness --mutants`, `docs/harness.md`): each seeded break given to
+  the execution level must be caught. Three survived in the examples (paid-media's `step-limit`
+  and `not-the-proposer`, refunds' `within-window`), so precondition tests now make a boundary
+  instance when the world has none, including for preconditions that read `params`. Every
+  mutant of the examples and both self domains is caught (Authoring 61, Delivery 29) (#126)
+
+- ✅ 6. The self domains' logs advance on one line: `AGENTS.md` says two branches never run the
+  loop at the same time, and the `checks` workflow fails a PR whose head does not extend each of
+  the base's append-only logs (`tools/logs_check.py`; it catches #124's first, diverged run)
+  (#129)
+
 ## M0b, M2 to M5
 
 Not started. Plans: [`roadmap.md`](roadmap.md).
@@ -105,10 +147,9 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    elements, and the change check records how many are left (#110); every decision action takes
    an optional `rationale` (#111); a check can read `actor.principal` (#113);
    `examples/paid-media/` shows the exception pattern (#115); every event records the
-   permissions it ran under (#116); a commit may cite its evidence (#117), and Authoring's
-   `commit_draft` passes it, changed through the self domains' own loop and approved and
-   deployed by the researcher in GitHub (#118: commit `5-c8fd1b8fc98be17c`, deployed and
-   verified).
+   permissions it ran under (#116); a commit may cite its evidence (#117, #118: free strings
+   on `commit`, Authoring commit `5-c8fd1b8fc98be17c`), replaced by typed evidence that must
+   resolve, cited with `cite_evidence` (#124, in the pstack umbrella).
 6. ADR-0042's follow-up work (accepted 2026-11-07): done: `domain_version` with the deployment
    log gives the rule in force when an event was decided, documented (the self domains are the
    exception, see *Left from reviews*); read visibility defined in the schema (`read`, refused

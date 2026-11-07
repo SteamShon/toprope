@@ -400,6 +400,7 @@
                         "confirm_element",
                         "skip_stage",
                         "commit",
+                        "cite_evidence",
                         "diff",
                         "checkout",
                         "merge_main",

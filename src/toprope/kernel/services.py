@@ -24,6 +24,8 @@ def complete(svc: Service, result: dict[str, Any]) -> dict[str, Any]:
     return full
 
 
+APPROVAL_RUNS = ".toprope/approval-runs.jsonl"   # written by tools/human_request.py (ADR-0039)
+
 _CALLER: ContextVar[dict[str, Any] | None] = ContextVar("kernel_caller", default=None)
 
 
@@ -181,9 +183,8 @@ class LocalKernel(KernelServices):
         return {"skipped": True}
 
     # -- commits (ADR-0029) -----------------------------------------------------------------
-    def _commit(self, declaration, evidence=None):
-        c, created = self.commits.commit(self._path(declaration), author=str((self.caller or {}).get("id") or ""),
-                                         evidence=list(evidence or []))
+    def _commit(self, declaration):
+        c, created = self.commits.commit(self._path(declaration), author=str((self.caller or {}).get("id") or ""))
         base = self.commits.review_base(c.domain, c.id)      # ADR-0033
         review = self.commits.diff(c.domain, base, c.id)["to_review"] if created else []
         approved = self.commits.latest_approved(c.domain)
@@ -191,6 +192,37 @@ class LocalKernel(KernelServices):
                 "parent": c.parents[0] if c.parents else "", "interface": c.interface, "to_review": review,
                 "last_approved": approved.id if approved else "", "domain": c.domain, "branch": c.branch,
                 "author": c.author}
+
+    def _cite_evidence(self, domain, commit, kind, ref):
+        if kind in ("interview", "source"):
+            spec = self._ws().sources.get(ref.split(":", 1)[0])
+            if spec is not None and (spec.kind == "interview-log") != (kind == "interview"):
+                raise ValueError(f"{ref} is {'an interview line' if spec.kind == 'interview-log' else 'a source chunk'}:"
+                                 f" cite it as {'interview' if spec.kind == 'interview-log' else 'source'}")
+            self._ws().source_of(ref)                        # an unknown chunk is refused
+        elif kind == "event":
+            stream, _, version = ref.rpartition("@")
+            if self.environment is None:
+                raise RuntimeError("no deploy environment configured: no events to cite")
+            with self.environment.events(domain) as store:
+                if store is None:
+                    raise RuntimeError(f"{domain} is not deployed here: no events to cite")
+                if not stream or not version.isdigit() or not 1 <= int(version) <= store.version(stream):
+                    raise ValueError(f"no event {ref!r}: give <stream>@<version> of a stored event")
+        elif kind == "approval-run":
+            self._approval_run(ref)
+        e = self.commits.cite(domain, commit, kind, ref, by=str((self.caller or {}).get("id") or ""))
+        return {"strength": e["strength"]}
+
+    def _approval_run(self, url):
+        """A GitHub Actions run that approved a human request (ADR-0039). The workflow records
+        each approved run in `.toprope/approval-runs.jsonl` with the result it pushes, so the
+        record survives a squash merge."""
+        import json
+        log = self.root / APPROVAL_RUNS
+        runs = {json.loads(x).get("run") for x in log.read_text().splitlines() if x.strip()} if log.exists() else set()
+        if url not in runs:
+            raise ValueError(f"no approved human request ran as {url!r} ({APPROVAL_RUNS})")
 
     def run(self, service, inputs):
         if service == "diff":   # `from` is a Python keyword
