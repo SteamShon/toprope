@@ -177,7 +177,7 @@ M0b's UI), checking the non-developer claim (M1 Phase B, M2), TLC modeling creat
 
 - ⬜ 1. A kernel reply is accepted only for a call that is waiting for it
 
-- ✅ 2. The change check replays past actions from the domain's own event log in git (#PR)
+- ✅ 2. The change check replays past actions from the domain's own event log in git (#144)
   `toprope-run`/`toprope-server` with `--composition` give the kernel each member's store, so
   `change_check` replays a self domain's real history with nothing deployed. Only actions this
   change newly blocks are errors; the base's own blocks are counted. On Authoring's log: 96 of 96
