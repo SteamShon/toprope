@@ -142,7 +142,9 @@ class Commit:
     message: str = ""
     branch: str = ""             # the branch it was made on (for reading; refs decide heads)
     author: str = ""             # who compiled it (ADR-0032); "" when not known
-    evidence: list[str] = field(default_factory=list)   # what the change cites (ADR-0041)
+    # Free-string evidence given at commit time, as #117 recorded it (commit 5 of the Authoring
+    # domain has some). Read only: a commit now cites typed evidence with `cite` (ADR-0041).
+    evidence: list[str] = field(default_factory=list)
 
 
 def _now() -> str:
@@ -358,7 +360,7 @@ class CommitStore:
     # -- writing ----------------------------------------------------------------------------------
     def commit(self, declaration: str | Path, representations: list[str | Path] | None = None,
                message: str = "", branch: str = DEFAULT_BRANCH, merge: str | None = None,
-               author: str = "", evidence: list[str] | None = None) -> tuple[Commit, bool]:
+               author: str = "") -> tuple[Commit, bool]:
         """Snapshot a working copy onto a branch. Returns (commit, created). A new branch starts
         from `main`. Identical content to the branch head returns the head, created False.
         `merge` names a second parent: the commit whose conflicts this working copy resolves.
@@ -389,7 +391,7 @@ class CommitStore:
                     self._move(dirp, branch, head.id)
                 return head, False
             parents = ([head.id] if head else []) + ([merge] if merge else [])
-            c = self._write(dirp, d, raw, reps, cid, parents, message, branch, author, evidence)
+            c = self._write(dirp, d, raw, reps, cid, parents, message, branch, author)
             if pending:
                 self._set_pending(dirp, branch, None)
             return c, True
@@ -442,8 +444,7 @@ class CommitStore:
                 "conflicts": [{"path": c.path, "base": c.base, "ours": c.ours, "theirs": c.theirs} for c in m.conflicts]}
 
     def _write(self, dirp: Path, d: Domain, raw: dict[str, Any], reps: dict[str, Any], cid: str,
-               parents: list[str], message: str, branch: str, author: str = "",
-               evidence: list[str] | None = None) -> Commit:
+               parents: list[str], message: str, branch: str, author: str = "") -> Commit:
         """Store a commit and move `branch` to it. Called under the domain lock."""
         domain = d.domain
         seq = max((c.seq for c in self.log(domain)), default=0) + 1
@@ -451,8 +452,7 @@ class CommitStore:
         if parents:
             first = self.get(domain, parents[0])
             iface = _bump(first.interface, diff_interface(interface(self.domain(domain, first.id)), interface(d)).bump)
-        c = Commit(f"{seq}-{cid}", seq, domain, cid, parents, _now(), iface, message, branch, author,
-                   list(evidence or []))
+        c = Commit(f"{seq}-{cid}", seq, domain, cid, parents, _now(), iface, message, branch, author)
         obj = dirp / "objects" / cid
         if not obj.exists():
             tmp = Path(tempfile.mkdtemp(dir=dirp, prefix=".obj-"))
