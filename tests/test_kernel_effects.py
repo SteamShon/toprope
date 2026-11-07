@@ -376,3 +376,38 @@ def test_an_optional_service_input_may_be_left_out_or_null(monkeypatch):
         dec = it.decide(Command(owner, "commit_draft", "D", params), state, lambda *_: None)
         req = next(e for e in dec.events if e.type == "EffectRequested")
         assert req.payload["error"] is None and req.payload["inputs"]["evidence"] == want
+
+
+def test_then_follows_what_a_created_object_sets_off():
+    """#86: `then` read only the target's stream, so a call set off on another stream (by an
+    object a reply created) was not shown. It follows the reply's causation now."""
+    from toprope.adapters.cli import followed
+    raw = {
+        "domain": "authoring", "version": 1, "roles": ["owner"],
+        "objects": {"Draft": {"properties": {"declaration": {"type": "string"}}},
+                    "Version": {"properties": {"content": {"type": "string"},
+                                               "errors": {"type": "integer", "optional": True}}}},
+        "actions": {
+            "commit_draft": {"description": "Commit.", "actor": ["owner"], "target": "Draft", "effects": [
+                {"call": "commit", "with": {"declaration": "target.declaration"}, "reply": "record_version"}]},
+            "record_version": {"description": "Record it.", "actor": ["external:kernel"], "creates": "Version",
+                               "params": {"content": {"type": "string"}}, "effects": [
+                                   {"call": "validate", "with": {"declaration": "target.content"},
+                                    "reply": "record_validation"}]},
+            "record_validation": {"description": "Record errors.", "actor": ["external:kernel"],
+                                  "target": "Version", "params": {"errors": {"type": "integer"}},
+                                  "effects": [{"set": {"target.errors": "params.errors"}}]}},
+        "world": {"fixtures": [{"Draft": {"id": "D1", "declaration": "x.yaml"}}], "actors": {"owner": ["owen"]}},
+    }
+    d = Domain.model_validate(raw)
+    assert [i for i in validate_domain(d) if i.severity == "error"] == []
+    kernel = RecordingKernel({"commit": {"ok": True, "id": "1-ab", "content": "ab"},
+                              "validate": {"ok": True, "errors": 0}})
+    e = Execution(d, MemoryEventStore(), StaticIdentity({"t": Caller(OWEN)}), clock=lambda: NOW, services=kernel)
+    e.seed_world()
+    before = e.store.version("D1")
+    assert e.submit("t", "commit_draft", "D1", idempotency_key="k").ok
+    then = followed(e, d, "D1", before)
+    assert [(t["kernel"], t["status"], t.get("object")) for t in then] == [
+        ("commit", "ok", "1-ab"), ("validate", "ok", "1-ab")]          # the second is on Version 1-ab
+    assert e.state("1-ab")["errors"] == 0
