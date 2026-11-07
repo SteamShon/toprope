@@ -292,5 +292,10 @@ class LocalKernel(KernelServices):
             return {"ok": False, "deployed": False, "error": f"{e.rule}: {e.reason}"}
         return {"deployed": True}
 
+    def _probe(self, domain, commit):
+        if self.environment is None:
+            raise RuntimeError("no deploy environment configured")
+        return self.environment.probe_commit(self.commits, domain, commit)
+
 
 __all__ = ["KernelServices", "LocalKernel", "RecordingKernel", "complete"]

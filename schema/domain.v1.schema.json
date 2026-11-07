@@ -407,7 +407,8 @@
                         "change_check",
                         "approve_commit",
                         "preview",
-                        "deploy"
+                        "deploy",
+                        "probe"
                       ]
                     },
                     "with": {

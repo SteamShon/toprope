@@ -451,6 +451,7 @@ works. The catalog is the kernel itself (ADR-0027):
 | `approve_commit` | `domain`, `commit`, `approver` | `approved`, `main` (merges into `main` and tags it, ADR-0033) |
 | `preview` | `domain`, `commit` | `build`, `harness_ok` |
 | `deploy` | `domain`, `commit`, `approver` | `deployed` (under the fixed floor, ADR-0022, ADR-0029) |
+| `probe` | `domain`, `commit` | `passed`, `summary` (the deployed commit in use: its build, its scenarios at the execution level, every object in the deployed store against every invariant; recorded as the `probes` check) |
 
 `changed`, `added`, `removed` and `to_review` are lists of element keys: a reply param that
 receives one is `{type: string, many: true}`. `approve_commit` and `deploy` record a person's

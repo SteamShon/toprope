@@ -126,6 +126,18 @@ def _set(doc: dict, segs: list[str], value: Any) -> None:
         cur[last] = value
 
 
+def _demote_enclosing(doc: dict, segs: list[str], source: dict[str, Any]) -> None:
+    """A change inside an element (`actions.verify.effects`) changes the element: it is proposed
+    again, citing the change's source, so a person confirms it. Otherwise an agent could rewrite
+    a confirmed element's parts while it still reads `confirmed`."""
+    for k in range(len(segs) - 1, 1, -1):
+        if is_element(segs[:k]):
+            el = _get(doc, segs[:k])
+            if isinstance(el, dict):
+                el["status"], el["source"] = "proposed", source
+            return
+
+
 def _no_provenance_path(segs: list[str]) -> None:
     """`source` and `status` are set by the tool, never written directly: otherwise an agent
     could write `actions.X.status: confirmed` (only a person confirms)."""
@@ -307,6 +319,7 @@ class Workspace:
         src = self.source_of(source_ref, quote)
         doc = self.draft()
         _set(doc, segs, self._with_provenance(segs, value, src))
+        _demote_enclosing(doc, segs, src)
         issues = self._write(doc)
         return {"path": path, "status": "proposed", "issues": issues}
 
@@ -327,6 +340,7 @@ class Workspace:
             _no_provenance_path(segs)
             src = {"kind": "interview", "ref": ref, "quote": answer}
             _set(doc, segs, self._with_provenance(segs, dec.get("value"), src))
+            _demote_enclosing(doc, segs, src)
         issues = self._write(doc) if decisions else []
         stage = question_id.split(":")[1] if question_id.startswith("bundle:") else self._current_stage()
         self._append(self.log_path, {"at": _now(), "kind": "answer", "stage": stage, "question_id": question_id,

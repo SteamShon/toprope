@@ -66,7 +66,8 @@ $R --member authoring approve_commit <id>               # you, on your terminal
 $R --member authoring deliver <id> --environment local  # hands off to Delivery
 $R --member delivery preview authoring:<id>:local
 $R --member delivery deploy authoring:<id>:local        # you, on your terminal
-$R --member delivery verify authoring:<id>:local --verified true
+$R --member delivery run_probes authoring:<id>:local    # the deployed commit, checked in use
+$R --member delivery verify authoring:<id>:local        # you, once its probes passed
 ```
 
 - **Commit what changed.** Each domain's events go to its own append-only log,
