@@ -382,7 +382,9 @@ def log_replay(new: Domain, old: Domain | None, events: EventStore,
     not cascade into the rest of history. `only` limits the re-decided actions to the affected
     ones (ADR-0013); the others still advance the replayed state. A past action the base model
     blocks too is not this change's doing: it is counted, not reported, so a change approved
-    once does not fail every later check."""
+    once does not fail every later check. A past action newly blocked on an object that is
+    finished now (no action allowed from its state) is a warning: a deliberately stricter rule
+    does not rewrite finished history, and nothing in flight depends on it."""
     res = CheckResult("log_replay")
     clock_at: list[datetime] = [EPOCH]
     interp = Interpreter(new, lambda: clock_at[0])
@@ -397,7 +399,10 @@ def log_replay(new: Domain, old: Domain | None, events: EventStore,
     # By time; ties keep each stream's own order (the sort is stable). Across streams with equal
     # times the true order is unknown: a coarse clock can misorder cross-object lookups.
     history.sort(key=lambda e: e.at or EPOCH)
-    replayed = blocked = already = 0
+    # Where each object is now: a block on an object that is finished (no move left from its
+    # state) changes nothing in flight, so a deliberately stricter rule is not an error there.
+    now_at = {s: (evs[0].aggregate, project(evs) or {}) for s, evs in _domain_streams(events)}
+    replayed = blocked = already = finished = 0
     for ev in history:
         action = (ev.payload or {}).get("action")
         if action is not None and ev.actor is not None and (only is None or action in only):
@@ -411,10 +416,15 @@ def log_replay(new: Domain, old: Domain | None, events: EventStore,
             if not dec.outcome.ok and before is not None and not before.decide(cmd, state, lookup).outcome.ok:
                 already += 1
             elif not dec.outcome.ok:
-                blocked += 1
-                res.add("error", f"{ev.stream}@{ev.version}",
-                        f"{action} by {ev.actor.get('id')} at {when} would now be "
+                what = (f"{action} by {ev.actor.get('id')} at {when} would now be "
                         f"{dec.outcome.status} ({dec.outcome.code}): {dec.outcome.reason}")
+                if _finished(new, *now_at.get(ev.stream, (None, {}))):
+                    finished += 1
+                    res.add("warning", f"{ev.stream}@{ev.version}",
+                            what + " The object is finished, so nothing in flight depends on it.")
+                else:
+                    blocked += 1
+                    res.add("error", f"{ev.stream}@{ev.version}", what)
             else:
                 was = (ev.payload or {}).get("changes") or {}
                 now = next((e.payload.get("changes") for e in dec.events if e.kind == "domain"), {}) or {}
@@ -425,8 +435,18 @@ def log_replay(new: Domain, old: Domain | None, events: EventStore,
         replay.append(ev.stream, replay.version(ev.stream), [_copy(ev)])
     total = sum(1 for ev in history if (ev.payload or {}).get("action") is not None and ev.actor is not None)
     res.note = f"{replayed} of {total} past action(s) re-decided; {blocked} would be blocked" + (
+        f"; {finished} on finished objects (warnings)" if finished else "") + (
         f"; {already} blocked by the base too" if already else "")
     return res
+
+
+def _finished(d: Domain, obj: str | None, state: dict[str, Any]) -> bool:
+    """An object of a type with a matrix whose current state allows no action: it is done."""
+    tr = d.transitions.get(obj) if obj else None
+    if tr is None:
+        return False
+    row = tr.matrix.get(state.get(tr.field)) or {}
+    return not any(_allows(c) for c in row.values())
 
 
 def _is_time(v: Any) -> bool:

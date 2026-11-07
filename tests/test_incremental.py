@@ -136,8 +136,8 @@ def test_a_single_cell_change_meets_the_latency_targets(tmp_path, examples):
 
 # -- review findings -----------------------------------------------------------------------------
 def test_a_removed_cell_still_replays_the_actions_that_read_it():
-    from test_change_check import history
-    base = schema_doc_domain()
+    from test_change_check import history, in_flight_example
+    base = in_flight_example()                               # the launched experiment can still end
     raw = copy.deepcopy(base)
     del raw["transitions"]["Experiment"]["matrix"]["approved"]["launch_experiment"]    # now undecided
     r = change_check(dom(raw), dom(base), events=history(base), examples=10)

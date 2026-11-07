@@ -28,7 +28,17 @@ def problems(report, check, severity=None):
 
 @pytest.fixture
 def base():
-    return schema_doc_domain()
+    return in_flight_example()
+
+
+def in_flight_example():
+    """The schema example, with a way to end a running experiment: so the history below leaves
+    E-onboarding in flight, not finished (log replay treats the two differently)."""
+    raw = schema_doc_domain()
+    raw["actions"]["end_experiment"] = {"description": "End it.", "actor": ["eng"], "target": "Experiment"}
+    for state, row in raw["transitions"]["Experiment"]["matrix"].items():
+        row["end_experiment"] = "ended" if state == "running" else "n/a"
+    return raw
 
 
 def history(raw):
@@ -132,6 +142,22 @@ def test_the_kernel_replays_a_domain_s_own_log_with_nothing_deployed(tmp_path, b
     out = k.call("change_check", {"domain": "example", "commit": c1.id})
     assert "log_replay" in out["failing"]
     assert st.check_status("example", c1.id)["log_replay"]["ok"] is False
+
+
+def test_a_stricter_rule_on_a_finished_object_is_a_warning(base):
+    """Finished history is not rewritten by a deliberately stricter rule; an object still in
+    flight is what a block endangers."""
+    st = MemoryEventStore()
+    m = ReferenceModel(dom(base), st)
+    for who, action in ((ANA, "approve_experiment"), (ELI, "launch_experiment"), (ELI, "end_experiment")):
+        assert m.execute(Command(who, action, "E-onboarding", {})).ok           # ended: no move left
+    raw = copy.deepcopy(base)
+    raw["actions"]["launch_experiment"]["actor"] = ["approver"]
+    r = change_check(dom(raw), dom(base), events=st, examples=10)
+    assert r.checks["log_replay"].ok
+    assert [p.severity for p in r.checks["log_replay"].problems] == ["warning"]
+    assert "The object is finished" in r.checks["log_replay"].problems[0].message
+    assert r.checks["log_replay"].note.endswith("; 0 would be blocked; 1 on finished objects (warnings)")
 
 
 def test_one_blocked_action_does_not_cascade(base):

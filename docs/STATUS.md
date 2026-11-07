@@ -201,6 +201,9 @@ M0b's UI), checking the non-developer claim (M1 Phase B, M2), TLC modeling creat
   (`run_probes`, `record_probes`, `verify` needs `probes-passed`, a new deploy clears probes);
   the researcher confirms, approves, deploys and verifies it in one human request.
   A proposal inside an element (`actions.verify.effects`) now proposes the element again.
+  The first approval run stopped at the change check: log replay found the four past checkbox
+  verifications blocked. They are on finished requests, so they are now warnings (the
+  researcher's choice); a block on an object in flight stays an error.
 
 ## M0b, M2 to M5
 
