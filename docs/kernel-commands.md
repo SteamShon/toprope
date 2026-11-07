@@ -120,6 +120,15 @@ The newest record of each check on a commit.
 | `DOMAIN` | the domain's name, as its declaration's `domain:` says |
 | `COMMIT` | a commit id, e.g. 4-b0c8834e25d9bbc7 |
 
+### `toprope-commits evidence`
+
+The evidence a commit cites, with its strength (ADR-0041).
+
+| Argument | What |
+|---|---|
+| `DOMAIN` | the domain's name, as its declaration's `domain:` says |
+| `COMMIT` | a commit id, e.g. 4-b0c8834e25d9bbc7 |
+
 ### `toprope-commits deployed`
 
 What a deploy environment runs.

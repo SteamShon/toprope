@@ -97,7 +97,15 @@ each into `umbrella/pstack-lessons`. Each sub-PR changes only its own item below
   It is left for the researcher to review and freeze before any arm runs. Its four questions
   need answers first (#123)
 
-- ⬜ 3. Commits cite evidence, with how strong it is (ADR-0041 follow-up)
+- ✅ 3. Commits cite evidence that must resolve, with how strong it is (ADR-0041, Resolved 3, with
+  a dated note). The kernel's `cite_evidence` refuses a ref that does not resolve (an interview
+  line, a source chunk, a check recorded on the commit, a stored event, or an approval run the
+  `human-request` workflow recorded in `.toprope/approval-runs.jsonl`) and records its strength
+  (pointed, ran, observed or approved); `toprope-commits evidence` lists it. One mechanism: the
+  `commit` service no longer takes free-string evidence. Authoring calls `cite_evidence` and
+  `commit_draft` dropped `evidence`, through the loop from develop's `main`: proposed by the
+  agent, confirmed, approved, deployed and verified by the researcher (Authoring `main` is
+  `7-92bcb1c921be21bd`) (#124)
 
 - ✅ 4. World map state charts show where the harness found a break: failed arrows, `breaks`,
   `mayBreak` and `unreachable` states, arrow conditions in brackets, and each minimal flow told
