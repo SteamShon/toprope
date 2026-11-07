@@ -99,8 +99,9 @@ class _RawArgs(FuncMetadata):
 
 
 def build_server(ex: Execution, credentials: Credentials, *, harness: dict[str, Any] | None = None,
-                 **server_kwargs: Any) -> MCPServer:
-    """`harness` is a harness report (JSON) whose per-edge results the world map shows."""
+                 sources: Any = None, **server_kwargs: Any) -> MCPServer:
+    """`harness` is a harness report (JSON) whose per-edge results the world map shows.
+    `sources` is an authoring workspace: with it, `read_source` serves its sources' text."""
     from ...worldmap import build_world_map, how_to_reach as reach
     d = ex.d
     wmap = build_world_map(d, harness)
@@ -177,7 +178,21 @@ def build_server(ex: Execution, credentials: Credentials, *, harness: dict[str, 
             roles &= set(c.on_behalf_of.roles) if c.on_behalf_of is not None else set()
         return reach(wmap, obj, st.get(tr.field), target_state, tuple(sorted(roles)))
 
-    for fn in (get_object, history, attempts, allowed_actions, describe_domain, world_map, how_to_reach):
+    def read_source(source_id: str, offset: int = 0, limit: int = 20) -> dict[str, Any]:
+        """Read a source's chunks: redacted (secrets, personal data), each with the ref to cite
+        in a proposal. A local-only source is refused. A read, not an action: what it serves is
+        recorded in the workspace's usage log, never in an event log."""
+        caller()
+        from ...workspace import AuthoringError
+        try:
+            return sources.read_source(source_id, offset, max(1, min(limit, 50)))
+        except AuthoringError as e:
+            raise ToolError(str(e)) from None
+
+    tools = [get_object, history, attempts, allowed_actions, describe_domain, world_map, how_to_reach]
+    if sources is not None:
+        tools.append(read_source)
+    for fn in tools:
         server.add_tool(fn, name=fn.__name__)
     return server
 

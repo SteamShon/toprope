@@ -295,8 +295,7 @@ def _model_checks(tested: Domain, carried: list[Any], baseline: Domain | None, e
         newly = baseline is not None and a in baseline.actions and a not in dead_old
         semantic.add("error" if newly else "warning", f"action:{a}",
                      "no matrix cell allows it any more" if newly else "no matrix cell allows it")
-    from ..harness.mechanical import unreachable_from_creation
-    for obj, states in unreachable_from_creation(tested).items():    # ADR-0035: mechanical, apart
+    for obj, states in h.unreachable_from_creation().items():          # ADR-0035: mechanical, apart
         for st in states:
             semantic.add("warning", f"state:{obj}.{st}", "no declared move reaches it from creation")
     for c in run.undecided:                                # missing cells count as undecided
