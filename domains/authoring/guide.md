@@ -17,7 +17,7 @@ A domain owner's workflow lives in people's heads; turning it into a declared do
 - **Answer**: The owner's answer, in their words; its decisions become proposed elements. Stages: `recorded` (starts `recorded`).
   - facts: `words` (string), `decisions` (string), `ref` (string, optional)
 - **Commit**: An immutable snapshot of the working copy on a branch. Stages: `recorded` (starts `recorded`).
-  - facts: `seq` (integer), `content` (string), `branch` (string), `author` (string, optional), `message` (string, optional), `interface` (string), `domain_id` (string), `checks_passed` (boolean, optional), `failing` (string, optional), `approved` (boolean, optional), `main` (string, optional)
+  - facts: `seq` (integer), `content` (string), `branch` (string), `author` (string, optional), `message` (string, optional), `interface` (string), `domain_id` (string), `checks_passed` (boolean, optional), `failing` (string, optional), `approved` (boolean, optional), `main` (string, optional), `last_evidence` (string, optional), `evidence_error` (string, optional)
 - **DecisionRequest**: A decision only a person may take, proposed with grounds and a recommendation and sent to that person's outbox. Stages: `open`, `decided` (starts `open`).
   - facts: `subject` (string), `grounds` (string), `recommendation` (string), `choice` (string, optional)
 - **Draft**: The working copy of a domain's declaration on a branch: what a commit snapshots. Stages: `open` (starts `open`).
@@ -54,7 +54,7 @@ A domain owner's workflow lives in people's heads; turning it into a declared do
 | `mark_unknown` | owner, expert | **Element** | — | the stage (per the matrix) | — | `ElementMarkUnknown` |
 | `request_decision` | owner | creates **DecisionRequest**; params `element` (a Element), `subject` (string), `grounds` (string), `recommendation` (string) | — | — | — | `DecisionRequestCreated` |
 | `decide` 🔒 📝 | owner | **DecisionRequest**; params `choice` (string), `rationale` (string, optional) | — | the stage (per the matrix); `target.choice` ← `params.choice` | — | `DecisionRequestDecide` |
-| `commit_draft` | owner | **Draft**; params `evidence` (string, many, optional) | — | the stage (per the matrix) | kernel `commit` → `record_commit` | `DraftCommitDraft` |
+| `commit_draft` | owner | **Draft** | — | the stage (per the matrix) | kernel `commit` → `record_commit` | `DraftCommitDraft` |
 | `record_commit` | the kernel | creates **Commit**; params `seq` (integer), `content` (string), `interface` (string), `domain` (string), `branch` (string), `author` (string) | — | `target.domain_id` ← `params.domain` | — | `CommitCreated` |
 | `check_commit` | owner | **Commit** | `not-approved`: An approved commit passed its check; check a new commit instead. | the stage (per the matrix) | kernel `change_check` → `record_check` | `CommitCheckCommit` |
 | `record_check` | the kernel | **Commit**; params `passed` (boolean), `summary` (string) | — | the stage (per the matrix); `target.checks_passed` ← `params.passed`, `target.failing` ← `params.summary` | — | `CommitRecordCheck` |
@@ -77,6 +77,8 @@ A domain owner's workflow lives in people's heads; turning it into a declared do
 | `record_merge` | the kernel | **Draft**; params `merge` (string), `conflicts` (integer), `paths` (string, many) | — | the stage (per the matrix); `target.merging` ← `params.merge`, `target.conflicts` ← `params.conflicts` | — | `DraftRecordMerge` |
 | `record_checkout` | the kernel | **Draft**; params `content` (string) | — | the stage (per the matrix) | — | `DraftRecordCheckout` |
 | `record_confirm_all` | the kernel | **Draft**; params `confirmed` (string, many) | — | the stage (per the matrix) | — | `DraftRecordConfirmAll` |
+| `record_evidence` | the kernel | **Commit**; params `strength` (string), `error` (string) | — | the stage (per the matrix); `target.last_evidence` ← `params.strength`, `target.evidence_error` ← `params.error` | — | `CommitRecordEvidence` |
+| `cite_evidence` | owner | **Commit**; params `kind` (one of interview, source, check, event, approval-run), `ref` (string) | `not-approved`: An approved commit is settled; cite evidence before approving it. | the stage (per the matrix) | kernel `cite_evidence` → `record_evidence` | `CommitCiteEvidence` |
 
 ## Transitions
 
@@ -90,9 +92,9 @@ For each stage: may the action happen, and where does it lead? A missing cell is
 
 ### Commit (`stage`)
 
-| stage | `check_commit` | `record_check` | `approve_commit` | `record_approval` | `deliver` |
-| --- | --- | --- | --- | --- | --- |
-| `recorded` | → `recorded` | → `recorded` | → `recorded` | → `recorded` | → `recorded` |
+| stage | `check_commit` | `record_check` | `approve_commit` | `record_approval` | `deliver` | `record_evidence` | `cite_evidence` |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `recorded` | → `recorded` | → `recorded` | → `recorded` | → `recorded` | → `recorded` | → `recorded` | → `recorded` |
 
 ### DecisionRequest (`stage`)
 
@@ -164,6 +166,8 @@ Generated from the actions, their actors, the matrix and the kernel calls: for e
 - **approve_commit** by `owner` — **a person only** — recorded as a decision. Needs: Run the change check, and approve only a commit that passes it. Already approved; approve a newer commit. Then starts kernel `approve_commit`, answered by `record_approval`. Run: `toprope-run --domain authoring.domain.yaml approve_commit ID`
 - **record_approval** by the kernel, automatically (a reply). Needs: A commit is recorded as approved only if its change check passed
 - **deliver** by `owner`. Needs: Only an approved commit is delivered. Then hands over to delivery.`request_delivery`. Run: `toprope-run --domain authoring.domain.yaml deliver ID --environment ENVIRONMENT`
+- **record_evidence** by the kernel, automatically (a reply)
+- **cite_evidence** by `owner`. Needs: An approved commit is settled; cite evidence before approving it. Then starts kernel `cite_evidence`, answered by `record_evidence`. Run: `toprope-run --domain authoring.domain.yaml cite_evidence ID --kind KIND --ref REF`
 
 ### DecisionRequest
 
@@ -231,7 +235,7 @@ Generated from the actions, their actors, the matrix and the kernel calls: for e
 ## What is generated
 
 - **Command line** `toprope-run --domain authoring.domain.yaml ...`: one subcommand per action, with the same rules as every other surface (ADR-0036), plus `get`, `history`, `allowed` and `guide`.
-- **MCP server** `toprope:authoring`: one tool per action (33), plus `get_object`, `history`, `attempts`, `allowed_actions`, `describe_domain`, `world_map` and `how_to_reach`. Kernel replies (`record_fetch`, `record_commit`, `record_check`, `record_approval`, `record_proposal`, `record_confirmation`, `record_answer_ref`, `record_questions`, `record_search`, `record_skip`, `record_merge`, `record_checkout`, `record_confirm_all`) are tools too, but only the kernel may take them.
-- **Events**: one per action (`AnswerCreated`, `AnswerRecordAnswerRef`, `CommitApproveCommit`, `CommitCheckCommit`, `CommitCreated`, `CommitDeliver`, `CommitRecordApproval`, `CommitRecordCheck`, `DecisionRequestCreated`, `DecisionRequestDecide`, `DraftCheckoutCommit`, `DraftCommitDraft`, `DraftConfirmAllProposed`, `DraftCreated`, `DraftMergeMain`, `DraftNextQuestions`, `DraftRecordCheckout`, `DraftRecordConfirmAll`, `DraftRecordMerge`, `DraftRecordQuestions`, `DraftRecordSearch`, `DraftRecordSkip`, `DraftSearch`, `DraftSkipStage`, `ElementConfirmElement`, `ElementCreated`, `ElementMarkUnknown`, `ElementRecordConfirmation`, `ElementRecordProposal`, `QuestionCreated`, `SourceCreated`, `SourceFetchSource`, `SourceRecordFetch`); the current state is the events replayed in order.
+- **MCP server** `toprope:authoring`: one tool per action (35), plus `get_object`, `history`, `attempts`, `allowed_actions`, `describe_domain`, `world_map` and `how_to_reach`. Kernel replies (`record_fetch`, `record_commit`, `record_check`, `record_approval`, `record_proposal`, `record_confirmation`, `record_answer_ref`, `record_questions`, `record_search`, `record_skip`, `record_merge`, `record_checkout`, `record_confirm_all`, `record_evidence`) are tools too, but only the kernel may take them.
+- **Events**: one per action (`AnswerCreated`, `AnswerRecordAnswerRef`, `CommitApproveCommit`, `CommitCheckCommit`, `CommitCiteEvidence`, `CommitCreated`, `CommitDeliver`, `CommitRecordApproval`, `CommitRecordCheck`, `CommitRecordEvidence`, `DecisionRequestCreated`, `DecisionRequestDecide`, `DraftCheckoutCommit`, `DraftCommitDraft`, `DraftConfirmAllProposed`, `DraftCreated`, `DraftMergeMain`, `DraftNextQuestions`, `DraftRecordCheckout`, `DraftRecordConfirmAll`, `DraftRecordMerge`, `DraftRecordQuestions`, `DraftRecordSearch`, `DraftRecordSkip`, `DraftSearch`, `DraftSkipStage`, `ElementConfirmElement`, `ElementCreated`, `ElementMarkUnknown`, `ElementRecordConfirmation`, `ElementRecordProposal`, `QuestionCreated`, `SourceCreated`, `SourceFetchSource`, `SourceRecordFetch`); the current state is the events replayed in order.
 - **World map** (`world-map.json`): every object, link, stage and (stage, action) edge.
-- **Harness**: passes; decided cells covered per level: model 111/111, execution 111/111, mcp 111/111; 0 finding(s).
+- **Harness**: passes; decided cells covered per level: model 117/117, execution 117/117, mcp 117/117; 0 finding(s).

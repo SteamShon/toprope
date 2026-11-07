@@ -128,3 +128,5 @@ def test_an_approved_run_is_recorded_so_a_commit_can_cite_it_after_any_merge(tmp
     assert row["steps"] == req["steps"] and row["summary"] == "Approve commit 6"
     workflow = (ROOT / ".github/workflows/human-request.yml").read_text()
     assert "human_request.py record" in workflow.split("git rm")[0]          # recorded, then committed
+    ignored = subprocess.run(["git", "check-ignore", "-q", hr.APPROVAL_RUNS], cwd=ROOT)
+    assert ignored.returncode == 1, f"{hr.APPROVAL_RUNS} is git-ignored, so `git add -A` would drop it"
