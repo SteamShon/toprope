@@ -136,9 +136,14 @@ only its own item below.
   using time, links or creation left out and reported; every example and both self domains under
   a 1,000,000-state bound (#136)
 
-- ⬜ 2. Exporter: a declaration's model level as a TLA+ spec and TLC config
+- ✅ 2. Exporter (`toprope.tla`; `toprope-harness --tla DIR`): a declaration's model level as a
+  TLA+ module and TLC config, values tagged so the check language stays fail closed; actions that
+  create objects, use time or follow links are left out and named (#137)
 
-- ⬜ 3. A `tla` CI job: TLC, pinned by version and sha256
+- ✅ 3. A `tla` CI job (`.github/workflows/tla.yml`, `tools/tla_check.py`): TLC 1.8.0 pinned by
+  sha256. The four examples are checked (paid-media 133,686 states, no break), and a seeded break
+  (paid-media without `not-a-holdout`) must be found, so the job can fail; a model TLC cannot
+  check, or a reached state bound, fails (#137)
 
 - ⬜ 4. Replay: each counterexample on the interpreter; a harness gap or a model mismatch fails
 
