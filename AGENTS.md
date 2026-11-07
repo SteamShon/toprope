@@ -178,6 +178,7 @@ check starts enforcing a rule, and drop a rule from the text once its mistake ca
 | A frozen instrument changes only through `amend` | `checks` workflow (`instruments.py verify --run`) |
 | A workspace source points at files that exist (#91) | `Workspace.stale_sources`, tested in `checks` |
 | One line of history for the self domains (below) | `checks` workflow (`tools/logs_check.py`) |
+| The harness misses no invariant break TLC can reach in the modeled part of a declaration (ADR-0043) | `tla` workflow (`tools/tla_check.py`), with a seeded break it must find |
 | Agents write only `proposed`; only a person confirms or approves | the kernel (`requires: human`, `_demote`) |
 | The researcher's own steps from a cloud session run after their approval | `human-request` workflow (ADR-0039) |
 | Gold sets and sealed files are human-only | text only: review |

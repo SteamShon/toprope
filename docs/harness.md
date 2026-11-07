@@ -49,8 +49,12 @@ and do not fail it: they are the interview's next questions (ADR-0010 §2).
 ## Limits in M0a
 - Cell tests use one person per role. Agents (principal and grant) are covered by the
   Execution and MCP tests, but are not yet in the generated cells.
-- Each required param gets one default value (the first enum value, the first fixture of a
-  `ref`, or a type default). A precondition test may set one param to another value.
+- Cell tests give each required param one default value (the first enum value, the first fixture
+  of a `ref`, or a type default). Param tests set one finite param (boolean, enum, integer) to each
+  other value; a precondition test may set one param to another value. Strings and `ref`s keep
+  their default.
+- The small world grows one instance per (object, state), so a break that first needs a state it
+  never builds is TLC's to find ("What each one catches", above).
 - Clones carry their outgoing links. No other object links to a clone.
 - Exploration runs on the model level. A minimal flow it finds can be replayed on the other
   levels like any other flow.
