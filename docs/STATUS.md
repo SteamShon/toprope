@@ -232,8 +232,10 @@ A review leftover from #86. The validator warns (`unset-on-create`) when a creat
 required property to an optional param or to nothing. It is a warning, not an error, so a
 declaration already running with it can still be fixed through the loop. It found one:
 Authoring's `add_source` leaves `Source.local_only` unset when the param is left out. The fix,
-`local_only` optional (absent means not local-only, as the source spec reads it), is proposed
-for the researcher to confirm and approve.
+`local_only` optional (absent means not local-only, as the source spec reads it), was confirmed,
+approved, deployed and verified by the researcher (approval run 42363055975): Authoring
+`10-01b4e6464862bbf9`, its `tla` check passed in the approval (219312 states). It is the first
+deploy recorded with the commits (ADR-0045): the events after it carry `domain_version` 10.
 
 ## M0b, M2 to M5
 
