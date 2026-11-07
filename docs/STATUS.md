@@ -38,6 +38,7 @@ replay and in-flight check, incremental analysis, commits and branches (ADR-0029
 | Probe suite (P01–P08) and verdict rules, frozen (`experiments/m1/instruments/FROZEN.json`) | ✅ | #56–#58, #61 |
 | Change requests (20) and the sealed change key (options drafted on request and selected by the researcher, ADR-0034), frozen | ✅ | #92 |
 | Binding (intent → element names; drafted on request, ADR-0038), frozen | ✅ | #93, #94 |
+| Phase B run protocol (drafted on request, decided by the researcher), frozen | 🟡 decided; freeze pending | #123, (PR) |
 | Phase A: the Authoring and Delivery self domains, built and confirmed | ✅ | #69, #73, #74 |
 | First self-domain commits approved | ✅ | #77 |
 | Domain guide at preview | ✅ | #67 |
@@ -92,10 +93,10 @@ each into `umbrella/pstack-lessons`. Each sub-PR changes only its own item below
   enforces it. Three rules stay text only (gold sets, real tests, model identifiers): no past
   mistake to prove a check on (#122)
 
-- 🟡 2. M1 Phase B run protocol: drafted (`experiments/m1/run-protocol.md`), with blinding,
-  grading by sanitized label, 3 runs per stochastic part, and the spread with every number.
-  It is left for the researcher to review and freeze before any arm runs. Its four questions
-  need answers first (#123)
+- ✅ 2. M1 Phase B run protocol (`experiments/m1/instruments/run-protocol.md`): blinding, grading
+  by sanitized label, reviewers 5 runs and probes 3, the spread with every number, run records
+  in git. Drafted (#123); its four questions decided by the researcher on 2026-11-07, and frozen
+  by hash (`freeze-protocol`; `verify --run` needs it) (PR)
 
 - ✅ 3. Commits cite evidence that must resolve, with how strong it is (ADR-0041, Resolved 3, with
   a dated note). The kernel's `cite_evidence` refuses a ref that does not resolve (an interview

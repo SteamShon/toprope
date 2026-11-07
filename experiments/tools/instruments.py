@@ -4,6 +4,7 @@ Usage (from the repo root):
   uv run --with pyyaml python experiments/tools/instruments.py validate experiments/m1/instruments
   uv run --with pyyaml python experiments/tools/instruments.py freeze   experiments/m1/instruments
   uv run --with pyyaml python experiments/tools/instruments.py freeze-binding experiments/m1/instruments
+  uv run --with pyyaml python experiments/tools/instruments.py freeze-protocol experiments/m1/instruments
   uv run --with pyyaml python experiments/tools/instruments.py verify   experiments/m1/instruments [--run]
   uv run --with pyyaml python experiments/tools/instruments.py amend    experiments/m1/instruments FILE --reason TEXT
 
@@ -14,6 +15,9 @@ freeze          researcher only: freezes into FROZEN.json the probe suite and ve
                 runs; ADR-0034). Status must be `frozen`. The binding is ignored here.
 freeze-binding  stage 2, researcher only, after Phase A and before any arm runs: freezes
                 binding.yaml. Requires the four instruments frozen.
+freeze-protocol researcher only, before any arm runs: freezes run-protocol.md (how the arms are
+                run and graded), by its hash only. Its `Status:` line must say frozen.
+                Requires the four instruments frozen.
 --sealed        with validate: print nothing derived from change-key.yaml beyond errors
                 (use it whenever an agent runs the validator for you).
 amend FILE --reason TEXT
@@ -23,13 +27,14 @@ amend FILE --reason TEXT
                 report which version it used. Nothing is ever erased from the manifest.
 verify          fails if a frozen file changed. It also fails unless the probe suite and verdict
                 rules are frozen (the gate for building the checks), and with --run (used by
-                the harness before every arm run) unless the change requests, the key and
-                the binding are frozen too.
+                the harness before every arm run) unless the change requests, the key,
+                the binding and the run protocol are frozen too.
 """
 from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -43,12 +48,14 @@ FILES = {
     "change-key": "change-key.yaml",
     "binding": "binding.yaml",          # written after Phase A
     "verdict-rules": "verdict-rules.yaml",
+    "run-protocol": "run-protocol.md",   # Markdown: frozen by hash, its status on a `Status:` line
 }
 SEALED = "--sealed" in sys.argv   # validate without printing anything derived from the sealed key
 # ADR-0034: the checks wait only for the probe suite and the verdict rules; the change requests
 # and their key are frozen before the pilot runs. A gold file is optional in M1 (ADR-0031); if
 # present, it is validated and frozen with them.
 BEFORE_CHECKS = ["probe-suite", "verdict-rules"]
+HASH_ONLY = {"run-protocol"}           # frozen by hash; no format to validate
 BEFORE_RUN = ["change-requests", "change-key"]
 INSTRUMENTS = BEFORE_CHECKS + BEFORE_RUN
 OPTIONAL_STAGE1 = ["gold-scenarios"]
@@ -67,6 +74,18 @@ def load(d: Path, key: str):
     except yaml.YAMLError as e:
         return {"__invalid__": f"YAML error: {str(e).splitlines()[0]}"}
     return doc if isinstance(doc, dict) else {"__invalid__": "top level must be a mapping"}
+
+
+def status(d: Path, key: str) -> str | None:
+    """A file's `status`: the YAML field, or for the Markdown protocol its `Status: **x**` line."""
+    p = d / FILES[key]
+    if not p.exists():
+        return None
+    if p.suffix == ".md":
+        m = re.search(r"^Status:\s*\**(\w+)", p.read_text(), re.MULTILINE)
+        return m.group(1).lower() if m else None
+    doc = load(d, key)
+    return doc.get("status") if isinstance(doc, dict) else None
 
 
 def items(doc, key: str) -> list[dict]:
@@ -111,10 +130,10 @@ def _gold_domains_and_facts(g: dict, warn: list[str]) -> list[str]:
 def validate(d: Path, include_binding: bool = True) -> list[str]:
     errs: list[str] = []
     warn: list[str] = []
-    docs = {k: load(d, k) for k in FILES}
+    docs = {k: load(d, k) for k in FILES if k not in HASH_ONLY}
     if not include_binding:
         docs["binding"] = None
-    for k in FILES:
+    for k in docs:
         if docs[k] is None:
             if k in BEFORE_CHECKS:
                 errs.append(f"missing {FILES[k]}")
@@ -221,10 +240,9 @@ def _sealed_validate(d: Path, include_binding: bool) -> list[str]:
 def _freeze(d: Path, keys: list[str]) -> list[str]:
     errs = _sealed_validate(d, include_binding="binding" in keys)
     for k in keys:
-        doc = load(d, k)
-        if doc is None:
+        if not (d / FILES[k]).exists():
             errs.append(f"missing {FILES[k]}")
-        elif doc.get("status") != "frozen":
+        elif status(d, k) != "frozen":
             errs.append(f"{FILES[k]}: set status: frozen yourself before freezing")
     if errs:
         return errs
@@ -268,8 +286,7 @@ def amend(d: Path, name: str, reason: str) -> list[str]:
         return [f"{f} is not frozen; use freeze"]
     key = next((k for k, v in FILES.items() if v == f), None)
     errs = _sealed_validate(d, include_binding=key == "binding")
-    doc = load(d, key) if key else None
-    if doc is None or doc.get("status") != "frozen":
+    if key is None or status(d, key) != "frozen":
         errs.append(f"{f}: keep status: frozen in the amended file")
     if errs:
         return errs
@@ -296,6 +313,16 @@ def freeze_binding(d: Path) -> list[str]:
     return _freeze(d, ["binding"])
 
 
+def freeze_protocol(d: Path) -> list[str]:
+    manifest, merrs = read_manifest(d)
+    if merrs:
+        return merrs
+    missing = [FILES[k] for k in INSTRUMENTS if FILES[k] not in manifest["files"]]
+    if missing:
+        return [f"the instruments are not all frozen yet: {missing}"]
+    return _freeze(d, ["run-protocol"])
+
+
 def verify(d: Path, run: bool = False) -> list[str]:
     if not (d / "FROZEN.json").exists():
         return ["no FROZEN.json: instruments are not frozen"]
@@ -303,7 +330,8 @@ def verify(d: Path, run: bool = False) -> list[str]:
     if merrs:
         return merrs
     files = manifest["files"]
-    required = [FILES[k] for k in BEFORE_CHECKS] + ([FILES[k] for k in BEFORE_RUN] + [FILES["binding"]] if run else [])
+    required = [FILES[k] for k in BEFORE_CHECKS] + (
+        [FILES[k] for k in BEFORE_RUN] + [FILES["binding"], FILES["run-protocol"]] if run else [])
     required += [FILES[k] for k in OPTIONAL_STAGE1 if (d / FILES[k]).exists()]   # a gold file, once it exists
     errs = [f"{f} is not frozen" for f in required if f not in files]
     for f, meta in files.items():
@@ -323,7 +351,8 @@ if __name__ == "__main__":
         reason = rest[rest.index("--reason") + 1] if "--reason" in rest and rest.index("--reason") + 1 < len(rest) else ""
         errs = amend(d, rest[0] if rest and rest[0] != "--reason" else "", reason)
     else:
-        errs = {"validate": validate, "freeze": freeze, "freeze-binding": freeze_binding}[cmd](d)
+        errs = {"validate": validate, "freeze": freeze, "freeze-binding": freeze_binding,
+                "freeze-protocol": freeze_protocol}[cmd](d)
     for e in errs:
         print("error:", e)
     print("ok" if not errs else f"{len(errs)} error(s)")
