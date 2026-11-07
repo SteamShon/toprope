@@ -118,9 +118,10 @@ Recording:
   (`toprope-server`, from the environment's current build) runs the declaration of an approved
   commit with `version` set to the commit's sequence number, and the environment's
   `deployments.jsonl` records when each build, and so each commit, went live. Together they say
-  which rule was in force when an event was decided (ADR-0042). The self domains are the
-  exception for now: `toprope-run --composition` reads their working-copy declarations, whose
-  `version` stays 1. A fact's time in the world, as distinct from when Toprope recorded it,
+  which rule was in force when an event was decided (ADR-0042). The self domains run the same
+  way (ADR-0045): with `--kernel-root`, a member runs its deployed commit (recorded in the commit
+  store's `deployments.jsonl`, in git), else its approved `main`; their events before that carry
+  `version` 1. A fact's time in the world, as distinct from when Toprope recorded it,
   arrives with the adapters (M0b).
 - Projection is a pure fold over events. Replaying the same events yields the same state
   (replay parity).

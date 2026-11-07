@@ -174,7 +174,10 @@ class LocalEnvironment:
                 self._log({"at": _now(), "commit": c.id, "result": "refused", "rule": e.rule,
                            "reason": e.reason, "approver": approver.ref()})
                 raise
-            return self._deploy_locked(build_id, approver, {"commit": c.id, "seq": c.seq, "commit_domain": domain})
+            out = self._deploy_locked(build_id, approver, {"commit": c.id, "seq": c.seq, "commit_domain": domain})
+            if hasattr(commits, "record_deployment"):     # ADR-0045: what runs, kept with the commits
+                commits.record_deployment(domain, c.id, self.root.name)
+            return out
 
     def probe_commit(self, commits: Any, domain: str, commit_id: str, events: Any = None) -> dict[str, Any]:
         """The deployed commit, checked in use: this environment runs its build and the floor
