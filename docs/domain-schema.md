@@ -484,6 +484,12 @@ Rules:
 - **The reply.** It is a command from `external:kernel` to the `reply` action on the same
   object, keyed by the effect id, so it is applied at most once. It goes through the matrix,
   preconditions and invariants like any other command.
+- **A late reply is recorded, not applied.** If, after the call, someone other than the
+  kernel (a person, an agent, a handoff) moved the object out of the state it was called in,
+  the reply is refused with `late-reply`; its result stays in the outbox record. Another reply
+  of the same action may move the object without making its siblings late. The model level
+  (harness, TLC) still treats a reply as any action, so it finds what a missing guard allows;
+  this is the runtime's backstop for it (#139, #140).
 - **Every field, every time.** A result always has every field: `ok`, `error` (`""` when
   ok), and the service's fields, with defaults when it failed. A failed call (including
   inputs of the wrong type) still replies, so the declaration decides what a failure means,

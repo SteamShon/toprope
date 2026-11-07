@@ -166,7 +166,8 @@ class Outbox:
                                                            "code": "unchanged", "reason": None})
             o = self.ex.receive_kernel_reply(p.id, pl["reply"], result["id"], params)
         else:
-            o = self.ex.receive_kernel_reply(p.id, pl["reply"], p.event.stream, params)
+            o = self.ex.receive_kernel_reply(p.id, pl["reply"], p.event.stream, params,
+                                             requested_at=p.event.version)
         self._follow = list(o.events)
         if o.status == "rejected" and o.code in TRANSIENT:
             return {"id": p.id, "result": "pending", "reason": o.reason}
