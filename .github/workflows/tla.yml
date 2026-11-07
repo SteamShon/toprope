@@ -1,0 +1,44 @@
+name: tla
+
+# ADR-0043: a second oracle for the harness. Each declaration's model level is exported to
+# TLA+ and model-checked by TLC, pinned by version and sha256.
+on:
+  pull_request:
+  push:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+env:
+  TLC_VERSION: v1.8.0
+  TLC_SHA256: e1f11b75c4b5bc4478ba0ac5cb6ae28e40a01b0016bc33e0aa97da22dfdbcd7f
+
+jobs:
+  tla:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync
+      - name: TLC, pinned
+        run: |
+          curl -sSLo "$RUNNER_TEMP/tla2tools.jar" \
+            "https://github.com/tlaplus/tlaplus/releases/download/$TLC_VERSION/tla2tools.jar"
+          echo "$TLC_SHA256  $RUNNER_TEMP/tla2tools.jar" | sha256sum -c -
+      - name: Model-check the declarations
+        run: |
+          uv run python tools/tla_check.py --jar "$RUNNER_TEMP/tla2tools.jar" --out tla-out \
+            examples/paid-media/paid-media.domain.yaml examples/paid-media/paid-media.step-1000.domain.yaml \
+            examples/refunds/refunds.domain.yaml examples/refunds/refunds.30-days.domain.yaml
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tla-out
+          path: tla-out

@@ -133,9 +133,12 @@ only its own item below.
 
 - ⬜ 1. ADR-0043: what is modeled, where TLC runs, what a finding is
 
-- ⬜ 2. Exporter: a declaration's model level as a TLA+ spec and TLC config
+- 🟡 2. Exporter (`toprope.tla`; `toprope-harness --tla DIR`): a declaration's model level as a
+  TLA+ module and TLC config, values tagged so the check language stays fail closed; actions that
+  create objects, use time or follow links are left out and named (PR)
 
-- ⬜ 3. A `tla` CI job: TLC, pinned by version and sha256
+- 🟡 3. A `tla` CI job (`.github/workflows/tla.yml`, `tools/tla_check.py`): TLC 1.8.0 pinned by
+  sha256, on the four examples; a model TLC cannot check, or a reached state bound, fails (PR)
 
 - ⬜ 4. Replay: each counterexample on the interpreter; a harness gap or a model mismatch fails
 
