@@ -167,6 +167,24 @@ only its own item below.
   A break that first needs a state the small world never builds (Delivery's) stays TLC's;
   `docs/harness.md`, "What each one catches" (#141)
 
+## Review follow-ups (umbrella, link: ① ③)
+
+From an integrated review of #135 (2026-11-07): the mechanical guarantee had gaps the self-compile
+showed, and the loop is heavy even for experts. One sub-PR each into `umbrella/review-follow-ups`;
+each changes only its own item below. Not here: a confirmation view for non-developers (needs
+M0b's UI), checking the non-developer claim (M1 Phase B, M2), TLC modeling creation and links
+(Next).
+
+- ⬜ 1. A kernel reply is accepted only for a call that is waiting for it
+
+- ⬜ 2. The change check replays past actions from the domain's own event log in git
+
+- ⬜ 3. Breaks that need several steps are caught before approval, not only in CI
+
+- ⬜ 4. One change, one request: confirm, commit, check and approve in one declared step
+
+- ⬜ 5. `verify` runs the domain's probes instead of taking a checkbox
+
 ## M0b, M2 to M5
 
 Not started. Plans: [`roadmap.md`](roadmap.md).
