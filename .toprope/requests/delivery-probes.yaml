@@ -1,4 +1,4 @@
-summary: Confirm, approve, deploy and verify Delivery's probes (verify needs probes
+summary: Confirm, approve, deploy and verify Delivery's probes (second run, after finished objects became warnings)
   that passed)
 steps:
 - run:
