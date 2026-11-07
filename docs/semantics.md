@@ -56,7 +56,9 @@ Evaluation stops at the first failure, and each failure has its own outcome:
    - Here, step 8 only checks that the claim is held. Failure → `denied: reservation`.
 9. **Effects** are computed on a copy. Functions may be called here and in steps 4–6 and 10;
    they are pure (ADR-0023). the state field from the matrix (or `initial` for a
-   create action, which takes only declared params), then `set` in order. Functions are
+   create action, which takes only declared params), then `set` in order. The validator warns
+   (`unset-on-create`) when a create action leaves a required property to an optional param or
+   to nothing. Functions are
    called here and must be pure. `create:` effects are not supported yet
    (`rejected: unsupported-effect`, ADR-0021).
 10. **Invariant guard** on the resulting state (ADR-0012). Failure →
@@ -108,7 +110,19 @@ Recording:
 ## 5. Events
 - Each event has: `type`, `aggregate`, `id`, `version`, `at`, `actor`, `on_behalf_of`,
   `grant`, `thread_id`/`run_id` (if from an agent run), `causation` (the handoff id, if a
-  handoff issued it; ADR-0024), `domain_version`, `payload`.
+  handoff issued it; ADR-0024), `domain_version`, `payload`, and `permissions`: the actor's
+  roles, the principal's, and the grant's scope (actions, targets, expiry) in force when it ran
+  (ADR-0041). Events written before it have no `permissions`.
+- **Which rule decided an event.** `at` is when the event was recorded. `domain_version` is the
+  version of the declaration that decided it. A domain served from a deployment
+  (`toprope-server`, from the environment's current build) runs the declaration of an approved
+  commit with `version` set to the commit's sequence number, and the environment's
+  `deployments.jsonl` records when each build, and so each commit, went live. Together they say
+  which rule was in force when an event was decided (ADR-0042). The self domains run the same
+  way (ADR-0045): with `--kernel-root`, a member runs its deployed commit (recorded in the commit
+  store's `deployments.jsonl`, in git), else its approved `main`; their events before that carry
+  `version` 1. A fact's time in the world, as distinct from when Toprope recorded it,
+  arrives with the adapters (M0b).
 - Projection is a pure fold over events. Replaying the same events yields the same state
   (replay parity).
 - Old events are read through upcasters (ADR-0012). They are never rewritten.

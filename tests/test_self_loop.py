@@ -81,6 +81,11 @@ def test_the_whole_loop_runs_on_the_generated_command_line(tmp_path):
         if src.is_file():
             dst.parent.mkdir(parents=True, exist_ok=True)
             dst.write_bytes(src.read_bytes())
+    from toprope.commits import CommitStore
+    approved = CommitStore(ROOT / ".toprope" / "commits")
+    for d in ("authoring", "delivery"):         # a clean draft: what the repository's own open
+        main = approved.main(d)                 # proposals, if any, are not this test's
+        approved.export(d, main.id, tmp_path / f"domains/{d}/{d}.domain.yaml")
     me = "steamshon <steamshon@apache.org>"
     (tmp_path / "ids.yaml").write_text(yaml.safe_dump({"t-owen": {"id": me, "roles": ["owner", "approver"]}}))
     base = ["--composition", "domains/toprope-self.composition.yaml", "--kernel-root", ".", "--workspace",
@@ -129,7 +134,9 @@ def test_the_whole_loop_runs_on_the_generated_command_line(tmp_path):
     step("delivery", "preview", request)
     assert get("delivery", request)["harness_ok"] is True
     step("delivery", "deploy", request)
-    step("delivery", "verify", request, "--verified", "true")
+    step("delivery", "run_probes", request)                     # the deployed commit, checked in use
+    assert get("delivery", request)["probes_passed"] is True
+    step("delivery", "verify", request)                         # a person verifies what the probes found
     assert get("delivery", request)["stage"] == "verified"
     for d in ("authoring", "delivery"):                         # each domain's own log, for git
         assert (tmp_path / f"domains/{d}/events/events.jsonl").stat().st_size > 0

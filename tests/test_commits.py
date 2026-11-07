@@ -247,7 +247,7 @@ def test_workspace_commit_diff_approve_and_the_diff_command(tmp_path):
     ws = Workspace(tmp_path)
     c1 = ws.commit("first")
     assert c1["created"] and c1["since"] is None and c1["to_review"]
-    ws.approve_commit(c1["commit"], via="cli", who="ana")
+    ws.approve_commit(c1["commit"], via="terminal", who="ana")
     raw["actions"]["launch_experiment"]["description"] = "Start traffic."
     write(tmp_path / "d.domain.yaml", raw)
     c2 = ws.commit()
@@ -263,10 +263,10 @@ def test_approving_without_a_domain_or_an_unknown_commit_is_an_authoring_error(t
     (tmp_path / "d.domain.yaml").write_text("version: 1\n")
     ws = Workspace(tmp_path)
     with pytest.raises(AuthoringError, match="names no `domain`"):
-        ws.approve_commit("1-x", via="cli", who="ana")
+        ws.approve_commit("1-x", via="terminal", who="ana")
     write(tmp_path / "d.domain.yaml", schema_doc_domain())
     with pytest.raises(AuthoringError, match="no commit"):
-        ws.approve_commit("1-x", via="cli", who="ana")
+        ws.approve_commit("1-x", via="terminal", who="ana")
 
 
 # -- gaps closed after review -------------------------------------------------------------------------
@@ -320,3 +320,152 @@ def test_an_unreadable_representation_stops_the_commit_and_an_explicit_empty_lis
         st.commit(wc)
 
 
+
+
+# -- ADR-0041 Resolved 1: main takes no unconfirmed proposal -----------------------------------
+def test_a_commit_with_a_proposed_element_is_not_approved(store):
+    st, wc = store
+    raw = schema_doc_domain()
+    raw["links"]["hypothesis"]["status"] = "proposed"
+    c, _ = st.commit(write(wc, raw))
+    with pytest.raises(CommitError, match=r"1 proposed element\(s\): links.hypothesis"):
+        st.approve("example", c.id, "ana")
+    assert st.main("example") is None and st.approvals("example") == []
+    raw["links"]["hypothesis"]["status"] = "confirmed"
+    c2, _ = st.commit(write(wc, raw))
+    assert st.approve("example", c2.id, "ana") == c2
+
+
+def test_a_merge_that_brings_in_a_proposed_element_is_not_approved(store, tmp_path):
+    st, wc = store
+    raw = schema_doc_domain()
+    base, _ = st.commit(write(wc, raw))
+    st.approve("example", base.id, "ana")
+    side = copy.deepcopy(raw)
+    side["actions"]["launch_experiment"]["status"] = "proposed"
+    c, _ = st.commit(write(tmp_path / "side.domain.yaml", side), branch="side")   # starts from main
+    raw["glossary"]["x"] = "y"
+    ahead, _ = st.commit(write(wc, raw))
+    st.approve("example", ahead.id, "ana")                     # main moves on: approving c merges
+    approvals, commits = st.approvals("example"), len(st.log("example"))
+    with pytest.raises(CommitError, match=r"proposed element\(s\): actions.launch_experiment"):
+        st.approve("example", c.id, "ana")
+    assert st.main("example") == ahead
+    assert st.approvals("example") == approvals and len(st.log("example")) == commits   # no merge commit
+
+
+def test_the_change_check_records_how_many_elements_are_still_proposed(store):
+    from toprope.check import check_commit
+    st, wc = store
+    raw = schema_doc_domain()
+    raw["links"]["hypothesis"]["status"] = "proposed"
+    c, _ = st.commit(write(wc, raw))
+    check_commit(st, "example", c.id)
+    rec = {r["check"]: r for r in st.checks("example", c.id)}["confirmed"]
+    assert rec["ok"] is False and rec["summary"] == "1 proposed element(s): links.hypothesis"
+
+
+def test_a_proposed_per_role_part_of_a_cell_blocks_approval_until_the_cell_is_confirmed(tmp_path):
+    from toprope.workspace import AuthoringError, Workspace
+    (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump({"domain": "d.domain.yaml", "sources": []}))
+    raw = schema_doc_domain()
+    raw["transitions"]["Experiment"]["matrix"]["draft"]["launch_experiment"] = {
+        "by_role": {"eng": {"deny": "Launch requires approval.", "status": "proposed"}},
+        "source": {"kind": "interview", "ref": "q1"}, "status": "confirmed"}
+    write(tmp_path / "d.domain.yaml", raw)
+    ws = Workspace(tmp_path)
+    c = ws.commit("by role")
+    with pytest.raises(AuthoringError, match="transitions.Experiment.matrix.draft.launch_experiment"):
+        ws.approve_commit(c["commit"], via="terminal", who="ana")
+    ws.confirm(["transitions.Experiment.matrix.draft.launch_experiment"], via="terminal", who="ana")
+    c2 = ws.commit("confirmed")
+    ws.approve_commit(c2["commit"], via="terminal", who="ana")
+    assert ws.commits.main("example").id == c2["commit"]
+
+
+def test_the_change_check_service_fails_while_elements_are_proposed(tmp_path):
+    st = CommitStore(tmp_path / "commits")
+    raw = schema_doc_domain()
+    raw["links"]["hypothesis"]["status"] = "proposed"
+    c, _ = st.commit(write(tmp_path / "wc.yaml", raw))
+    k = LocalKernel(tmp_path, commits=st, harness_examples=0)
+    out = k._change_check("example", c.id)
+    assert out["passed"] is False and "confirmed" in out["failing"]
+    assert out["summary"].endswith("; 1 proposed element(s) to confirm")
+
+
+def test_deploy_refuses_a_commit_approved_with_proposed_elements(tmp_path, monkeypatch):
+    st = CommitStore(tmp_path / "commits")
+    env = LocalEnvironment(tmp_path / "env")
+    raw = schema_doc_domain()
+    raw["links"]["hypothesis"]["status"] = "proposed"
+    c, _ = st.commit(write(tmp_path / "wc.yaml", raw))
+    monkeypatch.setattr(CommitStore, "_confirmed", staticmethod(lambda *a: None))  # approved before ADR-0041
+    st.approve("example", c.id, "ana")
+    monkeypatch.undo()
+    env.preview_commit(st, "example", c.id, examples=0)
+    with pytest.raises(DeployRefused) as e:
+        env.deploy_commit(st, "example", c.id, ANA)
+    assert e.value.rule == "proposed"
+
+
+# -- ADR-0041 Resolved 3: a commit may cite its evidence ---------------------------------------
+def test_free_string_evidence_recorded_before_cite_evidence_still_loads(store):
+    st, wc = store
+    c, _ = st.commit(write(wc, schema_doc_domain()))
+    log = st._dir("example") / "log.jsonl"
+    rows = [json.loads(line) for line in log.read_text().splitlines()]
+    rows[-1]["evidence"] = ["interview:domains/x/interview.jsonl#L3"]     # as #117 wrote it
+    log.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    assert st.get("example", c.id).evidence == ["interview:domains/x/interview.jsonl#L3"]
+    for r in rows:
+        r.pop("evidence")                                       # a record from before ADR-0041
+    log.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    assert st.get("example", c.id).evidence == []
+
+
+def test_the_commit_service_takes_no_evidence_a_declaration_passing_it_is_refused():
+    from toprope.decl import Domain, validate_domain
+    from toprope.kernel import CATALOG
+    assert set(CATALOG["commit"].inputs) == {"declaration"}               # cite_evidence instead (ADR-0041)
+    raw = {"domain": "d", "version": 1, "roles": ["owner"],
+           "objects": {"Draft": {"properties": {"declaration": {"type": "string"}, "status": {"enum": ["open"]}}}},
+           "actions": {
+               "commit_draft": {"description": "x", "actor": ["owner"], "target": "Draft",
+                                "params": {"evidence": {"type": "string", "many": True, "optional": True}},
+                                "effects": [{"call": "commit", "with": {"declaration": "target.declaration",
+                                                                         "evidence": "params.evidence"},
+                                             "reply": "done"}]},
+               "done": {"description": "x", "actor": ["external:kernel"], "target": "Draft"}},
+           "transitions": {"Draft": {"field": "status", "matrix": {"open": {"commit_draft": "open", "done": "open"}}}}}
+    assert [i.code for i in validate_domain(Domain.model_validate(raw)) if i.code == "unknown-input"] == ["unknown-input"]
+
+
+def test_where_the_rule_says_so_the_author_does_not_approve(tmp_path):
+    """ADR-0046 (charter §5): with `approval.distinct_from_author`, the commit's author may not
+    approve it. The rule in force is main's, so a commit cannot switch it off for itself."""
+    st = CommitStore(tmp_path / "commits")
+    raw = schema_doc_domain()
+    raw["approval"] = {"distinct_from_author": True}
+    c1, _ = st.commit(write(tmp_path / "d.domain.yaml", raw), author="ana")
+    with pytest.raises(CommitError, match="must not be the commit's author"):
+        st.approve("example", c1.id, "ana")
+    st.approve("example", c1.id, "eli")                                  # another person approves
+    off = copy.deepcopy(raw)
+    off["approval"] = {"distinct_from_author": False}
+    c2, _ = st.commit(write(tmp_path / "d.domain.yaml", off), author="ana")
+    with pytest.raises(CommitError, match="must not be the commit's author"):
+        st.approve("example", c2.id, "ana")                              # main's rule holds for it
+    st.approve("example", c2.id, "eli")
+    c3, _ = st.commit(write(tmp_path / "d.domain.yaml", {**off, "glossary": {**off["glossary"], "x": "X."}}), author="ana")
+    assert st.approve("example", c3.id, "ana").id == c3.id               # now off: ana may
+    nameless = CommitStore(tmp_path / "other")
+    c, _ = nameless.commit(write(tmp_path / "d.domain.yaml", raw))
+    with pytest.raises(CommitError, match="names no author"):
+        nameless.approve("example", c.id, "eli")
+
+
+def test_by_default_one_owner_commits_and_approves(tmp_path):
+    st = CommitStore(tmp_path / "commits")
+    c, _ = st.commit(write(tmp_path / "d.domain.yaml", schema_doc_domain()), author="ana")
+    assert st.approve("example", c.id, "ana").id == c.id                # M1: one owner (ADR-0032)

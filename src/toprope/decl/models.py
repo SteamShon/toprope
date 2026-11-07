@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Literal, Union
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, StringConstraints, field_serializer, model_validator
 from typing import Annotated
 
 Ident = Annotated[str, StringConstraints(pattern=r"^[A-Za-z_][A-Za-z0-9_-]*$")]
@@ -47,17 +47,27 @@ class Property(Strict):
     optional: bool = False
     min: float | None = None
     max: float | None = None
+    read: list[str] | None = None          # roles that may read it (ADR-0042 §3): defined, M0b
 
     @model_validator(mode="after")
     def _one_kind(self) -> Property:
         if (self.type is None) == (self.enum is None):
             raise ValueError("a property has exactly one of `type` or `enum`")
+        if self.read is not None:
+            raise not_yet("read visibility (`read`)", "M0b")
         return self
 
 
 class ObjectType(Provenance):
     description: str | None = None
     properties: dict[str, Property] = Field(default_factory=dict)
+    read: list[str] | None = None          # roles that may read objects of this type (ADR-0042 §3)
+
+    @model_validator(mode="after")
+    def _read_not_yet(self) -> ObjectType:
+        if self.read is not None:
+            raise not_yet("read visibility (`read`)", "M0b")
+        return self
 
 
 class Link(Provenance):
@@ -123,6 +133,27 @@ class Action(Provenance):
     applies_in: list[str] | None = None
     requires: Literal["human"] | None = None
     approvals: dict[str, Any] | None = None
+
+    _added: set[str] = PrivateAttr(default_factory=set)        # params the kernel added, not declared
+    _declared_rationale: bool = PrivateAttr(default=False)
+
+    @model_validator(mode="after")
+    def _rationale(self) -> Action:
+        """A decision action takes an optional `rationale` (ADR-0041, Resolved 2): the reason a
+        person gives, stored with the decision. Added here, after the declaration parses, so every
+        surface offers it; a declared one is reported by validation (`reserved-param`)."""
+        if self.records_decision:
+            if "rationale" in self.params:
+                self._declared_rationale = True
+            else:
+                self.params["rationale"] = Param(type="string", optional=True)
+                self._added.add("rationale")
+        return self
+
+    @field_serializer("params")
+    def _declared_params(self, params: dict[str, Param]) -> dict[str, Any]:
+        """Dump what was declared, so a dumped action validates again to the same action."""
+        return {k: v for k, v in params.items() if k not in self._added}
 
     @model_validator(mode="after")
     def _target_or_creates(self) -> Action:
@@ -207,7 +238,9 @@ class Step(Strict):
         return self
 
 
-class Scenario(Strict):
+class Scenario(Provenance):
+    """An example run the harness replays. An element (it carries provenance): an agent's
+    scenario is proposed until a person confirms it."""
     id: Ident
     given: dict[str, Any] = Field(default_factory=dict)
     steps: list[Step]
@@ -251,6 +284,13 @@ class Handoff(Provenance):
     target: str                                              # expression: the receiver's target id
 
 
+class Approval(Strict):
+    """How a commit of this domain is approved (ADR-0046)."""
+    # The commit's author may not approve it (charter §5, no self-approval). Off by default: in
+    # M1 each self domain has one owner, who both commits and approves (ADR-0032).
+    distinct_from_author: bool = False
+
+
 class Domain(Strict):
     domain: Ident
     version: Annotated[int, Field(ge=1)]
@@ -270,6 +310,7 @@ class Domain(Strict):
     invariants: list[Invariant] = Field(default_factory=list)
     world: World = Field(default_factory=World)
     scenarios: list[Scenario] = Field(default_factory=list)
+    approval: Approval = Field(default_factory=Approval)
 
     @model_validator(mode="after")
     def _not_yet(self) -> Domain:

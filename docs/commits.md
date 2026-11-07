@@ -22,6 +22,9 @@ uv run toprope-commits log DOMAIN action:launch_experiment   # an element's hist
 ```
 
 ## Commits
+- **Evidence.** A commit cites what the change rests on after it is made, with `cite_evidence`
+  (see *Evidence* below). Commit `5-c8fd1b8fc98be17c` of the Authoring domain still carries the
+  free strings the `commit` service took before (#117), as `evidence` on its record.
 - **Content-addressed and append-only.** A commit's content is the hash of the canonical
   declaration without `version`, plus its representations: the `*.representation.yaml` files
   next to the declaration whose `targets.domain` is this domain. Its id is `<seq>-<content>`, and
@@ -100,13 +103,46 @@ included, except provenance (`source`, `status`). Confirming an element changes 
 `change-check` runs the change check on a commit and records the result on it, one record
 per check plus the whole; a preview records its harness. See [`change-check.md`](change-check.md).
 
+## Evidence (ADR-0041)
+A commit may cite the evidence for its change, through the kernel's `cite_evidence` service
+or `CommitStore.cite`. Evidence is a pointer that must resolve, never prose. A claim with no
+pointer is refused. Each kind has a strength, which says how far the evidence goes:
+
+| Kind | Ref | Must resolve to | Strength |
+|---|---|---|---|
+| `interview` | a chunk of an interview-log source | a line the owner said | pointed |
+| `source` | a chunk of any other source | a line in the code or the records | pointed |
+| `check` | a check name, e.g. `change-check` | a check recorded on this commit | ran |
+| `event` | `<stream>@<version>` | an event in the deployed domain's store | observed |
+| `approval-run` | a GitHub Actions run URL | a human request approved in that run (ADR-0039), recorded in `.toprope/approval-runs.jsonl` | approved |
+
+The `human-request` workflow appends each approved run to `.toprope/approval-runs.jsonl` with
+the result it pushes, so the record outlives the branch and a squash merge.
+Citations are appended to `evidence.jsonl` next to the commit log, with who cited and when,
+and are never rewritten. `toprope-commits evidence DOMAIN COMMIT` lists them. Nothing requires
+evidence yet. In the Authoring domain, the owner or their agent cites with the action
+`cite_evidence` on a commit that is not approved yet. Its reply `record_evidence` keeps the
+last strength, or why the ref was refused, on the Commit. A rule such as "approve only with
+evidence that ran" is a later decision.
+
 ## Approval
 An approval is an immutable tag on a commit `main` points to. Tagging again is a no-op. A
 wrong approval is superseded by approving a newer commit. The kernel's `approve_commit`
 refuses unless the calling person is the approver, and returns the commit `main` points to.
+`main` takes no unconfirmed proposal (ADR-0041): approving a commit, or the merge it makes, is
+refused while it holds any element with `status: proposed`, and the change check records how
+many are left (the `confirmed` check record). The kernel's `change_check` service reports
+`passed: false` with `confirmed` among `failing` while any are left, so a declaration that
+approves only commits whose checks passed refuses them too. A cell's per-role parts
+(`by_role`) count as the cell: confirming the cell confirms them. Deploy refuses a commit that
+holds proposed elements as a backstop. Drafts and previews still compile and test them.
 
 `commit` also reports `last_approved`, so a declaration can ask `diff` what changed since
 the last approved commit.
+
+A domain that sets `approval: {distinct_from_author: true}` refuses an approval by the commit's
+own author, on every path (ADR-0046); the rule in force is `main`'s, so a commit cannot switch it
+off for itself. Off by default: in M1 one owner commits and approves.
 
 ## Delivery
 `LocalEnvironment.deploy_commit` (or the `deploy` kernel service, which Delivery's `deploy` action calls) is
@@ -118,3 +154,7 @@ stranded), it refuses a commit that is:
 - **superseded**: not what `main` points to
 - a **downgrade**: the deployed commit or one of its ancestors (rollback comes in M2)
 - not yet built: preview it first
+
+A deploy is also recorded with the commits, in `deployments.jsonl` (ADR-0045). With
+`--kernel-root`, `toprope-run` and `toprope-server --composition` run each member's deployed
+commit, else its approved `main`; `--working-copy` runs the files instead.

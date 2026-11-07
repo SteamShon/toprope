@@ -89,14 +89,16 @@ class Planner:
         view = ObjectView(self.d, a.object_type, (inst.data if inst else {}), self.lookup)
         return self.interp.actor_allowed(a, Command(actor, name, inst.data["id"] if inst else "new", self.params(a)), view)[0]
 
-    def first_failing(self, a: Action, inst_data: dict[str, Any], role: str) -> str | None:
+    def first_failing(self, a: Action, inst_data: dict[str, Any], role: str,
+                      params: dict[str, Any] | None = None) -> str | None:
         """The id of the first precondition that does not hold, or None."""
         from ..expr import EvalError, evaluate
         from ..semantics.interpreter import ObjectView
         view = ObjectView(self.d, a.object_type, inst_data, self.lookup)
+        params = self.params(a) if params is None else params
         for pre in a.preconditions:
             try:
-                ok = evaluate(parse(pre.check), self.interp._env(view, self.w.actors[role], self.params(a))) is True
+                ok = evaluate(parse(pre.check), self.interp._env(view, self.w.actors[role], params)) is True
             except EvalError:
                 ok = False
             if not ok:
@@ -111,6 +113,7 @@ class Planner:
                 out += self._create_cases(name, a)
             elif a.target in self.d.transitions:
                 out += self._cell_cases(name, a)
+                out += self._param_cases(name, a)
                 out += self._precondition_cases(name, a)
         return out
 
@@ -135,34 +138,97 @@ class Planner:
                 out.append(Case(cid, "cell", obj, state, name, role, inst, self.params(a), expect))
         return out
 
-    def _precondition_cases(self, name: str, a: Action) -> list[Case]:
-        """Boundary cases: an instance on which exactly this precondition is the first to fail."""
+    def _param_cases(self, name: str, a: Action) -> list[Case]:
+        """Each allowed cell, on every instance in its state, with one param set to another value of
+        a finite type (boolean, enum, integer). A cell test takes the default params only, so a
+        move that breaks an invariant only with another value went unseen: TLC found two, a
+        failing kernel reply on an approved commit or a deployed request (ADR-0043). Expected
+        outcomes come from the declaration, as for cells; an invariant guard is a finding."""
         out = []
         obj = a.object_type
-        for i, pre in enumerate(a.preconditions):
-            if any(p.root == "params" for p in paths_read(parse(pre.check))):
-                continue
-            found = None
-            for state in self.d.transitions[obj].matrix:
-                for role in self.w.actors:
-                    if cell_expectation(raw_cell(self.d, obj, state, name, role), state)["status"] != "ok":
+        base = self.params(a)
+        finite = [(p, s) for p, s in a.params.items() if not s.optional and s.ref is None
+                  and (s.enum or s.type in ("boolean", "integer"))]
+        if not finite:
+            return out
+        for state in self.d.transitions[obj].matrix:
+            for role in self.w.actors:
+                cell = cell_expectation(raw_cell(self.d, obj, state, name, role), state)
+                if cell["status"] != "ok":
+                    continue
+                for k, inst in enumerate(self.w.in_state(obj, state)):
+                    if not self.actor_ok(name, a, role, inst):
                         continue
-                    for inst in self.w.in_state(obj, state):
-                        if self.actor_ok(name, a, role, inst) and self.first_failing(a, inst.data, role) == pre.id:
-                            found = (state, role, inst)
-                            break
-                    if found:
-                        break
-                if found:
-                    break
+                    for p, spec in finite:
+                        for v in self._candidates(spec):
+                            v = [v] if spec.many else v
+                            if v == base[p]:
+                                continue
+                            params = {**base, p: v}
+                            pre = self.first_failing(a, inst.data, role, params)
+                            expect = {"status": "denied", "code": pre} if pre else cell
+                            out.append(Case(f"param:{obj}.{state}.{name}.{role}@{inst.data['id']}:{p}={v}", "param",
+                                            obj, state, name, role, inst, params, expect))
+        return out
+
+    def _precondition_cases(self, name: str, a: Action) -> list[Case]:
+        """Boundary cases: an instance on which exactly this precondition is the first to fail.
+        When no world instance is one, a boundary is made from one: a single property or param
+        the precondition reads is set to another value of its type (or an actor's id), keeping
+        every invariant. Without it, a skipped precondition would go unseen (harness mutants)."""
+        out = []
+        obj = a.object_type
+        for pre in a.preconditions:
+            found = self._boundary(name, a, pre)
             cid = f"precondition:{name}.{pre.id}"
             if found is None:
                 out.append(Case(cid, "precondition", obj, None, name, "", None, gap="no-boundary-instance"))
             else:
-                state, role, inst = found
-                out.append(Case(cid, "precondition", obj, state, name, role, inst, self.params(a),
+                state, role, inst, params = found
+                out.append(Case(cid, "precondition", obj, state, name, role, inst, params,
                                 {"status": "denied", "code": pre.id}))
         return out
+
+    def _boundary(self, name: str, a: Action, pre: Any):
+        obj = a.object_type
+        for state in self.d.transitions[obj].matrix:
+            for role in self.w.actors:
+                if cell_expectation(raw_cell(self.d, obj, state, name, role), state)["status"] != "ok":
+                    continue
+                for inst in self.w.in_state(obj, state):
+                    for data, params in self._variants(a, pre, inst.data):
+                        cand = inst if data is inst.data else Instance(inst.obj, inst.id, data, inst.path)
+                        if (self.actor_ok(name, a, role, cand) and self.first_failing(a, data, role, params) == pre.id
+                                and not self.interp.violated_invariants(obj, data, self.lookup)):
+                            return state, role, cand, params
+        return None
+
+    def _variants(self, a: Action, pre: Any, data: dict[str, Any]):
+        """The instance as it is, then each one-field change to what the precondition reads."""
+        params = self.params(a)
+        yield data, params
+        props = self.d.objects[a.object_type].properties
+        tr = self.d.transitions.get(a.object_type)
+        for p in paths_read(parse(pre.check)):
+            if not p.attrs:
+                continue
+            attr = p.attrs[0]
+            if p.root == "target" and attr in props and not (tr and attr == tr.field):
+                for v in self._candidates(props[attr]):
+                    if v != data.get(attr):
+                        yield {**data, attr: v}, params
+            elif p.root == "params" and attr in a.params and not a.params[attr].ref:
+                for v in self._candidates(a.params[attr]):
+                    if v != params.get(attr):
+                        yield data, {**params, attr: [v] if a.params[attr].many else v}
+
+    def _candidates(self, spec: Any) -> list[Any]:
+        from .mechanical import DATES, INTS, NUMS, STRS
+        if spec.enum:
+            return list(spec.enum)
+        return {"integer": list(INTS) + [1000, 10000], "number": list(NUMS) + [1000.0, 10000.0],
+                "boolean": [True, False], "datetime": list(DATES),
+                "string": list(STRS) + sorted({x.id for x in self.w.actors.values()})}[spec.type or "string"]
 
     def _create_cases(self, name: str, a: Action) -> list[Case]:
         out = []

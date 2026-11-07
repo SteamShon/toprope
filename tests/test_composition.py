@@ -169,3 +169,52 @@ def test_worldmap_cli_with_a_composition_reports_errors_and_writes_mermaid(tmp_p
     (tmp_path / "delivery.domain.yaml").unlink()
     gone = run("--composition", str(p), "--out", str(tmp_path / "m.json"))
     assert gone.returncode == 1 and "Traceback" not in gone.stderr and "member delivery" in gone.stderr
+
+
+def test_members_run_from_their_deployed_commit_not_the_working_copy(tmp_path):
+    """ADR-0045: a change in a working copy, or approved but not deployed, takes effect only
+    when deployed; events name the commit that decided them (its sequence number)."""
+    from toprope.commits import CommitStore
+    from toprope.deploy import LocalEnvironment
+    ana = Actor("ana", "person", ("approver",))
+    p = write(tmp_path)
+    st = CommitStore(tmp_path / "commits")
+    assert load_composition(p, st).domains["delivery"].version == RECEIVER["version"]   # nothing committed
+    c1, _ = st.commit(tmp_path / "delivery.domain.yaml")
+    st.approve("delivery", c1.id, "ana")
+    assert st.running("delivery").id == c1.id                             # approved, not deployed: main
+    env = LocalEnvironment(tmp_path / "env")
+    env.preview_commit(st, "delivery", c1.id, examples=0)
+    env.deploy_commit(st, "delivery", c1.id, ana)
+    assert st.deployed("delivery").id == c1.id
+    changed = copy.deepcopy(RECEIVER)
+    changed["actions"]["request_delivery"]["description"] = "Changed after the deploy."
+    (tmp_path / "delivery.domain.yaml").write_text(yaml.safe_dump(changed, sort_keys=False))
+    c2, _ = st.commit(tmp_path / "delivery.domain.yaml")
+    st.approve("delivery", c2.id, "ana")                                  # main moves on; c1 still runs
+    c = load_composition(p, st)
+    assert c.domains["delivery"].version == c1.seq
+    assert c.domains["delivery"].actions["request_delivery"].description != "Changed after the deploy."
+    assert c.domains["authoring"].version == SENDER["version"]           # never committed: its file
+    assert load_composition(p).domains["delivery"].actions["request_delivery"].description == \
+        "Changed after the deploy."                                       # without a store: the file
+    env.preview_commit(st, "delivery", c2.id, examples=0)
+    env.deploy_commit(st, "delivery", c2.id, ana)
+    assert load_composition(p, st).domains["delivery"].version == c2.seq     # deployed: it runs
+    ex = assemble(load_composition(p, st), {"authoring": MemoryEventStore(), "delivery": MemoryEventStore()},
+                  StaticIdentity({}))["delivery"]
+    ex.seed_world()
+    assert all(e.domain_version == c2.seq for s in ex.store.streams() for e in ex.store.read(s))
+
+
+def test_the_commands_run_from_the_kernel_s_commits_unless_asked_for_the_working_copy(tmp_path):
+    from types import SimpleNamespace
+
+    from toprope.adapters.cli import _base_parser
+    from toprope.adapters.mcp.cli import build_parser, running_commits
+    assert running_commits(SimpleNamespace(kernel_root=str(tmp_path), working_copy=False)).root == \
+        tmp_path / ".toprope" / "commits"
+    assert running_commits(SimpleNamespace(kernel_root=str(tmp_path), working_copy=True)) is None
+    assert running_commits(SimpleNamespace(kernel_root=None, working_copy=False)) is None
+    for ap in (_base_parser(add_help=False), build_parser()):
+        assert any("--working-copy" in a.option_strings for a in ap._actions)

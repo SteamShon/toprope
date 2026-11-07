@@ -24,6 +24,8 @@ def complete(svc: Service, result: dict[str, Any]) -> dict[str, Any]:
     return full
 
 
+APPROVAL_RUNS = ".toprope/approval-runs.jsonl"   # written by tools/human_request.py (ADR-0039)
+
 _CALLER: ContextVar[dict[str, Any] | None] = ContextVar("kernel_caller", default=None)
 
 
@@ -40,7 +42,7 @@ class KernelServices(ABC):
         svc = CATALOG.get(service)
         if svc is None:
             raise KeyError(f"no kernel service {service!r}")
-        missing = [i for i in svc.inputs if i not in inputs]
+        missing = [i for i in svc.required() if i not in inputs]
         if missing:
             return svc.failure(f"missing inputs {missing}")
         if "approver" in svc.inputs:
@@ -48,7 +50,7 @@ class KernelServices(ABC):
                 return svc.failure(f"{service} records a person's decision: the calling person must be the approver")
         token = _CALLER.set(caller)
         try:
-            return complete(svc, self.run(service, {k: inputs[k] for k in svc.inputs}))
+            return complete(svc, self.run(service, {k: inputs[k] for k in svc.inputs if k in inputs}))
         except Exception as e:   # a failure still replies: the declaration decides what it means
             return svc.failure(f"{type(e).__name__}: {e}")
         finally:
@@ -73,13 +75,18 @@ class RecordingKernel(KernelServices):
 
 class LocalKernel(KernelServices):
     def __init__(self, root: str | Path, workspace: Any = None, environment: Any = None,
-                 harness_examples: int = 50, commits: Any = None):
+                 harness_examples: int = 50, commits: Any = None, tlc_jar: Any = None):
         from ..commits import CommitStore
         self.root = Path(root).resolve()
         self.workspace = workspace          # toprope.workspace.Workspace: sources and the interview
         self.environment = environment      # toprope.deploy.LocalEnvironment, for preview and deploy
         self.examples = harness_examples
         self.commits = commits or CommitStore(self.root / ".toprope" / "commits")
+        # A domain's own event log, by domain (ADR-0037): the self domains keep theirs in git,
+        # so a change check replays their real history even with nothing deployed.
+        self.domain_events: dict[str, Any] = {}
+        # With a TLC jar, the change check model-checks too, and approval needs it passed (ADR-0043).
+        self.tlc_jar = tlc_jar
 
     def _path(self, rel: str) -> Path:
         p = (self.root / str(rel)).resolve()
@@ -191,12 +198,48 @@ class LocalKernel(KernelServices):
                 "last_approved": approved.id if approved else "", "domain": c.domain, "branch": c.branch,
                 "author": c.author}
 
+    def _cite_evidence(self, domain, commit, kind, ref):
+        if kind in ("interview", "source"):
+            spec = self._ws().sources.get(ref.split(":", 1)[0])
+            if spec is not None and (spec.kind == "interview-log") != (kind == "interview"):
+                raise ValueError(f"{ref} is {'an interview line' if spec.kind == 'interview-log' else 'a source chunk'}:"
+                                 f" cite it as {'interview' if spec.kind == 'interview-log' else 'source'}")
+            self._ws().source_of(ref)                        # an unknown chunk is refused
+        elif kind == "event":
+            stream, _, version = ref.rpartition("@")
+            if self.environment is None:
+                raise RuntimeError("no deploy environment configured: no events to cite")
+            with self.environment.events(domain) as store:
+                if store is None:
+                    raise RuntimeError(f"{domain} is not deployed here: no events to cite")
+                if not stream or not version.isdigit() or not 1 <= int(version) <= store.version(stream):
+                    raise ValueError(f"no event {ref!r}: give <stream>@<version> of a stored event")
+        elif kind == "approval-run":
+            self._approval_run(ref)
+        e = self.commits.cite(domain, commit, kind, ref, by=str((self.caller or {}).get("id") or ""))
+        return {"strength": e["strength"]}
+
+    def _approval_run(self, url):
+        """A GitHub Actions run that approved a human request (ADR-0039). The workflow records
+        each approved run in `.toprope/approval-runs.jsonl` with the result it pushes, so the
+        record survives a squash merge."""
+        import json
+        log = self.root / APPROVAL_RUNS
+        runs = {json.loads(x).get("run") for x in log.read_text().splitlines() if x.strip()} if log.exists() else set()
+        if url not in runs:
+            raise ValueError(f"no approved human request ran as {url!r} ({APPROVAL_RUNS})")
+
     def run(self, service, inputs):
         if service == "diff":   # `from` is a Python keyword
             return self.commits.diff(inputs["domain"], inputs["from"] or None, inputs["to"])
         return getattr(self, f"_{service}")(**inputs)
 
     def _approve_commit(self, domain, commit, approver):
+        if self.tlc_jar:
+            tla = self.commits.check_status(domain, commit).get("tla") or {}
+            if tla.get("ok") is not True:
+                raise ValueError(f"{commit} has no passing TLC check ({tla.get('summary') or 'never run with TLC'}):"
+                                 " run check_commit here, where TLC is configured, then approve")
         self.commits.approve(domain, commit, approver)   # conflicts fail the call, as any error does
         return {"approved": True, "main": self.commits.main(domain).id}
 
@@ -204,13 +247,22 @@ class LocalKernel(KernelServices):
         from ..check import check_commit
         from ..incremental import ResultCache
         rc = ResultCache(self.root / ".toprope" / "cache")
-        if self.environment is not None:
+        own = self.domain_events.get(domain)
+        if own is not None:
+            r = check_commit(self.commits, domain, commit, events=own, examples=self.examples, cache=rc,
+                             tlc=self.tlc_jar)
+        elif self.environment is not None:
             with self.environment.events(domain) as store:
-                r = check_commit(self.commits, domain, commit, events=store, examples=self.examples, cache=rc)
+                r = check_commit(self.commits, domain, commit, events=store, examples=self.examples, cache=rc,
+                                 tlc=self.tlc_jar)
         else:
-            r = check_commit(self.commits, domain, commit, examples=self.examples, cache=rc)
-        return {"passed": r.ok, "errors": r.errors, "warnings": r.warnings,
-                "failing": [n for n, c in r.checks.items() if not c.ok], "summary": r.summary()}
+            r = check_commit(self.commits, domain, commit, examples=self.examples, cache=rc, tlc=self.tlc_jar)
+        from ..decl.provenance import proposed_elements
+        left = proposed_elements(self.commits.declaration(domain, commit))
+        failing = [n for n, c in r.checks.items() if not c.ok] + (["confirmed"] if left else [])
+        summary = r.summary() + (f"; {len(left)} proposed element(s) to confirm" if left else "")
+        return {"passed": r.ok and not left, "errors": r.errors, "warnings": r.warnings,   # ADR-0041
+                "failing": failing, "summary": summary}
 
     def _merge_main(self, domain, branch, declaration):
         from ..decl.yamlio import load_yaml
@@ -239,6 +291,11 @@ class LocalKernel(KernelServices):
         except DeployRefused as e:
             return {"ok": False, "deployed": False, "error": f"{e.rule}: {e.reason}"}
         return {"deployed": True}
+
+    def _probe(self, domain, commit):
+        if self.environment is None:
+            raise RuntimeError("no deploy environment configured")
+        return self.environment.probe_commit(self.commits, domain, commit, events=self.domain_events.get(domain))
 
 
 __all__ = ["KernelServices", "LocalKernel", "RecordingKernel", "complete"]

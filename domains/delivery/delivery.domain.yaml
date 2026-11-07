@@ -49,6 +49,12 @@ objects:
         - deploying
         - done
         - verified
+      probes_passed:
+        type: boolean
+        optional: true
+      probe_summary:
+        type: string
+        optional: true
     source:
       kind: interview
       ref: interview:domains/delivery/interview.jsonl#L4
@@ -106,6 +112,14 @@ actions:
       ref: interview:domains/delivery/interview.jsonl#L4
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: confirmed
+    preconditions:
+    - id: not-deployed
+      check: target.deployed != true
+      reason: Already deployed; deliver again with a new request.
+      source:
+        kind: record
+        ref: records:docs/harness.md#L76-L94
+      status: confirmed
   record_build:
     description: Record the build and its harness result.
     actor:
@@ -155,6 +169,7 @@ actions:
       status: confirmed
   record_deployment:
     description: Record whether the deploy happened, or which floor rule refused it.
+      A new deploy clears the earlier probes.
     actor:
     - external:kernel
     target: DeliveryRequest
@@ -167,28 +182,21 @@ actions:
     - set:
         target.deployed: params.deployed
         target.refusal: params.error
+        target.probes_passed: false
     source:
-      kind: interview
-      ref: interview:domains/delivery/interview.jsonl#L4
-      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+      kind: record
+      ref: records:docs/handoffs-and-deploy.md#L76-L86
     status: confirmed
   verify:
-    description: Confirm the deployed domain works in use (the probes).
+    description: Verify the deployed domain in use, after its probes passed. Only
+      a person verifies.
     actor:
     - approver
     target: DeliveryRequest
     requires: human
-    params:
-      verified:
-        type: boolean
     effects:
     - set:
-        target.verified: params.verified
-    source:
-      kind: interview
-      ref: interview:domains/delivery/interview.jsonl#L4
-      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
-    status: confirmed
+        target.verified: true
     preconditions:
     - id: deployed
       check: target.deployed == true
@@ -198,6 +206,56 @@ actions:
         ref: interview:domains/delivery/interview.jsonl#L5
         quote: 전부 다 추천한 거 동의.
       status: confirmed
+    - id: probes-passed
+      check: target.probes_passed == true
+      reason: Run the probes on the deployment first; verify only one whose probes
+        passed.
+      source:
+        kind: record
+        ref: records:docs/handoffs-and-deploy.md#L76-L86
+      status: confirmed
+    source:
+      kind: record
+      ref: records:docs/handoffs-and-deploy.md#L76-L86
+    status: confirmed
+  record_probes:
+    description: Record what the probes found on the deployed commit.
+    actor:
+    - external:kernel
+    target: DeliveryRequest
+    params:
+      passed:
+        type: boolean
+      summary:
+        type: string
+    effects:
+    - set:
+        target.probes_passed: params.passed
+        target.probe_summary: params.summary
+    source:
+      kind: record
+      ref: records:docs/handoffs-and-deploy.md#L76-L86
+    status: confirmed
+  run_probes:
+    description: 'Run the probes on the deployed commit: its build, its scenarios
+      where it runs, and the objects in use against every invariant.'
+    actor:
+    - approver
+    target: DeliveryRequest
+    effects:
+    - call: probe
+      with:
+        domain: target.domain_id
+        commit: target.commit
+      reply: record_probes
+    preconditions:
+    - id: deployed
+      check: target.deployed == true
+      reason: Only a deployment that happened can be probed.
+    source:
+      kind: record
+      ref: records:docs/handoffs-and-deploy.md#L76-L86
+    status: confirmed
 transitions:
   DeliveryRequest:
     field: stage
@@ -221,6 +279,8 @@ transitions:
           status: confirmed
         record_deployment: n/a
         verify: n/a
+        run_probes: n/a
+        record_probes: n/a
       previewing:
         preview:
           deny: A preview is running.
@@ -245,6 +305,8 @@ transitions:
           status: confirmed
         record_deployment: n/a
         verify: n/a
+        run_probes: n/a
+        record_probes: n/a
       previewed:
         preview:
           to: previewing
@@ -263,6 +325,8 @@ transitions:
           status: confirmed
         record_deployment: n/a
         verify: n/a
+        run_probes: n/a
+        record_probes: n/a
       deploying:
         preview:
           deny: A deploy is running.
@@ -287,13 +351,14 @@ transitions:
             quote: 전부 다 추천한 거 동의.
           status: confirmed
         verify: n/a
+        run_probes: n/a
+        record_probes: n/a
       done:
         preview:
           to: previewing
           source:
             kind: interview
             ref: interview:domains/delivery/interview.jsonl#L5
-            quote: 전부 다 추천한 거 동의.
           status: confirmed
         record_build: n/a
         deploy:
@@ -311,6 +376,18 @@ transitions:
             ref: interview:domains/delivery/interview.jsonl#L5
             quote: 전부 다 추천한 거 동의.
           status: confirmed
+        run_probes:
+          to: done
+          source:
+            kind: record
+            ref: records:docs/handoffs-and-deploy.md#L76-L86
+          status: confirmed
+        record_probes:
+          to: done
+          source:
+            kind: record
+            ref: records:docs/handoffs-and-deploy.md#L76-L86
+          status: confirmed
       verified:
         preview: n/a
         record_build: n/a
@@ -323,6 +400,8 @@ transitions:
             ref: interview:domains/delivery/interview.jsonl#L5
             quote: 전부 다 추천한 거 동의.
           status: confirmed
+        run_probes: n/a
+        record_probes: n/a
 invariants:
 - id: deployed-builds-passed-their-harness
   'on': DeliveryRequest
@@ -359,6 +438,14 @@ invariants:
     kind: interview
     ref: interview:domains/delivery/interview.jsonl#L11
     quote: 25번은 A로 추천으로 해도 될 것 같고, 이십육 번도 A로.
+  status: confirmed
+- id: verified-requests-passed-their-probes
+  'on': DeliveryRequest
+  check: target.stage != 'verified' or target.probes_passed == true
+  reason: A verified deployment passed its probes.
+  source:
+    kind: record
+    ref: records:docs/handoffs-and-deploy.md#L76-L86
   status: confirmed
 world:
   actors:
@@ -410,6 +497,35 @@ world:
       harness_ok: true
       deployed: true
       refusal: ''
+  - DeliveryRequest:
+      id: R5
+      domain_id: delivery
+      commit: 6-e1f2
+      interface: 1.0.0
+      environment: local
+      approver: ana
+      stage: done
+      build: b5
+      harness_ok: true
+      deployed: true
+      refusal: ''
+      probes_passed: true
+      probe_summary: 'passed: 4 of 4 scenario(s) pass; 1 object(s) checked'
+  - DeliveryRequest:
+      id: R6
+      domain_id: authoring
+      commit: 7-a3b4
+      interface: 1.2.0
+      environment: local
+      approver: ana
+      stage: verified
+      build: b6
+      harness_ok: true
+      deployed: true
+      refusal: ''
+      probes_passed: true
+      probe_summary: 'passed: 9 of 9 scenario(s) pass; 3 object(s) checked'
+      verified: true
 scenarios:
 - id: deliver-preview-deploy-verify
   given:
@@ -460,10 +576,25 @@ scenarios:
         R1.deployed: true
   - actor:
       role: approver
-    do: verify
+    do: run_probes
+    target: R1
+    expect:
+      state:
+        R1.stage: done
+  - actor:
+      external: kernel
+    do: record_probes
     target: R1
     params:
-      verified: true
+      passed: true
+      summary: 'passed: 3 of 3 scenario(s) pass; 1 object(s) checked'
+    expect:
+      state:
+        R1.probes_passed: true
+  - actor:
+      role: approver
+    do: verify
+    target: R1
     expect:
       state:
         R1.stage: verified
@@ -486,8 +617,12 @@ scenarios:
       role: approver
     do: verify
     target: R3
-    params:
-      verified: true
+    expect:
+      denied_by: deployed
+  - actor:
+      role: approver
+    do: run_probes
+    target: R3
     expect:
       denied_by: deployed
   - actor:
@@ -497,6 +632,58 @@ scenarios:
     expect:
       state:
         R3.stage: previewing
+- id: verify-needs-probes-that-passed
+  given:
+    from_world: R4
+  steps:
+  - actor:
+      role: approver
+    do: verify
+    target: R4
+    expect:
+      denied_by: probes-passed
+      reason_shown: true
+  - actor:
+      role: approver
+    do: run_probes
+    target: R4
+    expect:
+      state:
+        R4.stage: done
+  - actor:
+      external: kernel
+    do: record_probes
+    target: R4
+    params:
+      passed: false
+      summary: 'R9: breaks verified-requests-were-deployed'
+    expect:
+      state:
+        R4.probes_passed: false
+  - actor:
+      role: approver
+    do: verify
+    target: R4
+    expect:
+      denied_by: probes-passed
+  - actor:
+      external: kernel
+    do: record_probes
+    target: R4
+    params:
+      passed: true
+      summary: 'passed: 3 of 3 scenario(s) pass; 1 object(s) checked'
+    expect:
+      state:
+        R4.probes_passed: true
+  - actor:
+      role: approver
+    do: verify
+    target: R4
+    expect:
+      state:
+        R4.stage: verified
+        R4.verified: true
 glossary:
   delivery request: A request, handed over from Authoring, to put one approved commit
     of a domain into an environment.
@@ -505,4 +692,4 @@ glossary:
   deploy floor: 'Rules the kernel enforces on every deploy that no declaration can
     weaken: approved, on main, not a downgrade, harness passed, a person deploys,
     nothing stranded.'
-  verified: A deployment a person has checked in use, after it happened.
+  verified: A deployment a person has verified in use, after its probes passed there.

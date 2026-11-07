@@ -142,6 +142,7 @@ def test_now_is_a_call_not_a_root(raw):
 
 
 def test_interface_bumps_follow_adr_0008(raw):
+    raw["links"]["hypothesis"]["status"] = "proposed"       # an agent's proposal, confirmed below
     old = interface(Domain.model_validate(raw))
     ref = copy.deepcopy(raw)
     ref["actions"]["approve_experiment"]["params"]["note"] = {"ref": "Metric", "optional": True}
@@ -175,3 +176,57 @@ def test_an_object_s_own_id_is_a_known_path(raw):
     assert errors(Domain.model_validate(raw)) == []
     raw["invariants"][0]["check"] = "exists(target.id.name)"
     assert {i.code for i in errors(Domain.model_validate(raw))} == {"unknown-path"}
+
+
+# -- ADR-0041 Resolved 2: a decision action takes an optional rationale --------------------------
+def test_a_decision_action_takes_an_optional_rationale(raw):
+    d = Domain.model_validate(raw)
+    assert raw["actions"]["approve_experiment"].get("records_decision") is True
+    p = d.actions["approve_experiment"].params["rationale"]
+    assert p.type == "string" and p.optional
+    assert "rationale" not in d.actions["launch_experiment"].params      # not a decision action
+
+
+def test_a_decision_action_may_not_declare_its_own_rationale(raw):
+    raw["actions"]["approve_experiment"]["params"]["rationale"] = {"type": "integer"}
+    issues = [i for i in validate_domain(Domain.model_validate(raw)) if i.code == "reserved-param"]
+    assert [i.where for i in issues] == ["actions.approve_experiment.params.rationale"]
+
+
+def test_the_added_rationale_is_not_dumped_so_a_dump_validates_to_the_same_action(raw):
+    a = Domain.model_validate(raw).actions["approve_experiment"]
+    again = type(a).model_validate(a.model_dump())
+    assert list(again.params) == list(a.params) and not again._declared_rationale
+    assert "rationale" not in a.model_dump()["params"]
+
+
+def test_the_rationale_follows_records_decision_after_coercion(raw):
+    raw["actions"]["approve_experiment"]["records_decision"] = "false"
+    assert "rationale" not in Domain.model_validate(raw).actions["approve_experiment"].params
+    raw["actions"]["approve_experiment"]["records_decision"] = True
+    raw["actions"]["approve_experiment"]["params"] = 5
+    with pytest.raises(ValidationError):
+        Domain.model_validate(raw)
+
+
+def test_a_creating_action_sets_every_required_property():
+    """#86: `record_commit` made Commits without `domain_id`, and nothing said so."""
+    raw = schema_doc_domain()
+    raw["actions"]["draft_experiment"] = {
+        "description": "Draft one.", "actor": ["eng"], "creates": "Experiment",
+        "params": {"name": {"type": "string"}, "planned_days": {"type": "integer", "optional": True}}}
+    for row in raw["transitions"]["Experiment"]["matrix"].values():
+        row["draft_experiment"] = "n/a"
+
+    def unset():
+        return [(i.where, i.severity) for i in validate_domain(Domain.model_validate(raw)) if i.code == "unset-on-create"]
+    found = unset()
+    assert ("actions.draft_experiment.params", "warning") in found
+    msgs = [i.message for i in validate_domain(Domain.model_validate(raw)) if i.code == "unset-on-create"]
+    assert any("`planned_days` (an optional param sets it)" in m for m in msgs)
+    required = [p for p, s in raw["objects"]["Experiment"]["properties"].items()
+                if not s.get("optional") and p not in ("status", "name")]
+    raw["actions"]["draft_experiment"]["params"]["planned_days"]["optional"] = False
+    raw["actions"]["draft_experiment"]["effects"] = [{"set": {f"target.{p}": "params.name"}} for p in required
+                                                     if p != "planned_days"]
+    assert unset() == []                                          # a required param, or an effect

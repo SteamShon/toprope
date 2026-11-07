@@ -79,6 +79,9 @@ def effect_id(e: Event) -> str:
     return f"{e.payload['service']}:{e.stream}@{e.version}"
 
 
+HANDOFF_STATUS = {"HandoffDelivered": "ok", "HandoffDenied": "denied", "HandoffFailed": "failed"}
+
+
 class Outbox:
     """The domain's outbox (step 12): handoffs (ADR-0024) and kernel-service calls (ADR-0028).
     Each entry gets exactly one resolution, in its own stream, so nothing is sent twice and the
@@ -100,6 +103,59 @@ class Outbox:
                 if (kind is None or p.kind == kind) and store.version(p.stream) == 0:
                     out.append(p)
         return out
+
+    def followed(self, target: str, before: int = 0) -> list[dict[str, Any]]:
+        """What the events on `target` after `before` set off: each kernel call with its reply,
+        and each handoff, then, on another stream (an object a reply created), what that reply
+        set off in turn. One summary for `toprope-run`'s `then` and the regeneration check."""
+        out: list[dict[str, Any]] = []
+        seen: set[str] = set()
+
+        def walk(events: list[Event]) -> None:
+            for e in events:
+                if e.type == "EffectRequested":
+                    eid = effect_id(e)
+                    if eid in seen:
+                        continue
+                    seen.add(eid)
+                    entry = self._effect_entry(e, eid)
+                    out.append(entry)
+                    obj = entry.get("object")
+                    if obj and obj != e.stream:      # the reply acted on another stream
+                        walk([x for x in self.ex.store.read(obj) if x.causation == eid])
+                elif e.type == "HandoffRequested":
+                    out.append(self._handoff_entry(e))
+        walk(self.ex.store.read(target)[before:])
+        return out
+
+    def _effect_entry(self, e: Event, eid: str) -> dict[str, Any]:
+        res = self.resolution(eid, "effect")
+        entry: dict[str, Any] = {"kernel": e.payload["service"], "reply": e.payload["reply"],
+                                 "resolution": res.type if res else None,
+                                 "reply_status": res.payload.get("status") if res else None}
+        if res is None:
+            entry["status"] = "pending"
+            return entry
+        result = res.payload.get("result") or {}
+        reply = self.ex.d.actions.get(e.payload["reply"])
+        # the service's own failure first: a failed call still replies (ADR-0028)
+        entry["status"] = "failed" if result.get("ok") is False else res.payload.get("status") or res.type
+        if entry["status"] == "ok":               # a refused reply made nothing
+            entry["object"] = result.get("id") if reply is not None and reply.creates else res.payload.get("object")
+        if result.get("error") or res.payload.get("reason"):
+            entry["error"] = result.get("error") or res.payload.get("reason")
+        return entry
+
+    def _handoff_entry(self, e: Event) -> dict[str, Any]:
+        res = self.resolution(handoff_id(e), "handoff")
+        to = e.payload.get("to") or {}
+        h = {"handoff": e.payload.get("handoff"), "to": f"{to.get('domain')}.{to.get('action')}",
+             "status": HANDOFF_STATUS.get(res.type, res.type) if res else "pending"}
+        if h["status"] == "ok":
+            h["object"] = e.payload.get("target")
+        elif res is not None and (res.payload.get("reason") or res.payload.get("error")):
+            h["error"] = res.payload.get("reason") or res.payload.get("error")
+        return h
 
     def resolution(self, oid: str, kind: str = "handoff") -> Event | None:
         evs = self.ex.store.read(Pending(oid, None, kind).stream)   # type: ignore[arg-type]
@@ -166,7 +222,8 @@ class Outbox:
                                                            "code": "unchanged", "reason": None})
             o = self.ex.receive_kernel_reply(p.id, pl["reply"], result["id"], params)
         else:
-            o = self.ex.receive_kernel_reply(p.id, pl["reply"], p.event.stream, params)
+            o = self.ex.receive_kernel_reply(p.id, pl["reply"], p.event.stream, params,
+                                             requested_at=p.event.version)
         self._follow = list(o.events)
         if o.status == "rejected" and o.code in TRANSIENT:
             return {"id": p.id, "result": "pending", "reason": o.reason}

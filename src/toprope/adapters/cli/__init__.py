@@ -53,6 +53,8 @@ def _base_parser(add_help: bool) -> argparse.ArgumentParser:
     ap.add_argument("--env", help="local deploy environment, for the preview and deploy services")
     ap.add_argument("--seed", action="store_true", help="load the declaration's example fixtures first")
     ap.add_argument("--key", help="idempotency key (default: a new one); reuse it to retry safely")
+    ap.add_argument("--working-copy", action="store_true", help="with --composition and --kernel-root: run "
+                    "each member from its working-copy file, not from its deployed commit (ADR-0045)")
     return ap
 
 
@@ -104,7 +106,7 @@ def _identity(spec: str | None, token: str | None = None) -> Identity:
         raise SystemExit(f"--identity is required for this command (or put {FILE} here)")
     if spec == "git" or spec.startswith("git:"):
         try:
-            return GitIdentity(spec[4:] or FILE)
+            return GitIdentity(spec[4:] or FILE, once=True)        # one command per process
         except (OSError, ValueError) as e:
             raise SystemExit(f"identity file: {e}") from None
     if spec == "github" or spec.startswith("github:"):      # the approver of a GitHub run (ADR-0039)
@@ -150,42 +152,11 @@ def _execution(args: Any, d: Domain) -> Execution:
     return ex
 
 
-HANDOFF_STATUS = {"HandoffDelivered": "ok", "HandoffDenied": "denied", "HandoffFailed": "failed"}
-
-
 def followed(ex: Execution, d: Domain, target: str, before: int) -> list[dict[str, Any]]:
-    """What the command set off: each kernel call with its reply (and the object a creating reply
-    made, such as the new Commit), and each handoff, so you know what to do next."""
-    from ...handoff import Outbox, effect_id, handoff_id
-    out: list[dict[str, Any]] = []
-    for e in ex.store.read(target)[before:]:
-        if e.type == "EffectRequested":
-            res = Outbox(ex).resolution(effect_id(e), "effect")
-            entry: dict[str, Any] = {"kernel": e.payload["service"], "reply": e.payload["reply"]}
-            if res is None:
-                entry["status"] = "pending"
-            else:
-                result = res.payload.get("result") or {}
-                reply = d.actions.get(e.payload["reply"])
-                # the service's own failure first: a failed call still replies (ADR-0028)
-                entry["status"] = "failed" if result.get("ok") is False else res.payload.get("status") or res.type
-                if entry["status"] == "ok":       # a refused reply made nothing
-                    entry["object"] = result.get("id") if reply is not None and reply.creates \
-                        else res.payload.get("object")
-                if result.get("error") or res.payload.get("reason"):
-                    entry["error"] = result.get("error") or res.payload.get("reason")
-            out.append(entry)
-        elif e.type == "HandoffRequested":
-            res = Outbox(ex).resolution(handoff_id(e), "handoff")
-            to = e.payload.get("to") or {}
-            h = {"handoff": e.payload.get("handoff"), "to": f"{to.get('domain')}.{to.get('action')}",
-                 "status": HANDOFF_STATUS.get(res.type, res.type) if res else "pending"}
-            if h["status"] == "ok":
-                h["object"] = e.payload.get("target")
-            elif res is not None and (res.payload.get("reason") or res.payload.get("error")):
-                h["error"] = res.payload.get("reason") or res.payload.get("error")
-            out.append(h)
-    return out
+    """What the command set off (`Outbox.followed`), as `then` shows it."""
+    from ...handoff import Outbox
+    return [{k: v for k, v in e.items() if k not in ("resolution", "reply_status")}
+            for e in Outbox(ex).followed(target, before)]
 
 
 def _domain(args: Any) -> Domain:
@@ -195,7 +166,8 @@ def _domain(args: Any) -> Domain:
         d = load_domain(args.domain)
     else:
         from ...compose import load_composition
-        d = load_composition(args.composition).domains[args.member]
+        from ..mcp.cli import running_commits
+        d = load_composition(args.composition, running_commits(args)).domains[args.member]
     errors = [i for i in validate_domain(d) if i.severity == "error"]
     if errors:
         for i in errors:

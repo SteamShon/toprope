@@ -8,6 +8,7 @@ Layout under `<root>/<domain>/`:
   approvals.jsonl                     one line per approval: commit, approver, at (never removed)
   checks.jsonl                        one line per check run on a commit (ADR-0032): commit, check,
                                       ok, summary, base, at (append-only, like approvals)
+  deployments.jsonl                   one line per deploy: commit, environment, at (ADR-0045)
 
 - **Content-addressed.** `content` is the hash of the canonical declaration without
   `version`, plus its representations. A commit's id is `<seq>-<content>`. Reading a commit
@@ -57,6 +58,14 @@ from ..decl.interface import review_hash
 MAIN = "main"
 DEFAULT_BRANCH = "work"
 MERGING = "merging.json"          # a merge in progress per branch (not shared: kept out of git)
+
+
+# What a commit may cite as evidence, and how strong each kind is: a person's words or a source
+# line point at the reason; a check record shows a run against the real declaration; an event
+# shows the behavior in use; an approval run is a person's approval recorded in GitHub
+# (ADR-0039). A claim with no pointer is not evidence.
+EVIDENCE = {"interview": "pointed", "source": "pointed", "check": "ran", "event": "observed",
+            "approval-run": "approved"}
 
 
 class CommitError(Exception):
@@ -134,6 +143,9 @@ class Commit:
     message: str = ""
     branch: str = ""             # the branch it was made on (for reading; refs decide heads)
     author: str = ""             # who compiled it (ADR-0032); "" when not known
+    # Free-string evidence given at commit time, as #117 recorded it (commit 5 of the Authoring
+    # domain has some). Read only: a commit now cites typed evidence with `cite` (ADR-0041).
+    evidence: list[str] = field(default_factory=list)
 
 
 def _now() -> str:
@@ -327,6 +339,37 @@ class CommitStore:
         p.write_text(yaml.safe_dump(self.declaration(domain, commit_id), sort_keys=False, allow_unicode=True))
         return p
 
+    # -- deployments (ADR-0045) ----------------------------------------------------------------------
+    def record_deployment(self, domain: str, commit_id: str, environment: str) -> None:
+        """The deploy floor moved an environment to this commit. Kept with the commits, in git,
+        so what runs survives the environment (the self domains' is rebuilt every run)."""
+        with self._lock(domain) as dirp:
+            self.get(domain, commit_id)
+            self._append(dirp / "deployments.jsonl", {"commit": commit_id, "environment": environment, "at": _now()})
+
+    def deployed(self, domain: str) -> Commit | None:
+        """The commit deployed last, in any environment."""
+        rows = self._lines(self._dir(domain) / "deployments.jsonl")
+        return self.get(domain, rows[-1]["commit"]) if rows else None
+
+    def running(self, domain: str) -> Commit | None:
+        """What a domain runs from (ADR-0045): its deployed commit, else its approved `main`."""
+        return self.deployed(domain) or self.main(domain)
+
+    def _not_self_approved(self, domain: str, c: Commit, main: Commit | None, approver: str) -> None:
+        """ADR-0046: where the domain's rule in force says so (its approved `main`; before the
+        first approval, the commit's own declaration), the commit's author may not approve it.
+        A commit that names no author cannot be told apart from its approver: refused."""
+        rule = self.domain(domain, (main or c).id).approval
+        if not rule.distinct_from_author:
+            return
+        if not c.author:
+            raise CommitError(f"{c.id} names no author, so its approver cannot be told apart: this "
+                              "domain's approver must not be the commit's author (ADR-0046)")
+        if c.author == approver:
+            raise CommitError(f"{approver} wrote {c.id}: this domain's approver must not be the "
+                              "commit's author (ADR-0046); ask another approver")
+
     def approvals(self, domain: str) -> list[dict[str, Any]]:
         return self._lines(self._dir(domain) / "approvals.jsonl")
 
@@ -357,13 +400,18 @@ class CommitStore:
         MERGE_HEAD), and is cleared once the commit is written."""
         if branch == MAIN:
             raise CommitError("`main` is protected: commit to a branch, and approving merges it into main")
-        raw = load_yaml(Path(declaration).read_text()) or {}
-        d = Domain.model_validate(raw)
-        if representations is None:   # a released UI is the pair (ADR-0008): take this domain's own
-            representations = self.representations_for(d.domain, Path(declaration).parent)
-        reps = {Path(r).name: load_yaml(Path(r).read_text()) for r in representations}
-        cid = content_id(raw, reps)
-        with self._lock(d.domain) as dirp:
+        domain = Domain.model_validate(load_yaml(Path(declaration).read_text()) or {}).domain
+        with self._lock(domain) as dirp:
+            # Read the working copy under the lock (#89), so a merge_main in another process is
+            # either wholly before this commit (its content and its second parent) or after it.
+            raw = load_yaml(Path(declaration).read_text()) or {}
+            d = Domain.model_validate(raw)
+            if d.domain != domain:
+                raise CommitError("the working copy changed its domain while committing")
+            reps_paths = representations if representations is not None else \
+                self.representations_for(d.domain, Path(declaration).parent)   # a released UI is the pair (ADR-0008)
+            reps = {Path(r).name: load_yaml(Path(r).read_text()) for r in reps_paths}
+            cid = content_id(raw, reps)
             log = self.log(d.domain)
             # A new branch starts from `main`; before the first approval, from the domain's first
             # commit, so every branch shares a base (ADR-0033: main exists from the first commit).
@@ -417,17 +465,19 @@ class CommitStore:
         conflict the branch's value is kept; at an element conflict the element holds both
         sides' changes, field by field. The next commit on the branch records both parents.
         Refused when the working copy has changes not yet committed to the branch."""
-        main, head = self.main(domain), self.head(domain, branch)
-        if main is None or head is None:
-            raise CommitError(f"nothing to merge: {'main' if main is None else branch} has no commits")
-        if self.is_ancestor(domain, main.id, head.id):
-            return {"merge": main.id, "branch": branch, "up_to_date": True, "conflicts": []}
-        current, present = self.working_copy(domain, declaration)
-        if current != head.content:
-            raise CommitError(f"the working copy has changes not committed to {branch}: commit them first")
-        m = self.merge3(domain, head.id, main.id)
-        self.write_working_copy(domain, m.merged, declaration, version, present)
+        # One lock for all of it (#89): a commit from another process between writing the working
+        # copy and recording the merge in progress would get one parent, and the next a stale second.
         with self._lock(domain) as dirp:
+            main, head = self.main(domain), self.head(domain, branch)
+            if main is None or head is None:
+                raise CommitError(f"nothing to merge: {'main' if main is None else branch} has no commits")
+            if self.is_ancestor(domain, main.id, head.id):
+                return {"merge": main.id, "branch": branch, "up_to_date": True, "conflicts": []}
+            current, present = self.working_copy(domain, declaration)
+            if current != head.content:
+                raise CommitError(f"the working copy has changes not committed to {branch}: commit them first")
+            m = self.merge3(domain, head.id, main.id)
+            self._write_files(self._files_of(m.merged, declaration, version), present, m.merged)
             self._set_pending(dirp, branch, main.id)
         return {"merge": main.id, "branch": branch, "up_to_date": False,
                 "conflicts": [{"path": c.path, "base": c.base, "ours": c.ours, "theirs": c.theirs} for c in m.conflicts]}
@@ -505,9 +555,11 @@ class CommitStore:
             if main is not None and self.is_ancestor(domain, c.id, main.id):
                 raise CommitError(f"{c.id} is already in main at {main.id}, which supersedes it; "
                                   "approve a newer commit")
+            self._not_self_approved(domain, c, main, approver)
             if main is None or self.is_ancestor(domain, main.id, c.id):
                 body = self._body(domain, c.id)               # fast-forward: main takes this commit
                 self._check(c.id, body["domain"])               # (a resolved merge comes this way too)
+                self._confirmed(c.id, body["domain"])
                 target = c
                 self._move(dirp, MAIN, c.id)
             else:
@@ -515,12 +567,24 @@ class CommitStore:
                 if m.conflicts:
                     raise MergeConflict(m.conflicts)
                 d = self._check(c.id, m.merged["domain"])
+                self._confirmed(c.id, m.merged["domain"])
                 reps = m.merged["representations"]
                 target = self._write(dirp, d, m.merged["domain"], reps, content_id(m.merged["domain"], reps),
                                      [main.id, c.id], f"merge {c.id} into main", MAIN, approver)
             self._append(dirp / "approvals.jsonl", {"commit": target.id, "approver": approver, "at": _now(),
                                                     **({"merged": c.id} if target.id != c.id else {})})
             return target
+
+    @staticmethod
+    def _confirmed(commit_id: str, raw: dict[str, Any]) -> None:
+        """What `main` takes holds no unconfirmed proposal (ADR-0041, Resolved 1): an agent's
+        proposal becomes a rule only once a person confirms it."""
+        from ..decl.provenance import proposed_elements
+        left = proposed_elements(raw)
+        if left:
+            shown = ", ".join(left[:5]) + (f" and {len(left) - 5} more" if len(left) > 5 else "")
+            raise CommitError(f"{commit_id} still holds {len(left)} proposed element(s): {shown}; "
+                              "confirm them, then commit and approve again")
 
     @staticmethod
     def _check(commit_id: str, raw: dict[str, Any]) -> Domain:
@@ -568,6 +632,28 @@ class CommitStore:
         for r in self.checks(domain, commit_id):
             out[r["check"]] = r
         return out
+
+    # -- evidence (ADR-0041, Resolved 3) ----------------------------------------------------------
+    def cite(self, domain: str, commit_id: str, kind: str, ref: str, by: str = "") -> dict[str, Any]:
+        """Append one piece of evidence a commit cites. Evidence is a pointer that resolves, never
+        prose: the caller resolves interview, source and event refs; a `check` ref must name a check
+        recorded on this commit. Its strength follows from its kind (EVIDENCE). Never rewritten."""
+        if kind not in EVIDENCE:
+            raise CommitError(f"evidence kind {kind!r}: use one of {', '.join(EVIDENCE)}")
+        if not ref.strip():
+            raise CommitError("evidence needs a ref: a pointer, not prose")
+        with self._lock(domain) as dirp:
+            self.get(domain, commit_id)
+            if kind == "check" and ref not in self.check_status(domain, commit_id):
+                raise CommitError(f"no check {ref!r} recorded on {commit_id}: run it first, then cite it")
+            entry = {"commit": commit_id, "kind": kind, "ref": ref, "strength": EVIDENCE[kind],
+                     "by": by, "at": _now()}
+            self._append(dirp / "evidence.jsonl", entry)
+            return entry
+
+    def evidence(self, domain: str, commit_id: str | None = None) -> list[dict[str, Any]]:
+        rows = self._lines(self._dir(domain) / "evidence.jsonl")
+        return [r for r in rows if commit_id is None or r["commit"] == commit_id]
 
     # -- history and checkout (ADR-0032) --------------------------------------------------------
     def element_log(self, domain: str, key: str, at: str | None = None) -> list[dict[str, Any]]:
@@ -644,6 +730,33 @@ class CommitStore:
         """Write a body (declaration and representations) into a working copy, under the domain
         lock: every file goes to a temporary name first, then all are renamed in place, then
         this domain's representations the body lacks are removed."""
+        files = self._files_of(body, declaration, version)
+        with self._lock(domain):
+            self._write_files(files, present, body)
+
+    @staticmethod
+    def _write_files(files: dict[Path, str], present: list[Path], body: dict[str, Any]) -> None:
+        """Write a working copy's files, each to a temporary name in its own folder (so the rename
+        is atomic), then rename all in place. The caller holds the domain lock."""
+        staged = []
+        try:
+            for target, text in files.items():
+                fd, tmp = tempfile.mkstemp(dir=target.parent, prefix=f".{target.name}.")
+                with os.fdopen(fd, "w") as f:
+                    f.write(text)
+                staged.append((tmp, target))
+        except BaseException:
+            for tmp, _ in staged:
+                os.unlink(tmp)
+            raise
+        for tmp, target in staged:
+            os.replace(tmp, target)
+        for p in present:
+            if p.name not in body["representations"] and p.exists():
+                p.unlink()
+
+    @staticmethod
+    def _files_of(body: dict[str, Any], declaration: str | Path, version: int) -> dict[Path, str]:
         path = Path(declaration)
         folder = path.parent
         folder.mkdir(parents=True, exist_ok=True)
@@ -652,23 +765,7 @@ class CommitStore:
         files = {path: yaml.safe_dump(out, sort_keys=False, allow_unicode=True)}
         files.update({folder / name: yaml.safe_dump(r, sort_keys=False, allow_unicode=True)
                       for name, r in body["representations"].items()})
-        with self._lock(domain):
-            staged = []
-            try:
-                for target, text in files.items():
-                    fd, tmp = tempfile.mkstemp(dir=folder, prefix=f".{target.name}.")  # same folder: rename is atomic
-                    with os.fdopen(fd, "w") as f:
-                        f.write(text)
-                    staged.append((tmp, target))
-            except BaseException:
-                for tmp, _ in staged:
-                    os.unlink(tmp)
-                raise
-            for tmp, target in staged:
-                os.replace(tmp, target)
-            for p in present:
-                if p.name not in body["representations"] and p.exists():
-                    p.unlink()
+        return files
 
     def checkout(self, domain: str, commit_id: str, declaration: str | Path, force: bool = False) -> Commit:
         """Load a commit's content into a working copy: its declaration and its representations,
@@ -716,5 +813,5 @@ class CommitStore:
         return {"changed": r.changed, "added": r.added, "removed": r.removed, "to_review": r.to_review}
 
 
-__all__ = ["DEFAULT_BRANCH", "MAIN", "Commit", "CommitError", "CommitStore", "Conflict", "Merge", "MergeConflict",
+__all__ = ["DEFAULT_BRANCH", "EVIDENCE", "MAIN", "Commit", "CommitError", "CommitStore", "Conflict", "Merge", "MergeConflict",
            "content_id"]

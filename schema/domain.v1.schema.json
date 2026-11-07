@@ -142,6 +142,13 @@
                 },
                 "max": {
                   "type": "number"
+                },
+                "read": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "roles that may read it (ADR-0042); defined, M0b"
                 }
               },
               "required": [],
@@ -159,6 +166,13 @@
                 }
               ]
             }
+          },
+          "read": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "roles that may read objects of this type (ADR-0042); defined, M0b"
           },
           "source": {
             "$ref": "#/$defs/source"
@@ -386,13 +400,15 @@
                         "confirm_element",
                         "skip_stage",
                         "commit",
+                        "cite_evidence",
                         "diff",
                         "checkout",
                         "merge_main",
                         "change_check",
                         "approve_commit",
                         "preview",
-                        "deploy"
+                        "deploy",
+                        "probe"
                       ]
                     },
                     "with": {
@@ -416,7 +432,8 @@
             }
           },
           "records_decision": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "a work decision; such an action also takes an optional `rationale` (string), which it may not declare (ADR-0041)"
           },
           "event": {
             "type": "string"

@@ -105,10 +105,12 @@ class Execution:
         return report
 
     def receive_kernel_reply(self, effect_id: str, action: str, target: str,
-                             params: dict[str, Any]) -> Outcome:
+                             params: dict[str, Any], requested_at: int | None = None) -> Outcome:
         """A kernel service's result (ADR-0028): a command from `external:kernel` to the reply
         action, keyed by the effect id, so it is applied at most once. It goes through the
-        domain's rules like any other command. Only the outbox calls this."""
+        domain's rules like any other command. Only the outbox calls this. `requested_at` is
+        the version of the target's stream that holds the call: a reply that comes after the
+        target left the state it was called in is late, recorded and not applied."""
         from ..kernel import KERNEL
         spec = self.d.actions.get(action)
         if spec is None:
@@ -116,9 +118,35 @@ class Execution:
         bad = self._model.interp.invalid_params(spec, dict(params))
         if bad:
             return Outcome("rejected", "invalid-command", bad)
+        late = self._moved_since(target, requested_at) if requested_at is not None else None
+        if late:
+            return Outcome("denied", "late-reply", late)
         cmd = Command(Actor(KERNEL, "system", (KERNEL,)), action, target, dict(params), effect_id, self.clock(),
                       causation=effect_id)
         return self._after(self._model.execute(cmd))
+
+    def _moved_since(self, target: str, version: int) -> str | None:
+        """Why a reply is late: after the call, someone other than the kernel (a person, an
+        agent, a handoff) moved the target out of its state (its matrix field). Another reply
+        of the same call's action may move it: that is the action's own result, not moving on."""
+        from ..kernel import KERNEL
+        from ..semantics.model import project
+        evs = self.store.read(target)
+        tr = self.d.transitions.get(evs[0].aggregate) if evs else None
+        if tr is None:
+            return None
+        domain = [e for e in evs if e.kind == "domain"]
+        then = (project([e for e in domain if e.version <= version]) or {}).get(tr.field)
+        for i, e in enumerate(domain):
+            if e.version <= version or (e.actor or {}).get("id") == KERNEL:
+                continue
+            before = (project(domain[:i]) or {}).get(tr.field)
+            after = (project(domain[:i + 1]) or {}).get(tr.field)
+            if before != after:
+                return (f"Late reply: {target} was {then} when the kernel was called; "
+                        f"{(e.payload or {}).get('action')} moved it to {after} since. "
+                        "The reply is recorded, not applied.")
+        return None
 
     def receive_handoff(self, handoff: str, action: str, target: str, params: dict[str, Any],
                         handoff_id: str, origin: dict[str, Any] | None) -> Outcome:

@@ -1,305 +1,185 @@
 # Toprope
 
-**A correctness layer and software factory for any stateful domain where people and agents act.**
+**Your agent knows how to call Stripe. It doesn't know your refund policy.**
 
-Toprope is **designed to** capture a domain through an interview, often a workflow that
-has only ever existed in people's heads, and turn it into a declared **world model**:
-objects, actions, a transition matrix and invariants. From that model it is meant to
-compile working software that people and agents both use, and to verify every allowed and
-denied state transition before anything is deployed. Every action and decision is recorded
-as an event, so the model can keep improving. Everything below describes the design.
+- It knows Meta Ads. It doesn't know that new creatives go to a test campaign first.
+- It knows GitHub. It doesn't know who may approve a release.
+- It knows your admin console's API. It doesn't know which steps come in which order.
 
-> Status: **M1 in progress**, and no link has a verdict yet. What is done and what is left:
-> [`docs/STATUS.md`](docs/STATUS.md). Verdicts: [Claim status](#claim-status).
+Toprope turns what your team decided into tools and rules your agent follows. It checks every
+action, by an agent or a person, against those rules, and it reviews changes to the rules the
+way code changes are reviewed. And when the system does not exist yet, the same declaration
+builds it.
+
+- **Govern what you have.** Put the rules in front of the tools and systems your agents already
+  use.
+- **Build what you need.** Declare the domain in the style of domain-driven design, and the
+  software for it is generated and tested, instead of written by a coding agent line by line.
+
+> Status: **a research prototype.** *Built* below means it runs today; *planned* names the
+> milestone ([Terms](#terms)). What is done and what is left: [`docs/STATUS.md`](docs/STATUS.md).
 
 ---
 
-## Why (where this started)
+## Who it is for
 
-Toprope started from one problem, and it is the first one we test. Agents raised individual productivity, coding most of all. Organizational productivity did
-not follow. The bottleneck moved to the work **between** people: getting code into the
-product, or designing an experiment and moving a metric. That work runs on implicit, oral
-process: who may approve, what must be true first, when a result counts.
+**Teams connecting agents to the tools they work in.** The agent can call the API, but your
+policies live in a wiki, a prompt or someone's head, so nothing stops it from skipping one.
+With Toprope the policies are a declaration the agent acts through: what it may not do is refused
+with the reason, and what only a person may do, it cannot do.
 
-- **Agents cannot automate what is not written down.**
-- **Written-down rules in natural language cannot be checked.** Add a line to a skill or
-  `AGENTS.md`, and nothing tells you whether it conflicts with the lines already there. You
-  find out after deployment.
-- **Decisions do not accumulate.** They are made in chats and meetings, so nobody can learn
-  from them.
+**Teams building an agent product.** Every support ticket means another prompt fix, and every fix
+breaks something that used to work. With Toprope each case you fix becomes a scenario in the
+declaration, and a change to the rules shows which scenarios it breaks before it ships.
 
-## Where it fits, and where it does not
+**Teams building a new system with coding agents.** The agent writes code fast, but nothing
+says whether the code does what the domain requires, and every change risks a state nobody
+meant to allow. With Toprope you declare the domain (objects, links, actions, functions, which
+action is allowed in which state, and what must always hold) and generate from it the tools, the
+tests that try every combination, and, as the factory grows, the backend and the UI.
 
-The work between people is the starting point, not the boundary. Toprope applies wherever
-there is **state, allowed actions and rules**, whoever acts:
+**Teams running operations with agents: marketing, support, finance.** You work out a policy by
+looking at the numbers, and a week later someone, or some agent, does it the old way. With
+Toprope the policy you found stays written down where it is enforced, and changing it goes
+through review, with a record of why.
 
-| Who acts | Example |
-|---|---|
-| people ↔ people | approving and launching an experiment, shipping a change across teams |
-| people ↔ agents | an agent does the work, and people step in only at approval points |
-| agents ↔ agents | agent pipelines with no human in the loop, where the boundary and the record matter even more |
-| end users ↔ a product | the backend of a consumer or business product built on state transitions: bookings, orders, subscriptions |
-| one person | a personal tool with real states and rules |
+## Try it
 
-It fits poorly where there is little to declare: one-off generation with no state,
-open-ended creative work, and tasks whose success cannot be defined. Without a transition
-matrix and invariants, the harness has nothing to check.
-
-The research stays narrow even though the positioning is broad. The first domains are
-Toprope itself and an experiment lifecycle. Only ⑥ is specific to work between people.
-Claims ① to ⑤ are about any declared domain.
-
-## The bet
-
-**Nobody can define a domain correctly in one go.** A domain is found by iterating. So
-the system must make each iteration cheap, safe and testable. Once the domain is declared
-precisely enough, writing the code is nearly free.
-
-That last sentence comes from the researcher's experience building with DDD and coding
-agents. With a well-defined domain, a transition matrix and invariants, generated code that
-passes a harness checking **every allowed state transition**, not just a call graph, has
-had almost no problems in production. This is *observed, not measured*. Toprope exists to
-measure it.
-
-## How it works
-
-```
- Intelligence   agents (Claude Code, Codex, any MCP client) and people
-       │        see the world model and its allowed boundary
-       ▼
- Toprope        declaration ─► compiler ─► MCP · UI · backend · query tools · harness
- correctness    Execution gate: matrix + roles + preconditions + invariant guard
- layer          event store: every action, decision, denial and outcome
-       │        only allowed actions pass
-       ▼
- Effects        greenfield: the backend Toprope generates
-                brownfield: existing servers, APIs, DBs behind adapters
-```
-
-### 1. Interview → declaration
-An agent drafts the domain from what already exists. The sources are used in order of how
-easily they can be automated: **systems** (code, schema, APIs), then **records** (docs,
-issues, chats), then an **interview** with the domain owner, then **use**.
-
-The expert never has to think in matrices. The interviewer turns undecided cells and
-candidate invariants into plain questions, such as *"Can someone approve an experiment
-that is already running?"*. Every element records where it came from and whether a human
-confirmed it. Agents only propose; humans confirm.
-
-### 2. Declaration → software
-One declaration compiles into:
-- an **MCP server** for agents, with typed actions whose descriptions and denial reasons
-  come from the model
-- a **greenfield backend**: a domain API over an event store
-- a **UI** for people, generated from a separately versioned *representation* layer that
-  hosts can override with their own components
-- **read-only query tools** over the event history
-- a **harness** (below).
-
-### 3. The harness checks the whole matrix
-From the transition matrix, the invariants and a **small world** grown from the expert's
-examples, the compiler generates:
-- a test for **every** (state × action × role) cell
-- invariant checks after every step
-- bounded exploration that finds invariant-breaking sequences and reports them as minimal
-  flows
-- the expert's own example flows.
-
-All of it runs against the model, the Execution gate, the MCP server, the UI and the
-adapters. The same test must give the same answer on every surface.
-
-### 4. Change safely, and fast
-Every edit first gets an **impact report** in domain terms, before anything runs. For
-example: *"changes 2 cells; affects 14 cell tests, 1 invariant, 2 views"*. Then the compiler
-checks the affected set for:
-- broken references
-- conflicting rules
-- example regressions
-- what past events would have done under the new rules
-- natural-language conflicts (warnings only).
-
-The edit gets a **preview** to try before deploying. Only affected artifacts and tests are
-rebuilt, and everything else comes from a hash-keyed cache. The draft targets are an
-impact report in 2 s, an affected harness in 30 s, and a preview in 30 s.
-
-### 5. Record everything, learn from it
-Domain events are the system of record. Decisions (with inputs and rationale), **denied
-attempts**, exceptions and effect outcomes are recorded too. Agents query this history to
-propose the next domain change. A human decides, and the loop starts again.
-
-### 6. See the whole world: the world map
-The compiler also emits a **world map**, a skill-tree view of the domain (ADR-0020).
-- Pick an actor and where an object stands. Unlocked actions light up, locked ones show
-  exactly what would unlock them, and undecided cells sit in fog.
-- Agents get the same map through MCP (`world_map`, `how_to_reach`).
-- Every impact report includes the map diff: what a change newly unlocks or locks, and for
-  whom.
-
-```mermaid
-stateDiagram-v2
-    direction LR
-    [*] --> draft
-    draft --> approved: approve_experiment<br/>role approver · needs ≥1 guardrail
-    approved --> running: launch_experiment<br/>role eng
-    running --> ended: end_experiment<br/>timer · after planned_days
-    ended --> decided: decide<br/>role pm · needs readout
-    note right of ended
-        fog: relaunch from ended is undecided
-    end note
-```
-
-## Components and relations
-
-*Hand-drawn placeholder. If the M1 self domain declares Toprope's components as object types
-and links, this diagram is replaced by the structure layer of its generated world map
-(ADR-0020).*
-
-```mermaid
-flowchart TB
-    subgraph INT["Intelligence layer"]
-        AG["Agents<br/>Claude Code · Codex · any MCP client"]
-        PP["People<br/>domain experts · users"]
-    end
-
-    subgraph AUTH["Authoring"]
-        SRC["Sources<br/>systems → records → interview → use"]
-        DECL["Declaration<br/>objects · links · actions<br/>matrix · invariants · timers<br/>functions · actors · scenarios · world"]
-        REP["Representation<br/>base + host overlay"]
-    end
-
-    subgraph CORE["toprope-core (library)"]
-        DC["Domain compiler"]
-        RC["Representation compiler"]
-        IF["Domain interface<br/>versioned · hashed"]
-        CC["Change check<br/>impact analysis · checks · preview"]
-        HR["Harness<br/>small world · cell tests<br/>exploration · parity"]
-        EX["Execution gate<br/>semantics · invariant guard"]
-        ES[("Event store<br/>events · projections")]
-        WM["World map"]
-    end
-
-    subgraph SURF["Surfaces"]
-        SRV["toprope-server<br/>MCP · HTTP · query tools · authoring MCP"]
-        SH["toprope-shell<br/>A2UI + CopilotKit · skill-tree view"]
-    end
-
-    subgraph EFF["Effects"]
-        GF["Greenfield backend<br/>(the event store is the record)"]
-        BF["Brownfield adapters<br/>GitHub · flags · internal APIs"]
-    end
-
-    RT["Optional runtime<br/>Aegra / LangGraph / Temporal<br/>(unattended proposals, from M4)"]
-
-    SRC -->|"agent drafts, human confirms"| DECL
-    DECL --> DC
-    REP --> RC
-    DC --> IF --> RC
-    DC --> WM
-    DECL --> CC
-    CC --> HR
-    HR -->|"verifies"| EX
-    HR -->|"verifies"| SRV
-    HR -->|"verifies"| SH
-    DC --> EX
-    RC --> SH
-    EX --> ES
-    ES --> GF
-    EX -->|"outbox · read-back · UNKNOWN"| BF
-    AG <-->|"MCP"| SRV
-    PP <--> SH
-    SRV --> EX
-    SH --> EX
-    ES -->|"query tools"| SRV
-    WM --> SRV
-    WM --> SH
-    RT -.->|"reads history, proposes diffs"| SRV
-    AG -.->|"proposes diffs"| DECL
-    PP -->|"decides"| DECL
-```
-
-How to read it:
-- The **declaration** is the only source of each domain's software: the MCP, backend,
-  views, harness and world map are generated per domain. `toprope-core` itself starts as a
-  hand-built kernel (M0a). Self-compile moves more of Toprope into generated form over time.
-  Function ports are always hand- or agent-written.
-- Every action, from an agent or a person, passes the **Execution gate**, and it lands in
-  the **event store**.
-- The **harness** verifies the gate and every surface against the same declaration before
-  a build can deploy.
-- The loop closes when agents read the event history, propose a change to the declaration,
-  and a person decides.
-
-## A taste of the declaration
+An agent proposes ad budget changes; a person approves them
+([`examples/paid-media/`](examples/paid-media/), runs locally with no keys):
 
 ```yaml
-transitions:                  # state × action → next state | deny(reason) | n/a | undecided
-  Experiment:
-    field: status
-    matrix:
-      draft:    {approve_experiment: approved, launch_experiment: {deny: "Launch requires approval."}}
-      approved: {approve_experiment: {deny: "Already approved."}, launch_experiment: running}
-      running:  {approve_experiment: {deny: "Only drafted experiments can be approved."}, launch_experiment: n/a}
-      # ended and decided rows omitted here; see docs/domain-schema.md
-
-invariants:
-  - id: running-has-approver
-    on: Experiment
-    check: target.status not in ['running', 'ended', 'decided'] or exists(target.approved_by)
-    reason: Nothing runs without someone having approved it.
-
-scenarios:                    # the expert's examples, run on every surface
-  - id: draft-to-running
-    given: {from_world: E-onboarding}
-    steps:
-      - {actor: {role: eng},      do: launch_experiment,  target: E-onboarding, expect: {denied_by: matrix}}
-      - {actor: {role: approver}, do: approve_experiment, target: E-onboarding, expect: {state: {E-onboarding.status: approved}}}
-      - {actor: {role: eng},      do: launch_experiment,  target: E-onboarding, expect: {state: {E-onboarding.status: running}}}
+actions:
+  propose_budget_change:
+    actor: [analyst]                 # the agent
+    preconditions:
+      - id: not-a-holdout
+        check: target.holdout == false or target.exception_approved == true
+        reason: Holdout campaigns keep their budget; changing it would break the test. A media lead can grant a one-time exception.
+      - id: step-limit
+        check: params.daily_budget - target.daily_budget <= 500
+        reason: Raise a daily budget by at most 500 at a time.
+  approve_budget_change:
+    actor: [media_lead]
+    requires: human
+    preconditions:
+      - id: not-the-proposer
+        check: target.proposed_by != actor.principal.id    # the agent's person, or the person
+        reason: Whoever proposed a change, or had their agent propose it, cannot approve it.
 ```
 
-Full schema: [`docs/domain-schema.md`](docs/domain-schema.md).
+| Who | Asks | Result |
+|---|---|---|
+| the agent | raise the holdout campaign to 1200 | denied: *Holdout campaigns keep their budget; changing it would break the test. A media lead can grant a one-time exception.* |
+| the agent | raise `C-search` from 1000 to 2500 | denied: *Raise a daily budget by at most 500 at a time.* |
+| the agent | raise `C-search` to 1400 | proposed |
+| the agent | approve it | denied: *Only a person can approve_budget_change.* |
+| the media lead | approve it | approved: the daily budget is 1400 |
 
-## How it differs
-
-| | Natural-language skills (`SKILL.md`, `AGENTS.md`) | Ontology platforms | Toprope |
-|---|---|---|---|
-| Who authors | anyone, in prose | engineers, often deployed on site | domain experts through an interview, with agents drafting |
-| Conflicts found | after deployment | at build time, by engineers | at compile time, reported in domain terms |
-| Behavior verified | not mechanically | per project | designed to check every matrix cell and invariant on every surface |
-| Cost of a change | a text edit, unchecked | an engineering project | an edit, an impact report, a preview |
-| Agents | read text and hope | integrate via APIs | first-class users via generated MCP |
-| Decisions | lost in chat | varies | event-sourced and queryable |
-
-## What it is not
-
-- Not an agent framework. The intelligence layer is whatever agent you use.
-- Not a guardrail product. Enforcement follows from the model, but it is not the goal.
-- Not a hosted multi-tenant service or a marketplace, for now.
-- Not yet proven. Every claim below is untested until its milestone reports.
-
-## The claim chain
-
-The repository is organized around one premise and six claims. Each claim matters only if
-the one before it holds.
+From the same file you also get MCP tools for the agent, a command line, a guide, and tests that
+try every state × action × role combination:
 
 ```
-P0 premise          nobody can define a domain correctly in one go; it is found by iterating
-      ↓
-① iterate safely    a domain can be changed cheaply and safely: breakage and conflicts are
-                    caught at compile time and the change can be tried before deployment
-      ↓
-② model is right    through those iterations, the model comes to capture how the work runs
-      ↓
-③ works as built    software generated from a harness-passing declaration works in real use;
-                    writing the code is nearly free (the software factory)
-      ↓
-④ shared language   MCP and UI generated from the model let people and agents act on the same meaning
-      ↓
-⑤ evolves           use accumulates decisions, and the model improves
-      ↓
-⑥ org productivity  handoff delay and re-explanation between people go down
+harness: PASS (model, execution, mcp)
+cells: 16 decided, covered model 16, execution 16, mcp 16; 0 undecided; 0 without an instance
 ```
+
+Raise the step limit to 1000, and before it ships you see what the change touches:
+
+```
+changes 1 precondition(s); affects 4 cell test(s), 14 param test(s), 2 precondition test(s), exploration; replays past propose_budget_change
+passes; 0 error(s), 0 warning(s)
+```
+
+In this example, approving updates Toprope's own record. Calling the ad platform needs an adapter
+(*planned*, M0b). A smaller example: [`examples/refunds/`](examples/refunds/).
+
+## Why Toprope
+
+- **Works with the agent you already use.** Agents reach it over MCP: Claude Code, Codex, Cursor
+  or your own.
+- **Rules your agent cannot skip.** Every action passes one check that refuses what is not allowed,
+  gives the reason, and records the attempt.
+- **Rules reviewed like code.** A change is a commit, checked before review, approved by a person
+  merging it into `main`, and deployed only if its tests pass. Why we think every workflow needs
+  this loop: [`docs/problem.md`](docs/problem.md).
+- **Tests you do not write.** The harness is generated from the declaration and tries every
+  state × action × role combination.
+- **You do not write the rules either.** An agent drafts them from your systems and your answers to
+  plain questions, such as *"Can someone approve an experiment that is already running?"*, and a
+  person confirms each one.
+- **Small and local.** A Python library and a server you run yourself, with no hosted service.
+
+## How to adopt it
+
+1. Run an example (above).
+2. Declare one workflow: let your agent interview you about it, and confirm what it drafts.
+3. Serve it over MCP to the agent that does the work.
+4. Put one write action behind it: the one that would hurt most if the agent got it wrong.
+5. Connect it to the system that action changes (adapters: *planned*, M0b).
+
+## Two graphs
+
+A Toprope domain keeps two kinds of knowledge apart.
+
+| | **World model**: what exists and what may happen | **Context graph**: why, and what happened |
+|---|---|---|
+| Holds | objects, links, actions, functions, states; the rules adopted over them (transition matrix, invariants, preconditions); the permissions (roles, actor rules, `requires: human`) | observations (events, refused attempts, outcomes), interview answers, rule candidates not yet adopted, decisions with their reasons, sources, versions and open conflicts |
+| Is | enforced: compiled into the gate, the tools and the tests | not enforced: it explains and proposes |
+| Produces | software | reviews and the next change |
+
+One rule joins them: a declared rule or permission changes only through a reviewed change, a
+commit whose checks passed and that a person approves. Knowing a method, or having done
+something before, changes nothing that is enforced. Two things sit between the graphs: the
+current state, derived from the event log, is what the gate checks; and an `undecided` cell
+refuses (a rule) while the question behind it stays open (context). "New creatives go
+to a test campaign first" is a hypothesis in the context graph while the team checks it against
+the numbers, and a rule in the world model once it is approved. Most of the context graph exists
+today as separate records (event logs, sources on every element, commits, approvals, check
+records); query tools over the event log are *planned* (M0b), and joining the rest into one
+graph has no plan yet. More:
+[`docs/how-it-works.md`](docs/how-it-works.md#two-graphs); the definition is ADR-0041.
+
+## What it gives you
+
+| Govern what you have | Status |
+|---|---|
+| the gate every action passes through, and an event log of actions, refusals and decisions | built |
+| MCP tools, a command line and a guide for the agent and for people | built |
+| commits, the change check, approval by merge, deploys of approved commits only ([`docs/commits.md`](docs/commits.md)) | built |
+| adapters to existing systems, with read-back | planned (M0b) |
+| proposals for the next change, from the history | planned (M4) |
+
+| Build what you need | Status |
+|---|---|
+| a declaration: objects and links, actions, a transition matrix (next state or a refusal, per state and action) and invariants (rules that always hold) | built |
+| a generated harness: every state × action × role combination, every invariant, at the model, gate and MCP levels | built |
+| functions that compute over the domain | planned (M0b) |
+| a generated backend and UI | planned (M0b) |
+| software that passes the harness working in real use, so writing it becomes nearly free | hypothesis ③, tested in M2 |
+
+Toprope's own workflows, making a domain and delivering it, are declared the same way, and their
+tools are generated from those declarations; only a small kernel is hand-built. More:
+[`docs/how-it-works.md`](docs/how-it-works.md).
+
+## Use cases, supported by Toprope
+
+Domains declared with Toprope and used for real, each with its declaration and what it governs.
+None yet: the first is milestone M2. To add yours, open a PR with the declaration and a short
+description of the workflow.
+
+## Limits
+
+- It covers only actions that go through it.
+- It says whether an action was *allowed*, not whether the rules are right or a decision was good.
+- None of the claims below is tested yet.
 
 ## Claim status
+
+Each claim is tested by a milestone with a verdict rule written down before the run: ① a domain
+can be changed safely, ② the model ends up right, ③ software generated from it works in real
+use, ④ people and agents act on the same meaning, ⑤ it improves through use, ⑥ handoffs
+between people get faster ([`docs/charter.md`](docs/charter.md#3-the-claim-chain)).
 
 | Link | Hypothesis | Verdict in | Status |
 |---|---|---|---|
@@ -313,59 +193,38 @@ P0 premise          nobody can define a domain correctly in one go; it is found 
 Status values: `untested` · `supported` · `weakened` · `refuted`. The `Status` column
 changes only in a PR that reports a preregistered experiment verdict.
 
-## Roadmap
+## Terms
 
-| Milestone | Link | What happens |
-|---|---|---|
-| M0a | none | Thin slice: semantics, model interpreter, Execution, event store, `toprope-server` MCP, authoring MCP, source readers, world map (JSON + MCP tools), harness, change check (incl. log replay and in-flight check), incremental analysis |
-| M1 | self-compile; ① ⑥ pilot | **Self-compile**: model Toprope's own Authoring and Delivery workflows, generated end to end (ADR-0028). A pilot of ① and ⑥: a natural-language skill vs. a structured spec without a compiler vs. Toprope, on a frozen change sequence with seeded conflicts. No link verdict: ② and ① are judged in M2 (ADR-0030, ADR-0034) |
-| M0b | none | Surfaces and effects: representation compiler and shell, brownfield adapter (GitHub), embedded shape, migration plans, query tools, timers and functions |
-| M2 | ① ② ③ | **Dogfood**: an application domain built with the self-compiled tool and used for real; the first ① and ② verdicts, which need an expert who is not Toprope's builder |
-| M3 | ④ | Do agents make fewer meaning errors through the generated surfaces? |
-| M4 | ⑤ | Proposals from the event history; humans decide (an optional runtime adapter, Aegra first, joins here) |
-| M5 | ⑥ (partial) | Typed handoffs between domains; write-up; public release |
+| Term | Meaning |
+|---|---|
+| domain, declaration | one area of work (ad budgets, refunds) and the YAML file that declares it |
+| transition matrix | for each state and action: the next state, or a refusal with its reason |
+| invariant | a rule that must hold after every action |
+| gate (Execution gate) | the one check every action passes through |
+| harness | tests generated from the declaration, run on the model, the gate and the MCP server |
+| change check | the checks a change to the rules gets before it is approved, starting with an impact report |
+| kernel | the hand-built core every domain shares; everything else is generated |
+| MCP | Model Context Protocol, how agents such as Claude Code call tools |
+| ADR | an architecture decision record, in [`docs/adr/`](docs/adr/) |
+| ①–⑥ | the claims above |
+| M0a … M5 | milestones: M0a the core (done), M1 Toprope on its own workflows (now), M0b UI and adapters to existing systems, M2 a real domain with an outside expert ("dogfood"), M3–M5 the later claims ([`docs/roadmap.md`](docs/roadmap.md)) |
 
-Details, exit criteria and kill criteria: [`docs/roadmap.md`](docs/roadmap.md).
+## Read next
 
-## Stack
+| To | Read |
+|---|---|
+| try it | [`examples/paid-media/`](examples/paid-media/), [`examples/refunds/`](examples/refunds/) |
+| see how it works | [`docs/concepts.md`](docs/concepts.md) (every part, and how they work together), [`docs/how-it-works.md`](docs/how-it-works.md), [`docs/domain-model.md`](docs/domain-model.md), [`docs/commits.md`](docs/commits.md) |
+| the problem, at length | [`docs/problem.md`](docs/problem.md) |
+| the design and its claims | [`docs/charter.md`](docs/charter.md), [`docs/architecture.md`](docs/architecture.md) |
+| use it | [`docs/workflow.md`](docs/workflow.md), [`docs/kernel-commands.md`](docs/kernel-commands.md), [`docs/server.md`](docs/server.md) |
+| write a declaration | [`docs/domain-schema.md`](docs/domain-schema.md), [`docs/semantics.md`](docs/semantics.md) |
+| follow the project | [`docs/STATUS.md`](docs/STATUS.md), [`docs/roadmap.md`](docs/roadmap.md), [`docs/adr/`](docs/adr/) |
+| contribute | [`AGENTS.md`](AGENTS.md): branch from `develop`, PR into `develop`, name the link your change serves |
 
-- **Domain core**: a Python library (`uv`). It never imports a runtime.
-- **`toprope-server`**: the first deployment shape. It serves MCP for agents, HTTP for the
-  greenfield API, and the query tools. It can also be imported as a library.
-- **Drafting and interviewing**: done by your own agent (e.g. Claude Code) through the
-  generated authoring MCP.
-- **Optional runtime** for unattended workflows (from M4): [Aegra](https://github.com/aegra/aegra), behind a port.
-- **UI** (`toprope-shell`): A2UI views compiled from the representation layer, rendered with React + CopilotKit.
-- **Event store**: PostgreSQL in its own schema.
-- **Harness exploration**: Hypothesis stateful testing.
-
-## Documents
-
-- [`docs/STATUS.md`](docs/STATUS.md): what is done and what is left, now
-- [`docs/charter.md`](docs/charter.md): problem, what Toprope is, the chain, hypotheses, principles
-- [`docs/roadmap.md`](docs/roadmap.md): milestones, each ending with a verdict on a link
-- [`docs/architecture.md`](docs/architecture.md): layers, bounded contexts, ports and adapters, pipelines
-- [`docs/workflow.md`](docs/workflow.md): who does what, when; the self domains end to end
-- [`docs/kernel-commands.md`](docs/kernel-commands.md): the kernel's commands, generated from their parsers
-- [`docs/domain-model.md`](docs/domain-model.md): the domain model: objects, links, actions and the transition matrix, and what each drives
-- [`docs/domain-schema.md`](docs/domain-schema.md): the declaration format
-- [`docs/experiments/M1-self-compile.md`](docs/experiments/M1-self-compile.md): the first experiment
-- [`docs/adr/`](docs/adr/): every decision, with provenance and supersession
-- [`notes/ko/`](notes/ko/): working notes in Korean
-
-## Working here
-
-Branching, PRs, merge methods and rules for coding agents are in [`AGENTS.md`](AGENTS.md).
-In short: branch from `develop`, open a PR into `develop`, and name the link your change
-serves.
-
-Ground rules:
-- Small, falsifiable milestones on an evenings-and-weekends budget (~10h+/week).
-- Reuse OSS for everything that is not a link in the chain.
-- Claims state their evidence level: *measured*, *observed once*, or *hypothesis*.
-- Gold sets and seeded change lists are written by the researcher only.
+Working notes in Korean: [`notes/ko/`](notes/ko/).
 
 ## License
 
-Not chosen yet. The repository stays private until M1 has a verdict. Apache-2.0 is the
-proposal (ADR-0005).
+No license yet, so all rights are reserved. The repository is private until M1 reports, and
+Apache-2.0 is the proposed license (ADR-0005).

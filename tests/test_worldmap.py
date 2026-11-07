@@ -31,7 +31,7 @@ def edge(m, eid):
 
 
 def test_structure_and_behavior_layers_come_from_the_declaration():
-    m = build_world_map(dom())
+    m = build_world_map(dom(lambda r: r["links"]["hypothesis"].update(status="proposed")))
     assert {n["id"] for n in m["structure"]["nodes"]} == {"Experiment", "Hypothesis", "Metric", "Readout"}
     hyp = next(e for e in m["structure"]["edges"] if e["id"] == "hypothesis")
     assert (hyp["from"], hyp["to"], hyp["required"], hyp["status"]) == ("Experiment", "Hypothesis", True, "proposed")
@@ -113,6 +113,33 @@ def test_mermaid_export():
     sd = mm["states"]["Experiment"]
     assert "[*] --> draft" in sd and "draft --> approved: approve_experiment" in sd
     assert "note right of ended: launch_experiment undecided" in sd
+
+
+def test_mermaid_marks_where_the_harness_found_a_break():
+    # pstack `statechart`: the chart shows where a rule breaks, and the bug as a path in domain words.
+    def seed_bug(raw):   # launching straight from draft: running without an approver
+        raw["transitions"]["Experiment"]["matrix"]["draft"]["launch_experiment"] = "running"
+    d = dom(seed_bug)
+    report = run_harness(d, levels=("model",), races=False).to_json()
+    mm = to_mermaid(build_world_map(d, report))
+    sd = mm["states"]["Experiment"].splitlines()
+    assert "  draft --> running: launch_experiment ✗ failed in the harness" in sd
+    assert "  note left of running: breaks running-has-approver" in sd and "  class running breaks" in sd
+    assert "  decided" in sd and "  class decided unreachable" in sd          # drawn, though no arrow reaches it
+    (flow,) = mm["flows"]
+    assert flow.splitlines() == ["Breaks `running-has-approver` in 1 step(s):",
+                                 "1. eng eli takes `launch_experiment` on E-onboarding, from `draft`: invariant-guard"]
+
+
+def test_mermaid_arrows_name_their_conditions_and_a_clean_map_has_no_marks():
+    def person(raw):
+        raw["actions"]["launch_experiment"]["requires"] = "human"
+    m = build_world_map(dom(person), run_harness(dom(person), levels=("model",), races=False).to_json())
+    mm = to_mermaid(m)
+    sd = mm["states"]["Experiment"]
+    assert "draft --> approved: approve_experiment [has-guardrails]" in sd
+    assert "approved --> running: launch_experiment [a person]" in sd
+    assert "breaks" not in sd.replace("classDef breaks", "") and mm["flows"] == []
 
 
 def _payload(res):

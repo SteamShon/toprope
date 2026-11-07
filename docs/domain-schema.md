@@ -20,6 +20,8 @@ readable schemas: [`schema/domain.v1.schema.json`](../schema/domain.v1.schema.js
 | `handoffs` | [Handoffs](#handoffs) | implemented (M0a, ADR-0024) |
 | composition files (`*.composition.yaml`: members and wiring) | [Handoffs](#handoffs) | implemented (M0a, ADR-0026) |
 | `approvals` on actions | [Approvals](#approvals) | defined; M0b |
+| `approval: {distinct_from_author}` | the commit's author may not approve it (ADR-0046) | implemented; off by default |
+| `read` on objects and properties | [Read visibility](#read-visibility-adr-0042) | defined; M0b |
 | `invariants` with `scope: cross` + `reservations` | [Reservations](#cross-aggregate-invariants-and-reservations) | defined; M0b |
 | `timers`, scenario `advance` steps | [Timers](#timers) | defined; M0b |
 | `functions` | [Functions](#functions) | defined; M0b |
@@ -71,7 +73,7 @@ objects:
 links:                      # a link is navigable from its `from` object by its name
   hypothesis:     {from: Experiment, to: Hypothesis, cardinality: many-to-one, required: true,
                    source: {kind: record, ref: "docs/experiments.md", quote: "Every experiment tests one hypothesis."},
-                   status: proposed}
+                   status: confirmed}
   primary_metric: {from: Experiment, to: Metric, cardinality: many-to-one, required: true}
   guardrails:     {from: Experiment, to: Metric, cardinality: many-to-many}
   readout:        {from: Experiment, to: Readout, cardinality: one-to-one}
@@ -89,7 +91,7 @@ actions:
         reason: An experiment needs at least one guardrail metric before approval.
     effects:
       - set: {target.approved_by: actor.id}
-    records_decision: true  # produces a Decision with who, when, inputs and rationale
+    records_decision: true  # produces a Decision: who, when, the params, the prior state, a rationale
   launch_experiment:
     description: Start traffic to an approved experiment.
     actor: [eng]
@@ -147,7 +149,9 @@ world:                      # the expert's examples; the compiler grows a small 
 
 - Every element may carry `source` (`system` | `record` | `interview` | `use`, with a ref or
   quote) and `status` (`proposed` | `confirmed` | `unknown`). Agents write only `proposed`.
-  Only humans confirm. Unknowns stay explicit instead of being guessed.
+  Only humans confirm. Unknowns stay explicit instead of being guessed. The elements are
+  objects, links, actions, preconditions, matrix cells, invariants, handoffs and scenarios;
+  world fixtures and the glossary carry no provenance, so proposing them is logged instead.
 - `description`, `reason` and `glossary` are written once and reused by every surface.
 - **Effect values** in `set` are check-language expressions: `actor.id`, `"now()"`,
   `params.note`. A string literal is quoted inside the expression: `"'manual'"`.
@@ -159,7 +163,11 @@ world:                      # the expert's examples; the compiler grows a small 
   string with a string or an integer (ADR-0024); floats, booleans, null and lists
   are refused. The set operators and boolean combinators were added by ADR-0010. Any further
   extension requires an ADR.
-- `records_decision: true` turns an action into an accumulated work decision (⑤).
+- `records_decision: true` turns an action into an accumulated work decision (⑤). Every such
+  action takes an optional `rationale` (string), the reason the person gives. The declaration
+  model adds it, so every surface offers it; it is stored in the `DecisionRecorded` event when
+  given. A decision action may not declare it (`reserved-param`); a non-decision action may, but
+  then cannot become a decision action without renaming it (ADR-0041).
 - **Transition matrix** (ADR-0010):
   - It is the single source for state-based rules. Every (state, action) cell is one of:
     a target state, `{deny: reason}`, `n/a`, `undecided`, or a per-role cell
@@ -439,12 +447,14 @@ works. The catalog is the kernel itself (ADR-0027):
 | `confirm_element` | `paths` (or `all`), `approver` | `confirmed`: the calling person must be the approver |
 | `skip_stage` | `stage`, `reason` | `skipped` |
 | `commit` | `declaration` | `id`, `seq`, `content`, `created`, `parent`, `interface`, `to_review`, `last_approved` (ADR-0029) |
+| `cite_evidence` | `domain`, `commit`, `kind` (`interview`, `source`, `check`, `event`, `approval-run`), `ref` | `strength` (`pointed`, `ran`, `observed`, `approved`): the ref must resolve (ADR-0041; [`commits.md`](commits.md#evidence-adr-0041)) |
 | `diff` | `domain`, `from`, `to` | `changed`, `added`, `removed`, `to_review` |
 | `checkout` | `domain`, `commit`, `declaration` | `content` (loads a commit into a working copy, ADR-0032) |
 | `change_check` | `domain`, `commit` | `passed`, `errors`, `warnings`, `failing`, `summary` (recorded on the commit, ADR-0009) |
 | `approve_commit` | `domain`, `commit`, `approver` | `approved`, `main` (merges into `main` and tags it, ADR-0033) |
 | `preview` | `domain`, `commit` | `build`, `harness_ok` |
 | `deploy` | `domain`, `commit`, `approver` | `deployed` (under the fixed floor, ADR-0022, ADR-0029) |
+| `probe` | `domain`, `commit` | `passed`, `summary` (the deployed commit in use: its build, its scenarios at the execution level, every object in the deployed store against every invariant; recorded as the `probes` check) |
 
 `changed`, `added`, `removed` and `to_review` are lists of element keys: a reply param that
 receives one is `{type: string, many: true}`. `approve_commit` and `deploy` record a person's
@@ -477,6 +487,12 @@ Rules:
 - **The reply.** It is a command from `external:kernel` to the `reply` action on the same
   object, keyed by the effect id, so it is applied at most once. It goes through the matrix,
   preconditions and invariants like any other command.
+- **A late reply is recorded, not applied.** If, after the call, someone other than the
+  kernel (a person, an agent, a handoff) moved the object out of the state it was called in,
+  the reply is refused with `late-reply`; its result stays in the outbox record. Another reply
+  of the same action may move the object without making its siblings late. The model level
+  (harness, TLC) still treats a reply as any action, so it finds what a missing guard allows;
+  this is the runtime's backstop for it (#139, #140).
 - **Every field, every time.** A result always has every field: `ok`, `error` (`""` when
   ok), and the service's fields, with defaults when it failed. A failed call (including
   inputs of the wrong type) still replies, so the declaration decides what a failure means,
@@ -521,6 +537,34 @@ are reserved and are not roles: `system` (timers, handoffs and fixtures) and
 `on_behalf_of` a person with a **grant** (actions, targets, expiry), which is issued at
 runtime, not in the declaration. The declaration controls agents with `requires: human` and
 with actor rules: an agent must satisfy the rule both for itself and for its principal.
+A check or an effect can read `actor.principal` (`id`, `kind`, `roles`, `role`): the person an
+agent acts for, or the actor itself when it is not an agent. Record and compare
+`actor.principal.id` to say "not the proposer, nor the proposer's agent" (ADR-0041).
+
+## Read visibility (ADR-0042)
+
+Who may *read* what, beside who may *do* what. Defined now so it is reviewed before any surface
+depends on it; the kernel refuses it until M0b, when the query tools let agents read history.
+
+```yaml
+objects:
+  Readout:
+    description: Metric results of an experiment after its planned duration.
+    read: [pm, analyst, approver]          # who may read a readout at all
+    properties:
+      primary_delta: {type: number}
+      guardrail_regressed: {type: boolean, read: [analyst, approver]}   # and this field
+```
+
+- `read` on an object type lists the roles that may read its objects; on a property, the roles
+  that may read that property. Without `read`, every role may read, as now.
+- It applies to every surface that reads: the MCP read tools, the command line's `get` and
+  `history`, the query tools and the guide's examples. An object an actor may not read is
+  reported as not found (like an action whose existence is hidden, ADR-0021); a property it may
+  not read is left out.
+- An agent must satisfy it both for itself and for its principal, like an actor rule.
+- It limits what is shown, never what is checked: the gate, invariants, the harness, `system`
+  and `external:kernel` read everything.
 
 ## Representation layer (ADR-0008)
 

@@ -152,13 +152,50 @@ state; they link here. The README claim-status table stays in the README, becaus
   table above.
 - Do not change the claim-status table, ADR decisions or gold sets on your own initiative.
   Propose them in the PR description instead.
-- Do not put model identifiers in commits, PRs or code.
+- Do not put model identifiers in commits, PRs or code. The one exception is an experiment's
+  run records (for example `experiments/m1/runs/`), where the model is a variable of the
+  experiment; they still stay out of commit messages and PRs.
 - Update `docs/STATUS.md` in the same PR as the work it describes (see Progress).
 - **Real tests only.** A new test must fail against the code before your change (or cover
   behavior the change adds). Never write a test that already passes against the old code
   and call it coverage. Never skip, delete, `xfail`, comment out or weaken a test, or loosen
   an assertion, to get green: fix the code, or stop and explain. This applies equally to
   generated harnesses and to the M1 instruments.
+
+## Rules and what enforces them
+
+A rule that only text enforces is skipped by the first agent that does not read it. When the
+same mistake comes back, fix it at the highest level that works: make it impossible in the
+design, then a check whose error names the fix, then a test; text is last, for judgment calls.
+Show that the check fails on the real past mistake. Keep this table current: add a row when a
+check starts enforcing a rule, and drop a rule from the text once its mistake cannot happen.
+
+| Rule | Enforced by |
+|---|---|
+| `docs/STATUS.md` is current in every PR into `develop` or `umbrella/*` | `status` workflow (`tools/status_check.py`) |
+| A release PR follows a cleanup PR | `status` workflow (`Cleaned for release`) |
+| Tests pass on the memory and SQLite stores | `checks` workflow (`uv run pytest`) |
+| A frozen instrument changes only through `amend` | `checks` workflow (`instruments.py verify --run`) |
+| A workspace source points at files that exist (#91) | `Workspace.stale_sources`, tested in `checks` |
+| One line of history for the self domains (below) | `checks` workflow (`tools/logs_check.py`) |
+| The harness misses no invariant break TLC can reach in the modeled part of a declaration (ADR-0043) | `tla` workflow (`tools/tla_check.py`), with a seeded break it must find |
+| A commit approved where TLC is configured passed TLC's check first (ADR-0044) | the kernel (`approve_commit` with `TOPROPE_TLC_JAR`), `human_request.py` |
+| A kernel reply after someone moved its object on changes no state (#148) | the kernel (`late-reply`) |
+| Where a domain says so, a commit's author does not approve it (ADR-0046) | the commit store (`approve`) |
+| Agents write only `proposed`; only a person confirms or approves | the kernel (`requires: human`, `_demote`) |
+| The researcher's own steps from a cloud session run after their approval | `human-request` workflow (ADR-0039) |
+| Gold sets and sealed files are human-only | text only: review |
+| Real tests only; no skipped or weakened tests | text only: review |
+| No model identifiers in commits, PRs or code (run records excepted) | text only: review |
+
+## Self domains: one loop at a time
+
+The self domains' commit store (`.toprope/commits/<domain>/`) and their event and interview logs
+(`domains/<domain>/`) advance on one line only. **Two branches must not run the self domains'
+loop at the same time.** Before running `toprope-run` on them, bring your branch up to date with
+`develop` (or your umbrella's base), and do not start while another open PR changes those files.
+If it happens anyway, do not join the files: take the base's files and run the loop again from
+them (#124). CI fails a PR whose head does not extend each such file of its base.
 
 ## Development
 

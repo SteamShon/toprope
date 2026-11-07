@@ -6,6 +6,8 @@ it for machines. Run: uv run python tools/gen_schema.py
 import json
 from pathlib import Path
 
+from toprope.kernel import CATALOG as KERNEL_SERVICES
+
 EXPR = {"type": "string", "description": "check-language expression (docs/domain-schema.md)"}
 ID = {"type": "string", "pattern": r"^[A-Za-z_][A-Za-z0-9_-]*$"}
 SCALAR_TYPES = ["string", "integer", "number", "boolean", "datetime"]
@@ -29,7 +31,9 @@ def with_prov(props, required=(), **kw):
 typed = {"type": {"enum": SCALAR_TYPES}, "enum": {"type": "array", "items": {"type": "string"}},
          "ref": {"type": "string"}, "many": {"type": "boolean"}, "optional": {"type": "boolean"}}
 property_ = obj({"type": {"enum": SCALAR_TYPES}, "enum": {"type": "array", "items": {"type": "string"}},
-                 "optional": {"type": "boolean"}, "min": {"type": "number"}, "max": {"type": "number"}},
+                 "optional": {"type": "boolean"}, "min": {"type": "number"}, "max": {"type": "number"},
+                 "read": {"type": "array", "items": {"type": "string"},
+                          "description": "roles that may read it (ADR-0042); defined, M0b"}},
                 oneOf=[{"required": ["type"]}, {"required": ["enum"]}])
 param = obj(typed, oneOf=[{"required": ["type"]}, {"required": ["enum"]}, {"required": ["ref"]}])
 deny = with_prov({"deny": {"type": "string"}}, ["deny"])
@@ -44,9 +48,7 @@ actor_rule = {"oneOf": [{"type": "string"}, obj({"role": {"type": "string"}, "wh
 effect = {"oneOf": [  # `create` is not in v1
     obj({"set": {"type": "object", "additionalProperties": {"type": ["string", "number", "boolean", "null"]}}},
         ["set"]),
-    obj({"call": {"enum": ["validate", "compile", "check_composition", "run_harness", "world_map",
-                           "read_source", "fetch_source", "commit", "diff", "approve_commit",
-                           "preview", "deploy"]},       # kernel services (ADR-0028, ADR-0029)
+    obj({"call": {"enum": list(KERNEL_SERVICES)},   # kernel services (ADR-0028, ADR-0029), from the catalog
          "with": {"type": "object", "additionalProperties": EXPR},
          "reply": {"type": "string"}}, ["call", "reply"]),
 ]}
@@ -58,7 +60,8 @@ action = with_prov({
     "params": {"type": "object", "additionalProperties": param},
     "preconditions": {"type": "array", "items": precondition},
     "effects": {"type": "array", "items": effect},
-    "records_decision": {"type": "boolean"},
+    "records_decision": {"type": "boolean", "description": "a work decision; such an action also takes an "
+                         "optional `rationale` (string), which it may not declare (ADR-0041)"},
     "event": {"type": "string"},
     "applies_in": {"type": "array", "items": {"type": "string"}},
     "requires": {"enum": ["human"]},
@@ -92,7 +95,9 @@ domain = {
         "glossary": {"type": "object", "additionalProperties": {"type": "string"}},
         "roles": {"type": "array", "items": {"type": "string"}},
         "objects": {"type": "object", "additionalProperties": with_prov(
-            {"description": {"type": "string"}, "properties": {"type": "object", "additionalProperties": property_}})},
+            {"description": {"type": "string"}, "properties": {"type": "object", "additionalProperties": property_},
+             "read": {"type": "array", "items": {"type": "string"},
+                      "description": "roles that may read objects of this type (ADR-0042); defined, M0b"}})},
         "links": {"type": "object", "additionalProperties": with_prov(
             {"from": {"type": "string"}, "to": {"type": "string"},
              "cardinality": {"enum": ["one-to-one", "one-to-many", "many-to-one", "many-to-many"]},

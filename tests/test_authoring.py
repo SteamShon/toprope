@@ -106,6 +106,31 @@ def test_sources_outside_the_workspace_and_symlinks_are_refused(tmp_path, ws):
     assert not any("link.md" in c.ref for c in read(SourceSpec("docs", "records", "docs"), ws.root))
 
 
+def test_a_source_that_points_at_removed_files_is_stale(tmp_path):
+    # The mistake #91 fixed: the switch-over removed files the Authoring workspace still read.
+    cfg = {"domain": "d.domain.yaml", "sources": [
+        {"id": "system", "kind": "repository", "path": "src", "globs": ["kernel/**", "authoring/**"]},
+        {"id": "records", "kind": "records", "path": "docs", "globs": ["workflow.md", "authoring.md"]},
+        {"id": "gone", "kind": "records", "path": "notes"},
+        {"id": "link", "kind": "records", "url": "https://example.com/policy"},
+    ]}
+    (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump(cfg))
+    (tmp_path / "src" / "kernel").mkdir(parents=True)
+    (tmp_path / "src" / "kernel" / "services.py").write_text("x = 1\n")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "workflow.md").write_text("# Workflow\n")
+    assert Workspace(tmp_path).stale_sources() == [
+        "source system: src/authoring/** matches no file",
+        "source records: docs/authoring.md matches no file",
+        "source gone: notes does not exist",
+    ]
+
+
+@pytest.mark.parametrize("workspace", ["toprope.authoring.workspace.yaml", "toprope.delivery.workspace.yaml"])
+def test_the_self_domain_workspaces_point_at_files_that_exist(workspace):
+    assert Workspace(Path(__file__).resolve().parent.parent / workspace).stale_sources() == []
+
+
 def test_usage_log_records_what_was_served(ws):
     ws.read_source("docs", limit=2)
     ws.search_sources("Engineers")
@@ -128,6 +153,21 @@ def test_propose_cites_a_real_chunk_and_is_always_proposed(ws):
         ws.propose("objects.Ghost", {}, "docs:docs/process.md#L99-L100")
     with pytest.raises(AuthoringError, match="unknown source"):
         ws.propose("objects.Ghost", {}, "nowhere:x#L1")
+
+
+def test_a_change_inside_a_confirmed_element_proposes_the_element_again(ws):
+    """Otherwise an agent could rewrite a confirmed action's effects while it reads `confirmed`."""
+    ws.propose("roles", ["approver"], "docs:docs/process.md#L4-L6")
+    ws.propose("objects.Experiment", {"description": "A test.", "properties": {"ok": {"type": "boolean"}}},
+               "docs:docs/process.md#L4-L6")
+    ws.propose("actions.approve", {"description": "Approve.", "actor": ["approver"], "target": "Experiment",
+                                   "effects": [{"set": {"target.ok": True}}]}, "docs:docs/process.md#L4-L6")
+    ws.confirm(["actions.approve"], via="terminal", who="ana")
+    assert ws.draft()["actions"]["approve"]["status"] == "confirmed"
+    ws.propose("actions.approve.effects", [{"set": {"target.ok": False}}], "docs:docs/process.md#L7-L8")
+    el = ws.draft()["actions"]["approve"]
+    assert el["effects"] == [{"set": {"target.ok": False}}]
+    assert el["status"] == "proposed" and el["source"]["ref"] == "docs:docs/process.md#L7-L8"
 
 
 def test_propose_keeps_the_draft_parseable_and_returns_issues(ws):
@@ -223,11 +263,11 @@ def test_only_a_human_channel_confirms(ws):
     with pytest.raises(AuthoringError, match="only a person"):
         ws.confirm(["objects.Readout"], via="agent")
     with pytest.raises(AuthoringError, match="not a drafted element"):
-        ws.confirm(["roles"], via="cli")
-    ws.confirm(["objects.Readout"], via="cli", who="owner")
+        ws.confirm(["roles"], via="terminal")
+    ws.confirm(["objects.Readout"], via="terminal", who="owner")
     assert ws.draft()["objects"]["Readout"]["status"] == "confirmed"
     log = [json.loads(line) for line in ws.log_path.read_text().splitlines()]
-    assert log[-1] == {**log[-1], "kind": "confirm", "paths": ["objects.Readout"], "via": "cli"}
+    assert log[-1] == {**log[-1], "kind": "confirm", "paths": ["objects.Readout"], "via": "terminal"}
 
 
 def test_check_runs_the_harness_on_the_draft(ws):
@@ -319,7 +359,7 @@ def test_a_workspace_may_be_named_by_its_file(tmp_path):
     assert one.chunks("docs")
 
 
-def test_a_cli_confirmation_records_the_git_identity(tmp_path):
+def test_a_terminal_confirmation_records_the_git_identity(tmp_path):
     """Who confirmed comes from the terminal's git identity, without anyone typing it."""
     import json
     import subprocess
@@ -334,12 +374,56 @@ def test_a_cli_confirmation_records_the_git_identity(tmp_path):
     (tmp_path / "d.domain.yaml").write_text(yaml.safe_dump(schema_doc_domain(), sort_keys=False))
     ws = Workspace(tmp_path)
     ws.propose("actions.approve_experiment", ws.draft()["actions"]["approve_experiment"], "docs:docs/a.md#L1-L2")
-    ws.confirm(["actions.approve_experiment"], via="cli")
+    ws.confirm(["actions.approve_experiment"], via="terminal")
     entry = json.loads(ws.log_path.read_text().splitlines()[-1])
     assert entry["who"] == "Ana Owner <ana@example.org>"
-    ws.confirm(["actions.approve_experiment"], via="cli", who="eli")              # an explicit name wins
+    ws.confirm(["actions.approve_experiment"], via="terminal", who="eli")              # an explicit name wins
     assert json.loads(ws.log_path.read_text().splitlines()[-1])["who"] == "eli"
 
+
+
+def test_the_terminal_is_named_as_the_identity_file_names_it(tmp_path):
+    """#85: `Workspace.identity` used git's `user.name`, the git identity adapter the file's name,
+    so one person had two names in the logs. The file's name wins when it lists the email."""
+    import subprocess
+    from toprope.workspace import Workspace
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.name", "ana-laptop"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.email", "ana@example.org"], check=True)
+    (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump({"domain": "d.domain.yaml", "sources": []}))
+    ws = Workspace(tmp_path)
+    assert ws.identity() == "ana-laptop <ana@example.org>"                  # no identity file: git's name
+    (tmp_path / "toprope.identity.yaml").write_text(yaml.safe_dump(
+        {"people": {"ana@example.org": {"name": "Ana Kim", "roles": ["owner"]}}}))
+    assert ws.identity() == "Ana Kim <ana@example.org>"                     # the file's name, as GitIdentity
+
+
+def test_the_removed_channels_are_refused(ws):
+    """#89: the CLI confirm and the MCP elicitation are gone; a person confirms at the terminal
+    or through a declared action."""
+    _seed_example(ws)
+    ws.propose("objects.Readout", {"description": "Result."}, "docs:docs/process.md#L7-L8")
+    for old in ("cli", "elicitation"):
+        with pytest.raises(AuthoringError, match="only a person"):
+            ws.confirm(["objects.Readout"], via=old, who="owner")
+
+
+def test_the_git_identity_reads_git_once_per_command(tmp_path, monkeypatch):
+    """#85: a command resolved its caller twice and read `git config` each time."""
+    import toprope.identity.git as g
+    calls = []
+    monkeypatch.setattr(g, "git_email", lambda root: calls.append(root) or "ana@example.org")
+    (tmp_path / "ids.yaml").write_text(yaml.safe_dump({"people": {"ana@example.org": {"roles": ["owner"]}}}))
+    ident = g.GitIdentity(tmp_path / "ids.yaml", tmp_path, once=True)
+    assert ident.resolve() is not None and ident.resolve() is not None
+    ident.explain()
+    assert len(calls) == 1
+    live = g.GitIdentity(tmp_path / "ids.yaml", tmp_path)                 # a long-lived process: each time
+    live.resolve(), live.resolve()
+    assert len(calls) == 3
+    from toprope.adapters.cli import _identity
+    monkeypatch.chdir(tmp_path)
+    assert _identity("git:ids.yaml").once is True                          # toprope-run: one command
 
 def test_a_handoff_is_an_element_to_confirm(tmp_path):
     """A handoff is a decision about what crosses into another domain: drafted, then confirmed."""
@@ -354,7 +438,7 @@ def test_a_handoff_is_an_element_to_confirm(tmp_path):
                                     "to": {"domain": "delivery", "interface": "1.x", "action": "request_delivery"},
                                     "params": {}, "target": "target.id"}, "docs:docs/a.md#L1-L2")
     assert "handoffs.deliver" in ws._proposed(ws.draft())
-    ws.confirm(["handoffs.deliver"], via="cli", who="ana")
+    ws.confirm(["handoffs.deliver"], via="terminal", who="ana")
     assert ws.draft()["handoffs"]["deliver"]["status"] == "confirmed"
 
 
@@ -382,3 +466,46 @@ def test_the_kernel_confirms_every_proposed_element_at_once(tmp_path):
     assert not again["ok"] and "nothing to confirm" in again["error"]
 
 
+
+
+def test_a_committed_domain_refuses_a_proposal_that_breaks_its_declaration(tmp_path):
+    # #124: an action proposed before the reply it names made the working copy invalid, and the
+    # generated tools then refused to load it at all, so nothing could undo the proposal.
+    (tmp_path / "toprope.workspace.yaml").write_text(yaml.safe_dump(
+        {"domain": "d.domain.yaml", "sources": [{"id": "docs", "kind": "records", "path": "docs"}]}))
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "a.md").write_text("# A\nrules\n")
+    (tmp_path / "d.domain.yaml").write_text(yaml.safe_dump(schema_doc_domain(), sort_keys=False))
+    ws = Workspace(tmp_path)
+    ws.commit()
+    cite = {"description": "Cite.", "actor": ["pm"], "target": "Experiment",
+            "effects": [{"call": "validate", "with": {"declaration": "target.name"}, "reply": "record_it"}]}
+    before = ws.domain_path.read_text()
+    with pytest.raises(AuthoringError, match="unknown-reply"):
+        ws.propose("actions.cite", cite, "docs:docs/a.md#L1-L2")
+    assert ws.domain_path.read_text() == before                          # nothing written
+    ws.propose("actions.record_it", {"description": "Record.", "actor": ["external:kernel"],
+                                     "target": "Experiment"}, "docs:docs/a.md#L1-L2")
+    out = ws.propose("actions.cite", cite, "docs:docs/a.md#L1-L2")       # in dependency order
+    assert not [i for i in out["issues"] if i["code"] == "unknown-reply"]
+
+
+def test_a_scenario_is_an_element_and_a_fixture_change_is_logged(ws):
+    """#86, #147: a proposed scenario was written without provenance, so no person confirmed it.
+    A scenario is an element now; fixtures and the glossary, which carry none, are logged."""
+    from toprope.decl.provenance import proposed_elements
+    _seed_example(ws)
+    sc = {"id": "approve-needs-a-guardrail", "given": {"from_world": "E-bare"},
+          "steps": [{"actor": {"role": "approver"}, "do": "approve_experiment", "target": "E-bare",
+                     "expect": {"denied_by": "has-guardrails"}}]}
+    out = ws.propose(f"scenarios.{sc['id']}", sc, "docs:docs/process.md#L4-L6")
+    assert out["marked"] is True
+    (added,) = [s for s in ws.draft()["scenarios"] if s["id"] == sc["id"]]
+    assert added["status"] == "proposed" and added["source"]["ref"] == "docs:docs/process.md#L4-L6"
+    assert f"scenarios.{sc['id']}" in proposed_elements(ws.draft())
+    ws.confirm([f"scenarios.{sc['id']}"], via="kernel", who="ana")
+    assert f"scenarios.{sc['id']}" not in proposed_elements(ws.draft())
+    fx = ws.draft()["world"]["fixtures"]
+    assert ws.propose("world.fixtures", fx, "docs:docs/process.md#L4-L6")["marked"] is False
+    last = json.loads(ws.log_path.read_text().splitlines()[-1])
+    assert last["kind"] == "unmarked-proposal" and last["path"] == "world.fixtures"

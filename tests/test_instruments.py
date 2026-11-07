@@ -115,7 +115,8 @@ def test_the_checks_wait_only_for_the_probes_and_verdict_rules(tmp_path, capsys)
     assert instruments.freeze(d) == []                                   # the pilot's two, later
     assert sorted(json.loads((d / "FROZEN.json").read_text())["files"]) == [
         "change-key.yaml", "change-requests.yaml", "probe-suite.yaml", "verdict-rules.yaml"]
-    assert [e for e in instruments.verify(d, run=True) if "binding" not in e] == []
+    assert [e for e in instruments.verify(d, run=True)
+            if "binding" not in e and "run-protocol" not in e] == []          # frozen later, below
 
 
 def test_a_frozen_file_can_be_amended_on_the_record(tmp_path, capsys):
@@ -142,3 +143,31 @@ def test_a_frozen_file_can_be_amended_on_the_record(tmp_path, capsys):
     assert instruments.amend(d, "verdict-rules", "again") == ["verdict-rules.yaml is unchanged; nothing to amend"]
     p.write_text(p.read_text().replace("status: frozen", "status: draft"))
     assert any("keep status: frozen" in e for e in instruments.amend(d, "verdict-rules", "draft again"))
+
+
+def test_the_run_protocol_is_frozen_by_hash_before_any_arm_runs(tmp_path, capsys):
+    """The Phase B run protocol (Markdown) is frozen by its hash, after the four instruments, and
+    `verify --run` needs it; a change after freezing goes through amend."""
+    import json
+    d = filled(tmp_path)
+    (d / "gold-scenarios.yaml").unlink()
+    for f in ("probe-suite", "verdict-rules", "change-requests", "change-key"):
+        p = d / f"{f}.yaml"
+        p.write_text(p.read_text().replace("status: draft", "status: frozen"))
+    proto = d / "run-protocol.md"
+    proto.write_text("# Run protocol\n\nStatus: **draft**.\n\nRun each reviewer 5 times.\n")
+    assert instruments.freeze_protocol(d) == [
+        "the instruments are not all frozen yet: ['probe-suite.yaml', 'verdict-rules.yaml', "
+        "'change-requests.yaml', 'change-key.yaml']"]
+    assert instruments.freeze(d) == []
+    assert instruments.validate(d) == []                                 # Markdown is not validated as YAML
+    assert instruments.freeze_protocol(d) == ["run-protocol.md: set status: frozen yourself before freezing"]
+    assert "run-protocol.md is not frozen" in instruments.verify(d, run=True)
+    proto.write_text(proto.read_text().replace("**draft**", "**frozen**"))
+    assert instruments.freeze_protocol(d) == []
+    assert "run-protocol.md" in json.loads((d / "FROZEN.json").read_text())["files"]
+    assert "run-protocol.md is not frozen" not in instruments.verify(d, run=True)
+    proto.write_text(proto.read_text().replace("5 times", "3 times"))
+    assert "run-protocol.md changed after freezing" in instruments.verify(d)
+    assert instruments.amend(d, "run-protocol", "fewer runs, for cost") == []
+    assert instruments.verify(d) == []

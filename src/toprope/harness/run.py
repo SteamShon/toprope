@@ -92,8 +92,13 @@ class Harness:
     def __init__(self, d: Domain, *, levels: tuple[str, ...] = DEFAULT_LEVELS,
                  clock: Callable[[], datetime] | None = None,
                  store_factory: Callable[[], EventStore] | None = None,
-                 build_server: Callable[..., Any] | None = None):
+                 build_server: Callable[..., Any] | None = None,
+                 implementation: Domain | None = None):
+        """`implementation` is the declaration the execution and MCP levels are built from;
+        by default `d`. The model level and every expectation always read `d`. A different one
+        stands for an implementation that drifted from the declaration (harness mutants)."""
         self.d = d
+        self.implementation = implementation or d
         self.levels = tuple(levels)
         self.clock = clock or (lambda: NOW)
         self.store_factory = store_factory
@@ -110,7 +115,8 @@ class Harness:
         cls = LEVELS[level]
         # The model level is the reference: always the plain in-memory store.
         store = self.store_factory() if self.store_factory and level != "model" else None
-        s = cls(self.d, self.clock, store, build=self.build_server) if level == "mcp" else cls(self.d, self.clock, store)
+        d = self.d if level == "model" else self.implementation
+        s = cls(d, self.clock, store, build=self.build_server) if level == "mcp" else cls(d, self.clock, store)
         for obj, data in self.world.fixtures:
             s.seed(obj, copy.deepcopy(data))
         return s
@@ -264,6 +270,13 @@ class Harness:
         return None
 
     # -- everything --------------------------------------------------------------------------
+    def unreachable_from_creation(self) -> dict[str, list[str]]:
+        """States no declared move reaches from creation (ADR-0035), computed once per harness."""
+        if getattr(self, "_unreachable", None) is None:
+            from .mechanical import unreachable_from_creation
+            self._unreachable = unreachable_from_creation(self.d)
+        return self._unreachable
+
     def mechanical(self, samples: int = 3, actions: set[str] | None = None) -> Any:
         """The mechanical layer (ADR-0035): every cell on objects generated from the types, at
         every level, with no examples needed."""
@@ -271,7 +284,7 @@ class Harness:
         surfaces = {lv: self.surface(lv) for lv in self.levels}
         try:
             m = run_mechanical(self.d, surfaces, self.clock, samples=samples, actions=actions,
-                               actors=self.world.actors)
+                               actors=self.world.actors, unreachable=self.unreachable_from_creation())
         finally:
             for s in surfaces.values():
                 s.close()
@@ -314,7 +327,7 @@ class Harness:
                 failed_cases |= set(f.case.split(" || "))
         out: dict[str, str] = {}
         for c in cases:
-            if c.kind not in ("cell", "create"):
+            if c.kind not in ("cell", "param", "create"):
                 continue
             e = _edge_of(c)
             if c.id in failed_cases:
@@ -351,7 +364,7 @@ class Harness:
 
 
 def _edge_of(c: Case) -> str:
-    return f"{c.obj}.{c.state}.{c.action}" if c.kind == "cell" else f"{c.obj}.(new).{c.action}"
+    return f"{c.obj}.{c.state}.{c.action}" if c.kind in ("cell", "param") else f"{c.obj}.(new).{c.action}"
 
 
 def run_harness(d: Domain, **kw: Any) -> Report:

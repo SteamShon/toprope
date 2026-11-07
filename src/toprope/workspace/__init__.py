@@ -5,9 +5,8 @@ Rules it enforces:
 - every drafted element cites a real source chunk (`source.ref`), so no rule is unsupported
 - agents write only `proposed`: `propose` and `answer` never set `confirmed`
 - only a person confirms: `confirm` is called with the channel the confirmation came
-  through (the CLI on the owner's terminal, an MCP elicitation shown to the user, or a
-  declared action the kernel checked was taken by that person), and each confirmation is
-  logged with that channel and who
+  through (`terminal`: the owner's own terminal; `kernel`: a declared action the kernel
+  checked was taken by that person), and each confirmation is logged with that channel and who
 - local-only sources are listed but their content is never served
 - the interview log records every question, answer quote and decision; the usage log
   records which source chunks were served (the drafter records which sources it used)
@@ -37,6 +36,7 @@ from ..sources import (
     SourceSpec,
     fetch,
     read,
+    stale,
 )
 
 CONFIG = "toprope.workspace.yaml"
@@ -61,6 +61,9 @@ class Question:
                 "priority": self.priority}
 
 
+
+CHANNELS = ("terminal", "kernel")      # how a person confirms or approves (the MCP elicitation is gone)
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -74,7 +77,7 @@ def element_path(path: str) -> list[str]:
 
 def is_element(segs: list[str]) -> bool:
     """Paths whose value carries `source` and `status` (Provenance in decl/models.py)."""
-    return ((len(segs) == 2 and segs[0] in ("objects", "links", "actions", "invariants", "handoffs"))
+    return ((len(segs) == 2 and segs[0] in ("objects", "links", "actions", "invariants", "handoffs", "scenarios"))
             or (len(segs) == 4 and segs[0] == "actions" and segs[2] == "preconditions")
             or (len(segs) == 5 and segs[0] == "transitions" and segs[2] == "matrix"))
 
@@ -123,6 +126,18 @@ def _set(doc: dict, segs: list[str], value: Any) -> None:
         cur.pop(last, None)
     else:
         cur[last] = value
+
+
+def _demote_enclosing(doc: dict, segs: list[str], source: dict[str, Any]) -> None:
+    """A change inside an element (`actions.verify.effects`) changes the element: it is proposed
+    again, citing the change's source, so a person confirms it. Otherwise an agent could rewrite
+    a confirmed element's parts while it still reads `confirmed`."""
+    for k in range(len(segs) - 1, 1, -1):
+        if is_element(segs[:k]):
+            el = _get(doc, segs[:k])
+            if isinstance(el, dict):
+                el["status"], el["source"] = "proposed", source
+            return
 
 
 def _no_provenance_path(segs: list[str]) -> None:
@@ -180,6 +195,10 @@ class Workspace:
         if spec.kind == "interview-log" or source_id not in self._chunks:
             self._chunks[source_id] = read(spec, self.root, self.extra, self.exclude)
         return self._chunks[source_id]
+
+    def stale_sources(self) -> list[str]:
+        """Sources that no longer point at a file (a removed path, a glob matching nothing)."""
+        return [m for s in self.sources.values() for m in stale(s, self.root, self.exclude)]
 
     def list_sources(self) -> list[dict[str, Any]]:
         out = []
@@ -260,15 +279,28 @@ class Workspace:
         return load_yaml(self.domain_path.read_text()) or {}
 
     def _write(self, doc: dict[str, Any]) -> list[dict[str, Any]]:
-        """Write the draft only if it parses as a declaration; return the validation issues."""
+        """Write the draft only if it parses as a declaration; return the validation issues.
+        Once the domain has a commit, its working copy is what the generated tools run, and they
+        refuse a declaration with errors. So a change that adds an error is refused there, and
+        nothing is written: propose what it refers to first (#124)."""
         try:
             d = Domain.model_validate(doc)
         except ValidationError as e:
             raise AuthoringError(f"the draft would not parse: {e.errors()[0]['loc']}: {e.errors()[0]['msg']}") from None
+        issues = validate_domain(d)
+        if self.domain_path.exists() and self.commits.log(d.domain):
+            before = {(i.code, i.where) for i in validate_domain(Domain.model_validate(self.draft()))
+                      if i.severity == "error"}
+            new = [i for i in issues if i.severity == "error" and (i.code, i.where) not in before]
+            if new:
+                raise AuthoringError(
+                    f"{d.domain} is committed, and its tools refuse a declaration with errors; this change "
+                    "would add " + "; ".join(f"{i.code} at {i.where}: {i.message}" for i in new) +
+                    ". Propose what it refers to first.")
         self.domain_path.parent.mkdir(parents=True, exist_ok=True)
         self.domain_path.write_text(yaml.safe_dump(doc, sort_keys=False, allow_unicode=True))
         return [{"code": i.code, "where": i.where, "message": i.message, "severity": i.severity}
-                for i in validate_domain(d)]
+                for i in issues]
 
     def _with_provenance(self, segs: list[str], value: Any, source: dict[str, Any]) -> Any:
         if segs[0] != "glossary":
@@ -289,8 +321,15 @@ class Workspace:
         src = self.source_of(source_ref, quote)
         doc = self.draft()
         _set(doc, segs, self._with_provenance(segs, value, src))
+        _demote_enclosing(doc, segs, src)
         issues = self._write(doc)
-        return {"path": path, "status": "proposed", "issues": issues}
+        marked = is_element(segs) or any(is_element(segs[:k]) for k in range(2, len(segs)))
+        if not marked:
+            # Fixtures and the glossary carry no provenance: the change is logged, so the person
+            # sees it with what is to confirm, and it shows in the commit's review diff.
+            self._append(self.log_path, {"at": _now(), "kind": "unmarked-proposal", "path": path,
+                                         "source": src.get("ref")})
+        return {"path": path, "status": "proposed", "marked": marked, "issues": issues}
 
     def answer(self, question_id: str, answer: str, decisions: list[dict[str, Any]],
                question: str | None = None) -> dict[str, Any]:
@@ -309,6 +348,7 @@ class Workspace:
             _no_provenance_path(segs)
             src = {"kind": "interview", "ref": ref, "quote": answer}
             _set(doc, segs, self._with_provenance(segs, dec.get("value"), src))
+            _demote_enclosing(doc, segs, src)
         issues = self._write(doc) if decisions else []
         stage = question_id.split(":")[1] if question_id.startswith("bundle:") else self._current_stage()
         self._append(self.log_path, {"at": _now(), "kind": "answer", "stage": stage, "question_id": question_id,
@@ -322,11 +362,24 @@ class Workspace:
                      and (s.path == rel or rel.startswith(s.path.rstrip("/") + "/"))), "interview")
 
     def identity(self) -> str | None:
-        """Who is at this terminal: the repository's git identity (`user.name <user.email>`), else
-        the login name. Recorded with confirmations and approvals made on the CLI, so the log says
-        who decided without anyone typing it."""
+        """Who is at this terminal, named as the git identity adapter names them: `name <email>`
+        from the identity file when it lists this repository's git email, else git's
+        `user.name <user.email>`, else the login name. Recorded with confirmations and approvals
+        made at the terminal, so the log says who decided without anyone typing it."""
         import getpass
         import subprocess
+
+        from ..identity.git import FILE, git_email, load_table
+        table = self.root / FILE
+        email = git_email(self.root)
+        if email and table.exists():
+            try:
+                listed = load_table(table).get(email)
+            except ValueError:
+                listed = None
+            if listed is not None:
+                return listed.actor.id
+
         def git(key: str) -> str:
             try:
                 out = subprocess.run(["git", "-C", str(self.root), "config", key], capture_output=True,
@@ -343,14 +396,15 @@ class Workspace:
             return None
 
     def confirm(self, paths: list[str], via: str, who: str | None = None) -> dict[str, Any]:
-        """Mark elements confirmed. Call only with a human channel (`cli`, `elicitation`). On the
-        CLI, `who` defaults to the terminal's git identity."""
-        if via not in ("cli", "elicitation", "kernel"):
-            raise AuthoringError("only a person confirms, through the CLI, an MCP elicitation, or a declared "
-                                 "action the kernel checked was taken by that person")
+        """Mark elements confirmed. Only a person confirms: through a declared action the kernel
+        checked was taken by that person (`kernel`, naming them), or at their own terminal
+        (`terminal`, where `who` defaults to the terminal's identity)."""
+        if via not in CHANNELS:
+            raise AuthoringError("only a person confirms: at their own terminal, or through a declared action the "
+                                 "kernel checked was taken by that person")
         if via == "kernel" and not who:
             raise AuthoringError("a confirmation through the kernel names the person who took it")
-        if who is None and via == "cli":
+        if who is None and via == "terminal":
             who = self.identity()
         doc = self.draft()
         for p in paths:
@@ -359,6 +413,9 @@ class Workspace:
             if not is_element(segs) or not isinstance(el, dict) or "source" not in el:
                 raise AuthoringError(f"{p} is not a drafted element with a source")
             el["status"] = "confirmed"
+            for part in (el.get("by_role") or {}).values():   # a cell's per-role parts are one element
+                if isinstance(part, dict) and part.get("status") == "proposed":
+                    part["status"] = "confirmed"
         issues = self._write(doc)
         self._append(self.log_path, {"at": _now(), "kind": "confirm", "paths": paths, "via": via, "who": who})
         return {"confirmed": paths, "issues": issues}
@@ -494,27 +551,8 @@ class Workspace:
         return attempts * 100 + risk * 10 + len(cells)
 
     def _proposed(self, doc: dict[str, Any]) -> list[str]:
-        out = []
-        for kind in ("objects", "links", "actions"):
-            for name, el in (doc.get(kind) or {}).items():
-                if isinstance(el, dict) and el.get("status") == "proposed":
-                    out.append(f"{kind}.{name}")
-                if kind == "actions" and isinstance(el, dict):
-                    for p in el.get("preconditions") or []:
-                        if isinstance(p, dict) and p.get("status") == "proposed":
-                            out.append(f"actions.{name}.preconditions.{p.get('id')}")
-        for name, h in (doc.get("handoffs") or {}).items():
-            if isinstance(h, dict) and h.get("status") == "proposed":
-                out.append(f"handoffs.{name}")
-        for inv in doc.get("invariants") or []:
-            if isinstance(inv, dict) and inv.get("status") == "proposed":
-                out.append(f"invariants.{inv.get('id')}")
-        for obj, tr in (doc.get("transitions") or {}).items():
-            for state, cells in ((tr or {}).get("matrix") or {}).items():
-                for name, c in (cells or {}).items():
-                    if isinstance(c, dict) and c.get("status") == "proposed":
-                        out.append(f"transitions.{obj}.matrix.{state}.{name}")
-        return out
+        from ..decl.provenance import proposed_elements
+        return proposed_elements(doc)
 
     def _stop(self, d: Domain, attempts: dict[str, int]) -> dict[str, Any]:
         """ADR-0014 §4: stop when no attempted (or effectful) cell is undecided, or the budget
@@ -656,8 +694,8 @@ class Workspace:
         """Approve a commit: merge it into `main` and tag the result (ADR-0033). Only a person,
         through a human channel (as `confirm`). Conflicts are an error that lists them; bring
         `main` into the branch with `merge_main`, resolve, commit, and approve again."""
-        if via not in ("cli", "elicitation"):
-            raise AuthoringError("only a person approves, through the CLI or an MCP elicitation")
+        if via not in CHANNELS:
+            raise AuthoringError("only a person approves: at their own terminal, or through a declared action")
         d = self.draft().get("domain")
         if not isinstance(d, str) or not d:
             raise AuthoringError("the draft names no `domain`, so there is no commit log to approve in")

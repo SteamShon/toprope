@@ -177,6 +177,40 @@ def test_without_services_calls_stay_pending_and_only_the_kernel_can_reply():
         Caller(Actor("external:kernel", "system", ("external:kernel",)))
 
 
+def test_a_reply_after_the_object_moved_on_is_recorded_not_applied():
+    """TLC found late replies breaking invariants (#139); #140 guarded the self domains by hand.
+    The kernel now refuses any reply whose target left the state it was called in."""
+    def moves_on(r):
+        r["actions"]["approve_version"].pop("preconditions")
+        r["transitions"]["DomainVersion"]["matrix"]["approved"].update(
+            record_validation="approved", record_harness="approved")    # the declaration would take it
+    e = ex(mutate=moves_on)
+    assert e.submit("t", "check_version", "V1", idempotency_key="k1").ok    # called while draft
+    assert e.submit("t", "approve_version", "V1", idempotency_key="k2").state["status"] == "approved"
+    kernel = RecordingKernel({"validate": {"ok": True, "errors": 3}, "run_harness": {"ok": False, "findings": 2}})
+    Outbox(e).dispatch(services=kernel)
+    assert len(kernel.calls) == 2                                           # the calls still ran
+    st = e.state("V1")
+    assert st.get("harness_ok") is None and st.get("conflicts") is None     # nothing applied
+    res = resolution(e, "V1", "run_harness")
+    assert res.payload["status"] == "denied" and res.payload["code"] == "late-reply"
+    assert "was draft when the kernel was called; approve_version moved it to approved" in res.payload["reason"]
+    assert res.payload["result"]["findings"] == 2                           # the result is on record
+
+
+def test_a_reply_that_moves_the_object_does_not_make_its_sibling_late():
+    def first_reply_moves(r):
+        m = r["transitions"]["DomainVersion"]["matrix"]
+        m["draft"]["record_validation"] = "approved"
+        m["approved"]["record_harness"] = "approved"
+    kernel = RecordingKernel({"validate": {"ok": True, "errors": 0}, "run_harness": {"ok": True, "findings": 0}})
+    e = ex(kernel, mutate=first_reply_moves)
+    e.submit("t", "check_version", "V1", idempotency_key="k1")
+    st = e.state("V1")
+    assert st["status"] == "approved" and st["harness_ok"] is True        # both results applied
+    assert resolution(e, "V1", "run_harness").payload["status"] == "ok"
+
+
 def test_the_harness_covers_kernel_replies_and_scenarios_state_results():
     from toprope.harness import run_harness
     r = run_harness(dom(), explore_examples=20, races=False)
@@ -310,3 +344,70 @@ def test_the_schema_lists_every_kernel_service():
                 yield from calls(v)
     (enum,) = list(calls(schema))
     assert set(enum) == set(CATALOG)
+
+
+def test_an_optional_service_input_may_be_left_out_or_null(monkeypatch):
+    from toprope.decl import Domain, validate_domain
+    from toprope.kernel import Service
+    # No catalog service has an optional input since commit's free-string evidence went (ADR-0041);
+    # the mechanism stays, so this test declares one.
+    commit = CATALOG["commit"]
+    monkeypatch.setitem(CATALOG, "commit", Service(commit.name, commit.description,
+                                                   {**commit.inputs, "evidence": "strings"}, commit.result,
+                                                   optional=frozenset({"evidence"})))
+    raw = {"domain": "d", "version": 1, "roles": ["owner"],
+           "objects": {"Draft": {"properties": {"declaration": {"type": "string"}, "status": {"enum": ["open"]}}}},
+           "actions": {
+               "commit_draft": {"description": "x", "actor": ["owner"], "target": "Draft",
+                                "params": {"evidence": {"type": "string", "many": True, "optional": True}},
+                                "effects": [{"call": "commit", "with": {"declaration": "target.declaration"},
+                                             "reply": "done"}]},
+               "done": {"description": "x", "actor": ["external:kernel"], "target": "Draft"}},
+           "transitions": {"Draft": {"field": "status", "matrix": {"open": {"commit_draft": "open", "done": "open"}}}}}
+    assert not [i for i in validate_domain(Domain.model_validate(raw)) if i.code == "missing-input"]
+    raw["actions"]["commit_draft"]["effects"][0]["with"]["evidence"] = "params.evidence"
+    assert not [i for i in validate_domain(Domain.model_validate(raw)) if i.code in ("missing-input", "unknown-input")]
+    from toprope.semantics import Actor, Command, Interpreter
+    it = Interpreter(Domain.model_validate(raw))
+    owner = Actor("ana", "person", ("owner",))
+    state = {"id": "D", "declaration": "d.domain.yaml", "status": "open"}
+    for params, want in (({"evidence": ["records:docs/x.md#L1-L2", "event:E-1#4"]}, ["records:docs/x.md#L1-L2", "event:E-1#4"]),
+                         ({}, None)):                    # a list of strings, or left out (null)
+        dec = it.decide(Command(owner, "commit_draft", "D", params), state, lambda *_: None)
+        req = next(e for e in dec.events if e.type == "EffectRequested")
+        assert req.payload["error"] is None and req.payload["inputs"]["evidence"] == want
+
+
+def test_then_follows_what_a_created_object_sets_off():
+    """#86: `then` read only the target's stream, so a call set off on another stream (by an
+    object a reply created) was not shown. It follows the reply's causation now."""
+    from toprope.adapters.cli import followed
+    raw = {
+        "domain": "authoring", "version": 1, "roles": ["owner"],
+        "objects": {"Draft": {"properties": {"declaration": {"type": "string"}}},
+                    "Version": {"properties": {"content": {"type": "string"},
+                                               "errors": {"type": "integer", "optional": True}}}},
+        "actions": {
+            "commit_draft": {"description": "Commit.", "actor": ["owner"], "target": "Draft", "effects": [
+                {"call": "commit", "with": {"declaration": "target.declaration"}, "reply": "record_version"}]},
+            "record_version": {"description": "Record it.", "actor": ["external:kernel"], "creates": "Version",
+                               "params": {"content": {"type": "string"}}, "effects": [
+                                   {"call": "validate", "with": {"declaration": "target.content"},
+                                    "reply": "record_validation"}]},
+            "record_validation": {"description": "Record errors.", "actor": ["external:kernel"],
+                                  "target": "Version", "params": {"errors": {"type": "integer"}},
+                                  "effects": [{"set": {"target.errors": "params.errors"}}]}},
+        "world": {"fixtures": [{"Draft": {"id": "D1", "declaration": "x.yaml"}}], "actors": {"owner": ["owen"]}},
+    }
+    d = Domain.model_validate(raw)
+    assert [i for i in validate_domain(d) if i.severity == "error"] == []
+    kernel = RecordingKernel({"commit": {"ok": True, "id": "1-ab", "content": "ab"},
+                              "validate": {"ok": True, "errors": 0}})
+    e = Execution(d, MemoryEventStore(), StaticIdentity({"t": Caller(OWEN)}), clock=lambda: NOW, services=kernel)
+    e.seed_world()
+    before = e.store.version("D1")
+    assert e.submit("t", "commit_draft", "D1", idempotency_key="k").ok
+    then = followed(e, d, "D1", before)
+    assert [(t["kernel"], t["status"], t.get("object")) for t in then] == [
+        ("commit", "ok", "1-ab"), ("validate", "ok", "1-ab")]          # the second is on Version 1-ab
+    assert e.state("1-ab")["errors"] == 0

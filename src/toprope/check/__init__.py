@@ -45,7 +45,7 @@ from ..semantics.types import Actor, Command, Event, Grant
 from ..store import EventStore, MemoryEventStore
 
 EPOCH = datetime.min.replace(tzinfo=timezone.utc)   # for events without a time
-CHECKS = ("structural", "semantic", "scenarios", "harness", "log_replay", "in_flight", "nl")
+CHECKS = ("structural", "semantic", "scenarios", "harness", "tla", "log_replay", "in_flight", "nl")
 
 
 @dataclass(frozen=True)
@@ -125,8 +125,11 @@ class NLChecker(Protocol):
 # -- the pipeline -------------------------------------------------------------------------------
 def change_check(new: Domain, old: Domain | None = None, *, events: EventStore | None = None,
                  nl: NLChecker | None = None, examples: int = 50, cache: Any = None, full: bool = False,
-                 roles_of: Callable[[dict[str, Any], str], tuple[str, ...]] | None = None) -> ChangeReport:
-    """Run every check of `new` against `old` (None: the first version). `events` is the
+                 roles_of: Callable[[dict[str, Any], str], tuple[str, ...]] | None = None,
+                 tlc: Any = None) -> ChangeReport:
+    """Run every check of `new` against `old` (None: the first version). `tlc` is the path of
+    a TLC jar: with it, TLC model-checks the model level too, which finds breaks that take
+    several steps (ADR-0043). `events` is the
     deployed environment's event store, for log replay and the in-flight check. `roles_of`
     resolves a past actor's roles (the Identity port); without it, an actor is assumed to have
     had every role the current version allowed for that action. `cache` (a ResultCache)
@@ -160,6 +163,12 @@ def change_check(new: Domain, old: Domain | None = None, *, events: EventStore |
     else:
         for name in ("semantic", "scenarios", "harness"):
             checks[name] = CheckResult(name, ran=False, note="the declaration has structural errors")
+    if tlc is None:
+        checks["tla"] = CheckResult("tla", ran=False, note="no TLC jar configured")
+    elif not structurally_ok:
+        checks["tla"] = CheckResult("tla", ran=False, note="the declaration has structural errors")
+    else:
+        checks["tla"] = _tla(new, tlc)
     if events is None:
         for name in ("log_replay", "in_flight"):
             checks[name] = CheckResult(name, ran=False, note="no event store (nothing deployed)")
@@ -180,7 +189,8 @@ def change_check(new: Domain, old: Domain | None = None, *, events: EventStore |
 def check_commit(commits: Any, domain: str, commit_id: str, base: str | None = "merge-base", *,
                  events: EventStore | None = None, nl: NLChecker | None = None, examples: int = 50,
                  cache: Any = None, full: bool = False,
-                 roles_of: Callable[[dict[str, Any], str], tuple[str, ...]] | None = None) -> ChangeReport:
+                 roles_of: Callable[[dict[str, Any], str], tuple[str, ...]] | None = None,
+                 tlc: Any = None) -> ChangeReport:
     """Run the change check on a commit of a commit store, and record the result on the commit
     (ADR-0032): one record per check, `ok: null` for one that did not run, plus `change-check`
     for the whole, appended together with one run id. The base is
@@ -192,12 +202,33 @@ def check_commit(commits: Any, domain: str, commit_id: str, base: str | None = "
         base = commits.review_base(domain, c.id)
     old = commits.domain(domain, base) if base else None
     report = change_check(commits.domain(domain, c.id), old, events=events, nl=nl, examples=examples,
-                          cache=cache, full=full, roles_of=roles_of)
+                          cache=cache, full=full, roles_of=roles_of, tlc=tlc)
     report.diff["from"], report.diff["to"] = base, c.id
     rows = [(name, res.ok if res.ran else None, res.summary()) for name, res in report.checks.items()]
     rows.append(("change-check", report.ok, report.summary()))
+    from ..decl.provenance import proposed_elements
+    left = proposed_elements(commits.declaration(domain, c.id))
+    rows.append(("confirmed", not left, f"{len(left)} proposed element(s)"
+                 + (": " + ", ".join(left[:5]) if left else "")))   # approval needs none (ADR-0041)
     commits.record_checks(domain, c.id, rows, base)        # one run, one append: skipped checks too
     return report
+
+
+def _tla(new: Domain, jar: Any) -> CheckResult:
+    """TLC on the model level, its violation replayed on the interpreter (ADR-0043). A break
+    the harness already reports passes here: the harness check fails on it."""
+    import tempfile
+    from pathlib import Path
+
+    from ..tla.tlc import PASSING, model_check
+    res = CheckResult("tla")
+    with tempfile.TemporaryDirectory() as out:
+        r = model_check(new, Path(jar), Path(out), new.domain)
+    res.note = (f"{r['judged']}; {r['distinct_states']} distinct states; "
+                f"{len(r['left_out'])} action(s) left out of the model")
+    if r["judged"] not in PASSING:
+        res.add("error", r["module"], r["judged"] + (f": broken {', '.join(r['broken'])}" if r["broken"] else ""))
+    return res
 
 
 def _diff(new: Domain, old: Domain | None) -> dict[str, Any]:
@@ -264,8 +295,7 @@ def _model_checks(tested: Domain, carried: list[Any], baseline: Domain | None, e
         newly = baseline is not None and a in baseline.actions and a not in dead_old
         semantic.add("error" if newly else "warning", f"action:{a}",
                      "no matrix cell allows it any more" if newly else "no matrix cell allows it")
-    from ..harness.mechanical import unreachable_from_creation
-    for obj, states in unreachable_from_creation(tested).items():    # ADR-0035: mechanical, apart
+    for obj, states in h.unreachable_from_creation().items():          # ADR-0035: mechanical, apart
         for st in states:
             semantic.add("warning", f"state:{obj}.{st}", "no declared move reaches it from creation")
     for c in run.undecided:                                # missing cells count as undecided
@@ -307,7 +337,16 @@ def _domain_streams(events: EventStore) -> list[tuple[str, list[Event]]]:
 
 
 def in_flight(new: Domain, events: EventStore) -> CheckResult:
-    """Objects whose type, or current state, the new declaration lacks (stranded)."""
+    """Objects whose type, or current state, the new declaration lacks (stranded), and objects
+    as they are now that break the new declaration's invariants (`in_use`)."""
+    res = stranded(new, events)
+    lost = {p.where for p in res.problems}
+    res.problems += [p for p in in_use(new, events).problems if p.where not in lost]
+    return res
+
+
+def stranded(new: Domain, events: EventStore) -> CheckResult:
+    """Objects whose type, or current state, the new declaration lacks: the deploy floor's rule."""
     res = CheckResult("in_flight")
     n = 0
     for stream, evs in _domain_streams(events):
@@ -326,16 +365,42 @@ def in_flight(new: Domain, events: EventStore) -> CheckResult:
     return res
 
 
+def in_use(d: Domain, events: EventStore) -> CheckResult:
+    """Every object in a deployed store, as it is now, against every invariant of `d`. The
+    harness checks the moves a declaration allows; this checks the state real use left. A break
+    on a finished object (its state allows no action) is a warning, as in log replay: a new
+    rule does not rewrite finished history. On an object in flight it is an error."""
+    from ..semantics.interpreter import Interpreter
+    res = CheckResult("in_use")
+    states = {s: (evs[0].aggregate, project(evs) or {}) for s, evs in _domain_streams(events)}
+    interp = Interpreter(d, lambda: EPOCH)
+    for stream, (obj, st) in states.items():
+        if obj not in d.objects:
+            res.add("error", stream, f"{obj} is not in the deployed declaration")
+            continue
+        done = _finished(d, obj, st)
+        for inv in interp.violated_invariants(obj, st, states.get):
+            res.add("warning" if done else "error", stream,
+                    f"breaks {inv.id}: {inv.reason}" + (" The object is finished." if done else ""))
+    res.note = f"{len(states)} object(s) checked"
+    return res
+
+
 def log_replay(new: Domain, old: Domain | None, events: EventStore,
                roles_of: Callable[[dict[str, Any], str], tuple[str, ...]] | None = None,
                only: set[str] | None = None) -> CheckResult:
     """Re-decide every past action with the new model, in order, at its original time. The
     replayed store takes the recorded events, not the new ones, so one blocked action does
     not cascade into the rest of history. `only` limits the re-decided actions to the affected
-    ones (ADR-0013); the others still advance the replayed state."""
+    ones (ADR-0013); the others still advance the replayed state. A past action the base model
+    blocks too is not this change's doing: it is counted, not reported, so a change approved
+    once does not fail every later check. A past action newly blocked on an object that is
+    finished now (no action allowed from its state) is a warning: a deliberately stricter rule
+    does not rewrite finished history, and nothing in flight depends on it."""
     res = CheckResult("log_replay")
     clock_at: list[datetime] = [EPOCH]
     interp = Interpreter(new, lambda: clock_at[0])
+    before = Interpreter(old, lambda: clock_at[0]) if old is not None else None
     replay = MemoryEventStore()
 
     def lookup(oid: str):
@@ -346,7 +411,10 @@ def log_replay(new: Domain, old: Domain | None, events: EventStore,
     # By time; ties keep each stream's own order (the sort is stable). Across streams with equal
     # times the true order is unknown: a coarse clock can misorder cross-object lookups.
     history.sort(key=lambda e: e.at or EPOCH)
-    replayed = blocked = 0
+    # Where each object is now: a block on an object that is finished (no move left from its
+    # state) changes nothing in flight, so a deliberately stricter rule is not an error there.
+    now_at = {s: (evs[0].aggregate, project(evs) or {}) for s, evs in _domain_streams(events)}
+    replayed = blocked = already = finished = 0
     for ev in history:
         action = (ev.payload or {}).get("action")
         if action is not None and ev.actor is not None and (only is None or action in only):
@@ -357,11 +425,18 @@ def log_replay(new: Domain, old: Domain | None, events: EventStore,
             state = None if found is None else found[1]
             dec = interp.decide(cmd, state, lookup)
             when = ev.at.isoformat() if ev.at else "?"
-            if not dec.outcome.ok:
-                blocked += 1
-                res.add("error", f"{ev.stream}@{ev.version}",
-                        f"{action} by {ev.actor.get('id')} at {when} would now be "
+            if not dec.outcome.ok and before is not None and not before.decide(cmd, state, lookup).outcome.ok:
+                already += 1
+            elif not dec.outcome.ok:
+                what = (f"{action} by {ev.actor.get('id')} at {when} would now be "
                         f"{dec.outcome.status} ({dec.outcome.code}): {dec.outcome.reason}")
+                if _finished(new, *now_at.get(ev.stream, (None, {}))):
+                    finished += 1
+                    res.add("warning", f"{ev.stream}@{ev.version}",
+                            what + " The object is finished, so nothing in flight depends on it.")
+                else:
+                    blocked += 1
+                    res.add("error", f"{ev.stream}@{ev.version}", what)
             else:
                 was = (ev.payload or {}).get("changes") or {}
                 now = next((e.payload.get("changes") for e in dec.events if e.kind == "domain"), {}) or {}
@@ -371,8 +446,19 @@ def log_replay(new: Domain, old: Domain | None, events: EventStore,
                     res.add("warning", f"{ev.stream}@{ev.version}", f"{action} at {when} would now set {differ} differently")
         replay.append(ev.stream, replay.version(ev.stream), [_copy(ev)])
     total = sum(1 for ev in history if (ev.payload or {}).get("action") is not None and ev.actor is not None)
-    res.note = f"{replayed} of {total} past action(s) re-decided; {blocked} would be blocked"
+    res.note = f"{replayed} of {total} past action(s) re-decided; {blocked} would be blocked" + (
+        f"; {finished} on finished objects (warnings)" if finished else "") + (
+        f"; {already} blocked by the base too" if already else "")
     return res
+
+
+def _finished(d: Domain, obj: str | None, state: dict[str, Any]) -> bool:
+    """An object of a type with a matrix whose current state allows no action: it is done."""
+    tr = d.transitions.get(obj) if obj else None
+    if tr is None:
+        return False
+    row = tr.matrix.get(state.get(tr.field)) or {}
+    return not any(_allows(c) for c in row.values())
 
 
 def _is_time(v: Any) -> bool:

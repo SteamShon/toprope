@@ -35,7 +35,14 @@ approve, deploy) can be done without your terminal: the agent commits a *human r
 `.toprope/requests/<id>.yaml`, listing the steps; the `human-request` workflow shows them on
 its run page and waits; you press **Approve and deploy** (web or the GitHub mobile app); the
 steps then run as you, the person `toprope.identity.yaml` lists with your `github:` login,
-and the result is pushed to the branch with the approver and the run in the commit. The
+and the result is pushed to the branch with the approver and the run in the commit. A request
+that approves a commit runs `check_commit` on it first: the workflow installs TLC, so that check
+model-checks the commit, and the kernel approves only a commit TLC passed (ADR-0044). One
+change takes one request: `python tools/human_request.py change .toprope/requests/<id>.yaml
+--draft <draft>` writes confirm, commit, check and approve, where the last two name `$commit`,
+the commit the request's own commit step makes. So nobody predicts the commit's id. The run
+is also appended to `.toprope/approval-runs.jsonl`, so a commit can cite it as evidence
+(`cite_evidence --kind approval-run`) after any merge. The
 format is in `tools/human_request.py`. One-time setup (maintainer): Repository settings →
 Environments → `researcher` → Required reviewers: you ("Prevent self-review" off); Actions →
 Workflow permissions: read and write.
@@ -59,7 +66,8 @@ $R --member authoring approve_commit <id>               # you, on your terminal
 $R --member authoring deliver <id> --environment local  # hands off to Delivery
 $R --member delivery preview authoring:<id>:local
 $R --member delivery deploy authoring:<id>:local        # you, on your terminal
-$R --member delivery verify authoring:<id>:local --verified true
+$R --member delivery run_probes authoring:<id>:local    # the deployed commit, checked in use
+$R --member delivery verify authoring:<id>:local        # you, once its probes passed
 ```
 
 - **Commit what changed.** Each domain's events go to its own append-only log,

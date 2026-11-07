@@ -8,6 +8,7 @@ __pycache__/
 .toprope/*
 !.toprope/commits/
 !.toprope/requests/
+!.toprope/approval-runs.jsonl
 .toprope/commits/**/.lock
 .toprope/commits/**/.obj-*
 .toprope/commits/**/.refs-*

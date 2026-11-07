@@ -2,6 +2,7 @@
 import copy
 import json
 import subprocess
+from pathlib import Path
 
 import pytest
 import yaml
@@ -27,7 +28,17 @@ def problems(report, check, severity=None):
 
 @pytest.fixture
 def base():
-    return schema_doc_domain()
+    return in_flight_example()
+
+
+def in_flight_example():
+    """The schema example, with a way to end a running experiment: so the history below leaves
+    E-onboarding in flight, not finished (log replay treats the two differently)."""
+    raw = schema_doc_domain()
+    raw["actions"]["end_experiment"] = {"description": "End it.", "actor": ["eng"], "target": "Experiment"}
+    for state, row in raw["transitions"]["Experiment"]["matrix"].items():
+        row["end_experiment"] = "ended" if state == "running" else "n/a"
+    return raw
 
 
 def history(raw):
@@ -42,7 +53,7 @@ def history(raw):
 def test_an_unchanged_declaration_passes_every_check_that_runs(base):
     r = change_check(dom(base), dom(copy.deepcopy(base)), events=history(base), examples=10)
     assert r.ok and r.diff["to_review"] == [] and r.diff["interface_bump"] == "none"
-    assert [n for n, c in r.checks.items() if not c.ran] == ["nl"]
+    assert [n for n, c in r.checks.items() if not c.ran] == ["tla", "nl"]     # no TLC jar here
     assert r.checks["log_replay"].note == "0 of 2 past action(s) re-decided; 0 would be blocked"   # nothing affected
     assert problems(r, "log_replay") == []                         # recorded timestamps are not differences
 
@@ -52,7 +63,7 @@ def test_structural_errors_stop_the_checks_that_need_a_valid_model(base):
     raw["transitions"]["Experiment"]["matrix"]["draft"]["approve_experiment"] = "aproved"
     r = change_check(dom(raw), dom(base), events=history(base), examples=10)
     assert not r.ok and ("error", "transitions.Experiment.matrix.draft.approve_experiment") in problems(r, "structural")
-    assert [n for n, c in r.checks.items() if not c.ran] == ["semantic", "scenarios", "harness", "log_replay", "nl"]
+    assert [n for n, c in r.checks.items() if not c.ran] == ["semantic", "scenarios", "harness", "tla", "log_replay", "nl"]
 
 
 def test_semantic_conflicts_newly_unreachable_states_and_dead_actions(base):
@@ -99,6 +110,67 @@ def test_log_replay_reports_past_actions_the_change_would_block(base):
         {"id": "long-enough", "check": "target.planned_days >= 30", "reason": "Run at least a month."})
     r2 = change_check(dom(raw2), dom(base), events=st, examples=10)
     assert [p.where for p in r2.checks["log_replay"].problems if p.severity == "error"] == ["E-onboarding@2"]
+
+
+def test_log_replay_reports_only_what_this_change_newly_blocks(base):
+    """A past action the base model already blocks (an earlier change removed what it used) is
+    not this change's doing: it is counted, so one approved change does not fail every check."""
+    st = history(base)
+    old = copy.deepcopy(base)                                            # already approved: the past fails it
+    old["actions"]["approve_experiment"]["preconditions"].append(
+        {"id": "long-enough", "check": "target.planned_days >= 30", "reason": "Run at least a month."})
+    new = copy.deepcopy(old)
+    new["actions"]["approve_experiment"]["preconditions"].append(
+        {"id": "always", "check": "true", "reason": "Touches approve, so it is re-decided."})
+    new["actions"]["launch_experiment"]["actor"] = ["approver"]          # newly blocks eli's launch
+    r = change_check(dom(new), dom(old), events=st, examples=10)
+    assert [p.message.split(" by ")[0] for p in r.checks["log_replay"].problems
+            if p.severity == "error"] == ["launch_experiment"]
+    assert r.checks["log_replay"].note.endswith("; 1 would be blocked; 1 blocked by the base too")
+
+
+def test_the_kernel_replays_a_domain_s_own_log_with_nothing_deployed(tmp_path, base):
+    from toprope.kernel.services import LocalKernel
+    st = CommitStore(tmp_path / ".toprope" / "commits")
+    c0, _ = st.commit(write(tmp_path / "d.yaml", base))
+    st.approve("example", c0.id, "ana")
+    raw = copy.deepcopy(base)
+    raw["actions"]["launch_experiment"]["actor"] = ["approver"]
+    c1, _ = st.commit(write(tmp_path / "d.yaml", raw))
+    k = LocalKernel(tmp_path, commits=st, harness_examples=10)             # no environment
+    k.domain_events["example"] = history(base)
+    out = k.call("change_check", {"domain": "example", "commit": c1.id})
+    assert "log_replay" in out["failing"]
+    assert st.check_status("example", c1.id)["log_replay"]["ok"] is False
+
+
+def test_a_stricter_rule_on_a_finished_object_is_a_warning(base):
+    """Finished history is not rewritten by a deliberately stricter rule; an object still in
+    flight is what a block endangers."""
+    st = MemoryEventStore()
+    m = ReferenceModel(dom(base), st)
+    for who, action in ((ANA, "approve_experiment"), (ELI, "launch_experiment"), (ELI, "end_experiment")):
+        assert m.execute(Command(who, action, "E-onboarding", {})).ok           # ended: no move left
+    raw = copy.deepcopy(base)
+    raw["actions"]["launch_experiment"]["actor"] = ["approver"]
+    r = change_check(dom(raw), dom(base), events=st, examples=10)
+    assert r.checks["log_replay"].ok
+    assert [p.severity for p in r.checks["log_replay"].problems] == ["warning"]
+    assert "The object is finished" in r.checks["log_replay"].problems[0].message
+    assert r.checks["log_replay"].note.endswith("; 0 would be blocked; 1 on finished objects (warnings)")
+
+
+def test_a_new_invariant_that_objects_in_use_break_is_reported(base):
+    """Delivery's probes invariant held for no verified request in its log, and no check said so.
+    An object in flight that breaks a new rule is an error; a finished one, a warning."""
+    st = history(base)                                                  # E-onboarding: running, can end
+    raw = copy.deepcopy(base)
+    raw["invariants"].append({"id": "running-is-long", "on": "Experiment",
+                              "check": "target.status != 'running' or target.planned_days >= 100",
+                              "reason": "A running experiment runs at least 100 days."})
+    r = change_check(dom(raw), dom(base), events=st, examples=10)
+    assert ("error", "E-onboarding") in problems(r, "in_flight")
+    assert not r.checks["in_flight"].ok
 
 
 def test_one_blocked_action_does_not_cascade(base):
@@ -237,3 +309,67 @@ def test_a_mistyped_environment_or_branch_is_an_error(tmp_path, base):
     assert not (tmp_path / "envs").exists()
     with pytest.raises(AuthoringError, match="no branch"):
         ws.change_check(branch="wrok", examples=5)
+
+
+def test_a_served_composition_gives_the_kernel_each_member_s_own_log(tmp_path):
+    from types import SimpleNamespace
+
+    from toprope.adapters.mcp.cli import _member
+    from toprope.identity import StaticIdentity
+    from toprope.kernel.services import LocalKernel
+    root = Path(__file__).resolve().parents[1]
+    k = LocalKernel(tmp_path, harness_examples=10)
+    args = SimpleNamespace(composition=str(root / "domains/toprope-self.composition.yaml"), member="authoring",
+                           store="memory", store_dir=None, no_seed=True)
+    _member(args, StaticIdentity({}), k)
+    assert sorted(k.domain_events) == ["authoring", "delivery"]
+
+
+@pytest.fixture
+def fake_tlc(monkeypatch):
+    """TLC's run replaced: the (exit status, stdout) it gives, and the commands it got."""
+    import toprope.tla.tlc as tlc
+    given = {"out": (0, "37 distinct states found, 0 states left on queue.\n"), "cmds": []}
+    real = subprocess.run
+
+    def run(cmd, *a, **kw):
+        if cmd[0] != "java":
+            return real(cmd, *a, **kw)
+        given["cmds"].append(cmd)
+        code, out = given["out"]
+        return subprocess.CompletedProcess(cmd, code, out, "")
+    monkeypatch.setattr(tlc.subprocess, "run", run)
+    return given
+
+
+def test_with_a_tlc_jar_the_change_check_model_checks(base, fake_tlc):
+    r = change_check(dom(base), dom(copy.deepcopy(base)), examples=10, tlc="tla2tools.jar")
+    assert r.checks["tla"].ran and r.checks["tla"].ok and fake_tlc["cmds"][0][3] == "tla2tools.jar"
+    assert r.checks["tla"].note.startswith("checked; 37 distinct states")
+    fake_tlc["out"] = (255, "Parse error\n")
+    bad = change_check(dom(base), dom(copy.deepcopy(base)), examples=10, tlc="tla2tools.jar")
+    assert not bad.ok and [p.message for p in bad.checks["tla"].problems] == ["error (exit 255)"]
+    fake_tlc["out"] = (0, "1000000 distinct states found\n")                # a bound reached is no pass
+    assert not change_check(dom(base), None, examples=10, tlc="tla2tools.jar").checks["tla"].ok
+
+
+def test_a_kernel_with_tlc_approves_only_a_commit_tlc_checked(tmp_path, base, fake_tlc):
+    from toprope.kernel.services import LocalKernel
+    st = CommitStore(tmp_path / ".toprope" / "commits")
+    c, _ = st.commit(write(tmp_path / "d.yaml", base))
+    LocalKernel(tmp_path, commits=st, harness_examples=10).call("change_check", {"domain": "example", "commit": c.id})
+    k = LocalKernel(tmp_path, commits=st, harness_examples=10, tlc_jar="tla2tools.jar")
+    with pytest.raises(Exception, match="no passing TLC check"):              # checked, but not by TLC
+        k.run("approve_commit", {"domain": "example", "commit": c.id, "approver": "ana"})
+    assert k.call("change_check", {"domain": "example", "commit": c.id})["passed"] is True
+    assert k.run("approve_commit", {"domain": "example", "commit": c.id, "approver": "ana"})["approved"] is True
+
+
+def test_the_change_check_computes_unreachable_from_creation_once(base, monkeypatch):
+    """#71: the mechanical layer and the semantic check each computed it."""
+    import toprope.harness.mechanical as mech
+    calls = []
+    real = mech.unreachable_from_creation
+    monkeypatch.setattr(mech, "unreachable_from_creation", lambda d: calls.append(1) or real(d))
+    change_check(dom(base), dom(copy.deepcopy(base)), examples=10)
+    assert len(calls) == 1

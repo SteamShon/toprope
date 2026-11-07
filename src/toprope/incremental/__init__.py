@@ -140,7 +140,7 @@ def tests_of(d: Domain, planner_cases: list[Any] | None = None, examples: int = 
         if c.action not in per_action:
             per_action[c.action] = action_deps(d, c.action, keys)
         deps = per_action[c.action]
-        if c.kind == "cell":       # a cell test reads its own cell; the others reach it through `instance`
+        if c.kind in ("cell", "param"):   # reads its own cell; the others reach it through `instance`
             own = f"cell:{c.obj}.{c.state}.{c.action}"
             deps = {k for k in deps if not k.startswith("cell:") or k == own}
         case = {"kind": c.kind, "obj": c.obj, "state": c.state, "action": c.action, "role": c.role,

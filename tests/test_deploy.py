@@ -125,3 +125,50 @@ def test_a_terminal_state_without_a_matrix_row_is_not_stranded(tmp_path):
     del raw["transitions"]["Experiment"]["matrix"]["decided"]         # still a valid state, just no row
     st, env, c, b = committed(tmp_path, raw)
     assert env.stranded(Domain.model_validate(raw)) == []
+
+
+def test_probes_check_the_deployed_commit_in_use(tmp_path):
+    """`verify` acts on what the probes found, not on a checkbox: the environment runs this
+    commit's build, its scenarios pass there, and the objects in use meet every invariant."""
+    from test_change_check import in_flight_example                   # a running experiment can still end
+    raw = in_flight_example()
+    st, env, c, b = committed(tmp_path, raw)
+    before = env.probe_commit(st, "example", c.id)                      # nothing deployed yet
+    assert before["passed"] is False and "not what this environment runs" in before["summary"]
+    env.deploy_commit(st, "example", c.id, ANA)
+    ok = env.probe_commit(st, "example", c.id)
+    n = len(raw["scenarios"])
+    assert ok == {"passed": True, "summary": f"passed: {n} of {n} scenario(s) pass; no store yet"}
+    assert st.check_status("example", c.id)["probes"]["ok"] is True
+    m = ReferenceModel(Domain.model_validate(raw), SQLiteEventStore(str(env.store_path)))
+    m.seed("Experiment", {"id": "E-bad", "status": "running", "planned_days": 1, "guardrails": []})  # no started_at
+    bad = env.probe_commit(st, "example", c.id)
+    assert bad["passed"] is False and bad["summary"].startswith("E-bad: breaks ")
+    assert st.check_status("example", c.id)["probes"]["ok"] is False
+
+
+def test_a_finished_object_that_breaks_a_new_rule_only_warns_the_probes(tmp_path):
+    """As in log replay: a new invariant does not rewrite finished history (Delivery's verified
+    requests from before its probes). The probes read the domain's own log when given one."""
+    from toprope.store import MemoryEventStore
+    st, env, c, b = committed(tmp_path, schema_doc_domain())
+    env.deploy_commit(st, "example", c.id, ANA)
+    own = MemoryEventStore()
+    ReferenceModel(Domain.model_validate(schema_doc_domain()), own).seed(
+        "Experiment", {"id": "E-old", "status": "decided", "planned_days": 1, "guardrails": []})  # no approver
+    out = env.probe_commit(st, "example", c.id, events=own)
+    assert out["passed"] is True and out["summary"].endswith("6 object(s) checked; 2 warning(s) on finished objects")  # the world, and E-old breaks both rules
+
+
+def test_probe_through_the_kernel(tmp_path):
+    from toprope.kernel import CATALOG
+    from toprope.kernel.services import LocalKernel
+    st, env, c, b = committed(tmp_path, schema_doc_domain())
+    env.deploy_commit(st, "example", c.id, ANA)
+    k = LocalKernel(tmp_path, environment=env, commits=st)
+    assert set(CATALOG["probe"].result) == {"passed", "summary"}
+    assert k.call("probe", {"domain": "example", "commit": c.id})["passed"] is True
+    from test_change_check import history, in_flight_example
+    k.domain_events["example"] = history(in_flight_example())          # its own log: E-onboarding runs
+    out = k.call("probe", {"domain": "example", "commit": c.id})
+    assert out["passed"] is True and "5 object(s) checked" in out["summary"]    # read, not "no store yet"

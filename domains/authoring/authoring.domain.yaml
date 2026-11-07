@@ -27,6 +27,7 @@ objects:
         type: string
       local_only:
         type: boolean
+        optional: true
       sha256:
         type: string
         optional: true
@@ -35,9 +36,8 @@ objects:
         - added
         - fetched
     source:
-      kind: interview
-      ref: interview:domains/authoring/interview.jsonl#L5
-      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+      kind: record
+      ref: records:docs/adr/0014-interview-design.md#L11-L41
     status: confirmed
   Question:
     description: A question in a stage's bundle, for the owner to answer.
@@ -151,6 +151,12 @@ objects:
       stage:
         enum:
         - recorded
+      last_evidence:
+        type: string
+        optional: true
+      evidence_error:
+        type: string
+        optional: true
     source:
       kind: interview
       ref: interview:domains/authoring/interview.jsonl#L5
@@ -407,7 +413,8 @@ actions:
       ref: records:docs/adr/0032-domain-knowledge-as-git-and-github.md#L38-L63
     status: confirmed
   commit_draft:
-    description: Snapshot the working copy as an immutable commit.
+    description: Snapshot the working copy as an immutable commit. Cite its evidence
+      on the commit with cite_evidence.
     actor:
     - owner
     target: Draft
@@ -417,9 +424,8 @@ actions:
         declaration: target.declaration
       reply: record_commit
     source:
-      kind: interview
-      ref: interview:domains/authoring/interview.jsonl#L5
-      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+      kind: record
+      ref: records:docs/commits.md#L106-L125
     status: confirmed
   record_commit:
     description: Record the commit the kernel made.
@@ -484,6 +490,14 @@ actions:
       ref: interview:domains/authoring/interview.jsonl#L5
       quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
     status: confirmed
+    preconditions:
+    - id: settled
+      check: target.approved != true
+      reason: An approved commit's check is settled; a late result is not recorded.
+      source:
+        kind: record
+        ref: records:docs/commits.md#L128-L142
+      status: confirmed
   approve_commit:
     description: 'Approve a commit: merge it into main and tag it. Only a person approves.'
     actor:
@@ -832,6 +846,57 @@ actions:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
     status: confirmed
+  record_evidence:
+    description: Record how strong the cited evidence is, or why it was refused.
+    actor:
+    - external:kernel
+    target: Commit
+    params:
+      strength:
+        type: string
+      error:
+        type: string
+    effects:
+    - set:
+        target.last_evidence: params.strength
+        target.evidence_error: params.error
+    source:
+      kind: record
+      ref: records:docs/commits.md#L106-L125
+    status: confirmed
+  cite_evidence:
+    description: 'Cite evidence for a commit''s change: an interview line, a source
+      chunk, a check recorded on the commit, a stored event, or an approval run. The
+      ref must resolve.'
+    actor:
+    - owner
+    target: Commit
+    params:
+      kind:
+        enum:
+        - interview
+        - source
+        - check
+        - event
+        - approval-run
+      ref:
+        type: string
+    preconditions:
+    - id: not-approved
+      check: target.approved != true
+      reason: An approved commit is settled; cite evidence before approving it.
+    effects:
+    - call: cite_evidence
+      with:
+        domain: target.domain_id
+        commit: target.id
+        kind: params.kind
+        ref: params.ref
+      reply: record_evidence
+    source:
+      kind: record
+      ref: records:docs/commits.md#L106-L125
+    status: confirmed
 transitions:
   Source:
     field: stage
@@ -1059,6 +1124,18 @@ transitions:
             kind: interview
             ref: interview:domains/authoring/interview.jsonl#L6
             quote: 전부 다 추천한 거 동의.
+          status: confirmed
+        record_evidence:
+          to: recorded
+          source:
+            kind: record
+            ref: records:docs/commits.md#L106-L125
+          status: confirmed
+        cite_evidence:
+          to: recorded
+          source:
+            kind: record
+            ref: records:docs/commits.md#L106-L125
           status: confirmed
   Answer:
     field: stage
