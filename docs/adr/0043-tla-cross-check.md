@@ -74,11 +74,14 @@ always means a bug in one of them.
 
 ## Consequences
 - `toprope.tla` exports a declaration to a `.tla` module and a `.cfg`. `toprope-harness --tla
-  DIR` writes them, with the list of actions left out. A replay command reads TLC's output and
-  prints each verdict.
-- The expression language maps to TLA+ through helpers that keep its fail-closed meaning: a
-  missing attribute is `Null`, and a comparison or a logical operator on the wrong type is false.
-  So TLC never stops on a type error that the interpreter treats as a failed check.
+  DIR` writes them, with the list of actions left out. `tools/tla_check.py` runs TLC and replays
+  each counterexample (`toprope.tla.replay`), printing its verdict.
+- Each run of the model starts from one fixture: no modeled step or invariant reads another
+  instance, so checking them one at a time reaches the same states, in a sum instead of a product
+  (`docs/harness.md`). Modeling links ends this.
+- The expression language maps to TLA+ through tagged values that keep its fail-closed meaning: a
+  missing attribute is null, and an operator on the wrong type gives an error value, so the check
+  fails. TLC never stops on a type error that the interpreter treats as a failed check.
 - The world map's state charts (#125) can later draw TLC's state graph. Not in this ADR.
 - What is modeled grows by later ADRs or PRs: time, links, creation. Each one shrinks the list of
   actions left out.

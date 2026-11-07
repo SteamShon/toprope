@@ -201,6 +201,9 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    read tools, an observed time on facts from adapters, identity mappings on adapters; in M2,
    `confirmed_at` and `review_by` warnings; in the M4 spec, goals, expected outcomes and the
    outcome-to-decision link.
+7. ADR-0043's follow-ups: make `tla` a required check on `develop` once the umbrella is in
+   (maintainer); model links, time and object creation, each shrinking what the model leaves out
+   (the self domains leave out their creating actions and one link invariant).
 
 ## Left from reviews
 
