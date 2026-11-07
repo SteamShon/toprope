@@ -73,6 +73,25 @@ command exits 1. Either a case is missing, or the mutant behaves like the declar
 state the harness can build (for example, a precondition that always holds).
 `toprope.harness.mutants.run_mutants(domain)` returns the same report.
 
+## Cross-check with TLC (ADR-0043)
+```bash
+uv run toprope-harness --domain my.domain.yaml --tla DIR    # the model level as TLA+, for TLC
+python tools/tla_check.py --jar tla2tools.jar DECLARATION... # what the `tla` CI job runs
+```
+Exploration samples action sequences. TLC enumerates every reachable state of the exported model
+and reports the shortest path to each broken invariant. Each path is replayed on the model level
+from the same fixtures (`toprope.tla.replay`):
+- **known**: reproduced, and the harness reports the same invariant broken. The harness fails on
+  it already.
+- **harness gap**: reproduced, and the harness missed it. Exploration did not reach the break.
+- **model mismatch**: not reproduced. The export and the interpreter disagree on what the
+  declaration says.
+
+The `tla` job fails on a harness gap, a model mismatch, a model TLC cannot check, or a reached
+state bound. It also requires a seeded break (`tests/tla/`) to be found and reproduced, so a
+silent pass cannot mean that TLC checks nothing. Actions that create objects, use time or
+follow links are left out of the model and listed with every run.
+
 ## The mechanical layer (ADR-0035)
 Besides the examples, the harness generates objects from the declaration's types, enums and
 links, in every stage, keeping only those that satisfy every invariant, and runs every
