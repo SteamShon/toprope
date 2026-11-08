@@ -15,7 +15,7 @@ Legend: ✅ done · 🟡 in part · ⬜ not started
 | Milestone | Link | Status | Note |
 |---|---|---|---|
 | M0a thin slice | none (enabler) | ✅ | released as `v0.1.0` (#65); the tag is not pushed yet |
-| M1 self-compile | ① ⑥ pilot, no verdict | ✅ | reported ([`M1-report.md`](experiments/M1-report.md)): pilot ① weakens, ⑥ inconclusive; self-compile not shown (probes) |
+| M1 self-compile | ① ⑥ pilot, no verdict | ✅ | reported ([`M1-report.md`](experiments/M1-report.md)): with its LLM review Toprope's recall is 0.84 against 0.64 for the NL skill (at the noise floor) and level with the structured spec; the compiler alone weakens ①; ⑥ inconclusive; self-compile not shown (probes) |
 | M0b surfaces and effects | none (enabler) | ⬜ | |
 | M2 dogfood | ① ② ③ | ⬜ | the first ① and ② verdicts |
 | M3 shared language | ④ | ⬜ | |
