@@ -1,0 +1,12 @@
+{
+  "id": "e99d6c6fb72db442",
+  "domain": "delivery",
+  "version": 7,
+  "declaration_sha256": "e99d6c6fb72db442e63daa8dabe050edfed0a7f9263b23f9e2a982ff980c1b5d",
+  "toolchain": "98c4deb6811c8648fe28340c6b4a2162f9ae5fa6e61383d132c257f1333e109e",
+  "harness_ok": true,
+  "created_at": "2026-11-08T05:55:23+00:00",
+  "commit": "7-ce761f68bc3e83be",
+  "seq": 7,
+  "commit_domain": "delivery"
+}

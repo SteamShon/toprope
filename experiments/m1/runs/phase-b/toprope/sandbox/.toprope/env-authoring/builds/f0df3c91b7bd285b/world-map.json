@@ -1,0 +1,1971 @@
+{
+  "behavior": {
+    "edges": [
+      {
+        "action": "record_answer_ref",
+        "fired_by": [],
+        "fog": false,
+        "from": "recorded",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Answer.recorded.record_answer_ref",
+        "invariants": [],
+        "object": "Answer",
+        "outcome": {
+          "kind": "to",
+          "to": "recorded"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "external:kernel"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "answer_question",
+        "fired_by": [],
+        "fog": false,
+        "from": "(new)",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Answer.(new).answer_question",
+        "invariants": [],
+        "object": "Answer",
+        "outcome": {
+          "kind": "to",
+          "to": "recorded"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            },
+            {
+              "role": "expert"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "check_commit",
+        "fired_by": [],
+        "fog": false,
+        "from": "recorded",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Commit.recorded.check_commit",
+        "invariants": [],
+        "object": "Commit",
+        "outcome": {
+          "kind": "to",
+          "status": "confirmed",
+          "to": "recorded"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [
+            {
+              "check": "target.approved != true",
+              "id": "not-approved",
+              "reason": "An approved commit passed its check; check a new commit instead.",
+              "status": null
+            }
+          ],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "record_check",
+        "fired_by": [],
+        "fog": false,
+        "from": "recorded",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Commit.recorded.record_check",
+        "invariants": [
+          "approved-commits-passed-their-checks"
+        ],
+        "object": "Commit",
+        "outcome": {
+          "kind": "to",
+          "status": "confirmed",
+          "to": "recorded"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "external:kernel"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [
+            {
+              "check": "target.approved != true",
+              "id": "settled",
+              "reason": "An approved commit's check is settled; a late result is not recorded.",
+              "status": "confirmed"
+            }
+          ],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "approve_commit",
+        "fired_by": [],
+        "fog": false,
+        "from": "recorded",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Commit.recorded.approve_commit",
+        "invariants": [
+          "approved-commits-passed-their-checks"
+        ],
+        "object": "Commit",
+        "outcome": {
+          "kind": "to",
+          "status": "confirmed",
+          "to": "recorded"
+        },
+        "records_decision": true,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [
+            {
+              "check": "target.checks_passed == true or params.wording_only == true",
+              "id": "checks-pass",
+              "reason": "Run the change check, and approve only a commit that passes it, unless the change is wording only.",
+              "status": "confirmed"
+            },
+            {
+              "check": "target.approved != true",
+              "id": "not-approved",
+              "reason": "Already approved; approve a newer commit.",
+              "status": "confirmed"
+            }
+          ],
+          "requires_human": true,
+          "reservations": []
+        }
+      },
+      {
+        "action": "record_approval",
+        "fired_by": [],
+        "fog": false,
+        "from": "recorded",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Commit.recorded.record_approval",
+        "invariants": [
+          "approved-commits-passed-their-checks"
+        ],
+        "object": "Commit",
+        "outcome": {
+          "kind": "to",
+          "status": "confirmed",
+          "to": "recorded"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "external:kernel"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [
+            {
+              "check": "params.approved != true or target.checks_passed == true or target.wording_only == true",
+              "id": "approved-only-if-checked",
+              "reason": "A commit is recorded as approved only if its change check passed, or its change is wording only.",
+              "status": "confirmed"
+            }
+          ],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "deliver",
+        "fired_by": [],
+        "fog": false,
+        "from": "recorded",
+        "hands_off": [
+          {
+            "action": "request_delivery",
+            "domain": "delivery",
+            "handoff": "deliver_approved_commit",
+            "interface": "1.x"
+          }
+        ],
+        "harness": "verified",
+        "id": "Commit.recorded.deliver",
+        "invariants": [],
+        "object": "Commit",
+        "outcome": {
+          "kind": "to",
+          "status": "confirmed",
+          "to": "recorded"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [
+            {
+              "check": "target.approved == true",
+              "id": "approved",
+              "reason": "Only an approved commit is delivered.",
+              "status": "confirmed"
+            }
+          ],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "record_evidence",
+        "fired_by": [],
+        "fog": false,
+        "from": "recorded",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Commit.recorded.record_evidence",
+        "invariants": [],
+        "object": "Commit",
+        "outcome": {
+          "kind": "to",
+          "status": "confirmed",
+          "to": "recorded"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "external:kernel"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "cite_evidence",
+        "fired_by": [],
+        "fog": false,
+        "from": "recorded",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Commit.recorded.cite_evidence",
+        "invariants": [],
+        "object": "Commit",
+        "outcome": {
+          "kind": "to",
+          "status": "confirmed",
+          "to": "recorded"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [
+            {
+              "check": "target.approved != true",
+              "id": "not-approved",
+              "reason": "An approved commit is settled; cite evidence before approving it.",
+              "status": null
+            }
+          ],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "record_commit",
+        "fired_by": [],
+        "fog": false,
+        "from": "(new)",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Commit.(new).record_commit",
+        "invariants": [
+          "approved-commits-passed-their-checks"
+        ],
+        "object": "Commit",
+        "outcome": {
+          "kind": "to",
+          "to": "recorded"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "external:kernel"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "decide",
+        "fired_by": [],
+        "fog": false,
+        "from": "open",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "DecisionRequest.open.decide",
+        "invariants": [
+          "decided-requests-record-the-choice"
+        ],
+        "object": "DecisionRequest",
+        "outcome": {
+          "kind": "to",
+          "status": "confirmed",
+          "to": "decided"
+        },
+        "records_decision": true,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": true,
+          "reservations": []
+        }
+      },
+      {
+        "action": "decide",
+        "fired_by": [],
+        "fog": false,
+        "from": "decided",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "DecisionRequest.decided.decide",
+        "invariants": [
+          "decided-requests-record-the-choice"
+        ],
+        "object": "DecisionRequest",
+        "outcome": {
+          "kind": "deny",
+          "reason": "Already decided; a new decision needs a new request.",
+          "status": "confirmed"
+        },
+        "records_decision": true,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": true,
+          "reservations": []
+        }
+      },
+      {
+        "action": "request_decision",
+        "fired_by": [],
+        "fog": false,
+        "from": "(new)",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "DecisionRequest.(new).request_decision",
+        "invariants": [
+          "decided-requests-record-the-choice"
+        ],
+        "object": "DecisionRequest",
+        "outcome": {
+          "kind": "to",
+          "to": "open"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "commit_draft",
+        "fired_by": [],
+        "fog": false,
+        "from": "open",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Draft.open.commit_draft",
+        "invariants": [],
+        "object": "Draft",
+        "outcome": {
+          "kind": "to",
+          "status": "confirmed",
+          "to": "open"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "next_questions",
+        "fired_by": [],
+        "fog": false,
+        "from": "open",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Draft.open.next_questions",
+        "invariants": [],
+        "object": "Draft",
+        "outcome": {
+          "kind": "to",
+          "status": "confirmed",
+          "to": "open"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "record_questions",
+        "fired_by": [],
+        "fog": false,
+        "from": "open",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Draft.open.record_questions",
+        "invariants": [],
+        "object": "Draft",
+        "outcome": {
+          "kind": "to",
+          "status": "confirmed",
+          "to": "open"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "external:kernel"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "search",
+        "fired_by": [],
+        "fog": false,
+        "from": "open",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Draft.open.search",
+        "invariants": [],
+        "object": "Draft",
+        "outcome": {
+          "kind": "to",
+          "status": "confirmed",
+          "to": "open"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "record_search",
+        "fired_by": [],
+        "fog": false,
+        "from": "open",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Draft.open.record_search",
+        "invariants": [],
+        "object": "Draft",
+        "outcome": {
+          "kind": "to",
+          "status": "confirmed",
+          "to": "open"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "external:kernel"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "skip_stage",
+        "fired_by": [],
+        "fog": false,
+        "from": "open",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Draft.open.skip_stage",
+        "invariants": [],
+        "object": "Draft",
+        "outcome": {
+          "kind": "to",
+          "status": "confirmed",
+          "to": "open"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": true,
+          "reservations": []
+        }
+      },
+      {
+        "action": "record_skip",
+        "fired_by": [],
+        "fog": false,
+        "from": "open",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Draft.open.record_skip",
+        "invariants": [],
+        "object": "Draft",
+        "outcome": {
+          "kind": "to",
+          "status": "confirmed",
+          "to": "open"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "external:kernel"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "merge_main",
+        "fired_by": [],
+        "fog": false,
+        "from": "open",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Draft.open.merge_main",
+        "invariants": [],
+        "object": "Draft",
+        "outcome": {
+          "kind": "to",
+          "status": "confirmed",
+          "to": "open"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "checkout_commit",
+        "fired_by": [],
+        "fog": false,
+        "from": "open",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Draft.open.checkout_commit",
+        "invariants": [],
+        "object": "Draft",
+        "outcome": {
+          "kind": "to",
+          "status": "confirmed",
+          "to": "open"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "confirm_all_proposed",
+        "fired_by": [],
+        "fog": false,
+        "from": "open",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Draft.open.confirm_all_proposed",
+        "invariants": [],
+        "object": "Draft",
+        "outcome": {
+          "kind": "to",
+          "status": "confirmed",
+          "to": "open"
+        },
+        "records_decision": true,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": true,
+          "reservations": []
+        }
+      },
+      {
+        "action": "record_merge",
+        "fired_by": [],
+        "fog": false,
+        "from": "open",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Draft.open.record_merge",
+        "invariants": [],
+        "object": "Draft",
+        "outcome": {
+          "kind": "to",
+          "status": "confirmed",
+          "to": "open"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "external:kernel"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "record_checkout",
+        "fired_by": [],
+        "fog": false,
+        "from": "open",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Draft.open.record_checkout",
+        "invariants": [],
+        "object": "Draft",
+        "outcome": {
+          "kind": "to",
+          "status": "confirmed",
+          "to": "open"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "external:kernel"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "record_confirm_all",
+        "fired_by": [],
+        "fog": false,
+        "from": "open",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Draft.open.record_confirm_all",
+        "invariants": [],
+        "object": "Draft",
+        "outcome": {
+          "kind": "to",
+          "status": "confirmed",
+          "to": "open"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "external:kernel"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "open_draft",
+        "fired_by": [],
+        "fog": false,
+        "from": "(new)",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Draft.(new).open_draft",
+        "invariants": [],
+        "object": "Draft",
+        "outcome": {
+          "kind": "to",
+          "to": "open"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "confirm_element",
+        "fired_by": [],
+        "fog": false,
+        "from": "proposed",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Element.proposed.confirm_element",
+        "invariants": [],
+        "object": "Element",
+        "outcome": {
+          "kind": "to",
+          "status": "confirmed",
+          "to": "confirmed"
+        },
+        "records_decision": true,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [
+            {
+              "check": "target.path not in ['actions.approve_commit', 'actions.deliver', 'actions.deploy'] or (exists(params.second_confirmer) and params.second_confirmer != actor.id)",
+              "id": "permission-needs-second-person",
+              "reason": "An element about who may approve or deploy needs a second person, other than the confirmer, to confirm it.",
+              "status": null
+            }
+          ],
+          "requires_human": true,
+          "reservations": []
+        }
+      },
+      {
+        "action": "mark_unknown",
+        "fired_by": [],
+        "fog": false,
+        "from": "proposed",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Element.proposed.mark_unknown",
+        "invariants": [],
+        "object": "Element",
+        "outcome": {
+          "kind": "to",
+          "status": "confirmed",
+          "to": "unknown"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            },
+            {
+              "role": "expert"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "record_proposal",
+        "fired_by": [],
+        "fog": false,
+        "from": "proposed",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Element.proposed.record_proposal",
+        "invariants": [],
+        "object": "Element",
+        "outcome": {
+          "kind": "to",
+          "status": "confirmed",
+          "to": "proposed"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "external:kernel"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "record_confirmation",
+        "fired_by": [],
+        "fog": false,
+        "from": "proposed",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Element.proposed.record_confirmation",
+        "invariants": [],
+        "object": "Element",
+        "outcome": {
+          "kind": "n/a"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "external:kernel"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "confirm_wording_fix",
+        "fired_by": [],
+        "fog": false,
+        "from": "proposed",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Element.proposed.confirm_wording_fix",
+        "invariants": [],
+        "object": "Element",
+        "outcome": {
+          "kind": "to",
+          "status": null,
+          "to": "confirmed"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [
+            {
+              "check": "params.wording_only == true",
+              "id": "wording-only",
+              "reason": "An agent confirms only an element that fixes wording; any other element is confirmed by a person.",
+              "status": null
+            }
+          ],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "withdraw_element",
+        "fired_by": [],
+        "fog": false,
+        "from": "proposed",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Element.proposed.withdraw_element",
+        "invariants": [],
+        "object": "Element",
+        "outcome": {
+          "kind": "to",
+          "status": null,
+          "to": "withdrawn"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "confirm_element",
+        "fired_by": [],
+        "fog": false,
+        "from": "unknown",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Element.unknown.confirm_element",
+        "invariants": [],
+        "object": "Element",
+        "outcome": {
+          "kind": "to",
+          "status": "confirmed",
+          "to": "confirmed"
+        },
+        "records_decision": true,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [
+            {
+              "check": "target.path not in ['actions.approve_commit', 'actions.deliver', 'actions.deploy'] or (exists(params.second_confirmer) and params.second_confirmer != actor.id)",
+              "id": "permission-needs-second-person",
+              "reason": "An element about who may approve or deploy needs a second person, other than the confirmer, to confirm it.",
+              "status": null
+            }
+          ],
+          "requires_human": true,
+          "reservations": []
+        }
+      },
+      {
+        "action": "mark_unknown",
+        "fired_by": [],
+        "fog": false,
+        "from": "unknown",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Element.unknown.mark_unknown",
+        "invariants": [],
+        "object": "Element",
+        "outcome": {
+          "kind": "n/a"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            },
+            {
+              "role": "expert"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "record_proposal",
+        "fired_by": [],
+        "fog": false,
+        "from": "unknown",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Element.unknown.record_proposal",
+        "invariants": [],
+        "object": "Element",
+        "outcome": {
+          "kind": "n/a"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "external:kernel"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "record_confirmation",
+        "fired_by": [],
+        "fog": false,
+        "from": "unknown",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Element.unknown.record_confirmation",
+        "invariants": [],
+        "object": "Element",
+        "outcome": {
+          "kind": "n/a"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "external:kernel"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "confirm_wording_fix",
+        "fired_by": [],
+        "fog": false,
+        "from": "unknown",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Element.unknown.confirm_wording_fix",
+        "invariants": [],
+        "object": "Element",
+        "outcome": {
+          "kind": "deny",
+          "reason": "An element not known yet needs a person to confirm it.",
+          "status": null
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [
+            {
+              "check": "params.wording_only == true",
+              "id": "wording-only",
+              "reason": "An agent confirms only an element that fixes wording; any other element is confirmed by a person.",
+              "status": null
+            }
+          ],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "withdraw_element",
+        "fired_by": [],
+        "fog": false,
+        "from": "unknown",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Element.unknown.withdraw_element",
+        "invariants": [],
+        "object": "Element",
+        "outcome": {
+          "kind": "deny",
+          "reason": "Only a proposed element is withdrawn; an unknown one stays visible until someone answers it.",
+          "status": null
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "confirm_element",
+        "fired_by": [],
+        "fog": false,
+        "from": "confirmed",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Element.confirmed.confirm_element",
+        "invariants": [],
+        "object": "Element",
+        "outcome": {
+          "kind": "n/a"
+        },
+        "records_decision": true,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [
+            {
+              "check": "target.path not in ['actions.approve_commit', 'actions.deliver', 'actions.deploy'] or (exists(params.second_confirmer) and params.second_confirmer != actor.id)",
+              "id": "permission-needs-second-person",
+              "reason": "An element about who may approve or deploy needs a second person, other than the confirmer, to confirm it.",
+              "status": null
+            }
+          ],
+          "requires_human": true,
+          "reservations": []
+        }
+      },
+      {
+        "action": "mark_unknown",
+        "fired_by": [],
+        "fog": false,
+        "from": "confirmed",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Element.confirmed.mark_unknown",
+        "invariants": [],
+        "object": "Element",
+        "outcome": {
+          "kind": "deny",
+          "reason": "A confirmed element changes by a new proposal and a new commit, not by marking it unknown.",
+          "status": "confirmed"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            },
+            {
+              "role": "expert"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "record_proposal",
+        "fired_by": [],
+        "fog": false,
+        "from": "confirmed",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Element.confirmed.record_proposal",
+        "invariants": [],
+        "object": "Element",
+        "outcome": {
+          "kind": "n/a"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "external:kernel"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "record_confirmation",
+        "fired_by": [],
+        "fog": false,
+        "from": "confirmed",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Element.confirmed.record_confirmation",
+        "invariants": [],
+        "object": "Element",
+        "outcome": {
+          "kind": "to",
+          "status": "confirmed",
+          "to": "confirmed"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "external:kernel"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "confirm_wording_fix",
+        "fired_by": [],
+        "fog": false,
+        "from": "confirmed",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Element.confirmed.confirm_wording_fix",
+        "invariants": [],
+        "object": "Element",
+        "outcome": {
+          "kind": "n/a"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [
+            {
+              "check": "params.wording_only == true",
+              "id": "wording-only",
+              "reason": "An agent confirms only an element that fixes wording; any other element is confirmed by a person.",
+              "status": null
+            }
+          ],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "withdraw_element",
+        "fired_by": [],
+        "fog": false,
+        "from": "confirmed",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Element.confirmed.withdraw_element",
+        "invariants": [],
+        "object": "Element",
+        "outcome": {
+          "kind": "deny",
+          "reason": "A confirmed element changes by a new proposal and a new commit, not by withdrawing it.",
+          "status": null
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "confirm_element",
+        "fired_by": [],
+        "fog": false,
+        "from": "withdrawn",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Element.withdrawn.confirm_element",
+        "invariants": [],
+        "object": "Element",
+        "outcome": {
+          "kind": "n/a"
+        },
+        "records_decision": true,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [
+            {
+              "check": "target.path not in ['actions.approve_commit', 'actions.deliver', 'actions.deploy'] or (exists(params.second_confirmer) and params.second_confirmer != actor.id)",
+              "id": "permission-needs-second-person",
+              "reason": "An element about who may approve or deploy needs a second person, other than the confirmer, to confirm it.",
+              "status": null
+            }
+          ],
+          "requires_human": true,
+          "reservations": []
+        }
+      },
+      {
+        "action": "mark_unknown",
+        "fired_by": [],
+        "fog": false,
+        "from": "withdrawn",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Element.withdrawn.mark_unknown",
+        "invariants": [],
+        "object": "Element",
+        "outcome": {
+          "kind": "n/a"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            },
+            {
+              "role": "expert"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "record_proposal",
+        "fired_by": [],
+        "fog": false,
+        "from": "withdrawn",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Element.withdrawn.record_proposal",
+        "invariants": [],
+        "object": "Element",
+        "outcome": {
+          "kind": "n/a"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "external:kernel"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "record_confirmation",
+        "fired_by": [],
+        "fog": false,
+        "from": "withdrawn",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Element.withdrawn.record_confirmation",
+        "invariants": [],
+        "object": "Element",
+        "outcome": {
+          "kind": "n/a"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "external:kernel"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "confirm_wording_fix",
+        "fired_by": [],
+        "fog": false,
+        "from": "withdrawn",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Element.withdrawn.confirm_wording_fix",
+        "invariants": [],
+        "object": "Element",
+        "outcome": {
+          "kind": "n/a"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [
+            {
+              "check": "params.wording_only == true",
+              "id": "wording-only",
+              "reason": "An agent confirms only an element that fixes wording; any other element is confirmed by a person.",
+              "status": null
+            }
+          ],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "withdraw_element",
+        "fired_by": [],
+        "fog": false,
+        "from": "withdrawn",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Element.withdrawn.withdraw_element",
+        "invariants": [],
+        "object": "Element",
+        "outcome": {
+          "kind": "deny",
+          "reason": "Already withdrawn; propose the element again if it is needed.",
+          "status": null
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "propose_element",
+        "fired_by": [],
+        "fog": false,
+        "from": "(new)",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Element.(new).propose_element",
+        "invariants": [],
+        "object": "Element",
+        "outcome": {
+          "kind": "to",
+          "to": "proposed"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "fetch_source",
+        "fired_by": [],
+        "fog": false,
+        "from": "added",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Source.added.fetch_source",
+        "invariants": [
+          "fetched-sources-have-a-snapshot"
+        ],
+        "object": "Source",
+        "outcome": {
+          "kind": "to",
+          "status": "confirmed",
+          "to": "added"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "record_fetch",
+        "fired_by": [],
+        "fog": false,
+        "from": "added",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Source.added.record_fetch",
+        "invariants": [
+          "fetched-sources-have-a-snapshot"
+        ],
+        "object": "Source",
+        "outcome": {
+          "kind": "to",
+          "status": "confirmed",
+          "to": "fetched"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "external:kernel"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "fetch_source",
+        "fired_by": [],
+        "fog": false,
+        "from": "fetched",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Source.fetched.fetch_source",
+        "invariants": [
+          "fetched-sources-have-a-snapshot"
+        ],
+        "object": "Source",
+        "outcome": {
+          "kind": "deny",
+          "reason": "A link is fetched once into a snapshot; add a new source to read it again.",
+          "status": "confirmed"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "record_fetch",
+        "fired_by": [],
+        "fog": false,
+        "from": "fetched",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Source.fetched.record_fetch",
+        "invariants": [
+          "fetched-sources-have-a-snapshot"
+        ],
+        "object": "Source",
+        "outcome": {
+          "kind": "n/a"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "external:kernel"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      },
+      {
+        "action": "add_source",
+        "fired_by": [],
+        "fog": false,
+        "from": "(new)",
+        "hands_off": [],
+        "harness": "verified",
+        "id": "Source.(new).add_source",
+        "invariants": [
+          "fetched-sources-have-a-snapshot"
+        ],
+        "object": "Source",
+        "outcome": {
+          "kind": "to",
+          "to": "added"
+        },
+        "records_decision": false,
+        "unlock": {
+          "actors": [
+            {
+              "role": "owner"
+            }
+          ],
+          "approvals": null,
+          "preconditions": [],
+          "requires_human": false,
+          "reservations": []
+        }
+      }
+    ],
+    "roles": [
+      {
+        "id": "owner",
+        "people": [
+          "ana"
+        ]
+      },
+      {
+        "id": "expert",
+        "people": [
+          "eli"
+        ]
+      }
+    ],
+    "states": [
+      {
+        "id": "Answer.recorded",
+        "initial": true,
+        "object": "Answer",
+        "state": "recorded",
+        "terminal": false
+      },
+      {
+        "id": "Commit.recorded",
+        "initial": true,
+        "object": "Commit",
+        "state": "recorded",
+        "terminal": false
+      },
+      {
+        "id": "DecisionRequest.open",
+        "initial": true,
+        "object": "DecisionRequest",
+        "state": "open",
+        "terminal": false
+      },
+      {
+        "id": "DecisionRequest.decided",
+        "initial": false,
+        "object": "DecisionRequest",
+        "state": "decided",
+        "terminal": true
+      },
+      {
+        "id": "Draft.open",
+        "initial": true,
+        "object": "Draft",
+        "state": "open",
+        "terminal": false
+      },
+      {
+        "id": "Element.proposed",
+        "initial": true,
+        "object": "Element",
+        "state": "proposed",
+        "terminal": false
+      },
+      {
+        "id": "Element.unknown",
+        "initial": false,
+        "object": "Element",
+        "state": "unknown",
+        "terminal": false
+      },
+      {
+        "id": "Element.confirmed",
+        "initial": false,
+        "object": "Element",
+        "state": "confirmed",
+        "terminal": false
+      },
+      {
+        "id": "Element.withdrawn",
+        "initial": false,
+        "object": "Element",
+        "state": "withdrawn",
+        "terminal": true
+      },
+      {
+        "id": "Source.added",
+        "initial": true,
+        "object": "Source",
+        "state": "added",
+        "terminal": false
+      },
+      {
+        "id": "Source.fetched",
+        "initial": false,
+        "object": "Source",
+        "state": "fetched",
+        "terminal": true
+      }
+    ],
+    "system_actors": [
+      "external:kernel"
+    ]
+  },
+  "domain": "authoring",
+  "format": "toprope.world-map/1",
+  "handoffs": [
+    {
+      "handoff": "deliver_approved_commit",
+      "to": {
+        "action": "request_delivery",
+        "domain": "delivery",
+        "interface": "1.x"
+      },
+      "when": "deliver"
+    }
+  ],
+  "minimal_flows": [],
+  "structure": {
+    "edges": [
+      {
+        "cardinality": "many-to-one",
+        "from": "DecisionRequest",
+        "id": "element",
+        "required": false,
+        "status": "confirmed",
+        "to": "Element"
+      },
+      {
+        "cardinality": "many-to-one",
+        "from": "Element",
+        "id": "origin",
+        "required": false,
+        "status": "confirmed",
+        "to": "Source"
+      },
+      {
+        "cardinality": "many-to-many",
+        "from": "Commit",
+        "id": "parents",
+        "required": false,
+        "status": "confirmed",
+        "to": "Commit"
+      },
+      {
+        "cardinality": "many-to-one",
+        "from": "Answer",
+        "id": "question",
+        "required": true,
+        "status": "confirmed",
+        "to": "Question"
+      }
+    ],
+    "nodes": [
+      {
+        "description": "The owner's answer, in their words; its decisions become proposed elements.",
+        "id": "Answer",
+        "properties": [
+          "decisions",
+          "ref",
+          "stage",
+          "words"
+        ],
+        "stateful": true,
+        "status": "confirmed"
+      },
+      {
+        "description": "An immutable snapshot of the working copy on a branch.",
+        "id": "Commit",
+        "properties": [
+          "approved",
+          "author",
+          "branch",
+          "checks_passed",
+          "content",
+          "domain_id",
+          "evidence_error",
+          "failing",
+          "interface",
+          "last_evidence",
+          "main",
+          "message",
+          "seq",
+          "stage",
+          "wording_only"
+        ],
+        "stateful": true,
+        "status": "confirmed"
+      },
+      {
+        "description": "A decision only a person may take, proposed with grounds and a recommendation and sent to that person's outbox.",
+        "id": "DecisionRequest",
+        "properties": [
+          "choice",
+          "deadline",
+          "grounds",
+          "recommendation",
+          "stage",
+          "subject"
+        ],
+        "stateful": true,
+        "status": "confirmed"
+      },
+      {
+        "description": "The working copy of a domain's declaration on a branch: what a commit snapshots.",
+        "id": "Draft",
+        "properties": [
+          "branch",
+          "bundle",
+          "conflicts",
+          "current_stage",
+          "declaration",
+          "domain_id",
+          "merging",
+          "stage"
+        ],
+        "stateful": true,
+        "status": "confirmed"
+      },
+      {
+        "description": "One part of the draft declaration (an object, action, cell, invariant...), proposed by an agent or confirmed by a person.",
+        "id": "Element",
+        "properties": [
+          "cites",
+          "issue_summary",
+          "issues",
+          "path",
+          "review",
+          "value"
+        ],
+        "stateful": true,
+        "status": "confirmed"
+      },
+      {
+        "description": "A question in a stage's bundle, for the owner to answer.",
+        "id": "Question",
+        "properties": [
+          "stage",
+          "text"
+        ],
+        "stateful": false,
+        "status": "confirmed"
+      },
+      {
+        "description": "Where raw material lives: code, records, transcripts or the interview log.",
+        "id": "Source",
+        "properties": [
+          "kind",
+          "local_only",
+          "path",
+          "sha256",
+          "stage"
+        ],
+        "stateful": true,
+        "status": "confirmed"
+      }
+    ]
+  },
+  "unreachable": {},
+  "version": 17
+}

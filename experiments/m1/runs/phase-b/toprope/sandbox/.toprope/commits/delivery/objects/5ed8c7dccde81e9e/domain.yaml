@@ -1,0 +1,527 @@
+domain: delivery
+purpose:
+  problem: An approved domain version must become working software in an environment,
+    and nothing unverified may reach it.
+  success_metric:
+    name: share of approved versions that reach verified-in-use without a manual fix
+      or rollback
+    direction: up
+  announcement: Approved domain versions now reach the environment as working software
+    in one step. Nothing that fails its checks or lacks a person's approval gets there.
+roles:
+- approver
+objects:
+  DeliveryRequest:
+    description: A request to deliver an approved commit of a domain, handed off by
+      Authoring.
+    properties:
+      domain_id:
+        type: string
+      commit:
+        type: string
+      branch:
+        type: string
+      interface:
+        type: string
+      environment:
+        type: string
+      approver:
+        type: string
+      build:
+        type: string
+        optional: true
+      harness_ok:
+        type: boolean
+        optional: true
+      deployed:
+        type: boolean
+        optional: true
+      refusal:
+        type: string
+        optional: true
+      verified:
+        type: boolean
+        optional: true
+      stage:
+        enum:
+        - requested
+        - previewing
+        - built
+        - deploying
+        - done
+        - verified
+    source:
+      kind: interview
+      ref: interview:domains/delivery/interview.jsonl#L24
+    status: confirmed
+  Environment:
+    description: Where a domain runs; it points at one deployed commit.
+    properties:
+      name:
+        type: string
+      current_commit:
+        type: string
+        optional: true
+    source:
+      kind: interview
+      ref: interview:interview/delivery/log.jsonl#L4
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+    status: confirmed
+links: {}
+actions:
+  request_delivery:
+    description: Receive a request to deliver an approved commit, handed off by Authoring.
+      The request must say which branch the commit came from; a request without it
+      is refused.
+    actor:
+    - system
+    creates: DeliveryRequest
+    params:
+      domain_id:
+        type: string
+      commit:
+        type: string
+      branch:
+        type: string
+      interface:
+        type: string
+      environment:
+        type: string
+      approver:
+        type: string
+    source:
+      kind: interview
+      ref: interview:domains/delivery/interview.jsonl#L24
+    status: confirmed
+  preview:
+    description: Build the commit and run its harness, before anything is deployed.
+    actor:
+    - approver
+    target: DeliveryRequest
+    effects:
+    - call: preview
+      with:
+        domain: target.domain_id
+        commit: target.commit
+      reply: record_build
+    source:
+      kind: interview
+      ref: interview:interview/delivery/log.jsonl#L4
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+    status: confirmed
+  record_build:
+    description: Record the build and its harness result.
+    actor:
+    - external:kernel
+    target: DeliveryRequest
+    params:
+      build:
+        type: string
+      harness_ok:
+        type: boolean
+    effects:
+    - set:
+        target.build: params.build
+        target.harness_ok: params.harness_ok
+    source:
+      kind: interview
+      ref: interview:interview/delivery/log.jsonl#L4
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+    status: confirmed
+  deploy:
+    description: Deploy the commit, under the fixed floor. Only a person deploys.
+    actor:
+    - approver
+    target: DeliveryRequest
+    requires: human
+    records_decision: true
+    effects:
+    - call: deploy
+      with:
+        domain: target.domain_id
+        commit: target.commit
+        approver: actor.id
+      reply: record_deployment
+    source:
+      kind: interview
+      ref: interview:interview/delivery/log.jsonl#L4
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+    status: confirmed
+    preconditions:
+    - id: harness-passed
+      check: target.harness_ok == true
+      reason: Deploy only a build whose harness passed.
+      source:
+        kind: interview
+        ref: interview:interview/delivery/log.jsonl#L5
+        quote: 전부 다 추천한 거 동의.
+      status: confirmed
+  record_deployment:
+    description: Record whether the deploy happened, or which floor rule refused it.
+    actor:
+    - external:kernel
+    target: DeliveryRequest
+    params:
+      deployed:
+        type: boolean
+      error:
+        type: string
+    effects:
+    - set:
+        target.deployed: params.deployed
+        target.refusal: params.error
+    source:
+      kind: interview
+      ref: interview:interview/delivery/log.jsonl#L4
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+    status: confirmed
+  verify:
+    description: Confirm the deployed domain works in use (the probes). A built request
+      may also be verified before it is deployed, to record a dry run.
+    actor:
+    - approver
+    target: DeliveryRequest
+    requires: human
+    params:
+      verified:
+        type: boolean
+    effects:
+    - set:
+        target.verified: params.verified
+    source:
+      kind: interview
+      ref: interview:domains/delivery/interview.jsonl#L28
+    status: confirmed
+    preconditions:
+    - id: deployed
+      check: target.stage == 'built' or target.deployed == true
+      reason: Only a deployment that happened can be verified, except a dry run on
+        a built request.
+      source:
+        kind: interview
+        ref: interview:interview/delivery/log.jsonl#L5
+        quote: 전부 다 추천한 거 동의.
+      status: confirmed
+transitions:
+  DeliveryRequest:
+    field: stage
+    initial: requested
+    matrix:
+      requested:
+        preview:
+          to: previewing
+          source:
+            kind: interview
+            ref: interview:interview/delivery/log.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: confirmed
+        record_build: n/a
+        deploy:
+          deny: Preview it first.
+          source:
+            kind: interview
+            ref: interview:interview/delivery/log.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: confirmed
+        record_deployment: n/a
+        verify: n/a
+      previewing:
+        preview:
+          deny: A preview is running.
+          source:
+            kind: interview
+            ref: interview:interview/delivery/log.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: confirmed
+        record_build:
+          to: built
+          source:
+            kind: interview
+            ref: interview:interview/delivery/log.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: confirmed
+        deploy:
+          deny: The preview has not finished.
+          source:
+            kind: interview
+            ref: interview:interview/delivery/log.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: confirmed
+        record_deployment: n/a
+        verify: n/a
+      built:
+        preview:
+          to: previewing
+          source:
+            kind: interview
+            ref: interview:interview/delivery/log.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: confirmed
+        record_build: n/a
+        deploy:
+          to: deploying
+          source:
+            kind: interview
+            ref: interview:interview/delivery/log.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: confirmed
+        record_deployment: n/a
+        verify:
+          to: verified
+          source:
+            kind: interview
+            ref: interview:domains/delivery/interview.jsonl#L28
+          status: confirmed
+      deploying:
+        preview:
+          deny: A deploy is running.
+          source:
+            kind: interview
+            ref: interview:interview/delivery/log.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: confirmed
+        record_build: n/a
+        deploy:
+          deny: A deploy is running.
+          source:
+            kind: interview
+            ref: interview:interview/delivery/log.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: confirmed
+        record_deployment:
+          to: done
+          source:
+            kind: interview
+            ref: interview:interview/delivery/log.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: confirmed
+        verify: n/a
+      done:
+        preview:
+          to: previewing
+          source:
+            kind: interview
+            ref: interview:interview/delivery/log.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: confirmed
+        record_build: n/a
+        deploy:
+          to: deploying
+          source:
+            kind: interview
+            ref: interview:interview/delivery/log.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: confirmed
+        record_deployment: n/a
+        verify:
+          to: verified
+          source:
+            kind: interview
+            ref: interview:interview/delivery/log.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: confirmed
+      verified:
+        preview: n/a
+        record_build: n/a
+        deploy: n/a
+        record_deployment: n/a
+        verify:
+          deny: Already verified.
+          source:
+            kind: interview
+            ref: interview:interview/delivery/log.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: confirmed
+invariants:
+- id: deployed-builds-passed-their-harness
+  'on': DeliveryRequest
+  check: target.deployed != true or target.harness_ok == true
+  reason: Nothing reaches the environment unless its harness passed.
+  source:
+    kind: interview
+    ref: interview:interview/delivery/log.jsonl#L6
+    quote: '19: a'
+  status: confirmed
+- id: verified-requests-were-deployed
+  'on': DeliveryRequest
+  check: target.stage != 'verified' or target.deployed == true or target.harness_ok
+    == true
+  reason: Only a deployment that happened is verified, or a dry run of a build whose
+    harness passed.
+  source:
+    kind: interview
+    ref: interview:domains/delivery/interview.jsonl#L28
+  status: confirmed
+- id: finished-deploys-record-the-outcome
+  'on': DeliveryRequest
+  check: target.stage not in ['done', 'verified'] or exists(target.deployed) or (target.stage
+    == 'verified' and target.harness_ok == true)
+  reason: A finished deploy records whether it happened; a dry-run verification has
+    no deploy.
+  source:
+    kind: interview
+    ref: interview:domains/delivery/interview.jsonl#L28
+  status: confirmed
+- id: deploying-builds-passed-their-harness
+  'on': DeliveryRequest
+  check: target.stage != 'deploying' or target.harness_ok == true
+  reason: A deploy starts only from a build whose harness passed.
+  source:
+    kind: interview
+    ref: interview:interview/delivery/log.jsonl#L11
+    quote: 25번은 A로 추천으로 해도 될 것 같고, 이십육 번도 A로.
+  status: confirmed
+world:
+  actors:
+    approver:
+    - ana
+  fixtures:
+  - Environment:
+      id: ENV-local
+      name: local
+  - DeliveryRequest:
+      id: R1
+      domain_id: authoring
+      commit: 2-c3d4
+      branch: main
+      interface: 1.1.0
+      environment: local
+      approver: ana
+      stage: requested
+  - DeliveryRequest:
+      id: R2
+      domain_id: authoring
+      commit: 3-e5f6
+      branch: main
+      interface: 1.1.0
+      environment: local
+      approver: ana
+      stage: built
+      build: b2
+      harness_ok: false
+  - DeliveryRequest:
+      id: R3
+      domain_id: authoring
+      commit: 4-a7b8
+      branch: main
+      interface: 1.2.0
+      environment: local
+      approver: ana
+      stage: done
+      build: b3
+      harness_ok: true
+      deployed: false
+      refusal: 'stranded: E-live (state ''ended'' is gone)'
+  - DeliveryRequest:
+      id: R4
+      domain_id: delivery
+      commit: 5-c9d0
+      branch: main
+      interface: 1.0.0
+      environment: local
+      approver: ana
+      stage: done
+      build: b4
+      harness_ok: true
+      deployed: true
+      refusal: ''
+scenarios:
+- id: deliver-preview-deploy-verify
+  given:
+    from_world: R1
+  steps:
+  - actor:
+      role: approver
+    do: deploy
+    target: R1
+    expect:
+      denied_by: matrix
+      reason_shown: true
+  - actor:
+      role: approver
+    do: preview
+    target: R1
+    expect:
+      state:
+        R1.stage: previewing
+  - actor:
+      external: kernel
+    do: record_build
+    target: R1
+    params:
+      build: b1
+      harness_ok: true
+    expect:
+      state:
+        R1.stage: built
+        R1.harness_ok: true
+  - actor:
+      role: approver
+    do: deploy
+    target: R1
+    expect:
+      state:
+        R1.stage: deploying
+  - actor:
+      external: kernel
+    do: record_deployment
+    target: R1
+    params:
+      deployed: true
+      error: ''
+    expect:
+      state:
+        R1.stage: done
+        R1.deployed: true
+  - actor:
+      role: approver
+    do: verify
+    target: R1
+    params:
+      verified: true
+    expect:
+      state:
+        R1.stage: verified
+        R1.verified: true
+  source:
+    kind: interview
+    ref: interview:domains/delivery/interview.jsonl#L17
+  status: confirmed
+- id: a-failed-harness-is-never-deployed
+  given:
+    from_world: R2
+  steps:
+  - actor:
+      role: approver
+    do: deploy
+    target: R2
+    expect:
+      denied_by: harness-passed
+- id: a-refused-deploy-is-not-verified-and-can-be-retried
+  given:
+    from_world: R3
+  steps:
+  - actor:
+      role: approver
+    do: verify
+    target: R3
+    params:
+      verified: true
+    expect:
+      denied_by: deployed
+  - actor:
+      role: approver
+    do: preview
+    target: R3
+    expect:
+      state:
+        R3.stage: previewing
+glossary:
+  delivery request: A request, handed over from Authoring, to put one approved commit
+    of a domain into an environment.
+  preview: Building a commit and running its harness before anything is deployed;
+    a preview changes no environment.
+  deploy floor: 'Rules the kernel enforces on every deploy that no declaration can
+    weaken: approved, on main, not a downgrade, harness passed, a person deploys,
+    nothing stranded.'
+  verified: A deployment a person has checked in use, after it happened.
