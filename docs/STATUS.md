@@ -86,6 +86,7 @@ command reference are generated.
 | 13. The run (RUNBOOK 3–6): dry run, full run (20 of 20 on each arm), grades confirmed by the researcher (the three probe runs `to-decide` listed, 2026-11-08), score (`runs/phase-b/scoring/metrics.json`) | ✅ | #166 |
 | 14. The Toprope arm's flags on the kernel's inputs: the first scored run (#166) took them by checking each commit again on the deploy environment's events, which are empty, so every log replay finding was lost (the kernel's own check replays the member's history, ADR-0045). Flags now come from the recorded base and the member's own history, and each says whether its base had it (`carried`); `phase_b recheck-toprope` takes them again from the stored commits (nothing is run by a model), keeping the first under `check.original`; then `grade` and `score` run again | ✅ | #169, #170 |
 | 15. The Toprope arm with its LLM review (the researcher: the fair comparison is Toprope's declarations, scenarios, compiler and LLM together against the NL skill with an LLM, 2026-11-08): `phase_b combine-toprope` reviews the Toprope arm's own edits five times with the frozen review prompt and adds the compiler's flags, into `runs/phase-b-combined` for `grade` and `score`; an arm added after the first scoring, reported as such. Also a secondary precision that counts a compiler check once per change and leaves out what the base had | ✅ | #172, #173 |
+| 16. The grader is asked once more for JSON when it answers in prose (M1 lost six verdicts that way, decided by the researcher); a gap equal to the noise floor is not "within" it (both rounded) | 🟡 | |
 
 How a run works (ADR-0047): the researcher opens a session through Remote Control on the
 repository's folder on their computer, and it follows [`phase_b/RUNBOOK.md`](../experiments/m1/phase_b/RUNBOOK.md):
@@ -367,9 +368,7 @@ it; each release's cleanup PR handles items older than one release.
   Found building probe P04's starting state (#103, 2026-11-06). Not fixed in M1: the self domains
   are the experiment's baseline
 
-- The Phase B harness: when the grader answers a probe in prose instead of JSON, its verdict is
-  lost (`passed: null`) and `to-decide` hands it to the researcher (four probe runs over the two
-  gradings); `phase-b-runs.tsv` has a second header where two arms created it at once; `phase_b
+- The Phase B harness: `phase-b-runs.tsv` has a second header where two arms created it at once; `phase_b
   status` lists the superseded `*.stale-1` folders too (#166, #170, 2026-11-08)
 
 ## Open questions

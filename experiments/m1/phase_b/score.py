@@ -143,6 +143,19 @@ def handoff_breaking(binding: dict[str, Any]) -> bool:
 
 # -- grading ------------------------------------------------------------------------------------------
 
+def _ask_json(backend: Any, system: str, user: str, transcript: Path) -> dict[str, Any] | None:
+    """The grader's answer as JSON. When it answers in prose (it did, now and then, in M1), it is
+    asked once more, with its answer, for the JSON alone; the second conversation is recorded too."""
+    answer = backend.converse(system, user, None, Transcript(transcript))
+    data = _json(answer)
+    if data is None:
+        again = (f"{user}\n\n--- Your answer was ---\n{answer}\n\n"
+                 "Give that answer again as the JSON the instructions ask for, and nothing else.")
+        data = _json(backend.converse(system, again, None,
+                                      Transcript(transcript.with_name(transcript.stem + "-json.jsonl"))))
+    return data
+
+
 def _json(text: str) -> dict[str, Any] | None:
     dec = json.JSONDecoder()
     for m in re.finditer(r"\{", text):
@@ -208,8 +221,7 @@ def grade_change(backend: Any, seq: int, req: dict[str, Any], recs: dict[str, di
                 flags.append({"id": fid, "run": r["run"], "index": i, "flag": f, "script_label": script})
         blocks.append("\n".join(lines))
     user = f"{_sealed_context(seq, req, key, binding)}\n\n" + "\n\n".join(blocks)
-    answer = backend.converse(prompt("grade_change"), user, None, Transcript(out / f"seq-{seq:02d}.jsonl"))
-    data = _json(answer) or {}
+    data = _ask_json(backend, prompt("grade_change"), user, out / f"seq-{seq:02d}.jsonl") or {}
     got = {str(x.get("id")): x for x in data.get("flags", []) if isinstance(x, dict)}
     for f in flags:
         g = got.get(f["id"], {})
@@ -258,8 +270,7 @@ def grade_probe(backend: Any, probe: dict[str, Any], run_dir: Path, result: dict
             f"Starting state: {probe['starting_state']}\n"
             f"It must: {json.dumps(probe.get('must', []))}\nIt must not: {json.dumps(probe.get('must_not', []))}\n"
             f"Notes: {probe.get('notes', '')}\n\n--- What the agent did ---\n{_probe_text(run_dir, result)}")
-    answer = backend.converse(prompt("grade_probe"), user, None, Transcript(out))
-    data = _json(answer) or {}
+    data = _ask_json(backend, prompt("grade_probe"), user, out) or {}
     passed = data.get("passed")
     return {"probe": probe["id"], "passed": passed if isinstance(passed, bool) else None,
             "why": data.get("why", ""), "error": result.get("error")}
@@ -495,7 +506,7 @@ def verdicts(m: dict[str, dict[str, Any]], rules: dict[str, Any]) -> dict[str, A
         for name, gap, rule in (("gap_nl", gap_nl, "iterate.supports.nl_recall_gap_min / weakens.nl_within"),
                                 ("gap_structured", gap_st,
                                  "iterate.supports.structured_recall_gap_min / narrowed_if_structured_gap_below")):
-            if abs(gap) < floor:
+            if round(abs(gap), 4) < floor:              # both rounded: 0.84 − 0.64 is not below 0.2
                 within[name] = f"within run-to-run noise ({round(gap, 4)} < noise floor {floor}); affects {rule}"
     return {"iterate": iterate, "handoff": handoff,
             "not_measured_here": ["hand_edits_to_generated_max (the self-compile result, reported separately)"],
