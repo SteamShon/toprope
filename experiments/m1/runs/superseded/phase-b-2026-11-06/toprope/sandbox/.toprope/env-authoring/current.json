@@ -1,0 +1,14 @@
+{
+  "build": "b45e2bf45a0ccc2f",
+  "domain": "authoring",
+  "version": 18,
+  "declaration": "/Users/doyungyoon/Workspace/toprope/experiments/m1/runs/phase-b/toprope/sandbox/.toprope/env-authoring/builds/b45e2bf45a0ccc2f/domain.yaml",
+  "deployed_at": "2026-11-06T15:24:57+00:00",
+  "approver": {
+    "id": "researcher-standin <standin@m1.invalid>",
+    "kind": "person"
+  },
+  "commit": "18-4130d767ddf2194f",
+  "seq": 18,
+  "commit_domain": "authoring"
+}

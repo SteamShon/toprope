@@ -1,0 +1,14 @@
+{
+  "build": "0e9d8cb8f26374a7",
+  "domain": "library",
+  "version": 1,
+  "declaration": "/Users/doyungyoon/Workspace/toprope/experiments/m1/runs/phase-b/worlds.building-mqlv7q47/worlds/P02/.toprope/env-library/builds/0e9d8cb8f26374a7/domain.yaml",
+  "deployed_at": "2026-11-08T03:08:26+00:00",
+  "approver": {
+    "id": "owner <owner@library.invalid>",
+    "kind": "person"
+  },
+  "commit": "1-d9ed7a127857fcad",
+  "seq": 1,
+  "commit_domain": "library"
+}

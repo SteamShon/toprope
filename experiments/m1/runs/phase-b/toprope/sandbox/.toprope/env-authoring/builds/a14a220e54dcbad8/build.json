@@ -1,0 +1,9 @@
+{
+  "id": "a14a220e54dcbad8",
+  "domain": "authoring",
+  "version": 19,
+  "declaration_sha256": "a14a220e54dcbad80d9a02bed92fb2fd27aabab4dcec54a12ffb96d3a0cb7f00",
+  "toolchain": "98c4deb6811c8648fe28340c6b4a2162f9ae5fa6e61383d132c257f1333e109e",
+  "harness_ok": true,
+  "created_at": "2026-11-08T05:48:32+00:00"
+}

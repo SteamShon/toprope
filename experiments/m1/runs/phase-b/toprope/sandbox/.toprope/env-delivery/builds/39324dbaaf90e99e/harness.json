@@ -1,0 +1,246 @@
+{
+  "ok": false,
+  "levels": [
+    "model",
+    "execution"
+  ],
+  "findings": [
+    {
+      "kind": "invariant",
+      "level": "model",
+      "case": "cell:DeliveryRequest.built.verify.approver",
+      "detail": {
+        "expected": {
+          "status": "ok",
+          "to": "verified"
+        },
+        "observed": {
+          "status": "rejected",
+          "code": "invariant-guard",
+          "reason": "Only a deployment that happened is verified, or a dry run of a build whose harness passed.",
+          "state": {
+            "approver": "ana",
+            "branch": "main",
+            "build": "b2",
+            "commit": "3-e5f6",
+            "domain_id": "authoring",
+            "environment": "local",
+            "harness_ok": false,
+            "id": "R2~h57",
+            "interface": "1.1.0",
+            "stage": "built"
+          }
+        }
+      }
+    },
+    {
+      "kind": "invariant",
+      "level": "model",
+      "case": "param:DeliveryRequest.built.verify.approver@R2:verified=False",
+      "detail": {
+        "expected": {
+          "status": "ok",
+          "to": "verified"
+        },
+        "observed": {
+          "status": "rejected",
+          "code": "invariant-guard",
+          "reason": "Only a deployment that happened is verified, or a dry run of a build whose harness passed.",
+          "state": {
+            "approver": "ana",
+            "branch": "main",
+            "build": "b2",
+            "commit": "3-e5f6",
+            "domain_id": "authoring",
+            "environment": "local",
+            "harness_ok": false,
+            "id": "R2~h65",
+            "interface": "1.1.0",
+            "stage": "built"
+          }
+        }
+      }
+    },
+    {
+      "kind": "invariant",
+      "level": "execution",
+      "case": "cell:DeliveryRequest.built.verify.approver",
+      "detail": {
+        "expected": {
+          "status": "ok",
+          "to": "verified"
+        },
+        "observed": {
+          "status": "rejected",
+          "code": "invariant-guard",
+          "reason": "Only a deployment that happened is verified, or a dry run of a build whose harness passed.",
+          "state": {
+            "approver": "ana",
+            "branch": "main",
+            "build": "b2",
+            "commit": "3-e5f6",
+            "domain_id": "authoring",
+            "environment": "local",
+            "harness_ok": false,
+            "id": "R2~h57",
+            "interface": "1.1.0",
+            "stage": "built"
+          }
+        }
+      }
+    },
+    {
+      "kind": "invariant",
+      "level": "execution",
+      "case": "param:DeliveryRequest.built.verify.approver@R2:verified=False",
+      "detail": {
+        "expected": {
+          "status": "ok",
+          "to": "verified"
+        },
+        "observed": {
+          "status": "rejected",
+          "code": "invariant-guard",
+          "reason": "Only a deployment that happened is verified, or a dry run of a build whose harness passed.",
+          "state": {
+            "approver": "ana",
+            "branch": "main",
+            "build": "b2",
+            "commit": "3-e5f6",
+            "domain_id": "authoring",
+            "environment": "local",
+            "harness_ok": false,
+            "id": "R2~h65",
+            "interface": "1.1.0",
+            "stage": "built"
+          }
+        }
+      }
+    },
+    {
+      "kind": "exploration",
+      "level": "model",
+      "case": "explore",
+      "detail": {
+        "invariant": "verified-requests-were-deployed",
+        "steps": [
+          {
+            "actor": "approver ana",
+            "action": "verify",
+            "target": "R2",
+            "from": "built",
+            "path": [],
+            "outcome": "invariant-guard"
+          }
+        ]
+      }
+    }
+  ],
+  "coverage": {
+    "edges": {
+      "DeliveryRequest.(new).request_delivery": "verified",
+      "DeliveryRequest.built.deploy": "verified",
+      "DeliveryRequest.built.preview": "verified",
+      "DeliveryRequest.built.record_build": "verified",
+      "DeliveryRequest.built.record_deployment": "verified",
+      "DeliveryRequest.built.verify": "failed",
+      "DeliveryRequest.deploying.deploy": "verified",
+      "DeliveryRequest.deploying.preview": "verified",
+      "DeliveryRequest.deploying.record_build": "verified",
+      "DeliveryRequest.deploying.record_deployment": "verified",
+      "DeliveryRequest.deploying.verify": "verified",
+      "DeliveryRequest.done.deploy": "verified",
+      "DeliveryRequest.done.preview": "verified",
+      "DeliveryRequest.done.record_build": "verified",
+      "DeliveryRequest.done.record_deployment": "verified",
+      "DeliveryRequest.done.verify": "verified",
+      "DeliveryRequest.previewing.deploy": "verified",
+      "DeliveryRequest.previewing.preview": "verified",
+      "DeliveryRequest.previewing.record_build": "verified",
+      "DeliveryRequest.previewing.record_deployment": "verified",
+      "DeliveryRequest.previewing.verify": "verified",
+      "DeliveryRequest.requested.deploy": "verified",
+      "DeliveryRequest.requested.preview": "verified",
+      "DeliveryRequest.requested.record_build": "verified",
+      "DeliveryRequest.requested.record_deployment": "verified",
+      "DeliveryRequest.requested.verify": "verified",
+      "DeliveryRequest.verified.deploy": "verified",
+      "DeliveryRequest.verified.preview": "verified",
+      "DeliveryRequest.verified.record_build": "verified",
+      "DeliveryRequest.verified.record_deployment": "verified",
+      "DeliveryRequest.verified.verify": "verified"
+    },
+    "cells": {
+      "decided": 60,
+      "covered": {
+        "model": 59,
+        "execution": 59
+      },
+      "undecided": [],
+      "gaps": []
+    },
+    "preconditions": {
+      "cases": 2,
+      "gaps": []
+    },
+    "creates": 2,
+    "invariants": {
+      "total": 4,
+      "exercised": 4
+    },
+    "flows": {
+      "total": 3,
+      "passed": {
+        "model": 3,
+        "execution": 3
+      }
+    },
+    "races": 0,
+    "unreachable": {},
+    "mechanical": {
+      "cells": 60,
+      "samples": 180,
+      "no_sample": [],
+      "unreachable_from_creation": {}
+    }
+  },
+  "minimal_flows": [
+    {
+      "invariant": "verified-requests-were-deployed",
+      "steps": [
+        {
+          "actor": "approver ana",
+          "action": "verify",
+          "target": "R2",
+          "from": "built",
+          "path": [],
+          "outcome": "invariant-guard"
+        }
+      ]
+    }
+  ],
+  "warnings": [
+    {
+      "kind": "inductive",
+      "level": "model",
+      "case": "mechanical:DeliveryRequest.built.verify.approver",
+      "detail": {
+        "reason": "Only a deployment that happened is verified, or a dry run of a build whose harness passed.",
+        "start": {
+          "id": "DeliveryRequest~m2282665b3",
+          "domain_id": "",
+          "commit": "x",
+          "branch": "",
+          "interface": "x",
+          "environment": "example",
+          "approver": "example",
+          "build": "x",
+          "harness_ok": false,
+          "refusal": "example",
+          "stage": "built"
+        },
+        "why": "from an object every invariant allows, this move breaks one: strengthen an invariant (rule out the start) or a precondition (refuse the move)"
+      }
+    }
+  ]
+}

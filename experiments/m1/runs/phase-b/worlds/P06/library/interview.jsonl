@@ -1,0 +1,3 @@
+{"at": "2026-11-08T03:09:30+00:00", "kind": "answer", "stage": "invariants", "question_id": "What must a lent book have?", "question": "What must a lent book have?", "answer": "Every lent book has a borrower. A member may renew a book once.", "decisions": []}
+{"at": "2026-11-08T03:09:38+00:00", "kind": "confirm", "paths": ["actions.renew"], "via": "kernel", "who": "owner <owner@library.invalid>"}
+{"at": "2026-11-08T03:09:43+00:00", "kind": "confirm", "paths": ["actions.inspect"], "via": "kernel", "who": "owner <owner@library.invalid>"}

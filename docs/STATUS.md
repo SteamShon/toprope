@@ -6,7 +6,7 @@ this page); plans live in [`roadmap.md`](roadmap.md) and the milestone and exper
 Every PR into `develop` or an `umbrella/*` branch fixes any line here it makes untrue, or says
 why not; each release trims it ([`AGENTS.md`](../AGENTS.md), "Progress").
 
-Updated: 2026-11-07 · Cleaned for release: `v0.1.0`
+Updated: 2026-11-09 · Cleaned for release: `v0.1.0`
 
 Legend: ✅ done · 🟡 in part · ⬜ not started
 
@@ -15,7 +15,7 @@ Legend: ✅ done · 🟡 in part · ⬜ not started
 | Milestone | Link | Status | Note |
 |---|---|---|---|
 | M0a thin slice | none (enabler) | ✅ | released as `v0.1.0` (#65); the tag is not pushed yet |
-| M1 self-compile | ① ⑥ pilot, no verdict | 🟡 | Phase A and the switch-over done; instruments and Phase B left |
+| M1 self-compile | ① ⑥ pilot, no verdict | ✅ | reported ([`M1-report.md`](experiments/M1-report.md)): with its LLM review Toprope's recall is 0.84 against 0.64 for the NL skill (at the noise floor) and level with the structured spec; the compiler alone weakens ①; ⑥ inconclusive; self-compile not shown (probes) |
 | M0b surfaces and effects | none (enabler) | ⬜ | |
 | M2 dogfood | ① ② ③ | ⬜ | the first ① and ② verdicts |
 | M3 shared language | ④ | ⬜ | |
@@ -46,8 +46,8 @@ replay and in-flight check, incremental analysis, commits and branches (ADR-0029
 | Domain commit store kept in git | ✅ | #75 |
 | Generated `toprope-run` and how-to-work guide (ADR-0036) | ✅ | #76 |
 | Switch-over (ADR-0037, umbrella #81): only the kernel stays hand-built | ✅ | #81 |
-| Phase B: the change sequence on the three arms | ⬜ | |
-| M1 report ([`experiments/M1-self-compile.md`](experiments/M1-self-compile.md)) | ⬜ | |
+| Phase B: the change sequence on the three arms (umbrella `umbrella/m1-phase-b`) | ✅ | #99 |
+| M1 report ([`experiments/M1-report.md`](experiments/M1-report.md)) | ✅ | |
 
 ### Switch-over (umbrella #81)
 
@@ -63,6 +63,36 @@ replay and in-flight check, incremental analysis, commits and branches (ADR-0029
 Signed off by the researcher and merged into `develop` (#81). Nothing but the kernel is
 hand-built: the self domains run from their declarations, and their guides and the kernel's
 command reference are generated.
+
+### Phase B (umbrella `umbrella/m1-phase-b`)
+
+| Sub-PR | Status | PR |
+|---|---|---|
+| 1. Execution protocol (ADR-0040); amended in 2a to run on the researcher's own Claude Code, on their machine | ✅ | #98 |
+| 2a. Harness core: each role a fresh `claude -p` with only the harness's confined tools; stop at the usage limit and resume; progress line; the NL and structured-spec arms; the NL skill's rendering. Tested with a fake model and a fake `claude` | ✅ | #100 |
+| 2b. The Toprope arm: a sandbox with fixed tools, the compiler's checks and a preview, the stand-in for person-only steps and its override of a failed check (the floors still hold). Tested on the real kernel | ✅ | #101 |
+| 2c. The probes: eight starting states built once per run with the approved tools (a small `library` domain), the same generic tools in every arm, the deployed domains' generated MCP in the Toprope arm; the probe agent never sees what a probe checks | ✅ | #103 |
+| 3. The three arms' materials (`experiments/m1/arms/`): structured and Toprope built from the approved commits, the NL skill rendered blind; reviewed side by side by the researcher | ✅ | #105, #163, #166 |
+| 4. Scorer (`grade` proposes labels with a grader, `score` computes the metrics and pilot verdicts from the researcher's confirmed labels; the key opens only here and only after every arm ran every change), tested with a synthetic key; the probes now also run once before any change | ✅ | #106, #164 |
+| 5. Dry run (changes 1–2), run by the researcher: time and usage per change | ✅ | #109 |
+| 6. Full run, scoring confirmed by the researcher, M1 report. The first full run (#112) is superseded (`experiments/m1/runs/superseded/`): it ran before the run protocol was frozen, and from `authoring@4` | ✅ | #112, #166, #170 |
+| 7. Re-baseline on `authoring@9` + `delivery@1` (researcher's decision, 2026-11-07): today's harness finds an invariant break in `authoring@4`, so the deploy floor refuses it. The harness reads the baseline from fixed repository revisions, never the working tree; materials rebuilt; the binding's `domain_version` amended; the NL skill removed until the researcher renders it again (the NL arm refuses a stale one); the editor is told when the kernel refuses its proposal | ✅ | #163 |
+| 8a. No experiment words (protocol §1): the harness's prompts, the change requests and probe requests as given, tool names and descriptions, and workspace file names are checked, and a run stops before showing one; tools never show the workspace's absolute path. The decision log (§4): `runs/phase-b-runs.tsv`, append-only, one row per edit, review or check, deploy and probe, with a pointer to its evidence; a change run again is superseded by a new row | ✅ | #164 |
+| 8b. Repeats and spread (protocol §2–3): five reviews and three probe runs per change; the Toprope arm's checks once, again uncached on three changes, and five timed repeats with the part that bounds each; every arm's flags graded in one pass per change under random labels A, B, C (the mapping kept apart), the script's and the grader's labels both kept; recall and precision per run with mean, minimum and maximum; the noise floor, marked next to the rule a gap affects. The agents' prompts are frozen with the protocol (§1): their hash goes in `FROZEN.json` through `python -m phase_b freeze-prompts` (the researcher's step; a change needs `--reason` and keeps the old hash), and a run refuses until then | ✅ | #164 |
+| 9. How Phase B runs now (ADR-0047, superseding ADR-0040 §2): a Remote Control session on the researcher's computer runs the harness from `phase_b/RUNBOOK.md`, never opening the key, the binding or the blind labels; the researcher keeps three judgments; `to-decide` lists only the grades that need one | ✅ | #165 |
+| 10. What an older run leaves behind is not a run: `worlds/` counts as built only when every probe's starting state is in it, and a Toprope sandbox only once the materials are; caches git ignores (left by `git mv` of the first run) are kept aside, and the harness builds afresh. Found by the first dry run on the researcher's computer (2026-11-08), which stopped at once on all three arms | ✅ | #167 |
+| 11. The Toprope arm's tools stay fixed: its stand-in and editor run the toolchain's files (`--working-copy`). Since ADR-0045 a member runs its deployed commit, and the sandbox's commit stores are the arm's, so the arm's own deployed changes had become its tools; change 9 (a request field the handoff does not send) then left the composition unable to compile and stopped the arm at change 10 (2026-11-08). The Toprope arm's changes 1–9 ran on drifting tools and run again | ✅ | #168 |
+| 12. The run's first two steps (RUNBOOK 1–2): the agents' prompts frozen at the researcher's instruction (2026-11-08); the NL skill rendered again from `authoring@9` + `delivery@1` and accepted by the researcher side by side with the declarations (2026-11-08) | ✅ | #166 |
+| 13. The run (RUNBOOK 3–6): dry run, full run (20 of 20 on each arm), grades confirmed by the researcher (the three probe runs `to-decide` listed, 2026-11-08), score (`runs/phase-b/scoring/metrics.json`) | ✅ | #166 |
+| 14. The Toprope arm's flags on the kernel's inputs: the first scored run (#166) took them by checking each commit again on the deploy environment's events, which are empty, so every log replay finding was lost (the kernel's own check replays the member's history, ADR-0045). Flags now come from the recorded base and the member's own history, and each says whether its base had it (`carried`); `phase_b recheck-toprope` takes them again from the stored commits (nothing is run by a model), keeping the first under `check.original`; then `grade` and `score` run again | ✅ | #169, #170 |
+| 15. The Toprope arm with its LLM review (the researcher: the fair comparison is Toprope's declarations, scenarios, compiler and LLM together against the NL skill with an LLM, 2026-11-08): `phase_b combine-toprope` reviews the Toprope arm's own edits five times with the frozen review prompt and adds the compiler's flags, into `runs/phase-b-combined` for `grade` and `score`; an arm added after the first scoring, reported as such. Also a secondary precision that counts a compiler check once per change and leaves out what the base had | ✅ | #172, #173 |
+| 16. The grader is asked once more for JSON when it answers in prose (M1 lost six verdicts that way, decided by the researcher); a gap equal to the noise floor is not "within" it (both rounded) | 🟡 | |
+
+How a run works (ADR-0047): the researcher opens a session through Remote Control on the
+repository's folder on their computer, and it follows [`phase_b/RUNBOOK.md`](../experiments/m1/phase_b/RUNBOOK.md):
+it runs the harness, pushes the results and stops for the researcher's three judgments (the
+prompts, the NL skill, the grades `to-decide` lists). Each role is still a fresh, tool-confined
+`claude -p` the harness starts; a stopped run continues with the same command.
 
 ### How the self domains run
 
@@ -287,8 +317,10 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 
 ## Next
 
-1. M1 Phase B: the change sequence on the three arms (every M1 instrument is frozen; the
-   harness runs `instruments.py verify --run` before each arm run), then the M1 report.
+1. M1's findings, before M2 (umbrella `umbrella/m1-findings`; [`M1-report.md`](experiments/M1-report.md),
+   *What M2 takes from this*): rules bound to outcomes (ADR), a capability diff in the change
+   check, the natural-language check, grouped warnings, an editor that proposes a patch, probes
+   that pass before any change. Then M2's design and its preregistered question.
 2. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
 3. When a domain is shared by several people or agents (M2, or a hosted server): its event
    log moves from git to a database (`--store postgres:DSN` for a composition, one schema per
@@ -314,6 +346,13 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    (#155), link paths to what no action changes (#156) and time, frozen at the harness's clock
    (#157), are modeled; no declaration in the repository leaves anything out.
 
+7. Before M2's Phase B: a probe's starting state written as conditions on objects (for example
+   a Commit with `checks_passed` true and `approved` false), and generated from the declarations
+   by searching their actions for a way to reach it, instead of a hand-written setup per probe.
+   This needs a format change to the probe suite (an ADR). M1 keeps the hand-written setups in
+   `experiments/m1/phase_b/probes.py`, built only from the approved tools on a separate domain
+   (decided 2026-11-06).
+
 ## Left from reviews
 
 Each item names the PR it came from and the review date. The PR that resolves an item deletes
@@ -324,6 +363,13 @@ it; each release's cleanup PR handles items older than one release.
   dispatches; the PR needs one more commit before it can merge. A push token that triggers
   workflows (a GitHub App or a fine-grained token, set up by the maintainer) would remove the
   step (#96, 2026-11-06)
+- Authoring's `record_questions` sets the stage and the bundle but not `params.questions`, so the
+  generated tools never show the bundle's questions (`next_questions` returns only the bundle id).
+  Found building probe P04's starting state (#103, 2026-11-06). Not fixed in M1: the self domains
+  are the experiment's baseline
+
+- The Phase B harness: `phase-b-runs.tsv` has a second header where two arms created it at once; `phase_b
+  status` lists the superseded `*.stale-1` folders too (#166, #170, 2026-11-08)
 
 ## Open questions
 
