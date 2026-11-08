@@ -13,7 +13,168 @@
         "check": "structural",
         "severity": "warning",
         "where": "actions.add_source.params",
-        "problem": "unset-on-create: add_source creates a Source without its required `local_only` (an optional param sets it): make the param required, set it in an effect, or make the property optional"
+        "problem": "unset-on-create: add_source creates a Source without its required `local_only` (an optional param sets it): make the param required, set it in an effect, or make the property optional",
+        "carried": true
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "5-c8fd1b8fc98be17c@5",
+        "problem": "approve_commit at 2026-11-06T18:05:47.280407+00:00 would now set ['wording_only'] differently",
+        "carried": true
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "7-92bcb1c921be21bd@5",
+        "problem": "approve_commit at 2026-11-07T00:06:14.749778+00:00 would now set ['wording_only'] differently",
+        "carried": true
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "9-b4ec65433222f096@5",
+        "problem": "approve_commit at 2026-11-07T04:12:29.531178+00:00 would now set ['wording_only'] differently",
+        "carried": true
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "4-3e90586c40faf7d7@5",
+        "problem": "approve_commit at 2026-11-07T04:12:33.304943+00:00 would now set ['wording_only'] differently",
+        "carried": true
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "10-a19a483764e3e654@5",
+        "problem": "approve_commit at 2026-11-08T05:19:13.668531+00:00 would now set ['wording_only'] differently",
+        "carried": true
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "11-33b085b6086f705d@5",
+        "problem": "approve_commit at 2026-11-08T05:21:18.183529+00:00 would now set ['wording_only'] differently",
+        "carried": true
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "12-bedd8ef013cbc3b8@5",
+        "problem": "approve_commit at 2026-11-08T05:23:41.866247+00:00 would now set ['wording_only'] differently",
+        "carried": true
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "13-a48d6ab38b1d16b6@5",
+        "problem": "approve_commit at 2026-11-08T05:25:38.714162+00:00 would now set ['wording_only'] differently",
+        "carried": true
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "2-13fd4540ec05a7d8@5",
+        "problem": "approve_commit at 2026-11-08T05:28:11.012654+00:00 would now set ['wording_only'] differently",
+        "carried": true
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "14-0f105a9a61619c23@5",
+        "problem": "approve_commit at 2026-11-08T05:30:22.161506+00:00 would now set ['wording_only'] differently",
+        "carried": true
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "15-d6658918cf380703@5",
+        "problem": "approve_commit at 2026-11-08T05:32:42.605761+00:00 would now set ['wording_only'] differently",
+        "carried": true
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "16-ff0411a4a8d73855@5",
+        "problem": "approve_commit at 2026-11-08T05:35:04.013876+00:00 would now set ['wording_only'] differently",
+        "carried": true
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "3-a1f303f621edddca@5",
+        "problem": "approve_commit at 2026-11-08T05:37:12.638684+00:00 would now set ['wording_only'] differently",
+        "carried": true
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "17-f58a8efefe3503b3@5",
+        "problem": "approve_commit at 2026-11-08T05:39:35.355519+00:00 would now set ['wording_only'] differently",
+        "carried": true
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "5-7cb3cb8c5d4b3045@5",
+        "problem": "approve_commit at 2026-11-08T05:43:55.026538+00:00 would now set ['wording_only'] differently",
+        "carried": true
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "18-a38638cb0d596c30@5",
+        "problem": "approve_commit at 2026-11-08T05:46:06.737996+00:00 would now set ['wording_only'] differently",
+        "carried": true
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "19-42e9f7941c90cc5c@5",
+        "problem": "approve_commit at 2026-11-08T05:48:30.537067+00:00 would now set ['wording_only'] differently",
+        "carried": true
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "6-ad93019264aa7cbb@5",
+        "problem": "approve_commit at 2026-11-08T05:50:50.876840+00:00 would now set ['wording_only'] differently",
+        "carried": true
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "20-a07ea0479549e630@5",
+        "problem": "approve_commit at 2026-11-08T05:53:07.594154+00:00 would now set ['wording_only'] differently",
+        "carried": true
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "7-ce761f68bc3e83be@5",
+        "problem": "approve_commit at 2026-11-08T05:55:21.729923+00:00 would now set ['wording_only'] differently",
+        "carried": true
       }
     ],
     "commits": {
@@ -59,7 +220,168 @@
             "check": "structural",
             "severity": "warning",
             "where": "actions.add_source.params",
-            "problem": "unset-on-create: add_source creates a Source without its required `local_only` (an optional param sets it): make the param required, set it in an effect, or make the property optional"
+            "problem": "unset-on-create: add_source creates a Source without its required `local_only` (an optional param sets it): make the param required, set it in an effect, or make the property optional",
+            "carried": true
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "5-c8fd1b8fc98be17c@5",
+            "problem": "approve_commit at 2026-11-06T18:05:47.280407+00:00 would now set ['wording_only'] differently",
+            "carried": true
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "7-92bcb1c921be21bd@5",
+            "problem": "approve_commit at 2026-11-07T00:06:14.749778+00:00 would now set ['wording_only'] differently",
+            "carried": true
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "9-b4ec65433222f096@5",
+            "problem": "approve_commit at 2026-11-07T04:12:29.531178+00:00 would now set ['wording_only'] differently",
+            "carried": true
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "4-3e90586c40faf7d7@5",
+            "problem": "approve_commit at 2026-11-07T04:12:33.304943+00:00 would now set ['wording_only'] differently",
+            "carried": true
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "10-a19a483764e3e654@5",
+            "problem": "approve_commit at 2026-11-08T05:19:13.668531+00:00 would now set ['wording_only'] differently",
+            "carried": true
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "11-33b085b6086f705d@5",
+            "problem": "approve_commit at 2026-11-08T05:21:18.183529+00:00 would now set ['wording_only'] differently",
+            "carried": true
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "12-bedd8ef013cbc3b8@5",
+            "problem": "approve_commit at 2026-11-08T05:23:41.866247+00:00 would now set ['wording_only'] differently",
+            "carried": true
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "13-a48d6ab38b1d16b6@5",
+            "problem": "approve_commit at 2026-11-08T05:25:38.714162+00:00 would now set ['wording_only'] differently",
+            "carried": true
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "2-13fd4540ec05a7d8@5",
+            "problem": "approve_commit at 2026-11-08T05:28:11.012654+00:00 would now set ['wording_only'] differently",
+            "carried": true
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "14-0f105a9a61619c23@5",
+            "problem": "approve_commit at 2026-11-08T05:30:22.161506+00:00 would now set ['wording_only'] differently",
+            "carried": true
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "15-d6658918cf380703@5",
+            "problem": "approve_commit at 2026-11-08T05:32:42.605761+00:00 would now set ['wording_only'] differently",
+            "carried": true
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "16-ff0411a4a8d73855@5",
+            "problem": "approve_commit at 2026-11-08T05:35:04.013876+00:00 would now set ['wording_only'] differently",
+            "carried": true
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "3-a1f303f621edddca@5",
+            "problem": "approve_commit at 2026-11-08T05:37:12.638684+00:00 would now set ['wording_only'] differently",
+            "carried": true
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "17-f58a8efefe3503b3@5",
+            "problem": "approve_commit at 2026-11-08T05:39:35.355519+00:00 would now set ['wording_only'] differently",
+            "carried": true
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "5-7cb3cb8c5d4b3045@5",
+            "problem": "approve_commit at 2026-11-08T05:43:55.026538+00:00 would now set ['wording_only'] differently",
+            "carried": true
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "18-a38638cb0d596c30@5",
+            "problem": "approve_commit at 2026-11-08T05:46:06.737996+00:00 would now set ['wording_only'] differently",
+            "carried": true
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "19-42e9f7941c90cc5c@5",
+            "problem": "approve_commit at 2026-11-08T05:48:30.537067+00:00 would now set ['wording_only'] differently",
+            "carried": true
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "6-ad93019264aa7cbb@5",
+            "problem": "approve_commit at 2026-11-08T05:50:50.876840+00:00 would now set ['wording_only'] differently",
+            "carried": true
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "20-a07ea0479549e630@5",
+            "problem": "approve_commit at 2026-11-08T05:53:07.594154+00:00 would now set ['wording_only'] differently",
+            "carried": true
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "7-ce761f68bc3e83be@5",
+            "problem": "approve_commit at 2026-11-08T05:55:21.729923+00:00 would now set ['wording_only'] differently",
+            "carried": true
           }
         ]
       }
@@ -125,7 +447,37 @@
         },
         "limiter": "preview"
       }
-    ]
+    ],
+    "original": {
+      "findings": [
+        {
+          "domain": "authoring",
+          "check": "structural",
+          "severity": "warning",
+          "where": "actions.add_source.params",
+          "problem": "unset-on-create: add_source creates a Source without its required `local_only` (an optional param sets it): make the param required, set it in an effect, or make the property optional"
+        }
+      ],
+      "runs": [
+        {
+          "run": 1,
+          "findings": [
+            {
+              "domain": "authoring",
+              "check": "structural",
+              "severity": "warning",
+              "where": "actions.add_source.params",
+              "problem": "unset-on-create: add_source creates a Source without its required `local_only` (an optional param sets it): make the param required, set it in an effect, or make the property optional"
+            }
+          ]
+        }
+      ]
+    },
+    "recheck": {
+      "at": "2026-11-08T09:52:27.859199+00:00",
+      "harness_commit": "f56e744d44c09afef5ef1412a4b22fe40eabb96a",
+      "why": "flags taken on the kernel's inputs (its base and the member's own history)"
+    }
   },
   "deploy": {
     "deployed": true,

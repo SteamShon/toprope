@@ -11,50 +11,51 @@
         17,
         20
       ],
-      "recall": 0.54,
+      "recall": 0.52,
       "recall_spread": {
         "runs": [
           0.5,
           0.4,
           0.6,
-          0.7,
+          0.6,
           0.5
         ],
-        "mean": 0.54,
+        "mean": 0.52,
         "min": 0.4,
-        "max": 0.7
+        "max": 0.6
       },
-      "recall_without_handoff": 0.6,
+      "recall_without_handoff": 0.5778,
       "recall_by_type": {
-        "breaks-past-behavior": 0.4,
+        "breaks-past-behavior": 0.2,
         "breaks-reference": 0.0,
-        "conflicts-with-rule": 0.76,
+        "conflicts-with-rule": 0.8,
         "other:required-stages": 0.8,
         "strands-objects": 0.0
       },
       "recall_by_designed_for_checks": {
-        "no": 0.6,
-        "yes": 0.525
+        "no": 0.4,
+        "yes": 0.55
       },
       "findings": 361,
-      "precision": 0.613,
+      "precision": 0.591,
       "precision_spread": {
         "runs": [
-          0.6143,
-          0.6119,
+          0.5857,
+          0.5821,
           0.6522,
-          0.6154,
-          0.5714
+          0.5897,
+          0.5455
         ],
-        "mean": 0.613,
-        "min": 0.5714,
+        "mean": 0.591,
+        "min": 0.5455,
         "max": 0.6522
       },
       "found_after_deploy": {
         "5": [
           "P01",
           "P02",
-          "P06",
+          "P04",
+          "P05",
           "P08"
         ],
         "9": [
@@ -68,61 +69,60 @@
           "P08"
         ],
         "15": [
-          "P02",
+          "P01",
+          "P06",
           "P08"
         ],
         "18": [
           "P02",
           "P04",
-          "P06"
+          "P05"
         ]
       },
       "silent": [],
       "breakages_found_only_after_deploy": 1.0,
       "edit_fidelity": {
-        "implements": 16,
-        "partial": 3,
-        "does-not": 1
+        "implements": 18,
+        "partial": 2,
+        "does-not": 0
       },
       "probe_pass_rate": {
         "runs": [
-          0.4375,
-          0.4625,
-          0.4
+          0.5062,
+          0.4875,
+          0.4188
         ],
-        "mean": 0.4333,
-        "min": 0.4,
-        "max": 0.4625
+        "mean": 0.4708,
+        "min": 0.4188,
+        "max": 0.5062
       },
       "probes_failed": {
         "0": [
+          "P01",
           "P04",
           "P05",
           "P07"
         ],
         "1": [
-          "P01",
           "P04",
           "P05",
           "P06",
           "P07"
         ],
         "2": [
+          "P01",
           "P04",
           "P05",
-          "P06",
           "P07"
         ],
         "3": [
           "P01",
-          "P02",
-          "P04",
           "P05",
           "P07"
         ],
         "4": [
-          "P04",
-          "P05",
+          "P01",
+          "P06",
           "P07"
         ],
         "5": [
@@ -132,17 +132,15 @@
           "P07"
         ],
         "6": [
-          "P01",
           "P02",
-          "P04",
           "P05",
-          "P07",
-          "P08"
+          "P07"
         ],
         "7": [
           "P01",
           "P04",
           "P05",
+          "P06",
           "P07"
         ],
         "8": [
@@ -158,7 +156,8 @@
           "P04",
           "P05",
           "P06",
-          "P07"
+          "P07",
+          "P08"
         ],
         "10": [
           "P01",
@@ -173,9 +172,9 @@
           "P07"
         ],
         "12": [
+          "P01",
           "P04",
           "P05",
-          "P06",
           "P07",
           "P08"
         ],
@@ -187,10 +186,9 @@
           "P07"
         ],
         "14": [
-          "P01",
+          "P02",
           "P04",
           "P05",
-          "P06",
           "P07"
         ],
         "15": [
@@ -210,7 +208,6 @@
         ],
         "17": [
           "P01",
-          "P05",
           "P06",
           "P07",
           "P08"
@@ -231,7 +228,6 @@
           "P01",
           "P04",
           "P05",
-          "P06",
           "P07"
         ]
       },
@@ -358,51 +354,57 @@
         "yes": 0.8
       },
       "findings": 407,
-      "precision": 0.5361,
+      "precision": 0.5164,
       "precision_spread": {
         "runs": [
-          0.5233,
-          0.519,
-          0.5422,
-          0.5714,
-          0.5244
+          0.5,
+          0.4937,
+          0.506,
+          0.5455,
+          0.5366
         ],
-        "mean": 0.5361,
-        "min": 0.519,
-        "max": 0.5714
+        "mean": 0.5164,
+        "min": 0.4937,
+        "max": 0.5455
       },
       "found_after_deploy": {
         "9": [
+          "P01",
           "P02",
           "P06"
         ],
         "15": [
-          "P02"
+          "P01",
+          "P02",
+          "P06"
         ],
         "18": [
-          "P01"
+          "P01",
+          "P02",
+          "P05",
+          "P06",
+          "P08"
         ]
       },
       "silent": [],
       "breakages_found_only_after_deploy": 0.75,
       "edit_fidelity": {
-        "implements": 15,
-        "partial": 5,
+        "implements": 17,
+        "partial": 3,
         "does-not": 0
       },
       "probe_pass_rate": {
         "runs": [
-          0.5062,
-          0.5625,
-          0.4938
+          0.5312,
+          0.5125,
+          0.5312
         ],
-        "mean": 0.5208,
-        "min": 0.4938,
-        "max": 0.5625
+        "mean": 0.525,
+        "min": 0.5125,
+        "max": 0.5312
       },
       "probes_failed": {
         "0": [
-          "P01",
           "P05",
           "P06",
           "P07",
@@ -411,7 +413,6 @@
         "1": [
           "P01",
           "P05",
-          "P06",
           "P07",
           "P08"
         ],
@@ -423,18 +424,20 @@
         ],
         "3": [
           "P05",
+          "P06",
           "P07",
           "P08"
         ],
         "4": [
-          "P01",
+          "P04",
           "P05",
           "P07",
           "P08"
         ],
         "5": [
           "P05",
-          "P07"
+          "P07",
+          "P08"
         ],
         "6": [
           "P04",
@@ -443,7 +446,7 @@
           "P08"
         ],
         "7": [
-          "P01",
+          "P05",
           "P07"
         ],
         "8": [
@@ -453,12 +456,12 @@
           "P08"
         ],
         "9": [
-          "P01",
           "P05",
           "P07",
           "P08"
         ],
         "10": [
+          "P05",
           "P07",
           "P08"
         ],
@@ -478,11 +481,9 @@
           "P01",
           "P05",
           "P06",
-          "P07",
-          "P08"
+          "P07"
         ],
         "14": [
-          "P01",
           "P05",
           "P07",
           "P08"
@@ -495,29 +496,30 @@
         ],
         "16": [
           "P05",
-          "P07"
+          "P07",
+          "P08"
         ],
         "17": [
           "P02",
           "P05",
-          "P07",
-          "P08"
+          "P07"
         ],
         "18": [
           "P01",
-          "P05",
           "P07",
           "P08"
         ],
         "19": [
           "P01",
           "P05",
+          "P06",
           "P07",
           "P08"
         ],
         "20": [
-          "P01",
+          "P02",
           "P05",
+          "P06",
           "P07",
           "P08"
         ]
@@ -611,82 +613,80 @@
       "seeded": 10,
       "runs": 1,
       "flagged": [
+        5,
+        9,
         11
       ],
-      "recall": 0.1,
+      "recall": 0.3,
       "recall_spread": {
         "runs": [
-          0.1
+          0.3
         ],
-        "mean": 0.1,
-        "min": 0.1,
-        "max": 0.1
+        "mean": 0.3,
+        "min": 0.3,
+        "max": 0.3
       },
-      "recall_without_handoff": 0.1111,
+      "recall_without_handoff": 0.2222,
       "recall_by_type": {
-        "breaks-past-behavior": 0.0,
-        "breaks-reference": 0.0,
+        "breaks-past-behavior": 0.5,
+        "breaks-reference": 1.0,
         "conflicts-with-rule": 0.2,
         "other:required-stages": 0.0,
         "strands-objects": 0.0
       },
       "recall_by_designed_for_checks": {
         "no": 0.0,
-        "yes": 0.125
+        "yes": 0.375
       },
-      "findings": 23,
-      "precision": 0.1739,
+      "findings": 221,
+      "precision": 0.0905,
       "precision_spread": {
         "runs": [
-          0.1739
+          0.0905
         ],
-        "mean": 0.1739,
-        "min": 0.1739,
-        "max": 0.1739
+        "mean": 0.0905,
+        "min": 0.0905,
+        "max": 0.0905
       },
       "found_after_deploy": {
-        "3": [
-          "P01",
-          "P05"
-        ],
-        "5": [
-          "P01",
-          "P08"
-        ],
-        "9": [
-          "P01",
-          "P02",
+        "7": [
+          "P04",
           "P06"
         ],
         "13": [
-          "P02"
+          "P02",
+          "P06"
         ],
         "15": [
-          "P02"
+          "P02",
+          "P05",
+          "P06"
         ],
         "17": [
           "P02"
+        ],
+        "20": [
+          "P05"
         ]
       },
       "silent": [
-        7,
-        18,
-        20
+        3,
+        18
       ],
-      "breakages_found_only_after_deploy": 0.75,
+      "breakages_found_only_after_deploy": 0.25,
       "edit_fidelity": {
-        "implements": 11,
-        "partial": 6,
-        "does-not": 3
+        "implements": 14,
+        "partial": 4,
+        "does-not": 2
       },
       "probe_pass_rate": {
         "runs": [
           0.3438,
-          0.3063,
-          0.3438
+          0.3375,
+          0.3375
         ],
-        "mean": 0.3313,
-        "min": 0.3063,
+        "mean": 0.3396,
+        "min": 0.3375,
         "max": 0.3438
       },
       "probes_failed": {
@@ -702,6 +702,8 @@
           "P01",
           "P02",
           "P04",
+          "P05",
+          "P06",
           "P07",
           "P08"
         ],
@@ -715,8 +717,10 @@
           "P08"
         ],
         "3": [
+          "P01",
           "P02",
           "P04",
+          "P05",
           "P06",
           "P07",
           "P08"
@@ -729,6 +733,7 @@
           "P07"
         ],
         "5": [
+          "P01",
           "P02",
           "P04",
           "P05",
@@ -739,9 +744,7 @@
         "6": [
           "P01",
           "P02",
-          "P04",
           "P05",
-          "P06",
           "P07",
           "P08"
         ],
@@ -758,6 +761,7 @@
           "P02",
           "P04",
           "P05",
+          "P06",
           "P07",
           "P08"
         ],
@@ -779,7 +783,6 @@
           "P01",
           "P02",
           "P04",
-          "P05",
           "P07",
           "P08"
         ],
@@ -787,7 +790,6 @@
           "P01",
           "P04",
           "P05",
-          "P06",
           "P07",
           "P08"
         ],
@@ -808,7 +810,6 @@
         "15": [
           "P01",
           "P04",
-          "P05",
           "P07",
           "P08"
         ],
@@ -816,6 +817,7 @@
           "P01",
           "P04",
           "P05",
+          "P06",
           "P07",
           "P08"
         ],
@@ -824,6 +826,7 @@
           "P02",
           "P04",
           "P05",
+          "P06",
           "P07",
           "P08"
         ],
@@ -837,7 +840,6 @@
         "19": [
           "P01",
           "P04",
-          "P05",
           "P07",
           "P08"
         ],
@@ -977,7 +979,7 @@
         11
       ],
       "handoff_breaking_caught": {
-        "9": false
+        "9": true
       },
       "repeat_same": {
         "1": true,
@@ -994,21 +996,21 @@
     ],
     "numbers": {
       "recall": {
-        "nl": 0.54,
+        "nl": 0.52,
         "structured": 0.74,
-        "toprope": 0.1
+        "toprope": 0.3
       },
-      "gap_nl": -0.44,
-      "gap_structured": -0.64,
-      "toprope_precision": 0.1739,
+      "gap_nl": -0.22,
+      "gap_structured": -0.44,
+      "toprope_precision": 0.0905,
       "median_edit_to_checked_s": 0.58,
-      "noise_floor": 0.3
+      "noise_floor": 0.2
     },
     "within_noise": {},
     "steps": "one run's recall moves in steps of 1/seeded (0.1)",
     "note": "M1 pilot targets (ADR-0034): reported, not a link verdict; the claim-status table does not change"
   },
-  "noise_floor": 0.3,
+  "noise_floor": 0.2,
   "script_and_researcher_disagree": [],
   "unbindable": []
 }

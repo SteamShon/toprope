@@ -7,7 +7,72 @@
     "changed": true
   },
   "check": {
-    "findings": [],
+    "findings": [
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "authoring:10-a19a483764e3e654:local@4",
+        "problem": "record_build at 2026-11-08T05:19:15.505770+00:00 would now set ['stage'] differently",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "authoring:10-a19a483764e3e654:local@5",
+        "problem": "deploy by researcher-standin <standin@m1.invalid> at 2026-11-08T05:19:16.107339+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "authoring:11-33b085b6086f705d:local@4",
+        "problem": "record_build at 2026-11-08T05:21:20.013902+00:00 would now set ['stage'] differently",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "authoring:11-33b085b6086f705d:local@5",
+        "problem": "deploy by researcher-standin <standin@m1.invalid> at 2026-11-08T05:21:20.633926+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "authoring:12-bedd8ef013cbc3b8:local@4",
+        "problem": "record_build at 2026-11-08T05:23:43.687324+00:00 would now set ['stage'] differently",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "authoring:12-bedd8ef013cbc3b8:local@5",
+        "problem": "deploy by researcher-standin <standin@m1.invalid> at 2026-11-08T05:23:44.292230+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "authoring:13-a48d6ab38b1d16b6:local@4",
+        "problem": "record_build at 2026-11-08T05:25:40.558678+00:00 would now set ['stage'] differently",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "authoring:13-a48d6ab38b1d16b6:local@5",
+        "problem": "deploy by researcher-standin <standin@m1.invalid> at 2026-11-08T05:25:41.165048+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+        "carried": false
+      }
+    ],
     "commits": {
       "delivery": {
         "commit": "2-13fd4540ec05a7d8",
@@ -45,7 +110,72 @@
     "runs": [
       {
         "run": 1,
-        "findings": []
+        "findings": [
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "authoring:10-a19a483764e3e654:local@4",
+            "problem": "record_build at 2026-11-08T05:19:15.505770+00:00 would now set ['stage'] differently",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "authoring:10-a19a483764e3e654:local@5",
+            "problem": "deploy by researcher-standin <standin@m1.invalid> at 2026-11-08T05:19:16.107339+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "authoring:11-33b085b6086f705d:local@4",
+            "problem": "record_build at 2026-11-08T05:21:20.013902+00:00 would now set ['stage'] differently",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "authoring:11-33b085b6086f705d:local@5",
+            "problem": "deploy by researcher-standin <standin@m1.invalid> at 2026-11-08T05:21:20.633926+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "authoring:12-bedd8ef013cbc3b8:local@4",
+            "problem": "record_build at 2026-11-08T05:23:43.687324+00:00 would now set ['stage'] differently",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "authoring:12-bedd8ef013cbc3b8:local@5",
+            "problem": "deploy by researcher-standin <standin@m1.invalid> at 2026-11-08T05:23:44.292230+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "authoring:13-a48d6ab38b1d16b6:local@4",
+            "problem": "record_build at 2026-11-08T05:25:40.558678+00:00 would now set ['stage'] differently",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "authoring:13-a48d6ab38b1d16b6:local@5",
+            "problem": "deploy by researcher-standin <standin@m1.invalid> at 2026-11-08T05:25:41.165048+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+            "carried": false
+          }
+        ]
       }
     ],
     "timed": [
@@ -109,7 +239,21 @@
         },
         "limiter": "preview"
       }
-    ]
+    ],
+    "original": {
+      "findings": [],
+      "runs": [
+        {
+          "run": 1,
+          "findings": []
+        }
+      ]
+    },
+    "recheck": {
+      "at": "2026-11-08T09:51:46.002564+00:00",
+      "harness_commit": "f56e744d44c09afef5ef1412a4b22fe40eabb96a",
+      "why": "flags taken on the kernel's inputs (its base and the member's own history)"
+    }
   },
   "deploy": {
     "deployed": true,

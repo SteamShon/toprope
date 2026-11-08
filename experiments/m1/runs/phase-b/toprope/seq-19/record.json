@@ -13,7 +13,520 @@
         "check": "structural",
         "severity": "warning",
         "where": "actions.add_source.params",
-        "problem": "unset-on-create: add_source creates a Source without its required `local_only` (an optional param sets it): make the param required, set it in an effect, or make the property optional"
+        "problem": "unset-on-create: add_source creates a Source without its required `local_only` (an optional param sets it): make the param required, set it in an effect, or make the property optional",
+        "carried": true
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-commit-evidence@1",
+        "problem": "propose_element at 2026-11-06T17:29:02.905181+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-commit-evidence-2@1",
+        "problem": "propose_element at 2026-11-06T17:29:37.887982+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-commit-evidence-3@1",
+        "problem": "propose_element at 2026-11-06T17:29:44.866347+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-cite-1@1",
+        "problem": "propose_element at 2026-11-06T23:56:30.200525+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-cite-2@1",
+        "problem": "propose_element at 2026-11-06T23:56:31.304930+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-cite-3@1",
+        "problem": "propose_element at 2026-11-06T23:56:32.422186+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-cite-4@1",
+        "problem": "propose_element at 2026-11-06T23:56:33.611768+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-cite-5@1",
+        "problem": "propose_element at 2026-11-06T23:56:34.712162+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-cite-6@1",
+        "problem": "propose_element at 2026-11-06T23:56:35.764871+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-cite-7@1",
+        "problem": "propose_element at 2026-11-06T23:56:36.824546+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-late-check@1",
+        "problem": "propose_element at 2026-11-07T04:00:56.145728+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-done-preview@1",
+        "problem": "propose_element at 2026-11-07T04:00:57.430674+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-done-preview-back@1",
+        "problem": "propose_element at 2026-11-07T04:01:57.681185+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-preview-not-deployed@1",
+        "problem": "propose_element at 2026-11-07T04:01:58.805232+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-1-1448a9ba@1",
+        "problem": "propose_element at 2026-11-08T05:18:58.853152+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-2-24f4fc55@1",
+        "problem": "propose_element at 2026-11-08T05:21:01.480170+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-2-813dd522@1",
+        "problem": "propose_element at 2026-11-08T05:21:02.841512+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-3-99588f05@1",
+        "problem": "propose_element at 2026-11-08T05:23:21.661973+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-3-1b78bce4@1",
+        "problem": "propose_element at 2026-11-08T05:23:25.073790+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-4-2f95c059@1",
+        "problem": "propose_element at 2026-11-08T05:25:24.356158+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-5-9443f696@1",
+        "problem": "propose_element at 2026-11-08T05:27:25.426800+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-5-f76c024c@1",
+        "problem": "propose_element at 2026-11-08T05:27:31.413023+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-5-ed01e342@1",
+        "problem": "propose_element at 2026-11-08T05:27:33.730330+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-5-4d90f393@1",
+        "problem": "propose_element at 2026-11-08T05:27:35.464239+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-5-806a70ce@1",
+        "problem": "propose_element at 2026-11-08T05:27:42.514316+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-5-b9419cfb@1",
+        "problem": "propose_element at 2026-11-08T05:27:51.025883+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-5-ac9268e7@1",
+        "problem": "propose_element at 2026-11-08T05:27:55.312324+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-6-bd6e0d7c@1",
+        "problem": "propose_element at 2026-11-08T05:30:03.936828+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-6-d8cd6dbb@1",
+        "problem": "propose_element at 2026-11-08T05:30:05.257981+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-7-15563a7a@1",
+        "problem": "propose_element at 2026-11-08T05:32:17.886029+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-7-b88b52ca@1",
+        "problem": "propose_element at 2026-11-08T05:32:20.578889+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-7-a340f8f5@1",
+        "problem": "propose_element at 2026-11-08T05:32:22.581789+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-7-c361cfd1@1",
+        "problem": "propose_element at 2026-11-08T05:32:23.939569+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-8-55250928@1",
+        "problem": "propose_element at 2026-11-08T05:34:42.089213+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-8-8b85d601@1",
+        "problem": "propose_element at 2026-11-08T05:34:46.847534+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-9-12ffd99d@1",
+        "problem": "propose_element at 2026-11-08T05:36:55.950819+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-9-f7e392c0@1",
+        "problem": "propose_element at 2026-11-08T05:36:57.427004+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-9-e7d3e6ad@1",
+        "problem": "propose_element at 2026-11-08T05:36:59.426405+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-10-b38ef1fc@1",
+        "problem": "propose_element at 2026-11-08T05:39:11.327102+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-10-257e8657@1",
+        "problem": "propose_element at 2026-11-08T05:39:12.679425+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-10-6cb12c55@1",
+        "problem": "propose_element at 2026-11-08T05:39:17.088785+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-11-934a251c@1",
+        "problem": "propose_element at 2026-11-08T05:41:31.378591+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-11-844478a8@1",
+        "problem": "propose_element at 2026-11-08T05:41:33.568773+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-11-2a68c2f1@1",
+        "problem": "propose_element at 2026-11-08T05:41:34.848629+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-11-34ed3374@1",
+        "problem": "propose_element at 2026-11-08T05:41:36.174707+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-12-5035d0ba@1",
+        "problem": "propose_element at 2026-11-08T05:43:39.708325+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-13-263d9845@1",
+        "problem": "propose_element at 2026-11-08T05:45:48.844828+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-14-2cd16671@1",
+        "problem": "propose_element at 2026-11-08T05:48:03.374991+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-14-a007ff44@1",
+        "problem": "propose_element at 2026-11-08T05:48:04.104990+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-14-d9f6de8a@1",
+        "problem": "propose_element at 2026-11-08T05:48:09.232109+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-15-6f13273c@1",
+        "problem": "propose_element at 2026-11-08T05:50:23.536358+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-15-bf479853@1",
+        "problem": "propose_element at 2026-11-08T05:50:28.535318+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-15-4715396b@1",
+        "problem": "propose_element at 2026-11-08T05:50:30.926704+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-15-1bc0cafa@1",
+        "problem": "propose_element at 2026-11-08T05:50:32.226940+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-15-d69e469c@1",
+        "problem": "propose_element at 2026-11-08T05:50:36.613314+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-16-a0685c52@1",
+        "problem": "propose_element at 2026-11-08T05:52:43.082588+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-16-35174375@1",
+        "problem": "propose_element at 2026-11-08T05:52:44.467064+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-16-e4b3f4e1@1",
+        "problem": "propose_element at 2026-11-08T05:52:46.847288+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-17-2fb11c51@1",
+        "problem": "propose_element at 2026-11-08T05:55:07.765378+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-18-63469723@1",
+        "problem": "propose_element at 2026-11-08T05:57:18.789658+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-18-b127f8b7@1",
+        "problem": "propose_element at 2026-11-08T05:57:20.687264+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-18-76ce3524@1",
+        "problem": "propose_element at 2026-11-08T05:57:23.365000+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-19-9a6bc307@1",
+        "problem": "propose_element at 2026-11-08T05:59:37.160598+00:00 would now set ['drafted_by'] differently",
+        "carried": false
+      },
+      {
+        "domain": "authoring",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "E-19-57400ee1@1",
+        "problem": "propose_element at 2026-11-08T05:59:38.543964+00:00 would now set ['drafted_by'] differently",
+        "carried": false
       }
     ],
     "commits": {
@@ -59,7 +572,520 @@
             "check": "structural",
             "severity": "warning",
             "where": "actions.add_source.params",
-            "problem": "unset-on-create: add_source creates a Source without its required `local_only` (an optional param sets it): make the param required, set it in an effect, or make the property optional"
+            "problem": "unset-on-create: add_source creates a Source without its required `local_only` (an optional param sets it): make the param required, set it in an effect, or make the property optional",
+            "carried": true
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-commit-evidence@1",
+            "problem": "propose_element at 2026-11-06T17:29:02.905181+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-commit-evidence-2@1",
+            "problem": "propose_element at 2026-11-06T17:29:37.887982+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-commit-evidence-3@1",
+            "problem": "propose_element at 2026-11-06T17:29:44.866347+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-cite-1@1",
+            "problem": "propose_element at 2026-11-06T23:56:30.200525+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-cite-2@1",
+            "problem": "propose_element at 2026-11-06T23:56:31.304930+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-cite-3@1",
+            "problem": "propose_element at 2026-11-06T23:56:32.422186+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-cite-4@1",
+            "problem": "propose_element at 2026-11-06T23:56:33.611768+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-cite-5@1",
+            "problem": "propose_element at 2026-11-06T23:56:34.712162+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-cite-6@1",
+            "problem": "propose_element at 2026-11-06T23:56:35.764871+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-cite-7@1",
+            "problem": "propose_element at 2026-11-06T23:56:36.824546+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-late-check@1",
+            "problem": "propose_element at 2026-11-07T04:00:56.145728+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-done-preview@1",
+            "problem": "propose_element at 2026-11-07T04:00:57.430674+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-done-preview-back@1",
+            "problem": "propose_element at 2026-11-07T04:01:57.681185+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-preview-not-deployed@1",
+            "problem": "propose_element at 2026-11-07T04:01:58.805232+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-1-1448a9ba@1",
+            "problem": "propose_element at 2026-11-08T05:18:58.853152+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-2-24f4fc55@1",
+            "problem": "propose_element at 2026-11-08T05:21:01.480170+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-2-813dd522@1",
+            "problem": "propose_element at 2026-11-08T05:21:02.841512+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-3-99588f05@1",
+            "problem": "propose_element at 2026-11-08T05:23:21.661973+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-3-1b78bce4@1",
+            "problem": "propose_element at 2026-11-08T05:23:25.073790+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-4-2f95c059@1",
+            "problem": "propose_element at 2026-11-08T05:25:24.356158+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-5-9443f696@1",
+            "problem": "propose_element at 2026-11-08T05:27:25.426800+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-5-f76c024c@1",
+            "problem": "propose_element at 2026-11-08T05:27:31.413023+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-5-ed01e342@1",
+            "problem": "propose_element at 2026-11-08T05:27:33.730330+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-5-4d90f393@1",
+            "problem": "propose_element at 2026-11-08T05:27:35.464239+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-5-806a70ce@1",
+            "problem": "propose_element at 2026-11-08T05:27:42.514316+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-5-b9419cfb@1",
+            "problem": "propose_element at 2026-11-08T05:27:51.025883+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-5-ac9268e7@1",
+            "problem": "propose_element at 2026-11-08T05:27:55.312324+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-6-bd6e0d7c@1",
+            "problem": "propose_element at 2026-11-08T05:30:03.936828+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-6-d8cd6dbb@1",
+            "problem": "propose_element at 2026-11-08T05:30:05.257981+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-7-15563a7a@1",
+            "problem": "propose_element at 2026-11-08T05:32:17.886029+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-7-b88b52ca@1",
+            "problem": "propose_element at 2026-11-08T05:32:20.578889+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-7-a340f8f5@1",
+            "problem": "propose_element at 2026-11-08T05:32:22.581789+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-7-c361cfd1@1",
+            "problem": "propose_element at 2026-11-08T05:32:23.939569+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-8-55250928@1",
+            "problem": "propose_element at 2026-11-08T05:34:42.089213+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-8-8b85d601@1",
+            "problem": "propose_element at 2026-11-08T05:34:46.847534+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-9-12ffd99d@1",
+            "problem": "propose_element at 2026-11-08T05:36:55.950819+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-9-f7e392c0@1",
+            "problem": "propose_element at 2026-11-08T05:36:57.427004+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-9-e7d3e6ad@1",
+            "problem": "propose_element at 2026-11-08T05:36:59.426405+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-10-b38ef1fc@1",
+            "problem": "propose_element at 2026-11-08T05:39:11.327102+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-10-257e8657@1",
+            "problem": "propose_element at 2026-11-08T05:39:12.679425+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-10-6cb12c55@1",
+            "problem": "propose_element at 2026-11-08T05:39:17.088785+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-11-934a251c@1",
+            "problem": "propose_element at 2026-11-08T05:41:31.378591+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-11-844478a8@1",
+            "problem": "propose_element at 2026-11-08T05:41:33.568773+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-11-2a68c2f1@1",
+            "problem": "propose_element at 2026-11-08T05:41:34.848629+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-11-34ed3374@1",
+            "problem": "propose_element at 2026-11-08T05:41:36.174707+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-12-5035d0ba@1",
+            "problem": "propose_element at 2026-11-08T05:43:39.708325+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-13-263d9845@1",
+            "problem": "propose_element at 2026-11-08T05:45:48.844828+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-14-2cd16671@1",
+            "problem": "propose_element at 2026-11-08T05:48:03.374991+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-14-a007ff44@1",
+            "problem": "propose_element at 2026-11-08T05:48:04.104990+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-14-d9f6de8a@1",
+            "problem": "propose_element at 2026-11-08T05:48:09.232109+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-15-6f13273c@1",
+            "problem": "propose_element at 2026-11-08T05:50:23.536358+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-15-bf479853@1",
+            "problem": "propose_element at 2026-11-08T05:50:28.535318+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-15-4715396b@1",
+            "problem": "propose_element at 2026-11-08T05:50:30.926704+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-15-1bc0cafa@1",
+            "problem": "propose_element at 2026-11-08T05:50:32.226940+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-15-d69e469c@1",
+            "problem": "propose_element at 2026-11-08T05:50:36.613314+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-16-a0685c52@1",
+            "problem": "propose_element at 2026-11-08T05:52:43.082588+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-16-35174375@1",
+            "problem": "propose_element at 2026-11-08T05:52:44.467064+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-16-e4b3f4e1@1",
+            "problem": "propose_element at 2026-11-08T05:52:46.847288+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-17-2fb11c51@1",
+            "problem": "propose_element at 2026-11-08T05:55:07.765378+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-18-63469723@1",
+            "problem": "propose_element at 2026-11-08T05:57:18.789658+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-18-b127f8b7@1",
+            "problem": "propose_element at 2026-11-08T05:57:20.687264+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-18-76ce3524@1",
+            "problem": "propose_element at 2026-11-08T05:57:23.365000+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-19-9a6bc307@1",
+            "problem": "propose_element at 2026-11-08T05:59:37.160598+00:00 would now set ['drafted_by'] differently",
+            "carried": false
+          },
+          {
+            "domain": "authoring",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "E-19-57400ee1@1",
+            "problem": "propose_element at 2026-11-08T05:59:38.543964+00:00 would now set ['drafted_by'] differently",
+            "carried": false
           }
         ]
       }
@@ -125,7 +1151,37 @@
         },
         "limiter": "preview"
       }
-    ]
+    ],
+    "original": {
+      "findings": [
+        {
+          "domain": "authoring",
+          "check": "structural",
+          "severity": "warning",
+          "where": "actions.add_source.params",
+          "problem": "unset-on-create: add_source creates a Source without its required `local_only` (an optional param sets it): make the param required, set it in an effect, or make the property optional"
+        }
+      ],
+      "runs": [
+        {
+          "run": 1,
+          "findings": [
+            {
+              "domain": "authoring",
+              "check": "structural",
+              "severity": "warning",
+              "where": "actions.add_source.params",
+              "problem": "unset-on-create: add_source creates a Source without its required `local_only` (an optional param sets it): make the param required, set it in an effect, or make the property optional"
+            }
+          ]
+        }
+      ]
+    },
+    "recheck": {
+      "at": "2026-11-08T09:52:37.880279+00:00",
+      "harness_commit": "f56e744d44c09afef5ef1412a4b22fe40eabb96a",
+      "why": "flags taken on the kernel's inputs (its base and the member's own history)"
+    }
   },
   "deploy": {
     "deployed": true,

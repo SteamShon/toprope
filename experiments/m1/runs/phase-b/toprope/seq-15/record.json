@@ -13,7 +13,216 @@
         "check": "harness",
         "severity": "warning",
         "where": "no-sample:mechanical:DeliveryRequest.verified.preview.external:kernel",
-        "problem": "no generated object satisfies the invariants in this stage: the cell is not tested mechanically; give an example in this stage"
+        "problem": "no generated object satisfies the invariants in this stage: the cell is not tested mechanically; give an example in this stage",
+        "carried": true
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "authoring:10-a19a483764e3e654:local@2",
+        "problem": "preview at 2026-11-08T05:19:14.969857+00:00 would now set ['stage'] differently",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "authoring:10-a19a483764e3e654:local@4",
+        "problem": "record_build by external:kernel at 2026-11-08T05:19:15.505770+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "authoring:11-33b085b6086f705d:local@2",
+        "problem": "preview at 2026-11-08T05:21:19.499886+00:00 would now set ['stage'] differently",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "authoring:11-33b085b6086f705d:local@4",
+        "problem": "record_build by external:kernel at 2026-11-08T05:21:20.013902+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "authoring:12-bedd8ef013cbc3b8:local@2",
+        "problem": "preview at 2026-11-08T05:23:43.158768+00:00 would now set ['stage'] differently",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "authoring:12-bedd8ef013cbc3b8:local@4",
+        "problem": "record_build by external:kernel at 2026-11-08T05:23:43.687324+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "authoring:13-a48d6ab38b1d16b6:local@2",
+        "problem": "preview at 2026-11-08T05:25:40.018211+00:00 would now set ['stage'] differently",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "authoring:13-a48d6ab38b1d16b6:local@4",
+        "problem": "record_build by external:kernel at 2026-11-08T05:25:40.558678+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "delivery:2-13fd4540ec05a7d8:local@2",
+        "problem": "preview at 2026-11-08T05:28:12.279950+00:00 would now set ['stage'] differently",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "delivery:2-13fd4540ec05a7d8:local@4",
+        "problem": "record_build by external:kernel at 2026-11-08T05:28:12.654375+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "authoring:14-0f105a9a61619c23:local@2",
+        "problem": "preview at 2026-11-08T05:30:23.474123+00:00 would now set ['stage'] differently",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "authoring:14-0f105a9a61619c23:local@4",
+        "problem": "record_build by external:kernel at 2026-11-08T05:30:24.009534+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "authoring:15-d6658918cf380703:local@2",
+        "problem": "preview at 2026-11-08T05:32:43.919802+00:00 would now set ['stage'] differently",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "authoring:15-d6658918cf380703:local@4",
+        "problem": "record_build by external:kernel at 2026-11-08T05:32:44.465868+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "authoring:16-ff0411a4a8d73855:local@2",
+        "problem": "preview at 2026-11-08T05:35:05.336124+00:00 would now set ['stage'] differently",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "authoring:16-ff0411a4a8d73855:local@4",
+        "problem": "record_build by external:kernel at 2026-11-08T05:35:05.882487+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "delivery:3-a1f303f621edddca:local@2",
+        "problem": "preview at 2026-11-08T05:37:13.909430+00:00 would now set ['stage'] differently",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "delivery:3-a1f303f621edddca:local@4",
+        "problem": "record_build by external:kernel at 2026-11-08T05:37:14.263648+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "authoring:17-f58a8efefe3503b3:local@2",
+        "problem": "preview at 2026-11-08T05:39:36.689817+00:00 would now set ['stage'] differently",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "authoring:17-f58a8efefe3503b3:local@4",
+        "problem": "record_build by external:kernel at 2026-11-08T05:39:37.283005+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "delivery:5-7cb3cb8c5d4b3045:local@2",
+        "problem": "preview at 2026-11-08T05:43:56.335261+00:00 would now set ['stage'] differently",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "delivery:5-7cb3cb8c5d4b3045:local@4",
+        "problem": "record_build by external:kernel at 2026-11-08T05:43:56.711898+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "authoring:18-a38638cb0d596c30:local@2",
+        "problem": "preview at 2026-11-08T05:46:08.137442+00:00 would now set ['stage'] differently",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "authoring:18-a38638cb0d596c30:local@4",
+        "problem": "record_build by external:kernel at 2026-11-08T05:46:08.730178+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "authoring:19-42e9f7941c90cc5c:local@2",
+        "problem": "preview at 2026-11-08T05:48:31.916613+00:00 would now set ['stage'] differently",
+        "carried": false
+      },
+      {
+        "domain": "delivery",
+        "check": "log_replay",
+        "severity": "warning",
+        "where": "authoring:19-42e9f7941c90cc5c:local@4",
+        "problem": "record_build by external:kernel at 2026-11-08T05:48:32.603072+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+        "carried": false
       }
     ],
     "commits": {
@@ -59,7 +268,216 @@
             "check": "harness",
             "severity": "warning",
             "where": "no-sample:mechanical:DeliveryRequest.verified.preview.external:kernel",
-            "problem": "no generated object satisfies the invariants in this stage: the cell is not tested mechanically; give an example in this stage"
+            "problem": "no generated object satisfies the invariants in this stage: the cell is not tested mechanically; give an example in this stage",
+            "carried": true
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "authoring:10-a19a483764e3e654:local@2",
+            "problem": "preview at 2026-11-08T05:19:14.969857+00:00 would now set ['stage'] differently",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "authoring:10-a19a483764e3e654:local@4",
+            "problem": "record_build by external:kernel at 2026-11-08T05:19:15.505770+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "authoring:11-33b085b6086f705d:local@2",
+            "problem": "preview at 2026-11-08T05:21:19.499886+00:00 would now set ['stage'] differently",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "authoring:11-33b085b6086f705d:local@4",
+            "problem": "record_build by external:kernel at 2026-11-08T05:21:20.013902+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "authoring:12-bedd8ef013cbc3b8:local@2",
+            "problem": "preview at 2026-11-08T05:23:43.158768+00:00 would now set ['stage'] differently",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "authoring:12-bedd8ef013cbc3b8:local@4",
+            "problem": "record_build by external:kernel at 2026-11-08T05:23:43.687324+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "authoring:13-a48d6ab38b1d16b6:local@2",
+            "problem": "preview at 2026-11-08T05:25:40.018211+00:00 would now set ['stage'] differently",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "authoring:13-a48d6ab38b1d16b6:local@4",
+            "problem": "record_build by external:kernel at 2026-11-08T05:25:40.558678+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "delivery:2-13fd4540ec05a7d8:local@2",
+            "problem": "preview at 2026-11-08T05:28:12.279950+00:00 would now set ['stage'] differently",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "delivery:2-13fd4540ec05a7d8:local@4",
+            "problem": "record_build by external:kernel at 2026-11-08T05:28:12.654375+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "authoring:14-0f105a9a61619c23:local@2",
+            "problem": "preview at 2026-11-08T05:30:23.474123+00:00 would now set ['stage'] differently",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "authoring:14-0f105a9a61619c23:local@4",
+            "problem": "record_build by external:kernel at 2026-11-08T05:30:24.009534+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "authoring:15-d6658918cf380703:local@2",
+            "problem": "preview at 2026-11-08T05:32:43.919802+00:00 would now set ['stage'] differently",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "authoring:15-d6658918cf380703:local@4",
+            "problem": "record_build by external:kernel at 2026-11-08T05:32:44.465868+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "authoring:16-ff0411a4a8d73855:local@2",
+            "problem": "preview at 2026-11-08T05:35:05.336124+00:00 would now set ['stage'] differently",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "authoring:16-ff0411a4a8d73855:local@4",
+            "problem": "record_build by external:kernel at 2026-11-08T05:35:05.882487+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "delivery:3-a1f303f621edddca:local@2",
+            "problem": "preview at 2026-11-08T05:37:13.909430+00:00 would now set ['stage'] differently",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "delivery:3-a1f303f621edddca:local@4",
+            "problem": "record_build by external:kernel at 2026-11-08T05:37:14.263648+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "authoring:17-f58a8efefe3503b3:local@2",
+            "problem": "preview at 2026-11-08T05:39:36.689817+00:00 would now set ['stage'] differently",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "authoring:17-f58a8efefe3503b3:local@4",
+            "problem": "record_build by external:kernel at 2026-11-08T05:39:37.283005+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "delivery:5-7cb3cb8c5d4b3045:local@2",
+            "problem": "preview at 2026-11-08T05:43:56.335261+00:00 would now set ['stage'] differently",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "delivery:5-7cb3cb8c5d4b3045:local@4",
+            "problem": "record_build by external:kernel at 2026-11-08T05:43:56.711898+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "authoring:18-a38638cb0d596c30:local@2",
+            "problem": "preview at 2026-11-08T05:46:08.137442+00:00 would now set ['stage'] differently",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "authoring:18-a38638cb0d596c30:local@4",
+            "problem": "record_build by external:kernel at 2026-11-08T05:46:08.730178+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "authoring:19-42e9f7941c90cc5c:local@2",
+            "problem": "preview at 2026-11-08T05:48:31.916613+00:00 would now set ['stage'] differently",
+            "carried": false
+          },
+          {
+            "domain": "delivery",
+            "check": "log_replay",
+            "severity": "warning",
+            "where": "authoring:19-42e9f7941c90cc5c:local@4",
+            "problem": "record_build by external:kernel at 2026-11-08T05:48:32.603072+00:00 would now be denied (undecided): Undecided. The object is finished, so nothing in flight depends on it.",
+            "carried": false
           }
         ]
       }
@@ -125,7 +543,37 @@
         },
         "limiter": "preview"
       }
-    ]
+    ],
+    "original": {
+      "findings": [
+        {
+          "domain": "delivery",
+          "check": "harness",
+          "severity": "warning",
+          "where": "no-sample:mechanical:DeliveryRequest.verified.preview.external:kernel",
+          "problem": "no generated object satisfies the invariants in this stage: the cell is not tested mechanically; give an example in this stage"
+        }
+      ],
+      "runs": [
+        {
+          "run": 1,
+          "findings": [
+            {
+              "domain": "delivery",
+              "check": "harness",
+              "severity": "warning",
+              "where": "no-sample:mechanical:DeliveryRequest.verified.preview.external:kernel",
+              "problem": "no generated object satisfies the invariants in this stage: the cell is not tested mechanically; give an example in this stage"
+            }
+          ]
+        }
+      ]
+    },
+    "recheck": {
+      "at": "2026-11-08T09:52:10.738422+00:00",
+      "harness_commit": "f56e744d44c09afef5ef1412a4b22fe40eabb96a",
+      "why": "flags taken on the kernel's inputs (its base and the member's own history)"
+    }
   },
   "deploy": {
     "deployed": true,
