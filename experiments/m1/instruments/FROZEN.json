@@ -32,5 +32,16 @@
       "sha256": "66e1abfdccd45bdb5305a9ed0c8a73131cacfe63bdc87cb155dc236546593cdd",
       "frozen_at": "2026-11-07T01:49:17+00:00"
     }
+  },
+  "prompts": {
+    "sha256": "6ce04936e93dc81858e3d576fca2cf8f4bf9ba3465cc07a12f49f9fa60800491",
+    "files": [
+      "edit.md",
+      "edit_toprope.md",
+      "probe.md",
+      "render.md",
+      "review.md"
+    ],
+    "frozen_at": "2026-11-08T02:37:09.250578+00:00"
   }
 }
