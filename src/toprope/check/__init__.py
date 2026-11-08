@@ -45,7 +45,7 @@ from ..semantics.types import Actor, Command, Event, Grant
 from ..store import EventStore, MemoryEventStore
 
 EPOCH = datetime.min.replace(tzinfo=timezone.utc)   # for events without a time
-CHECKS = ("structural", "semantic", "scenarios", "harness", "tla", "log_replay", "in_flight", "nl")
+CHECKS = ("structural", "semantic", "scenarios", "harness", "tla", "log_replay", "in_flight", "capability", "nl")
 
 
 @dataclass(frozen=True)
@@ -177,6 +177,15 @@ def change_check(new: Domain, old: Domain | None = None, *, events: EventStore |
         checks["log_replay"] = log_replay(new, old, events, roles_of,
                                           only=set(impact["actions"]) if impact and old is not None else None) \
             if structurally_ok else CheckResult("log_replay", ran=False, note="the declaration has structural errors")
+    if old is None:
+        checks["capability"] = CheckResult("capability", ran=False, note="a first version: nothing to compare with")
+    elif not structurally_ok:
+        checks["capability"] = CheckResult("capability", ran=False, note="the declaration has structural errors")
+    else:
+        from .capability import capability_diff
+        checks["capability"] = CheckResult("capability")
+        for severity, where, message in capability_diff(new, old):
+            checks["capability"].add(severity, where, message)
     diff = _diff(new, old)
     checks["nl"] = _nl(new, old, nl, diff["to_review"])
     report = ChangeReport(new.domain, diff, {n: checks[n] for n in CHECKS})
