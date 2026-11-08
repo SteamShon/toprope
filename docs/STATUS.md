@@ -6,7 +6,7 @@ this page); plans live in [`roadmap.md`](roadmap.md) and the milestone and exper
 Every PR into `develop` or an `umbrella/*` branch fixes any line here it makes untrue, or says
 why not; each release trims it ([`AGENTS.md`](../AGENTS.md), "Progress").
 
-Updated: 2026-11-07 · Cleaned for release: `v0.1.0`
+Updated: 2026-11-08 · Cleaned for release: `v0.1.0`
 
 Legend: ✅ done · 🟡 in part · ⬜ not started
 
@@ -80,6 +80,8 @@ command reference are generated.
 | 8a. No experiment words (protocol §1): the harness's prompts, the change requests and probe requests as given, tool names and descriptions, and workspace file names are checked, and a run stops before showing one; tools never show the workspace's absolute path. The decision log (§4): `runs/phase-b-runs.tsv`, append-only, one row per edit, review or check, deploy and probe, with a pointer to its evidence; a change run again is superseded by a new row | ✅ | #164 |
 | 8b. Repeats and spread (protocol §2–3): five reviews and three probe runs per change; the Toprope arm's checks once, again uncached on three changes, and five timed repeats with the part that bounds each; every arm's flags graded in one pass per change under random labels A, B, C (the mapping kept apart), the script's and the grader's labels both kept; recall and precision per run with mean, minimum and maximum; the noise floor, marked next to the rule a gap affects. The agents' prompts are frozen with the protocol (§1): their hash goes in `FROZEN.json` through `python -m phase_b freeze-prompts` (the researcher's step; a change needs `--reason` and keeps the old hash), and a run refuses until then | ✅ | #164 |
 | 9. How Phase B runs now (ADR-0047, superseding ADR-0040 §2): a Remote Control session on the researcher's computer runs the harness from `phase_b/RUNBOOK.md`, never opening the key, the binding or the blind labels; the researcher keeps three judgments; `to-decide` lists only the grades that need one | 🟡 | |
+| 10. The run's first two steps (RUNBOOK 1–2): the agents' prompts frozen at the researcher's instruction (2026-11-08); the NL skill rendered again from `authoring@9` + `delivery@1` and accepted by the researcher side by side with the declarations (2026-11-08) | ✅ | |
+| 11. The run (RUNBOOK 3–6): dry run, full run, grades confirmed by the researcher, score | ⬜ | |
 
 How a run works (ADR-0047): the researcher opens a session through Remote Control on the
 repository's folder on their computer, and it follows [`phase_b/RUNBOOK.md`](../experiments/m1/phase_b/RUNBOOK.md):
@@ -311,8 +313,8 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 ## Next
 
 1. M1 Phase B (ADR-0047): the researcher opens a Remote Control session on their computer and
-   has it follow `experiments/m1/phase_b/RUNBOOK.md`: freeze the prompts, render the NL skill,
-   the dry run, the full run, `grade`, `to-decide`, `score`. The researcher reads the prompts and
+   has it follow `experiments/m1/phase_b/RUNBOOK.md`. The prompts are frozen and the NL skill
+   accepted; left: the dry run, the full run, `grade`, `to-decide`, `score`. The researcher reads the prompts and
    the NL skill and decides what `to-decide` lists. Then the M1 report.
 2. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
 3. When a domain is shared by several people or agents (M2, or a hosted server): its event
