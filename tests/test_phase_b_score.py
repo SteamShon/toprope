@@ -372,3 +372,30 @@ def test_grouped_precision_counts_a_compiler_check_once_per_change_and_leaves_ou
     tp = score.score(run, inst)["metrics"]["toprope"]
     assert tp["precision_spread"]["mean"] == 0.25                      # 1 real of 4, one by one
     assert tp["precision_grouped_spread"]["mean"] == 1.0               # one unit, which names the seeded problem
+
+
+def test_a_grader_that_answers_in_prose_is_asked_once_more_for_the_json(tmp_path):
+    from phase_b.score import grade_probe
+    answers = iter(["It passed: it told the owner and waited.", json.dumps({"passed": True, "why": "w"})])
+    calls = []
+
+    def script(system, messages, tools):
+        calls.append(messages[0]["content"])
+        return next(answers)
+    out = grade_probe(ApiBackend(FakeModel(script)), {"id": "P02", "task": "t", "starting_state": "s"}, tmp_path,
+                      {"probe": "P02", "answer": "a", "transcript": "P02.jsonl"}, tmp_path / "t.jsonl")
+    assert out["passed"] is True and len(calls) == 2
+    assert "It passed: it told the owner" in calls[1] and (tmp_path / "t-json.jsonl").exists()
+
+
+def test_a_gap_equal_to_the_noise_floor_is_not_within_it():
+    rules = yaml.safe_load((ROOT / "experiments/m1/instruments/verdict-rules.yaml").read_text())
+
+    def arm(recall, lo, hi):
+        return {"recall": recall, "recall_spread": {"min": lo, "max": hi}, "precision": 0.5,
+                "median_edit_to_checked_s": 1.0, "breakages_found_only_after_deploy": 0.0, "seeded": 10,
+                "handoff_probe_P07_passes_throughout": False, "handoff_breaking_caught": {}}
+    v = score.verdicts({"toprope": arm(0.84, 0.7, 0.9), "nl": arm(0.64, 0.6, 0.7), "structured": arm(0.84, 0.8, 0.9)},
+                       rules)
+    assert v["numbers"]["noise_floor"] == 0.2 and "gap_nl" not in v["within_noise"]   # 0.2 is not < 0.2
+    assert "gap_structured" in v["within_noise"]
