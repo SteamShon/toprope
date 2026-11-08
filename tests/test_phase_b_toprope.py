@@ -296,3 +296,31 @@ def test_a_sandbox_with_only_leftover_caches_is_not_a_run(materials, tmp_path):
     assert (arm.sb.root / "ids.yaml").exists() and (tmp_path / "w/sandbox.stale-1/.hypothesis").is_dir()
     with pytest.raises(FileExistsError, match="has a run"):
         TopropeArm(materials, tmp_path / "w", Editor(lambda a: None))
+
+
+def test_the_tools_stay_fixed_when_a_change_is_deployed(materials, tmp_path):
+    """ADR-0040 §3: the toolchain is fixed for the whole run. A member runs its deployed commit
+    (ADR-0045), and the sandbox's commit stores are the arm's, so without `--working-copy` an
+    arm's deployed change became its own tools: a request that needs a field the handoff does not
+    send left the composition unable to compile, and the stand-in's next step failed (2026-11-08)."""
+    def needs_branch(a):
+        a["params"]["branch"] = {"type": "string"}
+
+    class Delivery(Editor):
+        def converse(self, system, user, tools, transcript, max_turns=40):
+            tl = {t.name: t for t in build_tools(tools)}
+            decl = yaml.safe_load(tl["read_declaration"].fn(domain="delivery"))
+            action = {k: v for k, v in decl["actions"]["request_delivery"].items() if k not in ("source", "status")}
+            self.change(action)
+            tl["propose_element"].fn(domain="delivery", path="actions.request_delivery", value=json.dumps(action))
+            return "proposed"
+
+    arm = TopropeArm(materials, tmp_path / "w", Delivery(needs_branch))
+    out = tmp_path / "w/seq-01"
+    arm.edit(REQ, out)
+    arm.check(REQ, out)
+    assert arm.deploy(REQ, out).data["deployed"]                      # delivery now needs a branch
+    assert "branch" in Path(arm.sb.env("delivery").current()["declaration"]).read_text()
+    arm.backend = Editor(lambda a: a.update(description="Verify it in use."))
+    arm.edit({**REQ, "seq": 2}, tmp_path / "w/seq-02")              # the stand-in's step still runs
+    assert arm.check({**REQ, "seq": 2}, tmp_path / "w/seq-02").data["commits"]
