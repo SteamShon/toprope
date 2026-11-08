@@ -13,24 +13,70 @@ researcher's decisions are marked as theirs.
 rules to tune the checks and size M2. The README claim-status table does not change.
 
 ## Summary
-- **The pilot verdict for ① is "weakens".** As run, the Toprope arm's pre-deploy check found
-  fewer seeded problems than an LLM review of either text: mean recall 0.30 against 0.52 (NL skill)
-  and 0.74 (structured spec), with precision 0.09 against 0.59 and 0.52. Both gaps are larger than
-  the noise floor (0.20).
-- **The arms find different kinds of problem.** The Toprope arm caught the handoff-breaking change
-  (9), which no LLM review caught in any of its ten runs. The LLM reviews caught most changes that
-  conflict with a rule (structured 1.0, NL 0.8), which the Toprope arm mostly missed (0.2).
-- **The Toprope arm measured here is the compiler alone.** Its change check ran without its
-  natural-language check (no checker configured) and without TLC. Its recall on rule conflicts is
-  bounded by what the declarations state as rules (see *Why*).
+- **The fair comparison favours Toprope over the natural-language skill.** The Toprope arm with
+  its LLM review is the declarations, their scenarios, the compiler, and an LLM reviewing the same
+  edits (*The fair comparison*, below). Graded blind in the same sitting as the other two arms:
+  - Toprope's recall is 0.84 (0.7–0.9), against 0.64 for the NL skill reviewed by an LLM. The gap
+    of 0.20 equals the noise floor, so it is at the edge of run-to-run noise.
+  - It matches the structured spec reviewed by an LLM (0.84).
+  - Grouped precision is about 0.5 in all three arms.
+  - On the seven seeded changes that all three arms' edits implemented, recall is 0.94 for
+    Toprope, 0.86 for the structured spec and 0.63 for the NL skill. This analysis was added
+    after the results, and seven changes are few.
+- **Most of the gain comes from the declaration format.** An LLM reading the structured
+  declarations does as well on recall as the declarations, compiler and LLM together. The
+  compiler's own share is a kind of problem the LLM reviews never caught: the handoff-breaking
+  change (9), found by none of the LLM reviews in any run.
+- **The compiler alone, as first run, is weak.** The Toprope arm's change check had no
+  natural-language checker and no TLC. Against the frozen rules, as preregistered:
+  - recall 0.30 and precision 0.09;
+  - the pilot verdict for ① is **weakens**;
+  - it misses the changes that conflict with a rule, because those rules were bound to actions
+    (*Why*).
+- **The grader itself varies.** The NL and structured arms were graded again with the combined
+  arm, with no new runs, and their recall moved by about 0.1 (0.52→0.64, 0.74→0.84). That is as
+  much as the reviews vary. So numbers compare only within one grading. The grader varies as much
+  as the arms do, so M2 needs several graders, or the researcher reading every label.
 - **The handoff pilot (⑥) is inconclusive.** The handoff-breaking change was caught before deploy,
   but probe P07 fails in every arm, before any change too.
-- **Self-compile: not shown to hold.** The tools are generated (no hand edits), the regeneration
-  check passes and the switch-over was signed off; but the probes, run on the generated tools
-  before any change, pass 2 of 8. Since probes fail before any change in every arm, the probe
-  set-up itself is suspect (see *Limits*).
+- **Self-compile: not shown to hold.** The tools are generated with no hand edits, the
+  regeneration check passes, and the switch-over was signed off. But the probes, run on the
+  generated tools before any change, pass 2 of 8. Since probes fail before any change in every
+  arm, the probe set-up itself is suspect (see *Limits*).
 
-## Phase B results
+## The fair comparison: Toprope with its LLM review
+
+Toprope's design pairs the compiler with an LLM (ADR-0009). The arm as first run had only the
+compiler. So, at the researcher's request (2026-11-08), the Toprope arm's own edits were reviewed
+five times each with the frozen review prompt, as the structured arm's were, and each review's
+findings were added to the compiler's flags (`phase_b combine-toprope`, #172; data in
+`experiments/m1/runs/phase-b-combined/`). No edit was made again. The three arms were graded blind
+in one sitting (#173).
+
+| | NL skill + LLM | Structured spec + LLM | Toprope (declarations, scenarios, compiler, LLM) |
+|---|---|---|---|
+| Recall, mean (min–max over runs) | 0.64 (0.6–0.7) | 0.84 (0.8–0.9) | 0.84 (0.7–0.9) |
+| Precision, every flag counted | 0.51 | 0.47 | 0.22 |
+| Precision, a compiler check counted once per change, carried ones left out | 0.51 | 0.47 | 0.48 |
+| Seeded changes flagged (in most runs) | 3, 7, 13, 17, 18, 20 | 3, 5, 7, 11, 13, 17, 18, 20 | 3, 5, 7, **9**, 11, 13, 17, 20 |
+| Recall on the 7 seeded changes all three edits implemented | 0.63 | 0.86 | 0.94 |
+| Edits that implemented the request (of 20) | 18 | 18 | 14 |
+
+What this arm adds, and what it does not show:
+- **Added after the first scoring.** The prompts and rules are frozen, and grading is blind. The
+  grouped precision and the fidelity-controlled recall were chosen after seeing the results.
+- **The LLM does not see the compiler's output.** It reviews the declarations as the structured
+  arm's reviewer does. A natural-language check that reads the compiler's impact report, as the
+  design has it, is not measured here.
+- **The Toprope edits are worse.** Its editor proposes one whole element at a time, and its edits
+  implemented the request less often (14 of 20, against 18). A seeded problem an edit did not
+  implement cannot be found, which is why recall on the seven changes all edits implemented is
+  reported too.
+- **The verdict rules do not apply.** They name the Toprope arm as the compiler's change check.
+  Applied to this arm, they give "weakens", with both gaps within the noise floor: +0.20 against
+  the NL skill and 0.00 against the structured spec. It is reported, not a verdict.
+
+## Phase B results: the compiler alone, as first run
 
 Ten of the twenty change requests carry a seeded problem (bindable; none unbindable). Reviews ran
 five times per change, probes three times; the Toprope arm's checks are derandomized and ran once
@@ -68,8 +114,8 @@ Against the frozen rules (`verdict-rules.yaml`), applied as they are to the mean
   arm's checks. The timed repeats cover the check and the preview, not the editor's own time
   (about 25 s per change), and use the result cache, as in use.
 
-Cost (estimates): NL $19.92, structured $26.91, Toprope $22.23 for the runs; grading $21.50 and,
-after the recheck, $21.74.
+Cost (estimates): NL $19.92, structured $26.91, Toprope $22.23 for the runs; grading $21.50,
+after the recheck $21.74, and for the combined arm $3.92 of reviews and $21.29 of grading.
 
 ## Why the Toprope arm missed rule conflicts
 
@@ -99,6 +145,8 @@ scored again; nothing was edited by hand. The decision log records each supersed
 4. **The Toprope arm's flags were taken on other inputs than the kernel's check.** Every log
    replay finding was lost. The flags were taken again from the stored commits (no model run),
    and all arms were graded again (#169).
+5. **The grader sometimes answered in prose,** and its verdict was lost; the researcher decided
+   those (six probe runs). It is now asked again for JSON (#174).
 
 The first full run (2026-11-06) is superseded: it ran before the run protocol was frozen, and from
 `authoring@4` (`experiments/m1/runs/superseded/`).
@@ -107,7 +155,10 @@ The first full run (2026-11-06) is superseded: it ran before the run protocol wa
 - **Seeding bias.** The builder of the checks chose the seeded problems, and the harness's author
   had seen the key (ADR-0040 §9). Its prompts were reviewed and frozen by the researcher.
 - **Small numbers.** Ten seeded problems, one domain pair, and one run of the Toprope arm.
-- **The Toprope arm was incomplete.** Neither the natural-language check nor TLC ran.
+- **The Toprope arm was incomplete.** Neither the natural-language check nor TLC ran. The
+  combined arm adds an LLM review, but not one that reads the compiler's output.
+- **The grader varies.** One grader graded the same flags about 0.1 of recall apart in two
+  sittings. That is as much as the reviews vary, and it is not part of the noise floor.
 - **The probes are suspect.** Several fail before any change in every arm (P07 everywhere; in the
   Toprope arm six of eight). So "found after deploy" and the probe pass rates measure the probes
   as much as the arms. When the grader answered in prose, its verdict was lost and the researcher
@@ -128,11 +179,15 @@ not write; nothing below is tested by M1's numbers.
    system) can reach which state, under which preconditions. A widening is a finding.
 3. **The full Toprope check.** The compiler, TLC, and a natural-language check that reads the
    structured diff with the impact report. Compare it with a structured spec reviewed by an LLM.
-   The question to preregister: does the full check beat the structured spec in both recall and
-   precision? If not, Toprope's value narrows to its declaration format.
+   M1 found them level on recall (0.84 each) when the LLM did not see the compiler's output. The
+   question to preregister: does the full check beat the structured spec in both recall and
+   precision? If not, Toprope's value narrows to its declaration format and to the classes of
+   problem only the compiler catches.
 4. **Grouped warnings.** One flag per check and element, with a count; what the base carried is
    shown apart.
 5. **An editor that proposes a patch.** It proposes several elements at once and sees them
    checked, instead of one whole element at a time.
-6. **Probes that pass before any change.** Fix their starting states and criteria, and have the
-   grader asked again when it does not answer in JSON.
+6. **A steadier grader.** Several graders, or the researcher reading every label, since one
+   grader varied by about 0.1 of recall between two sittings.
+7. **Probes that pass before any change.** Fix their starting states and criteria, and have the
+   grader asked again when it does not answer in JSON (done in #174).
