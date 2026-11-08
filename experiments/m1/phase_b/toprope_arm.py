@@ -36,6 +36,8 @@ import subprocess
 import sys
 import time
 import uuid
+from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -102,6 +104,80 @@ def export_toolchain(root: Path, out: Path) -> Path:
         (out / d).mkdir()
         store.export(d, store.main(d).id, out / d / f"{d}.domain.yaml")
     return out
+
+
+# -- the Toprope arm's flags --------------------------------------------------------------------------
+
+def problem(domain: str, check: str, p: Any) -> dict[str, Any]:
+    return {"domain": domain, "check": check, "severity": p.severity, "where": p.where, "problem": p.message}
+
+
+def recorded_base(root: Path, d: str, cid: str) -> str | None:
+    """The base the kernel's check of `cid` was recorded against (its first `change-check` row)."""
+    from toprope.commits import CommitStore
+    rows = [r for r in CommitStore(root / ".toprope/commits").checks(d, cid) if r["check"] == "change-check"]
+    if rows:
+        return rows[0].get("base")
+    st = CommitStore(root / ".toprope/commits")
+    return st.review_base(d, cid)
+
+
+def checked_at(root: Path, d: str, cid: str) -> str | None:
+    from toprope.commits import CommitStore
+    rows = [r for r in CommitStore(root / ".toprope/commits").checks(d, cid) if r["check"] == "change-check"]
+    return rows[0]["at"] if rows else None
+
+
+@contextmanager
+def history(root: Path, d: str, upto: str | None = None):
+    """The member's own event log, the history the kernel's change check replays (ADR-0045):
+    `toolchain/<d>/events`. With `upto`, only the events up to that time, as the check saw them."""
+    from toprope.store import open_store
+    src = root / "toolchain" / d / "events"
+    if upto is None:
+        yield open_store(f"jsonl:{src}")
+        return
+    import tempfile
+    cut = datetime.fromisoformat(upto)
+    with tempfile.TemporaryDirectory(prefix="history-") as tmp:
+        lines = (src / "events.jsonl").read_text().splitlines() if (src / "events.jsonl").exists() else []
+        keep = [x for x in lines if x.strip() and _event_at(x) <= cut]
+        Path(tmp, "events.jsonl").write_text("".join(x + "\n" for x in keep))
+        yield open_store(f"jsonl:{tmp}")
+
+
+def _event_at(line: str) -> datetime:
+    ev = json.loads(json.loads(line)["event"])
+    at = ev.get("at") or {}
+    return datetime.fromisoformat(at["$dt"] if isinstance(at, dict) else at)
+
+
+def check_report(root: Path, d: str, cid: str, base: str | None, cached: bool = True, upto: str | None = None) -> Any:
+    from toprope.check import change_check
+    from toprope.commits import CommitStore
+    from toprope.incremental import ResultCache
+    st = CommitStore(root / ".toprope/commits")
+    with history(root, d, upto) as events:
+        return change_check(st.domain(d, cid), st.domain(d, base) if base else None, events=events,
+                            cache=ResultCache(root / ".toprope/cache") if cached else None)
+
+
+def flags(root: Path, d: str, cid: str, upto: str | None = None) -> tuple[list[dict[str, Any]], Any]:
+    """A commit's flags: every problem of its change check, on the kernel's inputs. Each says
+    whether its base already had it (`carried`), from the base's own check on the same history:
+    the owner sees every problem, and whether the change brought it is for the grading."""
+    base = recorded_base(root, d, cid)
+    report = check_report(root, d, cid, base, upto=upto)
+    found = [problem(d, n, p) for n, res in report.checks.items() for p in res.problems]
+    before: set[tuple[str, str, str, str]] = set()
+    if base:
+        from toprope.commits import CommitStore
+        parents = CommitStore(root / ".toprope/commits").get(d, base).parents
+        old = check_report(root, d, base, parents[0] if parents else None, upto=upto)
+        before = {(n, p.severity, p.where, p.message) for n, res in old.checks.items() for p in res.problems}
+    for f in found:
+        f["carried"] = (f["check"], f["severity"], f["where"], f["problem"]) in before
+    return found, report
 
 
 def _aside(p: Path, why: str) -> Path:
@@ -302,8 +378,6 @@ class TopropeArm:
         return StepResult(time.monotonic() - t, {"summary": summary, "diff": changed, "changed": bool(changed)})
 
     def check(self, req: dict[str, Any], out: Path) -> StepResult:
-        from toprope.check import change_check
-        from toprope.incremental import ResultCache
         after = self._texts()
         changed = [d for d in DOMAINS if after[f"{d}.domain.yaml"] != self._before[f"{d}.domain.yaml"]]
         findings: list[dict[str, Any]] = []
@@ -325,17 +399,13 @@ class TopropeArm:
             passed = bool(self.sb.get("authoring", d, cid).get("checks_passed"))
             timings[d] = {"commit_and_check": time.monotonic() - t}
             # The problems in detail: the action records only a summary, so the same check runs
-            # again here, read-only and from the same cache. Should the two runs disagree (the
-            # exploration samples examples), both verdicts are recorded.
+            # again here, read-only, on the same inputs as the kernel's: the base it recorded and
+            # the member's own event history (ADR-0045's `domain_events`). Should the two runs
+            # disagree (the exploration samples examples), both verdicts are recorded.
             st = self.sb.commits()
             env = self.sb.env(d)
-            with env.events(d) as events:
-                report = change_check(st.domain(d, cid), st.domain(d, st.review_base(d, cid)), events=events,
-                                      cache=ResultCache(self.sb.root / ".toprope/cache"))
-            for name, res in report.checks.items():
-                for p in res.problems:
-                    findings.append({"domain": d, "check": name, "severity": p.severity, "where": p.where,
-                                     "problem": p.message})
+            found, report = flags(self.sb.root, d, cid)
+            findings += found
             t = time.monotonic()
             try:
                 build = env.preview_commit(st, d, cid)
@@ -365,19 +435,14 @@ class TopropeArm:
         return n
 
     def _report(self, d: str, cid: str, cached: bool) -> Any:
-        from toprope.check import change_check
-        from toprope.incremental import ResultCache
-        st, env = self.sb.commits(), self.sb.env(d)
-        with env.events(d) as events:
-            return change_check(st.domain(d, cid), st.domain(d, st.review_base(d, cid)), events=events,
-                                cache=ResultCache(self.sb.root / ".toprope/cache") if cached else None)
+        return check_report(self.sb.root, d, cid, recorded_base(self.sb.root, d, cid), cached=cached)
 
     def _repeat(self, first: list[dict[str, Any]]) -> dict[str, Any]:
         """Run protocol §3: a second run of the checks, uncached, must find the same."""
-        again = [{"domain": d, "check": name, "severity": p.severity, "where": p.where, "problem": p.message}
-                 for d, c in self._commits.items() for name, res in self._report(d, c["commit"], False).checks.items()
-                 for p in res.problems]
-        key = lambda f: json.dumps(f, sort_keys=True)                  # noqa: E731
+        again = [problem(d, name, p) for d, c in self._commits.items()
+                 for name, res in self._report(d, c["commit"], False).checks.items() for p in res.problems]
+        key = lambda f: json.dumps({k: f[k] for k in ("domain", "check", "severity", "where", "problem")},  # noqa: E731
+                                   sort_keys=True)
         a, b = {key(f) for f in first}, {key(f) for f in again}
         return {"same": a == b, "only_first": sorted(a - b), "only_second": sorted(b - a)}
 
