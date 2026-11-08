@@ -218,8 +218,11 @@ class TopropeArm:
     name = "toprope"
     described = DESCRIBED
 
+    repeat_changes = 3                             # run protocol §3: the checks run twice on 3 changes
+    timed = 5                                      # run protocol §3: 5 timed repeats per change
+
     def __init__(self, materials: Path, work: Path, backend: Backend, resume: bool = False):
-        self.backend = backend
+        self.backend, self.work = backend, work
         self.materials = tree_hash(materials)
         self.sb = Sandbox(work / "sandbox")
         if resume:
@@ -329,9 +332,66 @@ class TopropeArm:
                                 "check": list(checked.get("then", [])), "timings": report.timings}
         for d in self._failed:                         # no commit: back to what is deployed
             self._back_to_deployed((d,))
-        return StepResult(time.monotonic() - t0, {"findings": findings, "commits": self._commits,
-                                                  "not_committed": self._failed, "changed_domains": changed,
-                                                  "timings": timings})
+        seconds = time.monotonic() - t0
+        data: dict[str, Any] = {"findings": findings, "commits": self._commits, "not_committed": self._failed,
+                                "changed_domains": changed, "timings": timings,
+                                "runs": [{"run": 1, "findings": findings}]}     # derandomized: one run
+        if self._commits and self._repeats_done() < self.repeat_changes:
+            data["repeat"] = self._repeat(findings)
+        if self._commits:
+            data["timed"] = [self._timed() for _ in range(self.timed)]
+        return StepResult(seconds, data)
+
+    def _repeats_done(self) -> int:
+        n = 0
+        for f in self.work.glob("seq-*/record.json"):
+            n += "repeat" in (json.loads(f.read_text()).get("check") or {})
+        return n
+
+    def _report(self, d: str, cid: str, cached: bool) -> Any:
+        from toprope.check import change_check
+        from toprope.incremental import ResultCache
+        st, env = self.sb.commits(), self.sb.env(d)
+        with env.events(d) as events:
+            return change_check(st.domain(d, cid), st.domain(d, st.review_base(d, cid)), events=events,
+                                cache=ResultCache(self.sb.root / ".toprope/cache") if cached else None)
+
+    def _repeat(self, first: list[dict[str, Any]]) -> dict[str, Any]:
+        """Run protocol §3: a second run of the checks, uncached, must find the same."""
+        again = [{"domain": d, "check": name, "severity": p.severity, "where": p.where, "problem": p.message}
+                 for d, c in self._commits.items() for name, res in self._report(d, c["commit"], False).checks.items()
+                 for p in res.problems]
+        key = lambda f: json.dumps(f, sort_keys=True)                  # noqa: E731
+        a, b = {key(f) for f in first}, {key(f) for f in again}
+        return {"same": a == b, "only_first": sorted(a - b), "only_second": sorted(b - a)}
+
+    def _timed(self) -> dict[str, Any]:
+        """One timed repeat of edit's end → validated preview, for each changed domain (run protocol
+        §3, "Name the limiter"): the impact report and the affected harness (from the change check,
+        with the result cache, as in use) and the preview build."""
+        st = self.sb.commits()
+        out: dict[str, Any] = {"seconds": 0.0, "parts": {}}
+        for d, c in self._commits.items():
+            t = time.monotonic()
+            report = self._report(d, c["commit"], True)
+            check_s = time.monotonic() - t
+            t = time.monotonic()
+            try:
+                self.sb.env(d).preview_commit(st, d, c["commit"])
+            except Exception:                            # noqa: BLE001 - timed all the same
+                pass
+            preview_s = time.monotonic() - t
+            parts = {"impact": report.timings.get("impact") or 0.0, "harness": report.timings.get("harness") or 0.0,
+                     "preview": preview_s}
+            parts["other_check"] = max(0.0, check_s - parts["impact"] - parts["harness"])
+            out["parts"][d] = parts
+            out["seconds"] += check_s + preview_s
+        totals: dict[str, float] = {}
+        for parts in out["parts"].values():
+            for k, v in parts.items():
+                totals[k] = totals.get(k, 0.0) + v
+        out["limiter"] = max(totals, key=lambda k: totals[k]) if totals else None
+        return out
 
     def deploy(self, req: dict[str, Any], out: Path) -> StepResult:
         t = time.monotonic()
@@ -388,7 +448,7 @@ class TopropeArm:
         from .probes import run_probes
         toolchain = _deployed(self.sb, out / "deployed-toolchain")
         guides = _guides(toolchain)
-        return run_probes(self.backend, worlds, probes, out / "probes", "the Toprope tools generated from these "
+        return run_probes(self.backend, worlds, probes, out, "the Toprope tools generated from these "
                           "domains (their MCP tools)", guides, toolchain, jobs=jobs)
 
 

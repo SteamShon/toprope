@@ -32,10 +32,16 @@ PROMPTS = Path(__file__).parent / "prompts"
 
 
 def prompt(name: str, **fill: str) -> str:
+    """A role's prompt. The harness's own text in it (the template, and every fill but the
+    domain's materials) is checked for experiment words (run protocol §1)."""
+    from .blind import check
     text = (PROMPTS / f"{name}.md").read_text()
     for k, v in fill.items():
-        text = text.replace("{" + k + "}", v)
-    return text
+        if k != "materials":
+            text = text.replace("{" + k + "}", v)
+    if not name.startswith("grade_"):              # the grader sees the key; it is not in an arm
+        check(f"prompt {name}", text)
+    return text.replace("{materials}", fill.get("materials", "{materials}"))
 
 
 def tree_hash(root: Path) -> str:
@@ -60,6 +66,7 @@ def diff(before: dict[str, str], after: dict[str, str]) -> str:
 
 
 def request_text(req: dict[str, Any]) -> str:
+    """A change request as the agents get it: the frozen intent and rationale, nothing else."""
     return f"Change request {req['seq']}: {req['intent']}\nWhy: {req.get('rationale', '').strip()}"
 
 
@@ -89,6 +96,8 @@ class TextArm:
     A new run copies the materials. Resuming one (`resume=True`) starts again from what was last
     deployed: an edit left half done when the run stopped is thrown away, and that change runs
     again from the start."""
+
+    reviews = 5                                   # run protocol §3: five reviews per change
 
     def __init__(self, name: str, described: str, materials: Path, work: Path, backend: Backend,
                  resume: bool = False):
@@ -124,11 +133,17 @@ class TextArm:
         files = "\n\n".join(f"=== {name} ===\n{text}" for name, text in after.items())
         user = (f"{request_text(req)}\n\n--- The diff ---\n{diff(self._before, after) or '(no change)'}\n\n"
                 f"--- Every file after the change ---\n{files}")
-        t = time.monotonic()
-        answer = self.backend.converse(prompt("review", arm=self.described), user, None,
-                                       Transcript(out / "review.jsonl"))
-        findings, error = parse_findings(answer)
-        return StepResult(time.monotonic() - t, {"findings": findings, "error": error})
+        t0 = time.monotonic()
+        runs = []
+        for k in range(1, self.reviews + 1):
+            # Run protocol §3: the same prompt, model and settings, each a fresh conversation.
+            t = time.monotonic()
+            answer = self.backend.converse(prompt("review", arm=self.described), user, None,
+                                           Transcript(out / f"review-{k}.jsonl"))
+            findings, error = parse_findings(answer)
+            runs.append({"run": k, "findings": findings, "error": error, "seconds": time.monotonic() - t,
+                         "transcript": f"review-{k}.jsonl"})
+        return StepResult(time.monotonic() - t0, {"runs": runs})
 
     def deploy(self, req: dict[str, Any], out: Path) -> StepResult:
         t = time.monotonic()
@@ -140,7 +155,7 @@ class TextArm:
         """The probes after this change, with the deployed text as the rules to follow."""
         from .probes import run_probes
         materials = "\n\n".join(f"=== {name} ===\n{text}" for name, text in snapshot(self.deployed).items())
-        return run_probes(self.backend, worlds, probes, out / "probes", self.described, materials, jobs=jobs)
+        return run_probes(self.backend, worlds, probes, out, self.described, materials, jobs=jobs)
 
 
 def _replace(target: Path, source: Path) -> None:

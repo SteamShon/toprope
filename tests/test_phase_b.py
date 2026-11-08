@@ -45,6 +45,7 @@ from phase_b.model import (
     Usage,
     tool_use,
 )
+from phase_b.blind import words_in
 from phase_b.toolserver import ToolSpec, make_server
 
 SEALED = "SEALED-MARKER-7f3a"     # appears only in the synthetic key and binding
@@ -70,7 +71,7 @@ def instruments(tmp: Path, keep: int | None = None) -> Path:
     shutil.copy(real / "run-protocol.md", d / "run-protocol.md")
     files = {f.name: {"sha256": hashlib.sha256(f.read_bytes()).hexdigest(), "frozen_at": "t"}
              for f in [*d.glob("*.yaml"), d / "run-protocol.md"]}
-    (d / "FROZEN.json").write_text(json.dumps({"files": files}))
+    (d / "FROZEN.json").write_text(json.dumps({"files": files, "prompts": {"sha256": runner.prompts_hash()}}))
     return d
 
 
@@ -231,6 +232,7 @@ def test_a_cli_conversation_is_blind_and_recorded(tmp_path, monkeypatch, fake_cl
     assert a[a.index("--system-prompt") + 1] == "the role" and a[a.index("--model") + 1] == "m-under-test"
     assert call["stdin"] == "the message" and not call["api_key"]                          # the subscription
     assert ROOT not in Path(call["cwd"]).parents and Path(call["cwd"]) != ROOT             # outside the repository
+    assert words_in(Path(call["cwd"]).name) == []                                          # an ordinary name
     kinds = [json.loads(x)["kind"] for x in (tmp_path / "t.jsonl").read_text().splitlines()]
     assert kinds == ["start", "init", "reply", "result"]
     assert b.report()["tokens"]["input"] == 50 and b.usd == pytest.approx(0.01)
@@ -262,8 +264,8 @@ def test_the_cli_run_refuses_user_memory_unless_allowed(tmp_path, monkeypatch, f
     assert man["user_memory"] == hashlib.sha256(b"Always answer in French.").hexdigest()
     assert man["backend"] == "cli" and man["done"] == [1]
     rec = json.loads((tmp_path / "run/nl/seq-01/record.json").read_text())
-    assert rec["check"]["error"] and rec["tokens"]["input"] == 100      # a review that is not JSON is recorded
-    assert [c["args"][c["args"].index("--model") + 1] for c in fake_claude()] == ["m-under-test"] * 2
+    assert rec["check"]["runs"][0]["error"] and rec["tokens"]["input"] == 50 * 6   # a review not JSON is recorded
+    assert [c["args"][c["args"].index("--model") + 1] for c in fake_claude()] == ["m-under-test"] * 6  # edit, 5 reviews
 
 
 # -- an arm, change by change --------------------------------------------------------------
@@ -276,7 +278,9 @@ def test_a_text_arm_edits_checks_and_deploys_each_change(tmp_path):
     assert man["done"] == [1] and man["sessions"][-1]["stopped"] is None
     rec = json.loads((tmp_path / "run/nl/seq-01/record.json").read_text())
     assert "+Stages: drafted, built." in rec["edit"]["diff"]
-    assert rec["check"]["findings"][0]["kind"] == "reference"
+    assert [r["run"] for r in rec["check"]["runs"]] == [1, 2, 3, 4, 5]          # run protocol §3: five reviews
+    assert all(r["findings"][0]["kind"] == "reference" for r in rec["check"]["runs"])
+    assert len([c for c in m.calls if "review a change" in c["system"]]) == 5    # each a fresh conversation
     assert "built" in (tmp_path / "run/nl/deployed/SKILL.md").read_text()      # deployed though flagged
     review = next(c for c in m.calls if "review a change" in c["system"])
     assert "+Stages: drafted, built." in review["messages"][0]["content"]     # the reviewer sees the diff
@@ -305,7 +309,7 @@ def test_a_run_refuses_to_start_when_an_instrument_changed(tmp_path):
 
 def test_a_stopped_run_resumes_where_it_stopped(tmp_path):
     inst = instruments(tmp_path)
-    b = Budget((1000.0, 1000.0, 0, 0), cap_usd=0.25)          # one change costs about $0.33
+    b = Budget((1000.0, 1000.0, 0, 0), cap_usd=1.0)           # one change (an edit, 5 reviews) costs about $0.77
     with pytest.raises(SystemExit) as e:
         runner.main(arm_args(tmp_path, inst, "nl", "--seqs", "1-3"), backend=api(budget=b)[0])
     assert e.value.code == 2

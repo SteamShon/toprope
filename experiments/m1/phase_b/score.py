@@ -1,40 +1,45 @@
-"""Score M1 Phase B (ADR-0040 §8): the only code that opens the change key and the binding.
+"""Score M1 Phase B (ADR-0040 §8; run protocol §2–3): the only code that opens the change key
+and the binding.
 
-  python -m phase_b grade [--out RUN_DIR]     propose a label for every finding, edit and probe
+  python -m phase_b grade [--out RUN_DIR]     propose a label for every flag, edit and probe run
   python -m phase_b score [--out RUN_DIR]     the metrics and the pilot verdicts, from the
                                               labels the researcher confirmed
 
 `grade` runs only once every arm has run every change (`--partial` overrides it, for tests and
-a look at the dry run; the result says so). It writes `RUN_DIR/scoring/proposed.yaml`:
+a look at a dry run; the result says so). It writes `RUN_DIR/scoring/proposed.yaml`:
 
-- **findings**, each labelled `seeded` (it names the change's seeded problem), `other-real` (a real
-  problem the key does not list) or `false-alarm`. Toprope's findings name elements, so they are
-  first matched to the binding mechanically (`binding_match`); a grader conversation (a fresh
-  role with the key entry and the binding for that change) labels every finding of every arm.
-- **edits**: did the arm's edit implement the request (`implements`, `partial`, `does-not`)?
-  Without this a bad edit and a missed check look the same.
-- **probes**: pass or fail for each probe after each change, judged by the grader against the
+- **changes**: for each change, every arm's flags from every run, under random labels A, B and C
+  (a different order per change; the mapping is in `blind-labels.yaml`, kept apart), graded in
+  one pass against the bound key entry: `seeded`, `other-real` or `false-alarm`. A Toprope flag
+  that names a bound element gets the script's label too (`script_label`); the grader's is
+  `grader_label`; `label` is the one that counts, and the researcher's when they change it. Each
+  label's edit is judged too (`implements`, `partial`, `does-not`).
+- **probes**: pass or fail for each probe run after each change, judged by the grader against the
   probe's `must` and `must_not` (which no probe agent ever saw).
 
-The researcher reviews `proposed.yaml`, changes any label, sets `status: confirmed` and saves it
-as `confirmed.yaml`. `score` then computes, per arm:
+The researcher reviews `proposed.yaml`, changes any `label`, sets `status: confirmed` and saves it
+as `confirmed.yaml`. `score` then computes, per arm and per run (recall and precision with their
+mean, minimum and maximum):
 
-- pre-deploy recall: seeded problems (bindable, `problem` not `none`) with at least one finding
-  labelled `seeded`, over all of them; also without handoff-breaking changes, and per type
-- pre-deploy precision: findings labelled `seeded` or `other-real`, over all findings
-- found after deploy: a seeded problem missed before deploy, where a probe that passed before the
-  change fails after it; silent: missed and never surfaced
-- iteration time: the median of edit → checked (Toprope: → previewed), and its breakdown
-- the Toprope changes that did not deploy (a floor refused them)
+- pre-deploy recall: seeded problems (bindable, `problem` not `none`) with a flag labelled
+  `seeded` in that run, over all of them; also without handoff-breaking changes, and per type
+- pre-deploy precision: flags labelled `seeded` or `other-real`, over all flags of the run
+- found after deploy: a seeded problem missed (flagged in at most half the runs), where a probe
+  that passed (in most of its runs) before the change fails after it; silent: never surfaced
+- iteration time: per change, the median of its timed repeats with the part that bounds it, then
+  the median over changes
+- the noise floor (the largest spread of an arm's recall), and the Toprope arm's repeat check
 
-and applies the frozen verdict rules (`verdict-rules.yaml`): pilot targets, not a link verdict
-(ADR-0034).
+and applies the frozen verdict rules (`verdict-rules.yaml`) to the mean numbers, marking a gap
+within the noise floor next to the rule it affects: pilot targets, not a link verdict (ADR-0034).
 """
 
 from __future__ import annotations
 
 import json
+import random
 import re
+import secrets
 import statistics
 from pathlib import Path
 from typing import Any
@@ -46,6 +51,7 @@ from .arms import prompt
 
 ARMS = ("nl", "structured", "toprope")
 LABELS = ("seeded", "other-real", "false-alarm")
+BLIND = ("A", "B", "C")
 FIDELITY = ("implements", "partial", "does-not")
 
 
@@ -156,35 +162,74 @@ def _sealed_context(seq: int, req: dict[str, Any], key: dict[int, Any], binding:
             f"Elements it is bound to: {json.dumps(b.get('elements', []))}; note: {b.get('note', '')}")
 
 
-def grade_change(backend: Any, arm: str, rec: dict[str, Any], key, binding, out: Path) -> dict[str, Any]:
-    seq = rec["seq"]
-    findings = rec["check"].get("findings") or []
-    user = (f"{_sealed_context(seq, rec, key, binding)}\n\nThe arm: {arm}\n"
-            f"--- The edit the arm made ---\n{rec['edit'].get('diff') or '(no change)'}\n\n"
-            f"--- The arm's pre-deploy findings, numbered from 0 ---\n"
-            + "\n".join(f"{i}. {json.dumps(f, ensure_ascii=False)}" for i, f in enumerate(findings)))
-    answer = backend.converse(prompt("grade_change"), user, None, Transcript(out / f"{arm}-seq-{seq:02d}.jsonl"))
-    data = _json(answer) or {}
-    labels = {int(x.get("index", -1)): x for x in data.get("findings", []) if isinstance(x, dict)}
+def check_runs(rec: dict[str, Any]) -> list[dict[str, Any]]:
+    """A change's pre-deploy check runs: five reviews, or the Toprope arm's one (a record from
+    before the run protocol has one, under `findings`)."""
+    check = rec.get("check") or {}
+    if "runs" in check:
+        return check["runs"]
+    return [{"run": 1, "findings": check.get("findings") or [], "error": check.get("error")}]
+
+
+def probe_runs(rec: dict[str, Any]) -> list[dict[str, Any]]:
+    """The probe runs after a change (a record from before the run protocol has one)."""
+    probes = rec.get("probes") or []
+    if probes and "probe" in probes[0]:
+        return [{"run": 1, "dir": "probes", "results": probes}]
+    return probes
+
+
+def blind_labels(seqs: list[int], rng: random.Random) -> dict[int, dict[str, str]]:
+    """Run protocol §2: per change, the arms under random labels, a different order each time."""
+    out = {}
+    for s in seqs:
+        arms = list(ARMS)
+        rng.shuffle(arms)
+        out[s] = dict(zip(BLIND, arms, strict=True))
+    return out
+
+
+def grade_change(backend: Any, seq: int, req: dict[str, Any], recs: dict[str, dict[str, Any]],
+                 labels: dict[str, str], key, binding, out: Path) -> dict[str, Any]:
+    """One change, every arm's flags under its blind label, graded in one pass against the bound
+    key entry (run protocol §2). Toprope's flags name elements, so a script grades them too."""
     bound = (binding.get(seq) or {}).get("elements", [])
-    rows = []
-    for i, f in enumerate(findings):
-        g = labels.get(i, {})
-        row = {"index": i, "finding": f, "label": g.get("label") if g.get("label") in LABELS else None,
-               "why": g.get("why", "" if g else "the grader gave no label")}
-        if arm == "toprope":
-            row["binding_match"] = binding_match(f, bound)
-        rows.append(row)
-    fid = data.get("edit_fidelity")
-    return {"seq": seq, "findings": rows,
-            "edit": {"fidelity": fid if fid in FIDELITY else None, "why": data.get("edit_why", "")},
+    flags, blocks = [], []
+    for letter, arm in labels.items():
+        rec = recs.get(arm) or {}
+        lines = [f"=== {letter} ===", f"The edit: {(rec.get('edit') or {}).get('diff') or '(no change)'}"]
+        for r in check_runs(rec):
+            if r.get("error"):
+                lines.append(f"(run {r['run']} gave no flags: {r['error']})")
+            for i, f in enumerate(r.get("findings") or []):
+                fid = f"{letter}.{r['run']}.{i}"
+                lines.append(f"{fid}. {json.dumps(f, ensure_ascii=False)}")
+                script = "seeded" if arm == "toprope" and binding_match(f, bound) else None
+                flags.append({"id": fid, "run": r["run"], "index": i, "flag": f, "script_label": script})
+        blocks.append("\n".join(lines))
+    user = f"{_sealed_context(seq, req, key, binding)}\n\n" + "\n\n".join(blocks)
+    answer = backend.converse(prompt("grade_change"), user, None, Transcript(out / f"seq-{seq:02d}.jsonl"))
+    data = _json(answer) or {}
+    got = {str(x.get("id")): x for x in data.get("flags", []) if isinstance(x, dict)}
+    for f in flags:
+        g = got.get(f["id"], {})
+        f["grader_label"] = g.get("label") if g.get("label") in LABELS else None
+        f["why"] = g.get("why", "" if g else "the grader gave no label")
+        # The researcher's label counts; it starts as the script's (an element match) or the
+        # grader's. Where they differ, both stay on the record (run protocol §2).
+        f["label"] = f["script_label"] or f["grader_label"]
+    edits = {str(x.get("label")): x for x in data.get("edits", []) if isinstance(x, dict)}
+    return {"seq": seq, "flags": flags,
+            "edits": {letter: {"fidelity": (edits.get(letter) or {}).get("fidelity")
+                               if (edits.get(letter) or {}).get("fidelity") in FIDELITY else None,
+                               "why": (edits.get(letter) or {}).get("why", "")} for letter in labels},
             "grader_error": None if data else "the grader did not answer with JSON"}
 
 
 def _probe_text(run_dir: Path, result: dict[str, Any]) -> str:
     """What the probe agent did, from its transcript: tool calls, their results, messages, answer."""
     lines = []
-    t = run_dir / "probes" / result.get("transcript", "")
+    t = run_dir / result.get("transcript", "")
     if t.is_file():
         for row in t.read_text().splitlines():
             e = json.loads(row)
@@ -220,7 +265,8 @@ def grade_probe(backend: Any, probe: dict[str, Any], run_dir: Path, result: dict
             "why": data.get("why", ""), "error": result.get("error")}
 
 
-def grade(run: Path, instruments: Path, backend: Any, requests: list[dict[str, Any]], partial: bool = False) -> Path:
+def grade(run: Path, instruments: Path, backend: Any, requests: list[dict[str, Any]], partial: bool = False,
+          seed: int | None = None) -> Path:
     seqs = [r["seq"] for r in requests]
     missing = complete(run, seqs)
     if missing and not partial:
@@ -229,21 +275,32 @@ def grade(run: Path, instruments: Path, backend: Any, requests: list[dict[str, A
     probes = {p["id"]: p for p in yaml.safe_load((instruments / "probe-suite.yaml").read_text())["probes"]}
     out = run / "scoring"
     tr = out / "transcripts"
-    proposal: dict[str, Any] = {"status": "proposed", "partial": bool(missing), "missing": missing, "arms": {}}
-    for arm in ARMS:
-        recs = records(run, arm)
-        changes, probe_rows = [], []
-        for seq, rec in sorted(recs.items()):
-            if seq > 0:
-                changes.append(grade_change(backend, arm, rec, key, binding, tr))
-            for res in rec.get("probes") or []:
-                g = grade_probe(backend, probes[res["probe"]], run / arm / f"seq-{seq:02d}", res,
-                                tr / f"{arm}-seq-{seq:02d}-{res['probe']}.jsonl")
-                probe_rows.append({"seq": seq, **g})
-        proposal["arms"][arm] = {"changes": changes, "probes": probe_rows}
+    recs = {arm: records(run, arm) for arm in ARMS}
+    seed = secrets.randbits(32) if seed is None else seed
+    labels = blind_labels(seqs, random.Random(seed))
     out.mkdir(parents=True, exist_ok=True)
+    # The mapping is kept apart from what is graded (run protocol §2); `score` joins them.
+    (out / "blind-labels.yaml").write_text(
+        "# Which arm each label stands for, per change. Do not open it while grading.\n"
+        + yaml.safe_dump({"seed": seed, "labels": labels}, sort_keys=False))
+    reqs = {r["seq"]: r for r in requests}
+    changes = [grade_change(backend, s, reqs[s], {a: recs[a].get(s, {}) for a in ARMS}, labels[s], key, binding, tr)
+               for s in seqs if any(s in recs[a] for a in ARMS)]
+    probe_rows: dict[str, list[dict[str, Any]]] = {}
+    for arm in ARMS:
+        rows = probe_rows.setdefault(arm, [])
+        for seq, rec in sorted(recs[arm].items()):
+            for pr in probe_runs(rec):
+                for res in pr["results"]:
+                    g = grade_probe(backend, probes[res["probe"]], run / arm / f"seq-{seq:02d}" / pr["dir"], res,
+                                    tr / f"{arm}-seq-{seq:02d}-run-{pr['run']}-{res['probe']}.jsonl")
+                    rows.append({"seq": seq, "run": pr["run"], **g})
+    proposal: dict[str, Any] = {"status": "proposed", "partial": bool(missing), "missing": missing,
+                                "changes": changes, "probes": probe_rows}
     path = out / "proposed.yaml"
-    path.write_text("# Proposed by the grader (ADR-0040 §8). Review every label, change what is wrong, set\n"
+    path.write_text("# Proposed by the script (element matches) and the grader (ADR-0040 §8; run protocol §2).\n"
+                    "# Each change's flags are under blind labels (A, B, C); the mapping is in blind-labels.yaml.\n"
+                    "# Review every `label` (keep `script_label` and `grader_label` as they are), set\n"
                     "# `status: confirmed`, and save as confirmed.yaml; `score` reads only that file.\n"
                     + yaml.safe_dump(proposal, sort_keys=False, allow_unicode=True, width=110))
     return path
@@ -256,30 +313,59 @@ def _seeded(key: dict[int, Any], binding: dict[int, Any]) -> list[int]:
             and not (binding.get(s) or {}).get("unbindable")]
 
 
-def arm_metrics(arm: str, graded: dict[str, Any], recs: dict[int, Any], key, binding) -> dict[str, Any]:
-    changes = {c["seq"]: c for c in graded["changes"]}
+def spread(values: list[float | None]) -> dict[str, Any]:
+    """A number with its spread over runs (run protocol §3)."""
+    xs = [v for v in values if v is not None]
+    if not xs:
+        return {"runs": values, "mean": None, "min": None, "max": None}
+    return {"runs": values, "mean": round(statistics.mean(xs), 4), "min": round(min(xs), 4), "max": round(max(xs), 4)}
+
+
+def _by_arm(graded: dict[str, Any], labels: dict[int, dict[str, str]]) -> dict[str, dict[int, dict[str, Any]]]:
+    """The confirmed grades of each change, back under each arm's name."""
+    out: dict[str, dict[int, dict[str, Any]]] = {a: {} for a in ARMS}
+    for c in graded["changes"]:
+        for letter, arm in labels[c["seq"]].items():
+            out[arm][c["seq"]] = {"flags": [f for f in c["flags"] if f["id"].split(".")[0] == letter],
+                                  "edit": c["edits"].get(letter) or {}}
+    return out
+
+
+def arm_metrics(arm: str, changes: dict[int, dict[str, Any]], probes: list[dict[str, Any]], recs: dict[int, Any],
+                key, binding) -> dict[str, Any]:
     seeded = _seeded(key, binding)
-    flagged = {s for s in seeded if any(f["label"] == "seeded" for f in changes.get(s, {}).get("findings", []))}
-    all_findings = [f for c in changes.values() for f in c["findings"]]
-    real = [f for f in all_findings if f["label"] in ("seeded", "other-real")]
+    runs = sorted({r["run"] for s, rec in recs.items() if s > 0 for r in check_runs(rec)}) or [1]
 
-    def recall(of: list[int]) -> float | None:
-        return round(len([s for s in of if s in flagged]) / len(of), 4) if of else None
+    def flagged_in(run: int) -> set[int]:
+        return {s for s in seeded if any(f["label"] == "seeded" and f["run"] == run
+                                         for f in changes.get(s, {}).get("flags", []))}
 
+    def recall(of: list[int], run: int) -> float | None:
+        return round(len([s for s in of if s in flagged_in(run)]) / len(of), 4) if of else None
+
+    def precision(run: int) -> float | None:
+        fs = [f for c in changes.values() for f in c["flags"] if f["run"] == run]
+        return round(len([f for f in fs if f["label"] in ("seeded", "other-real")]) / len(fs), 4) if fs else None
+
+    # A seeded problem counts as flagged before deploy when most of the arm's runs flagged it; the
+    # rest are missed, and the probes tell whether they surfaced after deploy.
+    flagged = {s for s in seeded if sum(s in flagged_in(r) for r in runs) * 2 > len(runs)}
     no_handoff = [s for s in seeded if not handoff_breaking(binding.get(s, {}))]
     by_type: dict[str, list[int]] = {}
-    for s in seeded:
-        by_type.setdefault(str(key[s].get("type") or "unknown"), []).append(s)
     by_design: dict[str, list[int]] = {}
     for s in seeded:
+        by_type.setdefault(str(key[s].get("type") or "unknown"), []).append(s)
         by_design.setdefault(str(key[s].get("designed_for_checks", "unknown")), []).append(s)
-    # found after deploy: a probe that passed before the change and fails after it
-    probe_at: dict[int, dict[str, bool | None]] = {}
-    for p in graded["probes"]:
-        probe_at.setdefault(p["seq"], {})[p["probe"]] = p["passed"]
+    # A probe passes after a change when most of its runs passed.
+    votes: dict[int, dict[str, list[bool]]] = {}
+    for p in probes:
+        if isinstance(p.get("passed"), bool):
+            votes.setdefault(p["seq"], {}).setdefault(p["probe"], []).append(p["passed"])
+    probe_at = {s: {pid: sum(v) * 2 > len(v) for pid, v in ps.items()} for s, ps in votes.items()}
+    probe_runs_ = sorted({p.get("run", 1) for p in probes})
+    pass_rate = [round(statistics.mean([p["passed"] for p in probes if p.get("run", 1) == r and p["seq"] > 0
+                                        and isinstance(p["passed"], bool)] or [0]), 4) for r in probe_runs_]
     missed = [s for s in seeded if s not in flagged]
-    # A probe that turns from pass to fail after change t points at the missed seeded changes
-    # deployed since it last failed (or since the start): the problem may surface a change later.
     after_deploy: dict[int, list[str]] = {}
     seqs_seen = sorted(probe_at)
     for i, t_ in enumerate(seqs_seen[1:], 1):
@@ -292,31 +378,67 @@ def arm_metrics(arm: str, graded: dict[str, Any], recs: dict[int, Any], key, bin
                     after_deploy.setdefault(s, []).append(pid)
     after_deploy = {s: sorted(set(v)) for s, v in sorted(after_deploy.items())}
     breakages = [s for s in seeded if key[s].get("problem") == "breakage"]
-    times = [r["seconds"]["edit_to_checked"] for s, r in recs.items() if s > 0 and "edit_to_checked" in r["seconds"]]
+    rec_spread = spread([recall(seeded, r) for r in runs])
     out: dict[str, Any] = {
-        "seeded": len(seeded), "flagged": sorted(flagged),
-        "recall": recall(seeded), "recall_without_handoff": recall(no_handoff),
-        "recall_by_type": {t: recall(v) for t, v in sorted(by_type.items())},
-        "recall_by_designed_for_checks": {t: recall(v) for t, v in sorted(by_design.items())},
-        "findings": len(all_findings), "precision": round(len(real) / len(all_findings), 4) if all_findings else None,
+        "seeded": len(seeded), "runs": len(runs), "flagged": sorted(flagged),
+        "recall": rec_spread["mean"], "recall_spread": rec_spread,
+        "recall_without_handoff": spread([recall(no_handoff, r) for r in runs])["mean"],
+        "recall_by_type": {t: spread([recall(v, r) for r in runs])["mean"] for t, v in sorted(by_type.items())},
+        "recall_by_designed_for_checks": {t: spread([recall(v, r) for r in runs])["mean"]
+                                          for t, v in sorted(by_design.items())},
+        "findings": len([f for c in changes.values() for f in c["flags"]]),
+        "precision": spread([precision(r) for r in runs])["mean"], "precision_spread": spread([precision(r) for r in runs]),
         "found_after_deploy": after_deploy, "silent": sorted(s for s in missed if s not in after_deploy),
         "breakages_found_only_after_deploy": round(len([s for s in breakages if s in after_deploy]) / len(breakages), 4)
         if breakages else None,
-        "median_edit_to_checked_s": round(statistics.median(times), 2) if times else None,
-        "edit_fidelity": {f: len([c for c in changes.values() if c["edit"]["fidelity"] == f]) for f in FIDELITY},
+        "edit_fidelity": {f: len([c for c in changes.values() if c["edit"].get("fidelity") == f]) for f in FIDELITY},
+        "probe_pass_rate": spread(pass_rate),
         "probes_failed": {s: sorted(pid for pid, ok in v.items() if ok is False) for s, v in sorted(probe_at.items())},
         "handoff_probe_P07_passes_throughout": all(v.get("P07") is True for s, v in probe_at.items() if s > 0)
         if probe_at else None,
     }
+    out.update(_times(arm, recs))
     if arm == "toprope":
         out["undeployable"] = sorted(s for s, r in recs.items() if s > 0 and r.get("deploy", {}).get("domains")
                                      and not r["deploy"].get("deployed"))
         out["handoff_breaking_caught"] = {s: s in flagged for s in seeded if handoff_breaking(binding.get(s, {}))}
+        out["repeat_same"] = {s: r["check"]["repeat"]["same"] for s, r in sorted(recs.items())
+                              if "repeat" in (r.get("check") or {})}
     return out
 
 
+def _times(arm: str, recs: dict[int, Any]) -> dict[str, Any]:
+    """Iteration time (run protocol §3): per change, the median of its timed repeats, with their
+    spread and what bounds them; then the median over changes."""
+    per_change: dict[int, dict[str, Any]] = {}
+    for s, r in sorted(recs.items()):
+        if s <= 0:
+            continue
+        timed = (r.get("check") or {}).get("timed")
+        if timed:
+            xs = [t["seconds"] for t in timed]
+            limiters = [t["limiter"] for t in timed if t.get("limiter")]
+            per_change[s] = {"median_s": round(statistics.median(xs), 2), "min_s": round(min(xs), 2),
+                             "max_s": round(max(xs), 2),
+                             "limiter": max(set(limiters), key=limiters.count) if limiters else None}
+        elif "edit_to_checked" in r.get("seconds", {}):
+            per_change[s] = {"median_s": round(r["seconds"]["edit_to_checked"], 2), "limiter": None}
+    medians = [c["median_s"] for c in per_change.values()]
+    return {"median_edit_to_checked_s": round(statistics.median(medians), 2) if medians else None,
+            "iteration_time_by_change": per_change}
+
+
+def noise_floor(m: dict[str, dict[str, Any]]) -> float | None:
+    """The largest min-to-max spread of an arm's recall over runs (run protocol §3)."""
+    spans = [x["recall_spread"]["max"] - x["recall_spread"]["min"] for x in m.values()
+             if x.get("recall_spread", {}).get("max") is not None]
+    return round(max(spans), 4) if spans else None
+
+
 def verdicts(m: dict[str, dict[str, Any]], rules: dict[str, Any]) -> dict[str, Any]:
-    """The frozen pilot rules (verdict-rules.yaml), applied to the three arms' numbers."""
+    """The frozen pilot rules (verdict-rules.yaml), applied as they are to the arms' mean numbers;
+    a gap smaller than the noise floor is marked next to the rule it affects (run protocol,
+    Decision 1)."""
     it = rules["iterate"]
     t, nl, st = m["toprope"], m["nl"], m["structured"]
     r = {k: x["recall"] for k, x in m.items()}
@@ -346,10 +468,22 @@ def verdicts(m: dict[str, dict[str, Any]], rules: dict[str, Any]) -> dict[str, A
         handoff = "supports (partial)" if all(caught.values()) and p07 else ho.get("else", "inconclusive")
     else:
         handoff = (ho["if_none_seeded"]["report"] if p07 else ho.get("else", "inconclusive"))
+    floor = noise_floor(m)
+    within = {}
+    if floor is not None:
+        for name, gap, rule in (("gap_nl", gap_nl, "iterate.supports.nl_recall_gap_min / weakens.nl_within"),
+                                ("gap_structured", gap_st,
+                                 "iterate.supports.structured_recall_gap_min / narrowed_if_structured_gap_below")):
+            if abs(gap) < floor:
+                within[name] = f"within run-to-run noise ({round(gap, 4)} < noise floor {floor}); affects {rule}"
     return {"iterate": iterate, "handoff": handoff,
             "not_measured_here": ["hand_edits_to_generated_max (the self-compile result, reported separately)"],
             "numbers": {"recall": r, "gap_nl": round(gap_nl, 4), "gap_structured": round(gap_st, 4),
-                        "toprope_precision": t["precision"], "median_edit_to_checked_s": t["median_edit_to_checked_s"]},
+                        "toprope_precision": t["precision"], "median_edit_to_checked_s": t["median_edit_to_checked_s"],
+                        "noise_floor": floor},
+            "within_noise": within,
+            "steps": "one run's recall moves in steps of 1/seeded" + (f" ({round(1 / t['seeded'], 4)})"
+                                                                       if t.get("seeded") else ""),
             "note": "M1 pilot targets (ADR-0034): reported, not a link verdict; the claim-status table does not change"}
 
 
@@ -360,16 +494,21 @@ def score(run: Path, instruments: Path) -> dict[str, Any]:
     graded = yaml.safe_load(conf.read_text())
     if graded.get("status") != "confirmed":
         raise SystemExit(f"{conf}: set `status: confirmed` once every label is reviewed")
-    unlabelled = [(a, c["seq"], f["index"]) for a, g in graded["arms"].items() for c in g["changes"]
-                  for f in c["findings"] if f.get("label") not in LABELS]
-    unlabelled += [(a, p["seq"], p["probe"]) for a, g in graded["arms"].items() for p in g["probes"]
+    unlabelled = [(c["seq"], f["id"]) for c in graded["changes"] for f in c["flags"] if f.get("label") not in LABELS]
+    unlabelled += [(a, p["seq"], p.get("run", 1), p["probe"]) for a, ps in graded["probes"].items() for p in ps
                    if not isinstance(p.get("passed"), bool)]
     if unlabelled:
         raise SystemExit(f"{len(unlabelled)} item(s) still have no label, e.g. {unlabelled[:5]}")
+    labels = {int(s): v for s, v in yaml.safe_load((run / "scoring/blind-labels.yaml").read_text())["labels"].items()}
     key, binding = load_sealed(instruments)
     rules = yaml.safe_load((instruments / "verdict-rules.yaml").read_text())
-    m = {arm: arm_metrics(arm, graded["arms"][arm], records(run, arm), key, binding) for arm in ARMS}
+    by_arm = _by_arm(graded, labels)
+    m = {arm: arm_metrics(arm, by_arm[arm], graded["probes"].get(arm, []), records(run, arm), key, binding)
+         for arm in ARMS}
+    disagree = [(c["seq"], f["id"]) for c in graded["changes"] for f in c["flags"]
+                if f.get("script_label") and f.get("label") != f["script_label"]]
     result = {"partial": graded.get("partial", False), "metrics": m, "verdicts": verdicts(m, rules),
+              "noise_floor": noise_floor(m), "script_and_researcher_disagree": disagree,
               "unbindable": sorted(s for s, b in binding.items() if b.get("unbindable"))}
     (run / "scoring/metrics.json").write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n")
     return result

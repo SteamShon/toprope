@@ -229,10 +229,11 @@ def test_a_run_probes_after_every_change(worlds, tmp_path):
     runner.main(["arm", "nl", "--model", "m", "--materials", str(materials(tmp_path)), "--out", str(out),
                  "--seqs", "1", "--instruments", str(inst)], backend=ApiBackend(FakeModel(script)))
     rec = json.loads((out / "nl/seq-01/record.json").read_text())
-    assert [p["probe"] for p in rec["probes"]] == PROBES and rec["seconds"]["probes"] > 0
-    assert len(list((out / "nl/seq-01/probes").glob("P0*.jsonl"))) == 8
+    assert [r["run"] for r in rec["probes"]] == [1, 2, 3]                     # run protocol §3: three runs
+    assert all([p["probe"] for p in r["results"]] == PROBES for r in rec["probes"]) and rec["seconds"]["probes"] > 0
+    assert [len(list((out / "nl/seq-01/probes" / f"run-{k}").glob("P0*.jsonl"))) for k in (1, 2, 3)] == [8, 8, 8]
     before = json.loads((out / "nl/seq-00/record.json").read_text())             # the probes before any change
-    assert [p["probe"] for p in before["probes"]] == PROBES
+    assert all([p["probe"] for p in r["results"]] == PROBES for r in before["probes"])
     man = json.loads((out / "nl/manifest.json").read_text())
     assert man["probes"] and man["sessions"][-1]["probes"] == man["probes"]
     assert man["sessions"][-1]["jobs"] == 4                                  # probes four at a time by default

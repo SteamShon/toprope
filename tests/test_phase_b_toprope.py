@@ -257,3 +257,32 @@ def test_the_committed_materials_are_built_from_the_baseline(tmp_path):
     export_toolchain(base, tmp_path / "structured")
     for arm in ("toprope", "structured"):
         assert tree_hash(tmp_path / arm) == tree_hash(ROOT / "experiments/m1/arms" / arm), arm
+
+
+@pytest.fixture(autouse=True)
+def one_timed_repeat(monkeypatch):
+    """The run protocol's 5 timed repeats per change, cut to 1 here except where a test says."""
+    assert TopropeArm.timed == 5 and TopropeArm.repeat_changes == 3
+    monkeypatch.setattr(TopropeArm, "timed", 1)
+
+
+def test_the_checks_run_again_on_three_changes_and_each_change_is_timed(materials, tmp_path):
+    """Run protocol §3: the derandomized checks run once, and a second time (uncached) on three
+    changes, which must find the same; edit → validated preview is timed in repeats, each with
+    the part that bounds it."""
+    arm = TopropeArm(materials, tmp_path / "w", Editor(lambda a: None))
+    arm.timed = 2
+    repeats = []
+    for seq in range(1, 5):
+        arm.backend = Editor(lambda a, s=seq: a.update(description=f"Verify it in use ({s})."))
+        out = tmp_path / f"w/seq-{seq:02d}"
+        arm.edit({**REQ, "seq": seq}, out)
+        check = arm.check({**REQ, "seq": seq}, out).data
+        arm.deploy({**REQ, "seq": seq}, out)
+        (out / "record.json").write_text(json.dumps({"seq": seq, "check": check}, default=str))
+        assert check["runs"] == [{"run": 1, "findings": check["findings"]}]
+        assert len(check["timed"]) == 2 and all(t["limiter"] in ("impact", "harness", "preview", "other_check")
+                                                and t["seconds"] > 0 for t in check["timed"])
+        repeats.append(check.get("repeat"))
+    assert [r is not None for r in repeats] == [True, True, True, False]
+    assert all(r["same"] for r in repeats[:3])
