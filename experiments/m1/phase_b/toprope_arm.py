@@ -104,6 +104,14 @@ def export_toolchain(root: Path, out: Path) -> Path:
     return out
 
 
+def _aside(p: Path, why: str) -> Path:
+    """A free name beside `p` to move it to: `<name>.<why>-<n>`."""
+    n = 1
+    while (q := p.with_name(f"{p.name}.{why}-{n}")).exists():
+        n += 1
+    return q
+
+
 def unmet(out: dict[str, Any]) -> list[str]:
     """What an accepted action set off and did not get done: a kernel call that failed or was
     refused, or a handoff that did not go through (`toprope-run` exits 0 for the action itself)."""
@@ -231,7 +239,11 @@ class TopropeArm:
             self._back_to_deployed()                   # a change left half done starts again
         else:
             if self.sb.root.exists():
-                raise FileExistsError(f"{work} has a run: resume it, or start a new run directory")
+                if (self.sb.root / "ids.yaml").exists():           # copied from the materials: a run
+                    raise FileExistsError(f"{work} has a run: resume it, or start a new run directory")
+                # Only what git ignores is left (caches such as `.hypothesis/`, from a run moved
+                # away with `git mv`): not a run. Kept aside, never deleted.
+                self.sb.root.rename(_aside(self.sb.root, "stale"))
             shutil.copytree(materials, self.sb.root)
             self._start()
         self._before: dict[str, str] = {}
