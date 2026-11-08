@@ -124,3 +124,29 @@ def test_the_probes_run_three_times_after_each_change_and_before_any(tmp_path, m
     assert [(r["run"], r["dir"]) for r in rec["probes"]] == [(k, f"probes/run-{k}") for k in (1, 2, 3)]
     rows = [r for r in RunLog(log_path(work.parent)).rows() if r["what"] == "probe P01"]
     assert [(r["change"], r["run"]) for r in rows] == [(c, k) for c in ("0", "1") for k in ("1", "2", "3")]
+
+
+# -- §1: the prompts are frozen with the protocol -------------------------------------------------
+
+def test_a_run_needs_the_prompts_frozen_and_unchanged(tmp_path, monkeypatch):
+    inst = instruments(tmp_path)
+    frozen = json.loads((inst / "FROZEN.json").read_text())
+    del frozen["prompts"]
+    (inst / "FROZEN.json").write_text(json.dumps(frozen))
+    assert any("prompts are not frozen" in e for e in runner.verify_instruments(inst))
+    runner.main(["freeze-prompts", "--instruments", str(inst)])
+    assert runner.verify_instruments(inst) == []
+    with pytest.raises(SystemExit, match="nothing to change"):
+        runner.main(["freeze-prompts", "--instruments", str(inst)])
+    prompts = tmp_path / "prompts"
+    import shutil
+    shutil.copytree(PROMPTS, prompts)
+    (prompts / "review.md").write_text((prompts / "review.md").read_text() + "\nAlso check the spelling.\n")
+    monkeypatch.setattr(runner, "PROMPTS", prompts)
+    assert any("prompts changed after freezing" in e for e in runner.verify_instruments(inst))
+    with pytest.raises(SystemExit, match="--reason"):
+        runner.main(["freeze-prompts", "--instruments", str(inst)])
+    runner.main(["freeze-prompts", "--instruments", str(inst), "--reason", "the researcher asked for spelling"])
+    entry = json.loads((inst / "FROZEN.json").read_text())["prompts"]
+    assert entry["history"][0]["reason"] == "the researcher asked for spelling" and "grade_change.md" not in entry["files"]
+    assert runner.verify_instruments(inst) == []

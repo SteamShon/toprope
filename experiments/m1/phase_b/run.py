@@ -70,11 +70,52 @@ ARMS = {"nl": nl_arm, "structured": structured_arm, "toprope": toprope_arm}
 DEFAULT_OUT = M1 / "runs/phase-b"
 
 
+def arm_prompts() -> list[Path]:
+    """The prompts the agents in an arm get (the grader's are not among them)."""
+    return sorted(p for p in PROMPTS.glob("*.md") if not p.name.startswith("grade_"))
+
+
+def prompts_hash() -> str:
+    h = hashlib.sha256()
+    for p in arm_prompts():
+        h.update(p.name.encode() + b"\0" + p.read_bytes() + b"\0")
+    return h.hexdigest()
+
+
 def verify_instruments(d: Path = INSTRUMENTS) -> list[str]:
     spec = importlib.util.spec_from_file_location("instruments", ROOT / "experiments/tools/instruments.py")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)                                     # type: ignore[union-attr]
-    return mod.verify(d, run=True)
+    errs = mod.verify(d, run=True)
+    # The run protocol (§1) freezes each arm's prompt with it: the prompts' hash is in FROZEN.json.
+    frozen = json.loads((d / "FROZEN.json").read_text()).get("prompts") if (d / "FROZEN.json").exists() else None
+    if not frozen:
+        errs.append("the agents' prompts are not frozen: the researcher runs `python -m phase_b freeze-prompts`")
+    elif frozen["sha256"] != prompts_hash():
+        errs.append("the agents' prompts changed after freezing (phase_b/prompts): amend them with "
+                    "`python -m phase_b freeze-prompts --reason TEXT`, or restore them")
+    return errs
+
+
+def freeze_prompts(d: Path, reason: str = "") -> dict[str, Any]:
+    """Record the agents' prompts' hash in FROZEN.json (the researcher's step, run protocol §1).
+    A frozen hash changes only with a reason, and the old one stays in its history."""
+    mp = d / "FROZEN.json"
+    manifest = json.loads(mp.read_text())
+    if "run-protocol.md" not in manifest.get("files", {}):
+        raise SystemExit("freeze the run protocol first (instruments.py freeze-protocol)")
+    now = {"sha256": prompts_hash(), "files": [p.name for p in arm_prompts()], "frozen_at": _now()}
+    old = manifest.get("prompts")
+    if old:
+        if old["sha256"] == now["sha256"]:
+            raise SystemExit("the prompts are frozen as they are; nothing to change")
+        if not reason.strip():
+            raise SystemExit("the prompts are frozen with another hash: give --reason to amend them")
+        now["history"] = old.get("history", []) + [{"sha256": old["sha256"], "frozen_at": old["frozen_at"],
+                                                    "replaced_at": now["frozen_at"], "reason": reason.strip()}]
+    manifest["prompts"] = now
+    mp.write_text(json.dumps(manifest, indent=2) + "\n")
+    return now
 
 
 def change_requests(d: Path = INSTRUMENTS) -> list[dict[str, Any]]:
@@ -373,6 +414,10 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     sb = sub.add_parser("materials", help="build the structured-spec and Toprope arms' materials from the "
                         "approved self-domain commits (the NL arm's comes from `render`)")
     sb.add_argument("--out", type=Path, default=M1 / "arms", help="writes OUT/structured and OUT/toprope")
+    fp = sub.add_parser("freeze-prompts", help="researcher only: freeze the agents' prompts' hash in FROZEN.json "
+                        "(run protocol §1); with --reason, amend a frozen one")
+    fp.add_argument("--instruments", type=Path, default=INSTRUMENTS)
+    fp.add_argument("--reason", default="")
     s = sub.add_parser("status", help="how far each arm got")
     s.add_argument("--out", type=Path, default=DEFAULT_OUT)
     g = sub.add_parser("grade", parents=[common], help="propose a label for every finding, edit and probe "
@@ -385,6 +430,9 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     sc.add_argument("--instruments", type=Path, default=INSTRUMENTS)
     args = ap.parse_args(argv)
 
+    if args.cmd == "freeze-prompts":
+        print(json.dumps(freeze_prompts(args.instruments, args.reason), indent=2))
+        return
     if args.cmd == "status":
         print(json.dumps(status(args.out), indent=2))
         return

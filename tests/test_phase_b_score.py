@@ -45,7 +45,7 @@ def instruments(tmp: Path) -> Path:
     shutil.copy(real / "run-protocol.md", d / "run-protocol.md")
     files = {f.name: {"sha256": hashlib.sha256(f.read_bytes()).hexdigest(), "frozen_at": "t"}
              for f in [*d.glob("*.yaml"), d / "run-protocol.md"]}
-    (d / "FROZEN.json").write_text(json.dumps({"files": files}))
+    (d / "FROZEN.json").write_text(json.dumps({"files": files, "prompts": {"sha256": runner.prompts_hash()}}))
     return d
 
 
