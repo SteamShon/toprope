@@ -347,6 +347,26 @@ def arm_metrics(arm: str, changes: dict[int, dict[str, Any]], probes: list[dict[
         fs = [f for c in changes.values() for f in c["flags"] if f["run"] == run]
         return round(len([f for f in fs if f["label"] in ("seeded", "other-real")]) / len(fs), 4) if fs else None
 
+    def precision_grouped(run: int) -> float | None:
+        """Precision with the compiler's flags counted once per change and check, and those its base
+        already had left out (a secondary measure, added after M1's first scoring; the M1 report
+        says so). Review findings count one by one, as in `precision`."""
+        units: dict[Any, str] = {}
+        rank = {"seeded": 0, "other-real": 1, "false-alarm": 2}
+        for s, c in changes.items():
+            for i, f in enumerate(c["flags"]):
+                if f["run"] != run:
+                    continue
+                flag = f.get("flag") or {}
+                if "check" in flag:
+                    if flag.get("carried"):
+                        continue
+                    k: Any = (s, "compiler", flag["check"])
+                else:
+                    k = (s, "review", i)
+                units[k] = min(units.get(k, "false-alarm"), f["label"], key=lambda x: rank.get(x, 2))
+        return round(len([v for v in units.values() if v != "false-alarm"]) / len(units), 4) if units else None
+
     # A seeded problem counts as flagged before deploy when most of the arm's runs flagged it; the
     # rest are missed, and the probes tell whether they surfaced after deploy.
     flagged = {s for s in seeded if sum(s in flagged_in(r) for r in runs) * 2 > len(runs)}
@@ -388,6 +408,7 @@ def arm_metrics(arm: str, changes: dict[int, dict[str, Any]], probes: list[dict[
                                           for t, v in sorted(by_design.items())},
         "findings": len([f for c in changes.values() for f in c["flags"]]),
         "precision": spread([precision(r) for r in runs])["mean"], "precision_spread": spread([precision(r) for r in runs]),
+        "precision_grouped_spread": spread([precision_grouped(r) for r in runs]),
         "found_after_deploy": after_deploy, "silent": sorted(s for s in missed if s not in after_deploy),
         "breakages_found_only_after_deploy": round(len([s for s in breakages if s in after_deploy]) / len(breakages), 4)
         if breakages else None,

@@ -385,3 +385,35 @@ def test_a_change_that_past_behaviour_breaks_is_flagged_by_the_log_replay(materi
     found = arm.check({**REQ, "seq": 2}, out).data["findings"]
     replay = [f for f in found if f["check"] == "log_replay"]
     assert replay and not any(f["carried"] for f in replay)              # the past verify, on `local`
+
+
+def test_the_combined_arm_reviews_the_toprope_edits_and_adds_the_compilers_flags(materials, tmp_path):
+    """The fair comparison: the Toprope arm's own edit, reviewed five times by an LLM with the frozen
+    review prompt, plus the compiler's flags; written as a run `grade` and `score` read unchanged."""
+    from phase_b import run as runner
+    from phase_b.backend import ApiBackend
+    from phase_b.combined import combine
+    from phase_b.model import FakeModel
+    from phase_b.score import check_runs
+    src = tmp_path / "run"
+    for arm in ("nl", "structured"):
+        (src / arm).mkdir(parents=True)
+        (src / arm / "manifest.json").write_text(json.dumps({"arm": arm, "done": [1]}))
+    arm = TopropeArm(materials, src / "toprope", Editor(lambda a: a.update(description="Verify it in use.")))
+    runner.run_arm(arm, src / "toprope", [REQ], arm.backend, "fake")
+    seen = []
+
+    def reviewer(system, messages, tools):
+        seen.append(messages[0]["content"])
+        return json.dumps({"findings": [{"problem": "p", "where": "delivery", "kind": "other"}]})
+    out = combine(src, tmp_path / "combined", ApiBackend(FakeModel(reviewer)), materials=materials)
+    assert out["combined"] == [1] and len(seen) == 5
+    assert "Verify it in use." in seen[0] and "=== toprope-self.composition.yaml ===" in seen[0]
+    rec = json.loads((tmp_path / "combined/toprope/seq-01/record.json").read_text())
+    runs = check_runs(rec)
+    assert [r["run"] for r in runs] == [1, 2, 3, 4, 5]
+    compiler = rec["check"]["compiler"]
+    assert all(r["findings"][:len(compiler)] == compiler and r["findings"][-1]["from"] == "llm" for r in runs)
+    assert (tmp_path / "combined/nl/manifest.json").exists()
+    combine(src, tmp_path / "combined", ApiBackend(FakeModel(reviewer)), materials=materials)
+    assert len(seen) == 5                                                 # resumed: not reviewed again
