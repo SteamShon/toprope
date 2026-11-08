@@ -311,6 +311,21 @@ declaration makes the commit store refuse an approval by the commit's author, wi
 from `main`. Off by default, and off for the self domains in M1 (one owner); turn it on with a
 second owner.
 
+## M1's findings, before M2 (umbrella `umbrella/m1-findings`, link: ① ③)
+
+From [`M1-report.md`](experiments/M1-report.md), *What M2 takes from this*.
+
+| Item | Status | PR |
+|---|---|---|
+| ADR-0048: outcome rules, and a capability diff in the change check | 🟡 | |
+| The capability diff (a check over two declarations; no schema change) | ⬜ | |
+| Outcome rules: schema, validator, interpreter, harness, TLA+ export, guide | ⬜ | |
+| Grouped warnings in the change report (one per check and element, with a count; carried apart) | ⬜ | |
+| The natural-language check: an LLM reading the structured diff with the impact report (ADR-0009) | ⬜ | |
+| An editor that proposes a patch (several elements, checked at once) | ⬜ | |
+| Probes that pass before any change | ⬜ | |
+| M2's design: the full Toprope check against a structured spec reviewed by an LLM, preregistered | ⬜ | |
+
 ## M0b, M2 to M5
 
 Not started. Plans: [`roadmap.md`](roadmap.md).
