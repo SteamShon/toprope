@@ -1,0 +1,12 @@
+{
+  "id": "0e9d8cb8f26374a7",
+  "domain": "library",
+  "version": 1,
+  "declaration_sha256": "0e9d8cb8f26374a70088a46df494a5f12b09c7a70128d2a40ebf28837ccc3044",
+  "toolchain": "98c4deb6811c8648fe28340c6b4a2162f9ae5fa6e61383d132c257f1333e109e",
+  "harness_ok": true,
+  "created_at": "2026-11-08T03:08:48+00:00",
+  "commit": "1-d9ed7a127857fcad",
+  "seq": 1,
+  "commit_domain": "library"
+}

@@ -1,0 +1,2 @@
+{"at": "2026-11-08T03:10:19+00:00", "build": "0e9d8cb8f26374a7", "result": "deployed", "approver": {"id": "owner <owner@library.invalid>", "kind": "person"}}
+{"at": "2026-11-08T03:10:31+00:00", "commit": "2-55694aded68b5ebc", "result": "refused", "rule": "superseded", "reason": "commit 2-55694aded68b5ebc is superseded by approved 3-246bb8edfc8343cd", "approver": {"id": "owner <owner@library.invalid>", "kind": "person"}}

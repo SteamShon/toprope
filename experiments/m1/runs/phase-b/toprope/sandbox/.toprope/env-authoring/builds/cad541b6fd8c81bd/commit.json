@@ -1,0 +1,12 @@
+{
+  "id": "cad541b6fd8c81bd",
+  "domain": "authoring",
+  "version": 21,
+  "declaration_sha256": "cad541b6fd8c81bdc1bb28ebd7ca0c90f2b85e12331d07aa8f040f41df00b95d",
+  "toolchain": "98c4deb6811c8648fe28340c6b4a2162f9ae5fa6e61383d132c257f1333e109e",
+  "harness_ok": true,
+  "created_at": "2026-11-08T05:57:48+00:00",
+  "commit": "21-85d2f8d27e5c8ff0",
+  "seq": 21,
+  "commit_domain": "authoring"
+}

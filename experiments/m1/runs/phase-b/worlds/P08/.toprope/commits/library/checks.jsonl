@@ -1,0 +1,32 @@
+{"at": "2026-11-08T03:10:16+00:00", "base": null, "check": "structural", "commit": "1-d9ed7a127857fcad", "ok": true, "run": "b36f460726ac", "summary": "0 error(s), 0 warning(s)"}
+{"at": "2026-11-08T03:10:16+00:00", "base": null, "check": "semantic", "commit": "1-d9ed7a127857fcad", "ok": true, "run": "b36f460726ac", "summary": "0 error(s), 0 warning(s)"}
+{"at": "2026-11-08T03:10:16+00:00", "base": null, "check": "scenarios", "commit": "1-d9ed7a127857fcad", "ok": true, "run": "b36f460726ac", "summary": "0 error(s), 0 warning(s); 0/0 scenarios pass"}
+{"at": "2026-11-08T03:10:16+00:00", "base": null, "check": "harness", "commit": "1-d9ed7a127857fcad", "ok": true, "run": "b36f460726ac", "summary": "0 error(s), 0 warning(s); 7 tests: 7 run, 0 from cache, 0.183 s"}
+{"at": "2026-11-08T03:10:16+00:00", "base": null, "check": "tla", "commit": "1-d9ed7a127857fcad", "ok": null, "run": "b36f460726ac", "summary": "skipped: no TLC jar configured"}
+{"at": "2026-11-08T03:10:16+00:00", "base": null, "check": "log_replay", "commit": "1-d9ed7a127857fcad", "ok": null, "run": "b36f460726ac", "summary": "skipped: no event store (nothing deployed)"}
+{"at": "2026-11-08T03:10:16+00:00", "base": null, "check": "in_flight", "commit": "1-d9ed7a127857fcad", "ok": null, "run": "b36f460726ac", "summary": "skipped: no event store (nothing deployed)"}
+{"at": "2026-11-08T03:10:16+00:00", "base": null, "check": "nl", "commit": "1-d9ed7a127857fcad", "ok": null, "run": "b36f460726ac", "summary": "skipped: no natural-language checker configured"}
+{"at": "2026-11-08T03:10:16+00:00", "base": null, "check": "change-check", "commit": "1-d9ed7a127857fcad", "ok": true, "run": "b36f460726ac", "summary": "passes; 0 error(s), 0 warning(s)"}
+{"at": "2026-11-08T03:10:16+00:00", "base": null, "check": "confirmed", "commit": "1-d9ed7a127857fcad", "ok": true, "run": "b36f460726ac", "summary": "0 proposed element(s)"}
+{"at": "2026-11-08T03:10:19+00:00", "base": null, "check": "preview-harness", "commit": "1-d9ed7a127857fcad", "ok": true, "run": "da4958715422", "summary": "build 0e9d8cb8f26374a7: harness passed"}
+{"at": "2026-11-08T03:10:24+00:00", "base": "1-d9ed7a127857fcad", "check": "structural", "commit": "2-55694aded68b5ebc", "ok": true, "run": "424a41ae8a34", "summary": "0 error(s), 2 warning(s)"}
+{"at": "2026-11-08T03:10:24+00:00", "base": "1-d9ed7a127857fcad", "check": "semantic", "commit": "2-55694aded68b5ebc", "ok": true, "run": "424a41ae8a34", "summary": "0 error(s), 1 warning(s)"}
+{"at": "2026-11-08T03:10:24+00:00", "base": "1-d9ed7a127857fcad", "check": "scenarios", "commit": "2-55694aded68b5ebc", "ok": true, "run": "424a41ae8a34", "summary": "0 error(s), 0 warning(s); 0/0 scenarios pass"}
+{"at": "2026-11-08T03:10:24+00:00", "base": "1-d9ed7a127857fcad", "check": "harness", "commit": "2-55694aded68b5ebc", "ok": true, "run": "424a41ae8a34", "summary": "0 error(s), 0 warning(s); 10 tests: 4 run, 6 from cache, 0.089 s"}
+{"at": "2026-11-08T03:10:24+00:00", "base": "1-d9ed7a127857fcad", "check": "tla", "commit": "2-55694aded68b5ebc", "ok": null, "run": "424a41ae8a34", "summary": "skipped: no TLC jar configured"}
+{"at": "2026-11-08T03:10:24+00:00", "base": "1-d9ed7a127857fcad", "check": "log_replay", "commit": "2-55694aded68b5ebc", "ok": null, "run": "424a41ae8a34", "summary": "skipped: no event store (nothing deployed)"}
+{"at": "2026-11-08T03:10:24+00:00", "base": "1-d9ed7a127857fcad", "check": "in_flight", "commit": "2-55694aded68b5ebc", "ok": null, "run": "424a41ae8a34", "summary": "skipped: no event store (nothing deployed)"}
+{"at": "2026-11-08T03:10:24+00:00", "base": "1-d9ed7a127857fcad", "check": "nl", "commit": "2-55694aded68b5ebc", "ok": null, "run": "424a41ae8a34", "summary": "skipped: no natural-language checker configured"}
+{"at": "2026-11-08T03:10:24+00:00", "base": "1-d9ed7a127857fcad", "check": "change-check", "commit": "2-55694aded68b5ebc", "ok": true, "run": "424a41ae8a34", "summary": "passes; 0 error(s), 3 warning(s)"}
+{"at": "2026-11-08T03:10:24+00:00", "base": "1-d9ed7a127857fcad", "check": "confirmed", "commit": "2-55694aded68b5ebc", "ok": true, "run": "424a41ae8a34", "summary": "0 proposed element(s)"}
+{"at": "2026-11-08T03:10:28+00:00", "base": "2-55694aded68b5ebc", "check": "structural", "commit": "3-246bb8edfc8343cd", "ok": true, "run": "36bf6c8b181a", "summary": "0 error(s), 2 warning(s)"}
+{"at": "2026-11-08T03:10:28+00:00", "base": "2-55694aded68b5ebc", "check": "semantic", "commit": "3-246bb8edfc8343cd", "ok": true, "run": "36bf6c8b181a", "summary": "0 error(s), 2 warning(s)"}
+{"at": "2026-11-08T03:10:28+00:00", "base": "2-55694aded68b5ebc", "check": "scenarios", "commit": "3-246bb8edfc8343cd", "ok": true, "run": "36bf6c8b181a", "summary": "0 error(s), 0 warning(s); 0/0 scenarios pass"}
+{"at": "2026-11-08T03:10:28+00:00", "base": "2-55694aded68b5ebc", "check": "harness", "commit": "3-246bb8edfc8343cd", "ok": true, "run": "36bf6c8b181a", "summary": "0 error(s), 0 warning(s); 13 tests: 4 run, 9 from cache, 0.093 s"}
+{"at": "2026-11-08T03:10:28+00:00", "base": "2-55694aded68b5ebc", "check": "tla", "commit": "3-246bb8edfc8343cd", "ok": null, "run": "36bf6c8b181a", "summary": "skipped: no TLC jar configured"}
+{"at": "2026-11-08T03:10:28+00:00", "base": "2-55694aded68b5ebc", "check": "log_replay", "commit": "3-246bb8edfc8343cd", "ok": null, "run": "36bf6c8b181a", "summary": "skipped: no event store (nothing deployed)"}
+{"at": "2026-11-08T03:10:28+00:00", "base": "2-55694aded68b5ebc", "check": "in_flight", "commit": "3-246bb8edfc8343cd", "ok": null, "run": "36bf6c8b181a", "summary": "skipped: no event store (nothing deployed)"}
+{"at": "2026-11-08T03:10:28+00:00", "base": "2-55694aded68b5ebc", "check": "nl", "commit": "3-246bb8edfc8343cd", "ok": null, "run": "36bf6c8b181a", "summary": "skipped: no natural-language checker configured"}
+{"at": "2026-11-08T03:10:28+00:00", "base": "2-55694aded68b5ebc", "check": "change-check", "commit": "3-246bb8edfc8343cd", "ok": true, "run": "36bf6c8b181a", "summary": "passes; 0 error(s), 4 warning(s)"}
+{"at": "2026-11-08T03:10:28+00:00", "base": "2-55694aded68b5ebc", "check": "confirmed", "commit": "3-246bb8edfc8343cd", "ok": true, "run": "36bf6c8b181a", "summary": "0 proposed element(s)"}
+{"at": "2026-11-08T03:10:30+00:00", "base": null, "check": "preview-harness", "commit": "2-55694aded68b5ebc", "ok": true, "run": "6e625b279926", "summary": "build 599674c02c476e92: harness passed"}

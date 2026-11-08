@@ -1,0 +1,11 @@
+{"at": "2026-11-08T03:09:00+00:00", "base": null, "check": "structural", "commit": "1-d9ed7a127857fcad", "ok": true, "run": "bbe489df03d6", "summary": "0 error(s), 0 warning(s)"}
+{"at": "2026-11-08T03:09:00+00:00", "base": null, "check": "semantic", "commit": "1-d9ed7a127857fcad", "ok": true, "run": "bbe489df03d6", "summary": "0 error(s), 0 warning(s)"}
+{"at": "2026-11-08T03:09:00+00:00", "base": null, "check": "scenarios", "commit": "1-d9ed7a127857fcad", "ok": true, "run": "bbe489df03d6", "summary": "0 error(s), 0 warning(s); 0/0 scenarios pass"}
+{"at": "2026-11-08T03:09:00+00:00", "base": null, "check": "harness", "commit": "1-d9ed7a127857fcad", "ok": true, "run": "bbe489df03d6", "summary": "0 error(s), 0 warning(s); 7 tests: 7 run, 0 from cache, 0.179 s"}
+{"at": "2026-11-08T03:09:00+00:00", "base": null, "check": "tla", "commit": "1-d9ed7a127857fcad", "ok": null, "run": "bbe489df03d6", "summary": "skipped: no TLC jar configured"}
+{"at": "2026-11-08T03:09:00+00:00", "base": null, "check": "log_replay", "commit": "1-d9ed7a127857fcad", "ok": null, "run": "bbe489df03d6", "summary": "skipped: no event store (nothing deployed)"}
+{"at": "2026-11-08T03:09:00+00:00", "base": null, "check": "in_flight", "commit": "1-d9ed7a127857fcad", "ok": null, "run": "bbe489df03d6", "summary": "skipped: no event store (nothing deployed)"}
+{"at": "2026-11-08T03:09:00+00:00", "base": null, "check": "nl", "commit": "1-d9ed7a127857fcad", "ok": null, "run": "bbe489df03d6", "summary": "skipped: no natural-language checker configured"}
+{"at": "2026-11-08T03:09:00+00:00", "base": null, "check": "change-check", "commit": "1-d9ed7a127857fcad", "ok": true, "run": "bbe489df03d6", "summary": "passes; 0 error(s), 0 warning(s)"}
+{"at": "2026-11-08T03:09:00+00:00", "base": null, "check": "confirmed", "commit": "1-d9ed7a127857fcad", "ok": true, "run": "bbe489df03d6", "summary": "0 proposed element(s)"}
+{"at": "2026-11-08T03:09:03+00:00", "base": null, "check": "preview-harness", "commit": "1-d9ed7a127857fcad", "ok": true, "run": "3c2382279618", "summary": "build 0e9d8cb8f26374a7: harness passed"}

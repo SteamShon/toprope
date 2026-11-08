@@ -1,0 +1,2 @@
+{"at": "2026-11-08T03:09:56+00:00", "author": "owner <owner@library.invalid>", "branch": "work", "content": "d9ed7a127857fcad", "domain": "library", "evidence": [], "id": "1-d9ed7a127857fcad", "interface": "1.0.0", "message": "", "parents": [], "seq": 1}
+{"at": "2026-11-08T03:10:04+00:00", "author": "owner <owner@library.invalid>", "branch": "work", "content": "55694aded68b5ebc", "domain": "library", "evidence": [], "id": "2-55694aded68b5ebc", "interface": "1.1.0", "message": "", "parents": ["1-d9ed7a127857fcad"], "seq": 2}
