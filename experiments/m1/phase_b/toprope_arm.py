@@ -134,7 +134,11 @@ class Sandbox:
         self.root, self.tokens, self.reader = root, tokens or TOKENS, reader
 
     def run(self, who: str, member: str, domain: str, *args: str) -> dict[str, Any]:
-        cmd = [*toprope_run(), "--composition", COMPOSITION, "--kernel-root", ".", "--identity", "static:ids.yaml",
+        # `--working-copy`: the tools are the toolchain's files, fixed for the whole run. Without it a
+        # member runs its deployed commit (ADR-0045), and the sandbox's commit stores are the ones
+        # the arm changes, so the arm's own changes would become the tools it works with.
+        cmd = [*toprope_run(), "--composition", COMPOSITION, "--working-copy", "--kernel-root", ".",
+               "--identity", "static:ids.yaml",
                "--token", self.tokens[who], "--member", member, "--workspace", f"toprope.{domain}.workspace.yaml",
                "--env", f".toprope/env-{domain}", *args]
         r = subprocess.run(cmd, cwd=self.root, capture_output=True, text=True, check=False)
