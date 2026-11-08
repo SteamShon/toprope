@@ -468,6 +468,11 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
                         "(run protocol §1); with --reason, amend a frozen one")
     fp.add_argument("--instruments", type=Path, default=INSTRUMENTS)
     fp.add_argument("--reason", default="")
+    cb = sub.add_parser("combine-toprope", parents=[common], help="the Toprope arm with its LLM review: review the "
+                        "Toprope arm's own edits five times and add the compiler's flags (phase_b/combined.py)")
+    cb.add_argument("--out", type=Path, default=DEFAULT_OUT, help="the run to read")
+    cb.add_argument("--to", type=Path, default=M1 / "runs/phase-b-combined", help="the run directory it writes")
+    cb.add_argument("--instruments", type=Path, default=INSTRUMENTS)
     rc = sub.add_parser("recheck-toprope", help="take the Toprope arm's flags again from its stored commits, on "
                         "the kernel's inputs (#169); keeps the first ones under check.original")
     rc.add_argument("--out", type=Path, default=DEFAULT_OUT)
@@ -511,6 +516,13 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     mem = user_memory()
     extra: dict[str, Any] = {"backend": args.backend, "user_memory": hashlib.sha256(mem.read_bytes()).hexdigest()
                              if mem and args.allow_user_memory else None}
+    if args.cmd == "combine-toprope":
+        errs = verify_instruments(args.instruments)
+        if errs:
+            raise SystemExit("the instruments do not verify; nothing runs:\n" + "\n".join(errs))
+        from .combined import combine
+        print(json.dumps({**combine(args.out, args.to, backend), "usage": backend.report()}))
+        return
     if args.cmd == "grade":
         errs = verify_instruments(args.instruments)
         if errs:

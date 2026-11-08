@@ -356,3 +356,19 @@ def test_to_decide_lists_only_what_needs_the_researcher(tmp_path, capsys):
     assert [(f["seq"], f["script_label"], f["grader_label"]) for f in todo["flags"]] == [(2, "seeded", "false-alarm")]
     assert [(p["arm"], p["seq"]) for p in todo["probes"]] == [("nl", 0)] and todo["edits"] == []
     assert todo["count"] == 2 and todo["file"].endswith("proposed.yaml")
+
+
+def test_grouped_precision_counts_a_compiler_check_once_per_change_and_leaves_out_what_the_base_had(tmp_path):
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    write_run(run, "nl", {}, {1: 1, 2: 1, 3: 1})
+    write_run(run, "structured", {}, {1: 1, 2: 1, 3: 1})
+    c = lambda where, carried=False: {**F(where), "check": "log_replay", "severity": "warning", "carried": carried}  # noqa: E731
+    write_run(run, "toprope", {1: [c("actions.confirm_element.preconditions.p"), c("a"), c("b"), c("old", True)]},
+              {1: 1, 2: 1, 3: 1})
+    runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m"],
+                backend=ApiBackend(FakeModel(grader({("toprope", 1): ["seeded", "false-alarm", "false-alarm",
+                                                                       "false-alarm"]}, run)[0])))
+    confirmed(run)
+    tp = score.score(run, inst)["metrics"]["toprope"]
+    assert tp["precision_spread"]["mean"] == 0.25                      # 1 real of 4, one by one
+    assert tp["precision_grouped_spread"]["mean"] == 1.0               # one unit, which names the seeded problem
