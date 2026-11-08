@@ -512,3 +512,26 @@ def score(run: Path, instruments: Path) -> dict[str, Any]:
               "unbindable": sorted(s for s, b in binding.items() if b.get("unbindable"))}
     (run / "scoring/metrics.json").write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n")
     return result
+
+
+def to_decide(run: Path) -> dict[str, Any]:
+    """What the researcher must decide in the grades (ADR-0047 §3): flags where the script and the
+    grader disagree, flags with no label, edits with no judgment, and probe runs with no result.
+    The rest is accepted as proposed. Reads `confirmed.yaml` if it exists, else `proposed.yaml`."""
+    path = run / "scoring/confirmed.yaml"
+    if not path.exists():
+        path = run / "scoring/proposed.yaml"
+    g = yaml.safe_load(path.read_text())
+    flags, edits = [], []
+    for c in g["changes"]:
+        for f in c["flags"]:
+            if f.get("label") not in LABELS or (f.get("script_label") and f.get("grader_label")
+                                                and f["script_label"] != f["grader_label"]):
+                flags.append({"seq": c["seq"], "id": f["id"], "label": f.get("label"),
+                              "script_label": f.get("script_label"), "grader_label": f.get("grader_label"),
+                              "flag": f.get("flag"), "why": f.get("why")})
+        edits += [{"seq": c["seq"], "label": k} for k, e in c["edits"].items() if e.get("fidelity") not in FIDELITY]
+    probes = [{"arm": a, "seq": p["seq"], "run": p.get("run", 1), "probe": p["probe"], "why": p.get("why")}
+              for a, ps in g["probes"].items() for p in ps if not isinstance(p.get("passed"), bool)]
+    return {"file": str(path), "flags": flags, "edits": edits, "probes": probes,
+            "count": len(flags) + len(edits) + len(probes)}
