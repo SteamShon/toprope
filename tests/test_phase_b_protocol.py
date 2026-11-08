@@ -150,3 +150,30 @@ def test_a_run_needs_the_prompts_frozen_and_unchanged(tmp_path, monkeypatch):
     entry = json.loads((inst / "FROZEN.json").read_text())["prompts"]
     assert entry["history"][0]["reason"] == "the researcher asked for spelling" and "grade_change.md" not in entry["files"]
     assert runner.verify_instruments(inst) == []
+
+
+# -- what an older run leaves behind -------------------------------------------------------------
+
+def test_starting_states_with_only_leftover_caches_are_built_again(tmp_path, monkeypatch):
+    """`git mv` of an older run leaves what git ignores (`.hypothesis/`) in `worlds/`: the
+    harness used to take that for built starting states, and every probe failed (2026-11-08)."""
+    from phase_b.probes import PROBES
+    out = tmp_path / "runs/phase-b"
+    for p in PROBES:
+        (out / "worlds" / p / ".hypothesis").mkdir(parents=True)
+
+    def build(base, toolchain, dest):
+        for p in PROBES:
+            (dest / p).mkdir(parents=True)
+            (dest / p / "state.json").write_text("{}")
+            (dest / p / "situation.json").write_text("{}")
+    monkeypatch.setattr(runner, "build_worlds", build)
+    monkeypatch.setattr(runner, "export_toolchain", lambda base, dest: dest)
+    monkeypatch.setattr(runner, "baseline_root", lambda root: root)
+    worlds = runner.probe_worlds(out)
+    assert runner.worlds_complete(worlds)
+    assert (out / "worlds.incomplete-1/P01/.hypothesis").is_dir()        # kept aside, not deleted
+    calls = []
+    monkeypatch.setattr(runner, "build_worlds", lambda *a: calls.append(a))
+    runner.probe_worlds(out)
+    assert calls == []                                                     # complete: built once

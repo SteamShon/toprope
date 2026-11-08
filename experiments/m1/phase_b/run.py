@@ -303,9 +303,22 @@ def _log_probes(log: RunLog, arm: str, seq: int, run: int, where: Path, probes: 
                    f"error: {p['error']}" if p.get("error") else "ran (graded later)")
 
 
+def worlds_complete(worlds: Path) -> bool:
+    """Every probe's starting state is there: its state and its situation."""
+    from .probes import PROBES
+    return all((worlds / p / "state.json").is_file() and (worlds / p / "situation.json").is_file() for p in PROBES)
+
+
 def probe_worlds(out: Path) -> Path:
     """The probes' starting states, built once per run directory and shared by every arm."""
     worlds = out / "worlds"
+    if worlds.is_dir() and not worlds_complete(worlds):
+        # A directory with no starting states in it (only caches git ignores, left when an older
+        # run was moved away; or a build that stopped): kept aside, and built again.
+        from .toprope_arm import _aside
+        aside = _aside(worlds, "incomplete")
+        worlds.rename(aside)
+        _line(f"{worlds} had no complete starting states: moved to {aside.name}, building them again", end="\n")
     if not worlds.is_dir():
         _line("building the probes' starting states (once per run directory) ...", end="\n")
         out.mkdir(parents=True, exist_ok=True)
