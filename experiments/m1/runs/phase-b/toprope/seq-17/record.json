@@ -13,7 +13,8 @@
         "check": "harness",
         "severity": "warning",
         "where": "no-sample:mechanical:DeliveryRequest.verified.preview.external:kernel",
-        "problem": "no generated object satisfies the invariants in this stage: the cell is not tested mechanically; give an example in this stage"
+        "problem": "no generated object satisfies the invariants in this stage: the cell is not tested mechanically; give an example in this stage",
+        "carried": true
       }
     ],
     "commits": {
@@ -59,7 +60,8 @@
             "check": "harness",
             "severity": "warning",
             "where": "no-sample:mechanical:DeliveryRequest.verified.preview.external:kernel",
-            "problem": "no generated object satisfies the invariants in this stage: the cell is not tested mechanically; give an example in this stage"
+            "problem": "no generated object satisfies the invariants in this stage: the cell is not tested mechanically; give an example in this stage",
+            "carried": true
           }
         ]
       }
@@ -125,7 +127,37 @@
         },
         "limiter": "preview"
       }
-    ]
+    ],
+    "original": {
+      "findings": [
+        {
+          "domain": "delivery",
+          "check": "harness",
+          "severity": "warning",
+          "where": "no-sample:mechanical:DeliveryRequest.verified.preview.external:kernel",
+          "problem": "no generated object satisfies the invariants in this stage: the cell is not tested mechanically; give an example in this stage"
+        }
+      ],
+      "runs": [
+        {
+          "run": 1,
+          "findings": [
+            {
+              "domain": "delivery",
+              "check": "harness",
+              "severity": "warning",
+              "where": "no-sample:mechanical:DeliveryRequest.verified.preview.external:kernel",
+              "problem": "no generated object satisfies the invariants in this stage: the cell is not tested mechanically; give an example in this stage"
+            }
+          ]
+        }
+      ]
+    },
+    "recheck": {
+      "at": "2026-11-08T09:52:18.765092+00:00",
+      "harness_commit": "f56e744d44c09afef5ef1412a4b22fe40eabb96a",
+      "why": "flags taken on the kernel's inputs (its base and the member's own history)"
+    }
   },
   "deploy": {
     "deployed": true,

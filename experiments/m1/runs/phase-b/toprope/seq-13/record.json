@@ -13,7 +13,8 @@
         "check": "structural",
         "severity": "warning",
         "where": "actions.add_source.params",
-        "problem": "unset-on-create: add_source creates a Source without its required `local_only` (an optional param sets it): make the param required, set it in an effect, or make the property optional"
+        "problem": "unset-on-create: add_source creates a Source without its required `local_only` (an optional param sets it): make the param required, set it in an effect, or make the property optional",
+        "carried": true
       }
     ],
     "commits": {
@@ -59,7 +60,8 @@
             "check": "structural",
             "severity": "warning",
             "where": "actions.add_source.params",
-            "problem": "unset-on-create: add_source creates a Source without its required `local_only` (an optional param sets it): make the param required, set it in an effect, or make the property optional"
+            "problem": "unset-on-create: add_source creates a Source without its required `local_only` (an optional param sets it): make the param required, set it in an effect, or make the property optional",
+            "carried": true
           }
         ]
       }
@@ -125,7 +127,37 @@
         },
         "limiter": "preview"
       }
-    ]
+    ],
+    "original": {
+      "findings": [
+        {
+          "domain": "authoring",
+          "check": "structural",
+          "severity": "warning",
+          "where": "actions.add_source.params",
+          "problem": "unset-on-create: add_source creates a Source without its required `local_only` (an optional param sets it): make the param required, set it in an effect, or make the property optional"
+        }
+      ],
+      "runs": [
+        {
+          "run": 1,
+          "findings": [
+            {
+              "domain": "authoring",
+              "check": "structural",
+              "severity": "warning",
+              "where": "actions.add_source.params",
+              "problem": "unset-on-create: add_source creates a Source without its required `local_only` (an optional param sets it): make the param required, set it in an effect, or make the property optional"
+            }
+          ]
+        }
+      ]
+    },
+    "recheck": {
+      "at": "2026-11-08T09:52:04.312220+00:00",
+      "harness_commit": "f56e744d44c09afef5ef1412a4b22fe40eabb96a",
+      "why": "flags taken on the kernel's inputs (its base and the member's own history)"
+    }
   },
   "deploy": {
     "deployed": true,
