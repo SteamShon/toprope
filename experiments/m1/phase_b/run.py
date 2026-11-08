@@ -303,6 +303,38 @@ def _log_probes(log: RunLog, arm: str, seq: int, run: int, where: Path, probes: 
                    f"error: {p['error']}" if p.get("error") else "ran (graded later)")
 
 
+def recheck_toprope(out: Path) -> dict[str, Any]:
+    """The Toprope arm's flags, taken again from the commits its run stored (the checks are
+    deterministic, so nothing is run by a model). Each commit is checked against the base the
+    kernel recorded, on the member's own event history up to the moment of that check, and each
+    flag says whether its base had it already. The first flags stay under `check.original`; the
+    decision log gets a `recheck` row per change."""
+    from .toprope_arm import checked_at, flags
+    work = out / "toprope"
+    root = work / "sandbox"
+    log = RunLog(log_path(out))
+    done: dict[int, int] = {}
+    for f in sorted(work.glob("seq-*/record.json")):
+        rec = json.loads(f.read_text())
+        check = rec.get("check") or {}
+        if rec["seq"] <= 0 or not check.get("commits"):
+            continue
+        found: list[dict[str, Any]] = []
+        for d, c in sorted(check["commits"].items()):
+            found += flags(root, d, c["commit"], upto=checked_at(root, d, c["commit"]))[0]
+        check.setdefault("original", {"findings": check.get("findings"), "runs": check.get("runs")})
+        check["findings"] = found
+        check["runs"] = [{"run": 1, "findings": found}]
+        check["recheck"] = {"at": _now(), "harness_commit": harness_commit(),
+                            "why": "flags taken on the kernel's inputs (its base and the member's own history)"}
+        f.write_text(json.dumps(rec, indent=2, ensure_ascii=False) + "\n")
+        log.append("toprope", rec["seq"], 1, "recheck", f,
+                   f"{len(found)} flag(s), {sum(not x['carried'] for x in found)} new with the change "
+                   f"(first: {len(check['original']['findings'] or [])})")
+        done[rec["seq"]] = len(found)
+    return {"rechecked": done}
+
+
 def worlds_complete(worlds: Path) -> bool:
     """Every probe's starting state is there: its state and its situation."""
     from .probes import PROBES
@@ -436,6 +468,9 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
                         "(run protocol §1); with --reason, amend a frozen one")
     fp.add_argument("--instruments", type=Path, default=INSTRUMENTS)
     fp.add_argument("--reason", default="")
+    rc = sub.add_parser("recheck-toprope", help="take the Toprope arm's flags again from its stored commits, on "
+                        "the kernel's inputs (#169); keeps the first ones under check.original")
+    rc.add_argument("--out", type=Path, default=DEFAULT_OUT)
     td = sub.add_parser("to-decide", help="what the researcher must decide in the grades (ADR-0047 §3)")
     td.add_argument("--out", type=Path, default=DEFAULT_OUT)
     s = sub.add_parser("status", help="how far each arm got")
@@ -452,6 +487,9 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
 
     if args.cmd == "freeze-prompts":
         print(json.dumps(freeze_prompts(args.instruments, args.reason), indent=2))
+        return
+    if args.cmd == "recheck-toprope":
+        print(json.dumps(recheck_toprope(args.out), indent=2))
         return
     if args.cmd == "to-decide":
         from .score import to_decide
