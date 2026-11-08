@@ -374,7 +374,8 @@ def servers(root: Path) -> dict[str, Any]:
     if not exe.exists():
         raise RuntimeError(f"toprope-server is not installed next to this Python ({sys.executable})")
     exe = str(exe)
-    return {m: {"command": exe, "args": ["--composition", str(root / COMPOSITION), "--member", m, "--kernel-root",
+    return {m: {"command": exe, "args": ["--composition", str(root / COMPOSITION), "--working-copy", "--member", m,
+                                         "--kernel-root",
                                          str(root), "--workspace", str(root / "toprope.library.workspace.yaml"),
                                          "--env", str(root / ".toprope/env-library"), "--identity",
                                          f"static:{root / 'ids.yaml'}"],
