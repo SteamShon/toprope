@@ -324,3 +324,64 @@ def test_the_tools_stay_fixed_when_a_change_is_deployed(materials, tmp_path):
     arm.backend = Editor(lambda a: a.update(description="Verify it in use."))
     arm.edit({**REQ, "seq": 2}, tmp_path / "w/seq-02")              # the stand-in's step still runs
     assert arm.check({**REQ, "seq": 2}, tmp_path / "w/seq-02").data["commits"]
+
+
+def test_flags_come_from_the_kernels_inputs_and_say_what_the_base_had(materials, tmp_path):
+    """The Toprope arm's flags are its change check's findings, on what the kernel's check_commit
+    used: the recorded base and the member's own history (toolchain/<d>/events). The first run took
+    them again on the deploy environment's events, which lost the log replay's findings (#169).
+    A finding the base already had is marked `carried`."""
+    from phase_b.toprope_arm import check_report, flags, recorded_base
+    arm = TopropeArm(materials, tmp_path / "w", Editor(lambda a: a.update(description="Verify it in use.")))
+    out = tmp_path / "w/seq-01"
+    arm.edit(REQ, out)
+    data = arm.check(REQ, out).data
+    cid = data["commits"]["delivery"]["commit"]
+    root = arm.sb.root
+    assert recorded_base(root, "delivery", cid) == "1-584aaeea5e686ee8"
+    report = check_report(root, "delivery", cid, "1-584aaeea5e686ee8")
+    assert report.checks["log_replay"].ran                               # the member's own history
+    assert report.checks["log_replay"].note == "" or "past action" in report.checks["log_replay"].summary()
+    found, _ = flags(root, "delivery", cid)
+    assert {f["check"] for f in found} == {f["check"] for f in data["findings"]}
+    assert all(isinstance(f["carried"], bool) for f in found)
+    carried_only = [f for f in found if f["carried"]]
+    assert all((f["check"], f["where"]) in {(g["check"], g["where"]) for g in data["findings"]} for f in carried_only)
+
+
+def test_recheck_takes_the_flags_again_and_keeps_the_first(materials, tmp_path):
+    from phase_b import run as runner
+    work = tmp_path / "run/toprope"
+    arm = TopropeArm(materials, work, Editor(lambda a: a.update(description="Verify it in use.")))
+    out = work / "seq-01"
+    arm.edit(REQ, out)
+    check = arm.check(REQ, out).data
+    first = [{"domain": "delivery", "check": "structural", "severity": "warning", "where": "x", "problem": "old"}]
+    (out / "record.json").write_text(json.dumps({"seq": 1, "check": {**check, "findings": first,
+                                                                       "runs": [{"run": 1, "findings": first}]}}))
+    assert runner.recheck_toprope(tmp_path / "run") == {"rechecked": {1: len(check["findings"])}}
+    rec = json.loads((out / "record.json").read_text())
+    assert rec["check"]["original"]["findings"] == first and rec["check"]["recheck"]["why"]
+    assert rec["check"]["runs"] == [{"run": 1, "findings": rec["check"]["findings"]}]
+    assert all("carried" in f for f in rec["check"]["findings"])
+    rows = [r for r in runner.RunLog(runner.log_path(tmp_path / "run")).rows() if r["what"] == "recheck"]
+    assert [(r["arm"], r["change"]) for r in rows] == [("toprope", "1")]
+
+
+def test_a_change_that_past_behaviour_breaks_is_flagged_by_the_log_replay(materials, tmp_path):
+    """The run on the researcher's computer missed every log replay finding: the history the flags
+    were taken on was the deploy environment's, which is empty (#169). Here a first change goes out
+    through Delivery (its verify is history); a second one refuses that verify."""
+    arm = TopropeArm(materials, tmp_path / "w", Editor(lambda a: a.update(description="Verify it in use.")))
+    out = tmp_path / "w/seq-01"
+    arm.edit(REQ, out)
+    arm.check(REQ, out)
+    assert arm.deploy(REQ, out).data["deployed"]                        # deliver, preview, deploy, verify
+    arm.backend = Editor(lambda a: a.update(preconditions=[
+        *a.get("preconditions", []),
+        {"id": "staging-only", "check": "target.environment == \"staging\"", "reason": "Verify on staging."}]))
+    out = tmp_path / "w/seq-02"
+    arm.edit({**REQ, "seq": 2}, out)
+    found = arm.check({**REQ, "seq": 2}, out).data["findings"]
+    replay = [f for f in found if f["check"] == "log_replay"]
+    assert replay and not any(f["carried"] for f in replay)              # the past verify, on `local`
