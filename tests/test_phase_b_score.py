@@ -337,3 +337,22 @@ def test_iteration_time_is_the_median_of_timed_repeats_with_its_limiter(tmp_path
     assert tp["iteration_time_by_change"][1] == {"median_s": 20, "min_s": 10, "max_s": 30, "limiter": "harness"}
     assert tp["iteration_time_by_change"][3]["limiter"] == "preview"
     assert tp["median_edit_to_checked_s"] == 20                          # the median of 20, 5 and 45
+
+
+def test_to_decide_lists_only_what_needs_the_researcher(tmp_path, capsys):
+    """ADR-0047 §3: disagreements between the script and the grader, missing labels, missing edit
+    judgments and probe runs with no result; everything else is accepted as proposed."""
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    three_arms(run)
+    labels = {**LABELS, ("toprope", 2): ["false-alarm"]}                 # the grader disagrees with the script
+    runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m"],
+                backend=ApiBackend(FakeModel(grader(labels, run)[0])))
+    prop = yaml.safe_load((run / "scoring/proposed.yaml").read_text())
+    prop["probes"]["nl"][0]["passed"] = None
+    (run / "scoring/proposed.yaml").write_text(yaml.safe_dump(prop))
+    capsys.readouterr()                                                  # grade's own output
+    runner.main(["to-decide", "--out", str(run)])
+    todo = json.loads(capsys.readouterr().out)
+    assert [(f["seq"], f["script_label"], f["grader_label"]) for f in todo["flags"]] == [(2, "seeded", "false-alarm")]
+    assert [(p["arm"], p["seq"]) for p in todo["probes"]] == [("nl", 0)] and todo["edits"] == []
+    assert todo["count"] == 2 and todo["file"].endswith("proposed.yaml")

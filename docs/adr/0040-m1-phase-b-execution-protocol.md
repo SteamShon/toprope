@@ -1,6 +1,8 @@
 # ADR-0040: How M1 Phase B runs
 
-- Link: ① iterate safely, ⑥ org productivity (pilot, ADR-0034) · Status: accepted ·
+- Link: ① iterate safely, ⑥ org productivity (pilot, ADR-0034) · Status: accepted; §2 and
+  §1's "in an ordinary terminal" superseded by [ADR-0047](0047-phase-b-runs-from-a-remote-control-session.md)
+  (a Remote Control session runs the harness; the run protocol sets the repeats) ·
   2026-11-06 · decided by: SteamShon (D1–D4 "as recommended"; drafted by the assistant).
   Amended the same day by SteamShon: §1 and §2 run on the researcher's own Claude Code, on
   their machine, instead of the model API in GitHub Actions (no API key; the CI setup cost more

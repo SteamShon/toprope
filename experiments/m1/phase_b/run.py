@@ -1,13 +1,18 @@
-"""Run M1 Phase B (ADR-0040): the frozen change requests, in order, on one arm.
+"""Run M1 Phase B (ADR-0040, ADR-0047): the frozen change requests, in order, on one arm.
 
-Run it yourself, from `experiments/m1`, in an ordinary terminal (not inside an agent session,
-which can read the repository):
+A session connected through Remote Control to the repository's folder on the researcher's
+computer runs these, from `experiments/m1`, following `phase_b/RUNBOOK.md` (ADR-0047). It never
+opens the key, the binding or the blind labels, and never takes a role:
 
+  uv run python -m phase_b freeze-prompts                         freeze the agents' prompts (researcher's go)
   uv run python -m phase_b render --model M                      the NL arm's materials
   uv run python -m phase_b materials                              the structured and Toprope arms' materials
   uv run python -m phase_b arm nl --model M --seqs 1-2           the dry run, on one arm
   uv run python -m phase_b arm nl --model M                      every change; resumes a stopped run
   uv run python -m phase_b status                                 how far each arm got
+  uv run python -m phase_b grade --model M                        propose the grades (opens the key)
+  uv run python -m phase_b to-decide                              what the researcher must decide
+  uv run python -m phase_b score                                  the metrics, from confirmed.yaml
 
 Paths default to the repository's (`experiments/m1/arms/ARM`, `experiments/m1/runs/phase-b`).
 Each conversation is a fresh
@@ -418,6 +423,8 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
                         "(run protocol §1); with --reason, amend a frozen one")
     fp.add_argument("--instruments", type=Path, default=INSTRUMENTS)
     fp.add_argument("--reason", default="")
+    td = sub.add_parser("to-decide", help="what the researcher must decide in the grades (ADR-0047 §3)")
+    td.add_argument("--out", type=Path, default=DEFAULT_OUT)
     s = sub.add_parser("status", help="how far each arm got")
     s.add_argument("--out", type=Path, default=DEFAULT_OUT)
     g = sub.add_parser("grade", parents=[common], help="propose a label for every finding, edit and probe "
@@ -432,6 +439,10 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
 
     if args.cmd == "freeze-prompts":
         print(json.dumps(freeze_prompts(args.instruments, args.reason), indent=2))
+        return
+    if args.cmd == "to-decide":
+        from .score import to_decide
+        print(json.dumps(to_decide(args.out), indent=2, ensure_ascii=False))
         return
     if args.cmd == "status":
         print(json.dumps(status(args.out), indent=2))
