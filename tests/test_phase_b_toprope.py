@@ -286,3 +286,13 @@ def test_the_checks_run_again_on_three_changes_and_each_change_is_timed(material
         repeats.append(check.get("repeat"))
     assert [r is not None for r in repeats] == [True, True, True, False]
     assert all(r["same"] for r in repeats[:3])
+
+
+def test_a_sandbox_with_only_leftover_caches_is_not_a_run(materials, tmp_path):
+    """`git mv` of an older run left `sandbox/.hypothesis/`; the arm took it for a run and refused
+    to start (2026-11-08). A sandbox is a run once the materials are in it."""
+    (tmp_path / "w/sandbox/.hypothesis").mkdir(parents=True)
+    arm = TopropeArm(materials, tmp_path / "w", Editor(lambda a: None))
+    assert (arm.sb.root / "ids.yaml").exists() and (tmp_path / "w/sandbox.stale-1/.hypothesis").is_dir()
+    with pytest.raises(FileExistsError, match="has a run"):
+        TopropeArm(materials, tmp_path / "w", Editor(lambda a: None))
