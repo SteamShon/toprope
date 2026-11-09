@@ -76,7 +76,8 @@ def test_an_agent_proposes_checks_and_writes_one_request_and_no_commit(repo, cap
     assert hr.check(req) == []                                         # a request the workflow accepts
     assert [s["run"]["action"] for s in req["steps"]] == [
         "confirm_all_proposed", "commit_draft", "check_commit", "approve_commit"]
-    assert req["summary"] == "Drafts name their declaration"
+    assert req["summary"] == "[high risk: approval only] Drafts name their declaration"   # a new invariant
+    assert result["risk"] == "high" and any("invariant" in r for r in result["risk_reasons"])
     decl = yaml.safe_load((repo / "domains/authoring/authoring.domain.yaml").read_text())
     (added,) = [i for i in decl["invariants"] if i["id"] == RULE["id"]]
     assert added["status"] == "proposed"                               # nothing is confirmed by the agent
@@ -122,3 +123,13 @@ def test_a_patch_without_what_it_cites_is_refused_with_the_fix(tmp_path):
 
 def test_the_request_has_the_four_steps_a_change_takes():
     assert request_for("x", "authoring", "authoring", None) == hr.change("authoring", summary="x")
+    assert len(request_for("x", "authoring", "authoring", None, risk="high")["steps"]) == 4
+
+
+def test_a_low_risk_change_ships_on_the_same_request():
+    req = request_for("Reword a description", "authoring", "authoring", None, risk="low")
+    assert hr.check(req) == [] and req["summary"].startswith("[low risk: one approval ships it]")
+    assert [(s["run"]["member"], s["run"]["action"]) for s in req["steps"]][4:] == [
+        ("authoring", "deliver"), ("delivery", "preview"), ("delivery", "deploy"), ("delivery", "run_probes"),
+        ("delivery", "verify")]
+    assert req["steps"][5]["run"]["target"] == "authoring:$commit:local"

@@ -107,6 +107,33 @@ def test_one_request_takes_a_change_from_proposed_to_approved():
     assert any("step 5: approve_commit $commit needs a check_commit" in e for e in hr.check(stale))  # a newer commit
 
 
+def low_risk(root, commit, level="low"):
+    p = root / ".toprope/commits/authoring/checks.jsonl"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with p.open("a") as f:
+        f.write(json.dumps({"commit": commit, "check": "risk", "ok": True, "summary": level}) + "\n")
+
+
+def test_one_approval_ships_only_a_commit_checked_low_risk(tmp_path, monkeypatch):
+    (tmp_path / "ids.yaml").write_text(yaml.safe_dump(IDS))
+    monkeypatch.setenv(hr.TLC_ENV, "tla2tools.jar")
+    cmds = []
+
+    def run(cmd, **kw):
+        cmds.append(cmd)
+        then = [{"kernel": "commit", "reply": "record_commit", "status": "ok", "object": "7-c0ffee"}] \
+            if cmd[-2] == "commit_draft" else []
+        return subprocess.CompletedProcess(cmd, 0, json.dumps({"status": "ok", "then": then}), "")
+    monkeypatch.setattr(hr.subprocess, "run", run)
+    low_risk(tmp_path, "7-c0ffee", "high: an invariant or outcome rule changed: invariant:x")
+    req = hr.change("authoring")
+    req["steps"].append({"run": {"member": "delivery", "action": "deploy", "target": "authoring:$commit:local"}})
+    assert "One approval ships this change" in hr.render(req)
+    with pytest.raises(SystemExit, match="7-c0ffee is not low risk .high.*Fix: read the preview"):
+        hr.run(req, "ana-gh", identity="ids.yaml", cwd=tmp_path)
+    assert [c[-2] for c in cmds] == ["confirm_all_proposed", "commit_draft", "check_commit", "approve_commit"]
+
+
 def test_the_commit_a_step_made_is_the_target_of_the_next(tmp_path, monkeypatch):
     (tmp_path / "ids.yaml").write_text(yaml.safe_dump(IDS))
     monkeypatch.setenv(hr.TLC_ENV, "tla2tools.jar")
@@ -118,6 +145,7 @@ def test_the_commit_a_step_made_is_the_target_of_the_next(tmp_path, monkeypatch)
             if cmd[-2] == "commit_draft" else []
         return subprocess.CompletedProcess(cmd, 0, json.dumps({"status": "ok", "then": then}), "")
     monkeypatch.setattr(hr.subprocess, "run", run)
+    low_risk(tmp_path, "7-c0ffee")                      # what check_commit records (ADR-0050)
     req = hr.change("authoring")
     req["steps"].append({"run": {"member": "delivery", "action": "preview", "target": "authoring:$commit:local"}})
     assert hr.check(req) == [] and "`authoring:<the commit made above>:local`" in hr.render(req)
@@ -235,3 +263,28 @@ def test_a_run_step_can_name_the_workspace_of_the_draft_it_acts_on():
     assert "(workspace `toprope.delivery.workspace.yaml`)" in hr.render(req)
     bad = {"summary": "x", "steps": [{"run": {**step["run"], "workspace": "/etc/passwd"}}]}
     assert "run takes" in hr.check(bad)[0]
+
+
+def test_naming_the_commit_does_not_get_around_the_risk_gate(tmp_path, monkeypatch):
+    (tmp_path / "ids.yaml").write_text(yaml.safe_dump(IDS))
+    monkeypatch.setenv(hr.TLC_ENV, "tla2tools.jar")
+    monkeypatch.setattr(hr.subprocess, "run",
+                        lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0, json.dumps({"status": "ok"}), ""))
+    low_risk(tmp_path, "7-c0ffee", "low")
+    low_risk(tmp_path, "7-c0ffee", "high: the harness check failed")       # the newest record wins
+    req = {"summary": "s", "steps": [
+        {"run": {"member": "authoring", "action": "check_commit", "target": "7-c0ffee"}},
+        {"run": {"member": "authoring", "action": "approve_commit", "target": "7-c0ffee"}},
+        {"run": {"member": "authoring", "action": "deliver", "target": "7-c0ffee", "params": {"environment": "local"}}}]}
+    assert hr.check(req) == [] and "One approval ships this change" in hr.render(req)
+    with pytest.raises(SystemExit, match="7-c0ffee is not low risk"):
+        hr.run(req, "ana-gh", identity="ids.yaml", cwd=tmp_path)
+
+
+def test_a_second_request_ships_an_approved_commit(tmp_path):
+    out = tmp_path / "ship.yaml"
+    hr.main(["ship", str(out), "--commit", "7-c0ffee"])
+    req = hr.load(out)
+    assert hr.check(req) == []
+    assert [s["run"]["action"] for s in req["steps"]] == ["deliver", "preview", "deploy", "run_probes", "verify"]
+    assert "One approval ships" not in hr.render(req)       # it approves nothing: the person read the preview

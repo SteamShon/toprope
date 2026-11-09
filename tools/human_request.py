@@ -24,6 +24,8 @@ Steps, from a fixed set:
   first part.
 
   python tools/human_request.py change REQUEST --draft DRAFT [--member authoring] [--workspace W]
+  python tools/human_request.py ship REQUEST --commit COMMIT [--domain authoring]   (ADR-0050: the
+      second request of a high-risk change, after its preview was read)
 
 writes REQUEST with the four steps: confirm_all_proposed, commit_draft, check_commit $commit,
 approve_commit $commit.
@@ -137,6 +139,13 @@ def render(req: dict) -> str:
             lines.append(f"{i}. **amend** `{arg['file']}` in `{arg['dir']}`: {arg['reason']}")
         else:
             lines.append(f"{i}. **{kind}** `{arg}`")
+    approves = {str((st.get("run") or {}).get("target")) for st in req["steps"]
+                if (st.get("run") or {}).get("action") == "approve_commit"}
+    if any((st.get("run") or {}).get("action") in SHIPS
+           and shipped_commit(st["run"], None) in approves for st in req["steps"]):
+        lines += ["", "**One approval ships this change** (ADR-0050): the delivery steps run only if the "
+                  "check in this request finds it low risk, and `verify` runs only if the probes passed; "
+                  "approving verifies in advance on that condition."]
     for st in req["steps"]:                      # what a confirm step confirms, as one diff (B5)
         (kind, arg), = st.items()
         if kind == "run" and arg.get("action") in ("confirm_all_proposed", "confirm_element"):
@@ -206,6 +215,37 @@ def _unmet(stdout: str) -> list[str]:
             for t in then if t.get("status") != "ok"]
 
 
+SHIPS = ("deliver", "preview", "deploy", "run_probes", "verify")
+
+
+def shipped_commit(arg: dict, made: str | None) -> str | None:
+    """The commit a delivery step ships: `deliver <commit>`, or `<domain>:<commit>:<env>`."""
+    target = str(arg.get("target", "")).replace(MADE, made or MADE)
+    return target if arg.get("action") == "deliver" else (target.split(":")[1] if target.count(":") == 2 else None)
+
+
+def ship(commit: str, domain: str, summary: str | None = None) -> dict:
+    """The second request of a high-risk change (ADR-0050): ship an approved commit, after the
+    person has read its preview."""
+    t = f"{domain}:{commit}:local"
+    return {"summary": summary or f"Ship {commit}, approved earlier, after reading its preview",
+            "steps": [{"run": {"member": "authoring", "action": "deliver", "target": commit,
+                               "params": {"environment": "local"}}},
+                      *({"run": {"member": "delivery", "action": a, "target": t}}
+                        for a in ("preview", "deploy", "run_probes", "verify"))]}
+
+
+def recorded_risk(commit: str, cwd: str | Path = ".") -> str | None:
+    """The risk `check_commit` last recorded on a commit (ADR-0050), from any domain's checks."""
+    level = None
+    for path in sorted((Path(cwd) / ".toprope" / "commits").glob("*/checks.jsonl")):
+        for line in path.read_text().splitlines():
+            row = json.loads(line) if line.strip() else {}
+            if row.get("commit") == commit and row.get("check") == "risk":
+                level = str(row.get("summary", "")).split(":", 1)[0].strip()
+    return level
+
+
 def run(req: dict, approver: str, identity: str = "toprope.identity.yaml", cwd: str | Path = ".") -> list[dict]:
     """Run every step as the approver; stop at the first that fails."""
     sys.path.insert(0, str(ROOT / "src"))
@@ -217,11 +257,20 @@ def run(req: dict, approver: str, identity: str = "toprope.identity.yaml", cwd: 
     if any((st.get("run") or {}).get("action") == "approve_commit" for st in req["steps"]) \
             and not env.get(TLC_ENV):
         raise SystemExit(f"approve_commit needs TLC: set {TLC_ENV} to a TLC jar (the workflow does)")
-    done, made = [], None
+    done, made, approved = [], None, set()
     for st in req["steps"]:
         arg = st.get("run") or {}
         if MADE in str(arg.get("target")) and made is None:
             raise SystemExit(f"step {len(done) + 1}: {MADE}, but no commit_draft step before it made a commit")
+        if arg.get("action") == "approve_commit":
+            approved.add(made if arg["target"] == MADE else arg["target"])
+        ships = shipped_commit(arg, made) if arg.get("action") in SHIPS else None
+        if ships and ships in approved and recorded_risk(ships, cwd) != "low":
+            # ADR-0050: one approval ships only a low-risk change, as checked inside this request
+            print(json.dumps(done, indent=2), file=sys.stderr)
+            raise SystemExit(f"step {len(done) + 1}: {ships} is not low risk ({recorded_risk(ships, cwd)}), so this "
+                             "approval does not ship it. Fix: read the preview, then approve a second request "
+                             "with the delivery steps")
         cmd = command(st, made)
         r = subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True, check=False)
         done.append({"step": st, "returncode": r.returncode, "stdout": r.stdout[-4000:], "stderr": r.stderr[-4000:]})
@@ -252,7 +301,7 @@ def record(req: dict, approver: str, person: str, run_url: str, cwd: str | Path 
 
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=["check", "render", "run", "record", "change"])
+    ap.add_argument("cmd", choices=["check", "render", "run", "record", "change", "ship"])
     ap.add_argument("request")
     ap.add_argument("--approver", help="the GitHub login that approved the run (for run)")
     ap.add_argument("--identity", default="toprope.identity.yaml")
@@ -261,8 +310,18 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--draft", help="the draft whose change to take through (for change)")
     ap.add_argument("--member", default="authoring", help="(for change)")
     ap.add_argument("--workspace", help="(for change) the draft's workspace, if not the member's")
-    ap.add_argument("--summary", help="(for change)")
+    ap.add_argument("--summary", help="(for change, ship)")
+    ap.add_argument("--commit", help="(for ship) the approved commit to ship")
+    ap.add_argument("--domain", default="authoring", help="(for ship) the commit's domain")
     args = ap.parse_args(argv)
+    if args.cmd == "ship":
+        if not args.commit:
+            raise SystemExit("ship needs --commit, the approved commit")
+        Path(args.request).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.request).write_text(yaml.safe_dump(ship(args.commit, args.domain, args.summary),
+                                                     sort_keys=False, allow_unicode=True))
+        print(args.request)
+        return
     if args.cmd == "change":
         if not args.draft:
             raise SystemExit("change needs --draft")
