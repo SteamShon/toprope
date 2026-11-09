@@ -83,6 +83,20 @@ def is_element(segs: list[str]) -> bool:
             or (len(segs) == 5 and segs[0] == "transitions" and segs[2] == "matrix"))
 
 
+def _words_pattern(words: str) -> re.Pattern:
+    """The words as typed, matched whole: case and spacing ignored, never inside another word."""
+    parts = [re.escape(w) for w in words.split()]
+    return re.compile(r"(?<!\w)" + r"\s+".join(parts) + r"(?!\w)", re.IGNORECASE)
+
+
+def _answer_of(text: str) -> str | None:
+    """The owner's answer in an interview line (`question: …`, `answer: …`)."""
+    for line in text.splitlines():
+        if line.startswith("answer: "):
+            return line[len("answer: "):]
+    return None
+
+
 def _get(doc: Any, segs: list[str]) -> Any:
     cur = doc
     for i, s in enumerate(segs):
@@ -278,19 +292,36 @@ class Workspace:
         if sid in self.sources and rest.strip():
             specs, words = [self.sources[sid]], rest
         else:
-            specs, words = [s for s in self.sources.values() if not s.local_only], ref
-        norm = " ".join(words.split()).strip().strip('"').strip().lower()
-        hits = [c.ref for s in specs for c in self.chunks(s.id) if norm in " ".join(c.text.split()).lower()]
+            specs, words = list(self.sources.values()), ref
+        if any(s.local_only for s in specs) and len(specs) == 1:
+            # matching would tell a model whether a phrase is in content it may not read (#206's review)
+            raise AuthoringError(fixed(f"source {specs[0].id!r} is local-only, so it is not searched for words",
+                                       "cite its chunk ref, as the owner gives it"))
+        specs = [s for s in specs if not s.local_only]
+        words = words.strip().strip('"').strip()
+        pattern = _words_pattern(words)
+        hits: list[tuple[str, str, str]] = []           # (ref, the passage's own words, source)
+        for s in specs:
+            for c in self.chunks(s.id):
+                # in an interview line only the owner's answer is quoted, never the question asked
+                text = (_answer_of(c.text) if s.kind == "interview-log" else c.text) or ""
+                if m := pattern.search(text):
+                    hits.append((c.ref, m.group(0), s.id))
+        if len(hits) > 1:            # the same passage read through several sources: the first declared
+            places = {h[0].split(":", 1)[1] for h in hits}
+            if len(places) == 1:
+                hits = hits[:1]
         if not hits:
             raise AuthoringError(fixed(f"no chunk {ref!r}, and no passage contains those words",
                                        "run `search` with words from the passage, and cite the `ref` it "
                                        "returns or words it shows"))
         if len(hits) > 1:
-            shown = ", ".join(hits[:5]) + (f" and {len(hits) - 5} more" if len(hits) > 5 else "")
-            raise AuthoringError(fixed(f"{len(hits)} passages contain {words.strip()!r}: {shown}",
+            shown = ", ".join(h[0] for h in hits[:5]) + (f" and {len(hits) - 5} more" if len(hits) > 5 else "")
+            raise AuthoringError(fixed(f"{len(hits)} passages contain {words!r}: {shown}",
                                        "quote more of the passage, or cite one of those refs"))
-        self._used(hits[0].split(":", 1)[0], hits)
-        return hits[0], words.strip().strip('"')
+        ref, said, source = hits[0]
+        self._used(source, [ref])
+        return ref, " ".join(said.split())             # the passage's own words, not what was typed
 
     def source_of(self, ref: str, quote: str | None = None) -> dict[str, Any]:
         """Where an element came from: its chunk, and the owner's words if given. A citation by

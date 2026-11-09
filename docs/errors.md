@@ -120,6 +120,7 @@ the error is raised.
 | only a person confirms: at their own terminal, or through a declared action the kernel checked was taken by that person | ask the person to run the confirm action themselves, at their terminal or through a human request |
 | only optional stages can be skipped: {…} | skip only an optional stage listed; answer the others |
 | source {…} is a path, not a link | fetch only a source with a `url:`; a `path:` source is read in place |
+| source {…} is local-only, so it is not searched for words | cite its chunk ref, as the owner gives it |
 | source {…} is local-only: its content is never sent to a model | read it yourself, or remove `local_only: true` from the source if its content may be shared |
 | source {…}: give either a path or a url | give the source exactly one of `path:` or `url:` in the workspace file |
 | the draft does not parse: {…} | fix the draft so it matches the schema (docs/domain-schema.md), then commit again |
