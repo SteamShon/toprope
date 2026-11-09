@@ -27,6 +27,22 @@ the error is raised.
 | {…}: not valid YAML ({…}) | fix the file, or give --no-config |
 | {…}: unknown key(s) {…} | use only the keys {…} |
 
+## `adapters/cli/change.py`
+
+| Error | Fix |
+|---|---|
+| --workspace {…} is not a workspace file | give the `*.workspace.yaml` file a human request can name |
+| a request is already waiting to be pushed: {…} | push it (one request per push), or remove it, then run the change |
+| cannot read the patch {…}: {…} | give a YAML list of elements |
+| element {…} of the patch has no {…} | give each element its `path`, `value` and `cites` |
+| no check ran on {…}'s working copy | check the draft with `toprope-run check_commit` after a commit, and report the problem |
+| no workspace to check | give --workspace, or set `workspace:` in toprope.yaml |
+| the change check found problems in {…}'s working copy: {…} (proposed and still in the draft: {…}) | fix the proposals and run the change again; nothing was requested |
+| the patch {…} lists no elements | write a YAML list of `{path, value, cites}`, one per element |
+| {…} exists | name a new request file, or leave --request out |
+| {…} names no origin | give it `origin:` (a Source object's id), or --origin for every element |
+| {…}{…} | fix that element and run the change again with the elements not yet proposed, or restore the draft with `git checkout -- <declaration>` |
+
 ## `adapters/mcp/cli.py`
 
 | Error | Fix |
