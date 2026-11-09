@@ -86,3 +86,45 @@ def test_the_human_request_page_shows_what_a_confirm_step_confirms(tmp_path):
     req = hr.change("d", workspace=str(tmp_path / "toprope.workspace.yaml"))
     page = hr.render(req)
     assert "#### What `confirm_all_proposed` confirms" in page and "+ objects.Note" in page
+
+
+def test_a_property_named_status_or_source_is_content_and_shows(tmp_path):
+    ws = workspace(tmp_path)
+    ws.propose("objects.Note", {"description": "Free text.", "properties": {
+        "status": {"enum": ["open", "done"]}, "source": {"type": "string"}}}, ws.chunks("docs")[0].ref)
+    (item,) = ws.review()
+    assert item["now"]["properties"] == {"status": {"enum": ["open", "done"]}, "source": {"type": "string"}}
+    assert "status:" in ws.render_review() and "source:" in ws.render_review()
+
+
+def test_the_run_page_shows_the_steps_even_when_the_review_cannot_be_made(tmp_path, monkeypatch):
+    monkeypatch.setitem(sys.modules, "toprope.workspace", None)       # as on a runner without the package
+    page = hr.render(hr.change("d", workspace=str(tmp_path / "nowhere.yaml")))
+    assert "**confirm_all_proposed**" in page and "(the review could not be made" in page
+
+
+def test_confirming_through_toprope_run_shows_the_diff_first(tmp_path, capsys, monkeypatch):
+    from toprope.adapters import cli
+    seen = {}
+    monkeypatch.setattr(cli, "_confirm_on_terminal",
+                        lambda ident, caller, action, target, preface=None: seen.update(
+                            action=action, text=preface() if callable(preface) else preface)
+                        or (_ for _ in ()).throw(SystemExit("stop")))
+    monkeypatch.setattr(cli, "_caller", lambda ident, token: None)
+    from toprope.identity.git import GitIdentity
+    monkeypatch.setattr(cli, "_identity", lambda spec, token=None: GitIdentity.__new__(GitIdentity))
+    with pytest.raises(SystemExit, match="stop"):
+        main(["--no-config", "--composition", str(ROOT / "domains/toprope-self.composition.yaml"), "--kernel-root",
+              str(ROOT), "--workspace", str(ROOT / "toprope.authoring.workspace.yaml"), "confirm_all_proposed",
+              "authoring"])
+    assert seen["action"] == "confirm_all_proposed" and "proposed" in seen["text"]
+
+
+def test_a_domain_action_named_review_keeps_its_name():
+    from toprope.adapters.cli import build_parser
+    from toprope.decl import Domain
+    from test_decl import schema_doc_domain
+    raw = schema_doc_domain()
+    raw["actions"]["review"] = {**raw["actions"]["launch_experiment"]}
+    p = build_parser(Domain.model_validate(raw))                      # no "conflicting subparser"
+    assert p.parse_args(["review", "E-1"]).cmd == "review"
