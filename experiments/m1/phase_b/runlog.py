@@ -7,6 +7,7 @@ later row supersedes it (`what` = `superseded`, naming what it replaces).
 
 from __future__ import annotations
 
+import fcntl
 import os
 from datetime import UTC, datetime
 from pathlib import Path
@@ -38,18 +39,22 @@ class RunLog:
     def append(self, arm: str, change: int | str, run: int | str, what: str, evidence: Path | str | None,
                result: object) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        new = not self.path.exists()
         row = (datetime.now(UTC).isoformat(timespec="seconds"), arm, change, run, what,
                self.pointer(evidence) if isinstance(evidence, Path) else (evidence or ""), result)
         with self.path.open("a") as f:
-            if new:
-                f.write("\t".join(COLUMNS) + "\n")
-            f.write("\t".join(_cell(x) for x in row) + "\n")
-            f.flush()
-            os.fsync(f.fileno())
+            fcntl.flock(f, fcntl.LOCK_EX)       # two arms may append at once: one header, whole rows
+            try:
+                if f.seek(0, os.SEEK_END) == 0:
+                    f.write("\t".join(COLUMNS) + "\n")
+                f.write("\t".join(_cell(x) for x in row) + "\n")
+                f.flush()
+                os.fsync(f.fileno())
+            finally:
+                fcntl.flock(f, fcntl.LOCK_UN)
 
     def rows(self) -> list[dict[str, str]]:
         if not self.path.exists():
             return []
         lines = self.path.read_text().splitlines()
-        return [dict(zip(COLUMNS, line.split("\t"), strict=True)) for line in lines[1:] if line]
+        header = "\t".join(COLUMNS)              # a header written twice before the lock (#166) is skipped
+        return [dict(zip(COLUMNS, line.split("\t"), strict=True)) for line in lines[1:] if line and line != header]
