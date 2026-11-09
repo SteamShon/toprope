@@ -482,3 +482,12 @@ def test_by_default_one_owner_commits_and_approves(tmp_path):
     st = CommitStore(tmp_path / "commits")
     c, _ = st.commit(write(tmp_path / "d.domain.yaml", schema_doc_domain()), author="ana")
     assert st.approve("example", c.id, "ana").id == c.id                # M1: one owner (ADR-0032)
+
+
+def test_a_changed_outcome_rule_is_reviewed_again():
+    from toprope.decl.interface import review_diff, review_elements
+    raw = schema_doc_domain()
+    raw["rules"] = {"only-approvers": {"on": "Experiment.approved", "requires": {"roles": ["approver"]}, "reason": "r"}}
+    old = review_elements(Domain.model_validate(raw))
+    raw["rules"]["only-approvers"]["requires"] = "human"
+    assert review_diff(old, review_elements(Domain.model_validate(raw))).changed == ["rule:only-approvers"]
