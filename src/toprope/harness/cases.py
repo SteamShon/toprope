@@ -74,9 +74,21 @@ class Planner:
     def params(self, a: Action) -> dict[str, Any]:
         return default_params(self.d, a, self.w.fixtures, self.interp.clock)
 
-    def actor_ok(self, name: str, a: Action, role: str, inst: Instance | None) -> bool:
+    def rule_refusing(self, name: str, a: Action, role: str, inst: Instance | None) -> str | None:
+        """The outcome rule (ADR-0048) that refuses this actor here, if any: checked after the
+        cell and before the preconditions, as the interpreter does."""
+        from ..decl.rules import covering, meets
+        actor = self.w.actors[role]
+        tr = self.d.transitions.get(a.object_type)
+        frm = inst.data.get(tr.field) if (tr is not None and inst is not None and a.target) else None
+        return next((rid for rid, r in covering(self.d, name, frm) if not meets(r, actor.kind, actor.roles, actor.roles)),
+                    None)
+
+    def actor_ok(self, name: str, a: Action, role: str, inst: Instance | None, rules: bool = True) -> bool:
         actor = self.w.actors[role]
         if a.requires == "human" and actor.kind != "person":
+            return False
+        if rules and self.rule_refusing(name, a, role, inst):
             return False
         plain = [r for r in a.actor if isinstance(r, str)]
         if role in plain:
@@ -129,11 +141,13 @@ class Planner:
                     continue
                 # Prefer an instance where every precondition holds, so the cell itself is tested.
                 inst = next((i for i in insts if self.first_failing(a, i.data, role) is None), insts[0])
-                if not self.actor_ok(name, a, role, inst):
+                if not self.actor_ok(name, a, role, inst, rules=False):
                     expect = {"status": "denied", "code": "actor"}
                 else:
                     expect = cell_expectation(raw_cell(self.d, obj, state, name, role), state)
-                    if expect["status"] == "ok" and (pre := self.first_failing(a, inst.data, role)):
+                    if expect["status"] == "ok" and (rule := self.rule_refusing(name, a, role, inst)):
+                        expect = {"status": "denied", "code": rule}
+                    elif expect["status"] == "ok" and (pre := self.first_failing(a, inst.data, role)):
                         expect = {"status": "denied", "code": pre}
                 out.append(Case(cid, "cell", obj, state, name, role, inst, self.params(a), expect))
         return out

@@ -418,10 +418,11 @@ def _action(d: Domain, name: str, a: Any, tr: Any, actors: dict[str, Any], ids: 
         else:
             who = " \\/ ".join(f"Pass({ex(r.where)})" for r in rules)
         moves = []
+        from ..decl.rules import covering, meets
         for state, cells in tr.matrix.items():
             to = _resolve(cells.get(name, "undecided"), actor.roles)
-            if to is not None:
-                moves.append(f"<<{tla_str(state)}, {tla_str(to)}>>")
+            if to is not None and all(meets(r, actor.kind, actor.roles) for _, r in covering(d, name, state)):
+                moves.append(f"<<{tla_str(state)}, {tla_str(to)}>>")   # an outcome rule removes the move (ADR-0048)
         if not moves:
             continue
         pre = [f"Pass({ex(p.check)})" for p in a.preconditions]
@@ -475,8 +476,11 @@ def _create(d: Domain, name: str, a: Any, actors: dict[str, Any], ids: list[str]
     if tr is not None and tr.initial:
         base[tr.field] = value(tr.initial)
     out = []
+    from ..decl.rules import covering, meets
     for role, actor in sorted(actors.items()):
         if a.requires == "human" and actor.kind != "person":
+            continue
+        if not all(meets(r, actor.kind, actor.roles) for _, r in covering(d, name, None)):
             continue
         rules = [r for r in a.actor if (r.role if isinstance(r, ActorRule) else r) in actor.roles]
         if not rules:
