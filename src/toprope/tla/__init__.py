@@ -401,10 +401,13 @@ def _action(d: Domain, name: str, a: Any, tr: Any, actors: dict[str, Any], ids: 
     required = {p: s for p, s in a.params.items() if not s.optional}
     pvars = {p: f"p_{ident(p)}" for p in required}
     cands = {}
+    unread = _unread_params(d, a)
     for p, s in required.items():
         vals = _candidates(d, s, ids)
         if not vals:
             raise Unsupported(f"the param {p} with no candidate value")
+        if p in unread:            # only copied into fields nothing reads: one value stands for all
+            vals = vals[:1]
         cands[p] = [[v] if s.many else v for v in vals]
     out = []
     for role, actor in sorted(actors.items()):
@@ -515,6 +518,45 @@ def _create(d: Domain, name: str, a: Any, actors: dict[str, Any], ids: list[str]
                 f"\n    /\\ last' = <<{tla_str(name)}, {tla_str(role)}, {tla_str(new_id)}, {params_rec}>>")
         out.append((op, body))
     return out
+
+
+def _unread_params(d: Domain, action: Any) -> set[str]:
+    """The params of an action on an existing object that only an effect copies into a field
+    (`target.f: params.p`), where no other expression of the action reads `params.p` and no
+    expression of the domain reads a field `f` (a precondition, an actor rule, an effect, a call's
+    inputs, an invariant, a rule or a handoff). Their values cannot change any step or check, so
+    TLC tries one (as `_reads` does for creation); otherwise each stored string multiplies the
+    states."""
+    copies: dict[str, set[str]] = {}
+    own: list[str] = [p.check for p in action.preconditions]
+    own += [r.where for r in action.actor if isinstance(r, ActorRule) and r.where]
+    for e in action.effects:
+        own += [v for v in (e.with_ or {}).values() if isinstance(v, str)]
+        for key, v in (e.set or {}).items():
+            m = re.fullmatch(r"params\.([A-Za-z_][A-Za-z0-9_]*)", v.strip()) if isinstance(v, str) else None
+            if m and key.startswith("target."):
+                copies.setdefault(m.group(1), set()).add(key.split(".", 1)[1])
+            elif isinstance(v, str):
+                own.append(v)
+    if not copies:
+        return set()
+    texts = list(own)
+    for a in d.actions.values():
+        if a is action:
+            continue
+        texts += [p.check for p in a.preconditions]
+        texts += [r.where for r in a.actor if isinstance(r, ActorRule) and r.where]
+        for e in a.effects:
+            texts += [v for v in (e.set or {}).values() if isinstance(v, str)]
+            texts += [v for v in (e.with_ or {}).values() if isinstance(v, str)]
+    texts += [i.check for i in d.invariants]
+    texts += [r.requires.check for r in d.rules.values() if isinstance(r.requires, RuleCheck)]
+    for h in d.handoffs.values():
+        texts += [h.target, *h.params.values()]
+    blob = " ".join(texts)
+    return {p for p, fields in copies.items()
+            if not re.search(rf"\bparams\.{p}\b", " ".join(own))
+            and not any(re.search(rf"\.{f}\b", blob) for f in fields)}
 
 
 def _reads(d: Domain, obj: str, creating: Any) -> set[str]:
