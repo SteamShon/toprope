@@ -535,7 +535,11 @@ def _nl(new: Domain, old: Domain | None, nl: NLChecker | None, changed: list[str
     if nl is None:
         return CheckResult("nl", ran=False, note="no natural-language checker configured")
     res = CheckResult("nl")
-    for where, message in nl.conflicts(old, new, changed):
+    try:
+        found = nl.conflicts(old, new, changed)
+    except Exception as e:                                       # noqa: BLE001 - a failed checker is not a pass
+        return CheckResult("nl", ran=False, note=f"the natural-language checker failed: {str(e)[:300]}")
+    for where, message in found:
         res.add("warning", where, message)                     # never an error (ADR-0009)
     return res
 
