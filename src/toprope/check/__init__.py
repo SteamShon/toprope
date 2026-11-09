@@ -107,8 +107,27 @@ class ChangeReport:
         head = "passes" if self.ok else f"fails: {', '.join(failing)}"
         return f"{head}; {self.errors} error(s), {self.warnings} warning(s)"
 
+    def groups(self) -> list[dict[str, Any]]:
+        """The problems grouped (M1-report, *What M2 takes from this* 4): one per check, severity
+        and message once its times and object ids are taken out, with a count and a few places.
+        A log replay that re-decides 64 past actions the same way is one group of 64."""
+        import re
+        out: dict[tuple[str, str, str], dict[str, Any]] = {}
+        for name, res in self.checks.items():
+            for p in res.problems:
+                msg = re.sub(r"\d{4}-\d\d-\d\dT[\d:.]+(?:[+-]\d\d:\d\d|Z)?", "<time>", p.message)
+                msg = re.sub(r"\b[\w-]+@\d+\b", "<object>", msg)
+                g = out.setdefault((name, p.severity, msg), {"check": name, "severity": p.severity, "problem": msg,
+                                                            "count": 0, "where": []})
+                g["count"] += 1
+                if len(g["where"]) < 3:
+                    g["where"].append(p.where)
+        order = {"error": 0, "warning": 1, "info": 2}
+        return sorted(out.values(), key=lambda g: (order.get(g["severity"], 3), g["check"], -g["count"]))
+
     def to_json(self) -> dict[str, Any]:
         return {"domain": self.domain, "ok": self.ok, "errors": self.errors, "warnings": self.warnings,
+                "groups": self.groups(),
                 "summary": self.summary(), "diff": self.diff, "impact": self.impact, "timings": self.timings,
                 **({"selection_misses": self.selection_misses} if self.selection_misses is not None else {}),
                 "checks": {n: {"ok": c.ok, "ran": c.ran, "summary": c.summary(), "note": c.note,
