@@ -27,6 +27,7 @@ Its subcommands are the domain's actions, one per action, plus `get`, `history`,
 | `--working-copy` | with --composition and --kernel-root: run each member from its working-copy file, not from its deployed commit (ADR-0045) |
 | `--config` `CONFIG` | the options file (default: toprope.yaml in the current directory, if any) |
 | `--no-config` | ignore toprope.yaml |
+| `--failures` `FAILURES` | a directory where a command that fails before the gate is recorded, one file per failure (ADR-0049, D1b) |
 
 ## `toprope-server`
 

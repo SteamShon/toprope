@@ -99,3 +99,16 @@ def test_an_actor_not_seen_in_the_events_is_kept_apart(tmp_path):
     m = ub.measure(tmp_path)
     assert m["domains"]["authoring"]["commands_by_actor"] == {"unknown": 1}
     assert m["commands_by_person_agent_unknown"] == [0, 0, 1]
+
+
+def test_failures_before_the_gate_are_counted_and_join_the_second_rate(tmp_path):
+    domain(tmp_path, "authoring", [command(PERSON, "approve_commit")], [event("X", PERSON, "person")],
+           ["1-a"], ["1-a"])
+    write(tmp_path / ".toprope/failures/a.json", [])
+    (tmp_path / ".toprope/failures/a.json").write_text(json.dumps({"kind": "usage", "has_fix": False}))
+    (tmp_path / ".toprope/failures/b.json").write_text(json.dumps({"kind": "refused", "has_fix": True}))
+    m = ub.measure(tmp_path)
+    assert m["failed_before_the_gate"] == {"usage": 1, "refused": 1}
+    assert m["failed_before_the_gate_without_a_fix"] == 1
+    assert m["refused_or_failed_per_command"] == 0.0
+    assert m["refused_or_failed_per_command_with_failures"] == round(2 / 3, 3)

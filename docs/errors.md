@@ -13,6 +13,7 @@ the error is raised.
 | no declaration given | give --domain, or --composition with --member, or put a {…} here |
 | no declaration given | give --domain, or --composition with --member, or put a {…} here |
 | not taken | answer `y` to take it |
+| the declaration has {…} error(s), listed above | fix them, then run `toprope-harness --domain <file>` to check |
 | {…} is an action of {…} | give --member |
 | {…} reads one member | give --member, one of {…} |
 | {…} requires a person | run it yourself on a terminal, or through a human request (tools/human_request.py) |

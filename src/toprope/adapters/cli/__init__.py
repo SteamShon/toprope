@@ -50,7 +50,7 @@ CONFIG = "toprope.yaml"
 # The keys `toprope.yaml` may set, and the option each one stands for.
 CONFIG_KEYS = {"composition": "--composition", "member": "--member", "kernel_root": "--kernel-root",
                "workspace": "--workspace", "env": "--env", "store_dir": "--store-dir",
-               "identity": "--identity"}
+               "identity": "--identity", "failures": "--failures"}
 
 
 def _base_parser(add_help: bool) -> argparse.ArgumentParser:
@@ -76,6 +76,8 @@ def _base_parser(add_help: bool) -> argparse.ArgumentParser:
                     "each member from its working-copy file, not from its deployed commit (ADR-0045)")
     ap.add_argument("--config", help=f"the options file (default: {CONFIG} in the current directory, if any)")
     ap.add_argument("--no-config", action="store_true", help=f"ignore {CONFIG}")
+    ap.add_argument("--failures", help="a directory where a command that fails before the gate is recorded, "
+                    "one file per failure (ADR-0049, D1b)")
     return ap
 
 
@@ -102,7 +104,7 @@ def read_config(path: Path) -> dict[str, str]:
             raise SystemExit(fixed(f"{path}: `{key}` must be a single value", "give one value, such as a path"))
         value = str(value)
         # A path in the file is relative to the file, so the file works from anywhere.
-        if key in ("composition", "kernel_root", "workspace", "env", "store_dir"):
+        if key in ("composition", "kernel_root", "workspace", "env", "store_dir", "failures"):
             value = str((base / value)) if not Path(value).is_absolute() else value
         elif key == "identity" and value.split(":", 1)[0] in ("git", "github", "static"):
             kind, _, file = value.partition(":")
@@ -278,12 +280,67 @@ def _domain(args: Any) -> Domain:
     if errors:
         for i in errors:
             print(f"error {i.code} at {i.where}: {i.message}", file=sys.stderr)
-        raise SystemExit(1)
+        raise SystemExit(fixed(f"the declaration has {len(errors)} error(s), listed above",
+                               "fix them, then run `toprope-harness --domain <file>` to check"))
     return d
 
 
+SECRET_OPTIONS = ("--token",)
+
+
+def record_failure(directory: str | Path, argv: list[str], kind: str, message: str) -> Path:
+    """One file per failed command, so two branches never write the same file. The command line
+    is kept without secrets; who ran it is the git email, when there is one."""
+    import datetime
+    import subprocess
+    shown, skip = [], False
+    for a in argv:
+        if skip:
+            shown.append("***")
+            skip = False
+        elif a in SECRET_OPTIONS:
+            shown.append(a)
+            skip = True
+        elif any(a.startswith(o + "=") for o in SECRET_OPTIONS):
+            shown.append(a.split("=", 1)[0] + "=***")
+        else:
+            shown.append(a)
+    try:
+        who = subprocess.run(["git", "config", "user.email"], capture_output=True, text=True,
+                             timeout=5).stdout.strip() or None
+    except (OSError, subprocess.SubprocessError):
+        who = None
+    now = datetime.datetime.now(datetime.timezone.utc)
+    entry = {"at": now.isoformat(timespec="seconds"), "by": who, "argv": shown, "kind": kind,
+             "message": message, "has_fix": "Fix: " in message}
+    d = Path(directory)
+    d.mkdir(parents=True, exist_ok=True)
+    path = d / f"{now:%Y%m%dT%H%M%S}-{uuid.uuid4().hex[:8]}.json"
+    path.write_text(json.dumps(entry, ensure_ascii=False, indent=1) + "\n")
+    return path
+
+
 def main(argv: list[str] | None = None) -> None:
-    argv = infer_member(with_config(list(sys.argv[1:] if argv is None else argv)))
+    """Run one command. A command that fails before the gate (a usage error, a refused option,
+    a crash) is recorded under `--failures` (or `failures:` in toprope.yaml), so F1 counts it."""
+    raw = list(sys.argv[1:] if argv is None else argv)
+    failures = None
+    try:
+        args = with_config(raw)
+        failures = _base_parser(add_help=False).parse_known_args(args)[0].failures
+        _main(infer_member(args))
+    except SystemExit as e:
+        if failures and e.code not in (None, 0, 1):        # 1: denied or rejected at the gate, recorded there
+            record_failure(failures, raw, "usage" if e.code == 2 else "refused",
+                           "argparse usage error" if e.code == 2 else str(e.code))
+        raise
+    except Exception as e:                                  # noqa: BLE001 - a crash is a failure too
+        if failures:
+            record_failure(failures, raw, "crash", f"{type(e).__name__}: {e}")
+        raise
+
+
+def _main(argv: list[str]) -> None:
     pre, _ = _base_parser(add_help=False).parse_known_args(argv)
     if not (pre.domain or pre.composition):
         _base_parser(add_help=True).parse_args(argv or ["--help"])

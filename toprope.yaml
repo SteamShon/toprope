@@ -4,3 +4,4 @@ composition: domains/toprope-self.composition.yaml
 kernel_root: .
 workspace: toprope.authoring.workspace.yaml
 env: .toprope/env
+failures: .toprope/failures

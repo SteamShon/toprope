@@ -15,8 +15,9 @@ through another; so a change's commands are counted across all domains. The kern
 replies (`record_*`, taken by `external:` and `handoff:` actors) are not friction and are left
 out of the rates.
 
-What it cannot see: a command that fails before the gate (a bad argument, an unresolved
-citation, a crash) writes nothing, so it is not counted. ADR-0049's theme 1 records those.
+A command that fails before the gate (a bad argument, a refused option, a crash) is recorded
+since ADR-0049's D1b, one file each under `.toprope/failures/`; they are counted separately, and
+in a second rate. Failures from before D1b were never recorded.
 """
 from __future__ import annotations
 
@@ -122,6 +123,8 @@ def measure(root: Path) -> dict:
     taken = person + agent + unknown
     approvals = total(lambda m: m["approvals_in_window"])
     bad = total(lambda m: m["refused"] - m["refused_by_actor"].get("system", 0) + m["effects_failed"])
+    failures = [json.loads(p.read_text()) for p in sorted((root / ".toprope" / "failures").glob("*.json"))]
+    by_kind = Counter(f.get("kind") for f in failures)
     return {
         "domains": per,
         "commands_by_person_agent_unknown": [person, agent, unknown],
@@ -132,7 +135,10 @@ def measure(root: Path) -> dict:
         },
         "approval_runs": len(_jsonl(root / ".toprope" / "approval-runs.jsonl")),
         "refused_or_failed_per_command": _ratio(bad, taken),
-        "not_counted": "commands that fail before the gate write nothing (ADR-0049, theme 1)",
+        "failed_before_the_gate": dict(by_kind),
+        "failed_before_the_gate_without_a_fix": sum(1 for f in failures if not f.get("has_fix")),
+        # A failed command never reached the gate, so it is not among `taken`: add it to both sides.
+        "refused_or_failed_per_command_with_failures": _ratio(bad + len(failures), taken + len(failures)),
     }
 
 
@@ -157,7 +163,10 @@ def render(m: dict) -> str:
              f"{t['commands_by_person_or_agent']} commands by a person or agent, "
              f"{t['commands_by_person']} by a person.",
              f"Approved human requests: {m['approval_runs']}. Refused or failed per command by a "
-             f"person or agent: {m['refused_or_failed_per_command']}. Not counted: {m['not_counted']}."]
+             f"person or agent: {m['refused_or_failed_per_command']}.",
+             f"Failed before the gate (recorded since D1b): {m['failed_before_the_gate'] or 'none'}, "
+             f"{m['failed_before_the_gate_without_a_fix']} without a fix; with them, refused or failed "
+             f"per command: {m['refused_or_failed_per_command_with_failures']}."]
     return "\n".join(rows)
 
 
