@@ -155,9 +155,8 @@ def _base(w: World) -> dict[str, Any]:
     c1 = _commit(w)
     _approve(w, c1)
     r1 = w.made(w.act("authoring", "deliver", c1, "--environment", "local"))
-    for action in ("preview", "deploy"):
+    for action in ("preview", "deploy", "run_probes", "verify"):     # delivery@6: verify needs passed probes
         w.act("delivery", action, r1)
-    w.act("delivery", "verify", r1, "--verified", "true")
     return {"draft": "library", "deployed": c1}
 
 
