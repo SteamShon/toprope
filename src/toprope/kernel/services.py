@@ -45,10 +45,11 @@ class KernelServices(ABC):
             raise KeyError(fixed(f"no kernel service {service!r}", "use a service the kernel's catalog lists (src/toprope/kernel/__init__.py)"))
         missing = [i for i in svc.required() if i not in inputs]
         if missing:
-            return svc.failure(f"missing inputs {missing}")
+            return svc.failure(fixed(f"missing inputs {missing}", "map them in the effect's `inputs` in the declaration"))
         if "approver" in svc.inputs:
             if not caller or caller.get("kind") != "person" or caller.get("id") != inputs["approver"]:
-                return svc.failure(f"{service} records a person's decision: the calling person must be the approver")
+                return svc.failure(fixed(f"{service} records a person's decision: the calling person must be the approver",
+                                         "the person named as approver takes the action themselves"))
         token = _CALLER.set(caller)
         try:
             return complete(svc, self.run(service, {k: inputs[k] for k in svc.inputs if k in inputs}))
@@ -204,7 +205,7 @@ class LocalKernel(KernelServices):
             spec = self._ws().sources.get(ref.split(":", 1)[0])
             if spec is not None and (spec.kind == "interview-log") != (kind == "interview"):
                 raise ValueError(fixed(f"{ref} is {'an interview line' if spec.kind == 'interview-log' else 'a source chunk'}:"
-                                 f" cite it as {'interview' if spec.kind == 'interview-log' else 'source'}", "cite it with the kind named"))
+                                 f" not a {kind}", f"cite it with `--kind {'interview' if spec.kind == 'interview-log' else 'source'}`"))
             self._ws().source_of(ref)                        # an unknown chunk is refused
         elif kind == "event":
             stream, _, version = ref.rpartition("@")
@@ -214,7 +215,7 @@ class LocalKernel(KernelServices):
                 if store is None:
                     raise RuntimeError(fixed(f"{domain} is not deployed here: no events to cite", "deploy it here first, or cite another kind of evidence"))
                 if not stream or not version.isdigit() or not 1 <= int(version) <= store.version(stream):
-                    raise ValueError(fixed(f"no event {ref!r}: give <stream>@<version> of a stored event", "give `<stream>@<version>` of an event, as `toprope-run history <id>` lists them"))
+                    raise ValueError(fixed(f"no event {ref!r} in the deployed domain's event log", "give `<stream>@<version>`: an object's id and the version of one of its events there"))
         elif kind == "approval-run":
             self._approval_run(ref)
         e = self.commits.cite(domain, commit, kind, ref, by=str((self.caller or {}).get("id") or ""))
@@ -239,8 +240,7 @@ class LocalKernel(KernelServices):
         if self.tlc_jar:
             tla = self.commits.check_status(domain, commit).get("tla") or {}
             if tla.get("ok") is not True:
-                raise ValueError(fixed(f"{commit} has no passing TLC check ({tla.get('summary') or 'never run with TLC'}):"
-                                 " run check_commit here, where TLC is configured, then approve", "run `check_commit` here, where TLC is configured (TOPROPE_TLC_JAR), then approve"))
+                raise ValueError(fixed(f"{commit} has no passing TLC check ({tla.get('summary') or 'never run with TLC'})", "run `check_commit` here, where TLC is configured (TOPROPE_TLC_JAR), then approve"))
         self.commits.approve(domain, commit, approver)   # conflicts fail the call, as any error does
         return {"approved": True, "main": self.commits.main(domain).id}
 

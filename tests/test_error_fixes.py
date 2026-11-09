@@ -15,6 +15,12 @@ def test_every_error_on_the_loops_path_names_its_fix():
     assert not missing, "errors without a fix; wrap the message as fixed(message, fix):\n" + "\n".join(missing)
 
 
+def test_every_fix_says_something():
+    empty = [f"src/toprope/{r.module}:{r.line}" for r in scan()
+             if r.fix is not None and len(r.fix.replace("{…}", "").strip()) < 8]
+    assert not empty, "a fix must say what to do, in words:\n" + "\n".join(empty)
+
+
 def test_the_catalog_is_the_generated_one():
     assert DOC.read_text() == catalog(), \
         "docs/errors.md is stale: run python -m toprope.errors --out docs/errors.md"
@@ -22,7 +28,7 @@ def test_the_catalog_is_the_generated_one():
 
 def test_fixed_puts_the_fix_after_the_message():
     assert fixed("no source 'x'", "add it") == "no source 'x'. Fix: add it"
-    assert fixed("nothing to check:", "commit first") == "nothing to check: Fix: commit first"
+    assert fixed("nothing to check:", "commit first") == "nothing to check. Fix: commit first"
     assert MARK in fixed("a", "b")
 
 
@@ -54,10 +60,23 @@ def test_the_scan_covers_a_message_built_with_plus(tmp_path):
     assert r[0].message == "a {…} b" and r[0].fix is None
 
 
-@pytest.mark.parametrize("module", ["workspace/__init__.py", "kernel/services.py", "commits/__init__.py"])
-def test_each_covered_module_imports_fixed_where_it_uses_it(module):
-    tree = ast.parse((ROOT / "src/toprope" / module).read_text())
-    uses = any(isinstance(n, ast.Name) and n.id == "fixed" for n in ast.walk(tree))
-    imports = any(isinstance(n, ast.ImportFrom) and n.module and n.module.endswith("errors")
-                  and any(a.name == "fixed" for a in n.names) for n in ast.walk(tree))
-    assert uses and imports
+def test_each_branch_of_a_conditional_message_needs_a_fix(tmp_path):
+    r = scan_text(tmp_path, 'def f(x):\n    raise SystemExit(x() if x else "no caller")\n')
+    assert [(r0.message, r0.fix) for r0 in r] == [("no caller", None)]
+
+
+def test_format_and_percent_messages_are_scanned(tmp_path):
+    r = scan_text(tmp_path, ('def f(x):\n    raise ValueError("no {}".format(x))\n'
+                             'def g(x):\n    raise ValueError("no %s" % x)\n'))
+    assert sorted(r0.message for r0 in r) == ["no %s", "no {}"]
+
+
+def test_a_services_failure_reply_is_scanned_and_its_empty_default_is_not(tmp_path):
+    r = scan_text(tmp_path, ('def f(svc, x):\n    svc.failure("")\n'
+                             '    return svc.failure(f"missing inputs {x}")\n'))
+    assert [(r0.exception, r0.message, r0.fix) for r0 in r] == [("failure", "missing inputs {…}", None)]
+
+
+def test_a_merge_conflict_names_its_fix():
+    from toprope.commits import Conflict, MergeConflict
+    assert MARK in str(MergeConflict([Conflict("actions.a", None, 1, 2)]))

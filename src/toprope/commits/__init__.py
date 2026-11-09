@@ -84,7 +84,9 @@ class Conflict:
 class MergeConflict(CommitError):
     def __init__(self, conflicts: list[Conflict]):
         self.conflicts = conflicts
-        super().__init__("merge conflicts at " + ", ".join(c.path for c in conflicts))
+        super().__init__(fixed("merge conflicts at " + ", ".join(c.path for c in conflicts),
+                               "edit each path in the working copy to the value you want, then commit; "
+                               "the commit records the merge"))
 
 
 @dataclass(frozen=True)
@@ -366,10 +368,10 @@ class CommitStore:
             return
         if not c.author:
             raise CommitError(fixed(f"{c.id} names no author, so its approver cannot be told apart: this "
-                              "domain's approver must not be the commit's author (ADR-0046)", "commit it again with `commit_draft`, which records the author, and have someone else approve it"))
+                              "domain's approver must not be the commit's author (ADR-0046)", "change the draft and commit it with `commit_draft`, which records its author; then have someone else approve it"))
         if c.author == approver:
             raise CommitError(fixed(f"{approver} wrote {c.id}: this domain's approver must not be the "
-                              "commit's author (ADR-0046); ask another approver", "have an approver other than the author approve it"))
+                              "commit's author (ADR-0046)", "have an approver other than the author approve it"))
 
     def approvals(self, domain: str) -> list[dict[str, Any]]:
         return self._lines(self._dir(domain) / "approvals.jsonl")
@@ -400,7 +402,7 @@ class CommitStore:
         Without it, a merge started by `merge_main` on this branch is used (like git's
         MERGE_HEAD), and is cleared once the commit is written."""
         if branch == MAIN:
-            raise CommitError(fixed("`main` is protected: commit to a branch, and approving merges it into main", "commit to a work branch, such as `work`; approving merges it into main"))
+            raise CommitError(fixed("`main` is protected", "commit to a work branch, such as `work`; approving merges it into main"))
         domain = Domain.model_validate(load_yaml(Path(declaration).read_text()) or {}).domain
         with self._lock(domain) as dirp:
             # Read the working copy under the lock (#89), so a merge_main in another process is
@@ -476,7 +478,7 @@ class CommitStore:
                 return {"merge": main.id, "branch": branch, "up_to_date": True, "conflicts": []}
             current, present = self.working_copy(domain, declaration)
             if current != head.content:
-                raise CommitError(fixed(f"the working copy has changes not committed to {branch}: commit them first", "commit the working copy with `commit_draft`, then merge"))
+                raise CommitError(fixed(f"the working copy has changes not committed to {branch}", "commit the working copy with `commit_draft`, then merge"))
             m = self.merge3(domain, head.id, main.id)
             self._write_files(self._files_of(m.merged, declaration, version), present, m.merged)
             self._set_pending(dirp, branch, main.id)
@@ -554,8 +556,7 @@ class CommitStore:
                 return None                                  # approved already, directly or by a merge
             main = self.main(domain)
             if main is not None and self.is_ancestor(domain, c.id, main.id):
-                raise CommitError(fixed(f"{c.id} is already in main at {main.id}, which supersedes it; "
-                                  "approve a newer commit", "approve the newer commit on the branch instead"))
+                raise CommitError(fixed(f"{c.id} is already in main at {main.id}, which supersedes it", "approve the newer commit on the branch instead"))
             self._not_self_approved(domain, c, main, approver)
             if main is None or self.is_ancestor(domain, main.id, c.id):
                 body = self._body(domain, c.id)               # fast-forward: main takes this commit
@@ -584,8 +585,7 @@ class CommitStore:
         left = proposed_elements(raw)
         if left:
             shown = ", ".join(left[:5]) + (f" and {len(left) - 5} more" if len(left) > 5 else "")
-            raise CommitError(fixed(f"{commit_id} still holds {len(left)} proposed element(s): {shown}; "
-                              "confirm them, then commit and approve again", "confirm the proposed elements (`confirm_all_proposed`, a person only), commit, check and approve again"))
+            raise CommitError(fixed(f"{commit_id} still holds {len(left)} proposed element(s): {shown}", "confirm the proposed elements (`confirm_all_proposed`, a person only), commit, check and approve again"))
 
     @staticmethod
     def _check(commit_id: str, raw: dict[str, Any]) -> Domain:
@@ -640,13 +640,13 @@ class CommitStore:
         prose: the caller resolves interview, source and event refs; a `check` ref must name a check
         recorded on this commit. Its strength follows from its kind (EVIDENCE). Never rewritten."""
         if kind not in EVIDENCE:
-            raise CommitError(fixed(f"evidence kind {kind!r}: use one of {', '.join(EVIDENCE)}", "use one of the kinds listed"))
+            raise CommitError(fixed(f"no evidence kind {kind!r}", f"use one of {', '.join(EVIDENCE)}"))
         if not ref.strip():
-            raise CommitError(fixed("evidence needs a ref: a pointer, not prose", "give a ref the kind can resolve: a source chunk, a check id, an event `<stream>@<version>` or a run URL"))
+            raise CommitError(fixed("evidence needs a ref, a pointer and not prose", "give a ref the kind can resolve: a source chunk, a check id, an event `<stream>@<version>` or a run URL"))
         with self._lock(domain) as dirp:
             self.get(domain, commit_id)
             if kind == "check" and ref not in self.check_status(domain, commit_id):
-                raise CommitError(fixed(f"no check {ref!r} recorded on {commit_id}: run it first, then cite it", "run `check_commit` on this commit, then cite the check it records"))
+                raise CommitError(fixed(f"no check {ref!r} recorded on {commit_id}", "run `check_commit` on this commit, then cite the check it records"))
             entry = {"commit": commit_id, "kind": kind, "ref": ref, "strength": EVIDENCE[kind],
                      "by": by, "at": _now()}
             self._append(dirp / "evidence.jsonl", entry)
@@ -723,7 +723,7 @@ class CommitStore:
             reps = {p.name: load_yaml(p.read_text()) for p in present}
             raw = (load_yaml(path.read_text()) or {}) if path.exists() else None
         except Exception as e:                       # noqa: BLE001 - any parse error: report the file
-            raise CommitError(fixed(f"cannot read the working copy: {e}", "fix the declaration file so it parses, or check out with `force`")) from None
+            raise CommitError(fixed(f"cannot read the working copy: {e}", "fix the declaration file so it parses, or restore it with `git checkout -- <file>`, then check out again")) from None
         return (content_id(raw, reps) if raw is not None else None), present
 
     def write_working_copy(self, domain: str, body: dict[str, Any], declaration: str | Path, version: int,
@@ -783,7 +783,7 @@ class CommitStore:
             current, present = self.working_copy(domain, path)
             known = {x.content for x in self.log(domain)}
             if (current is not None and current not in known) or (current is None and present):
-                raise CommitError(fixed(f"{path.name} has changes no commit holds: commit them first", "commit them with `commit_draft` first, or check out with `force` to drop them"))
+                raise CommitError(fixed(f"{path.name} has changes no commit holds", "commit them with `commit_draft`, or drop them with `git checkout -- <file>`, then check out again"))
         version = c.seq
         try:
             draft = load_yaml(path.read_text()) if path.exists() else None

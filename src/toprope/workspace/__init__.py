@@ -168,7 +168,7 @@ class Workspace:
         else:
             self.root, cfg_path = given, given / CONFIG
         if not cfg_path.exists():
-            raise AuthoringError(fixed(f"no {CONFIG} in {self.root}", "pass `--workspace` the path of a workspace file, or put `toprope.yaml` with a `workspace:` key here"))
+            raise AuthoringError(fixed(f"no {CONFIG} in {self.root}", "check the path given by `--workspace` or by `workspace:` in toprope.yaml; it names a workspace file or its directory"))
         cfg = load_yaml(cfg_path.read_text()) or {}
         self.domain_path = self.root / cfg["domain"]
         self.log_path = self.root / cfg.get("interview_log", "interview/log.jsonl")
@@ -192,7 +192,7 @@ class Workspace:
     def chunks(self, source_id: str) -> list[Chunk]:
         spec = self.sources.get(source_id)
         if spec is None:
-            raise AuthoringError(fixed(f"no source {source_id!r}", "use a source id listed in the workspace file's `sources:`, or add one with `add_source`"))
+            raise AuthoringError(fixed(f"no source {source_id!r}", "use a source id listed in the workspace file's `sources:`, or add the source there with a `path:` or `url:`"))
         if spec.kind == "interview-log" or source_id not in self._chunks:
             self._chunks[source_id] = read(spec, self.root, self.extra, self.exclude)
         return self._chunks[source_id]
@@ -216,7 +216,7 @@ class Workspace:
         """Fetch link sources into their snapshots (all, or one). Re-fetching replaces the
         snapshot; refs into it may change, so fetch before drafting from it."""
         if source_id and source_id not in self.sources:
-            raise AuthoringError(fixed(f"no source {source_id!r}", "use a source id listed in the workspace file's `sources:`, or add one with `add_source`"))
+            raise AuthoringError(fixed(f"no source {source_id!r}", "use a source id listed in the workspace file's `sources:`, or add the source there with a `path:` or `url:`"))
         targets = [self.sources[source_id]] if source_id else [s for s in self.sources.values() if s.url]
         out = []
         for spec in targets:
@@ -232,7 +232,7 @@ class Workspace:
     def read_source(self, source_id: str, offset: int = 0, limit: int = 20) -> dict[str, Any]:
         spec = self.sources.get(source_id)
         if spec is None:
-            raise AuthoringError(fixed(f"no source {source_id!r}", "use a source id listed in the workspace file's `sources:`, or add one with `add_source`"))
+            raise AuthoringError(fixed(f"no source {source_id!r}", "use a source id listed in the workspace file's `sources:`, or add the source there with a `path:` or `url:`"))
         if spec.local_only:
             raise AuthoringError(fixed(f"source {source_id!r} is local-only: its content is never sent to a model", "read it yourself, or remove `local_only: true` from the source if its content may be shared"))
         cs = self.chunks(source_id)[offset:offset + limit]
@@ -654,7 +654,7 @@ class Workspace:
             d = self.draft().get("domain")
         except Exception as e:                       # noqa: BLE001 - an unreadable draft
             if not force:
-                raise AuthoringError(fixed(f"cannot read the working copy: {e}", "fix the declaration file so it parses, then check out again")) from None
+                raise AuthoringError(fixed(f"cannot read the working copy: {e}", "fix the declaration file so it parses, or restore it with `git checkout -- <file>`, then check out again")) from None
             d = next((x.name for x in sorted(self.commits.root.glob("*")) if x.is_dir()
                       and any(c.id == commit_id for c in self.commits.log(x.name))), None)
         if not isinstance(d, str) or not d:
