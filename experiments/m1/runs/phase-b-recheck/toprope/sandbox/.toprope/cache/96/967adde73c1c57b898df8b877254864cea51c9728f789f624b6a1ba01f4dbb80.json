@@ -1,0 +1,1 @@
+{"test": "mechanical:preview", "findings": [{"kind": "no-sample", "level": "model", "case": "mechanical:DeliveryRequest.verified.preview.external:kernel", "detail": {"reason": "no generated object satisfies the invariants in this stage", "why": "the cell is not tested mechanically; give an example in this stage"}}]}
