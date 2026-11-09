@@ -260,6 +260,19 @@ class Purpose(Strict):
     announcement: str | None = None
 
 
+class RuleRoles(Strict):
+    roles: Annotated[list[str], Field(min_length=1)]
+
+
+class Rule(Provenance):
+    """An outcome rule (ADR-0048): whatever action brings it about, `on` (an object's state, or a
+    property an effect sets) may be reached only by an actor that meets `requires`."""
+
+    on: str
+    requires: Union[Literal["human"], RuleRoles]
+    reason: str
+
+
 NOT_YET = {"reservations": "M0b", "timers": "M0b", "functions": "M0b", "external": "M0b"}
 
 
@@ -307,6 +320,7 @@ class Domain(Strict):
     links: dict[str, Link] = Field(default_factory=dict)
     actions: dict[str, Action] = Field(default_factory=dict)
     transitions: dict[str, Transitions] = Field(default_factory=dict)
+    rules: dict[str, Rule] = Field(default_factory=dict)
     invariants: list[Invariant] = Field(default_factory=list)
     world: World = Field(default_factory=World)
     scenarios: list[Scenario] = Field(default_factory=list)
