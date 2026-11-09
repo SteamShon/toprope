@@ -59,6 +59,7 @@ $R open_draft authoring --domain-id authoring \
 $R next_questions authoring          # the current stage's questions
 $R propose_element E-1 --path ... --origin S-1 --cites REF --value JSON
                                      # REF: a chunk ref, or words from the passage (B4)
+$R review                            # what you are about to confirm, as one diff
 $R confirm_all_proposed authoring    # you, on your terminal
 $R commit_draft authoring            # `then` names the new commit <id>
 $R check_commit <id>
