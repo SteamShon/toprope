@@ -16,7 +16,7 @@ Legend: ✅ done · 🟡 in part · ⬜ not started
 |---|---|---|---|
 | M0a thin slice | none (enabler) | ✅ | released as `v0.1.0` (#65); the tag is not pushed yet |
 | M1 self-compile | ① ⑥ pilot, no verdict | ✅ | reported ([`M1-report.md`](experiments/M1-report.md)): with its LLM review Toprope's recall is 0.84 against 0.64 for the NL skill (at the noise floor) and level with the structured spec; the compiler alone weakens ①; ⑥ inconclusive; self-compile not shown (probes) |
-| U usability before M2 (ADR-0049) | none (enabler) | 🟡 | ADR accepted; baseline next |
+| U usability before M2 (ADR-0049) | none (enabler) | 🟡 | ADR accepted; F1 baseline recorded; F2 next |
 | M0b surfaces and effects | none (enabler) | ⬜ | |
 | M2 dogfood | ① ② ③ | ⬜ | the first ① and ② verdicts |
 | M3 shared language | ④ | ⬜ | |
@@ -332,10 +332,18 @@ From [`M1-report.md`](experiments/M1-report.md), *What M2 takes from this*.
 Four umbrellas after a baseline. A sub-PR that runs the self domains' loop waits until no other
 open PR changes their commit store or logs (`umbrella/m1-recheck` has them now).
 
+F1 baseline (2026-11-09, `uv run python tools/usability_baseline.py`; the self domains' logs as
+of M1, from 2026-11-06 05:12, when the command log begins): per change approved in that window (6),
+18.8 commands by a person or an agent, 8.3 of them by a person; 6 approved human requests; 1
+refusal and 5 failed effects in 113 commands by a person or an agent (0.053); 1 commit with a
+failed check. The logs do not see commands that fail before the gate, so that rate is low; once
+theme 1 records those (D1), it is measured again before it is compared (ADR-0049, 5).
+
 | Item | Status | PR |
 |---|---|---|
 | ADR-0049: the program, its order and targets | ✅ | #196 |
-| Baseline: F1 (friction in the change loop, from the logs) and F2 (time to a first enforced rule) | ⬜ | |
+| Baseline F1: friction in the change loop, from the logs (`tools/usability_baseline.py`) | ✅ | #197 |
+| Baseline F2: time to a first enforced rule, on a written script | ⬜ | |
 | Theme 1, the change loop: B4 citations from a query, C1 `toprope change`, C3 `toprope.yaml`, B5 one diff to confirm, D1 a fix in every error, C2 approvals by risk (its own ADR first) | ⬜ | |
 | Theme 2, getting started: A4 `init` and `try`, A3 templates, E1 docs, E2 a tutorial | ⬜ | |
 | Theme 3, interview and feedback: B1 choice questions, B2 examples first, B3 a live map, D2 impact as decisions, D3 counterexamples as stories | ⬜ | |
@@ -347,7 +355,7 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 
 ## Next
 
-1. ADR-0049's baseline (F1, F2), then theme 1 (the change loop). M2's spec waits for the
+1. ADR-0049's F2 baseline, then theme 1 (the change loop). M2's spec waits for the
    program.
 2. M2's spec, from the draft (`docs/experiments/M2-design.md`): the researcher decides each point,
    freezes the verdict rules, and finds the domain expert who is not the builder; the expert
