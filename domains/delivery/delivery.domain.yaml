@@ -702,7 +702,7 @@ rules:
     source:
       kind: record
       ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
-    status: proposed
+    status: confirmed
   only-a-person-deliveryrequest-deploying:
     'on': DeliveryRequest.deploying
     requires: human
@@ -711,7 +711,7 @@ rules:
     source:
       kind: record
       ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
-    status: proposed
+    status: confirmed
   only-a-person-deliveryrequest-done:
     'on': DeliveryRequest.done
     requires: human
@@ -720,7 +720,7 @@ rules:
     source:
       kind: record
       ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
-    status: proposed
+    status: confirmed
   only-a-person-deliveryrequest-refusal:
     'on': DeliveryRequest.refusal
     requires: human
@@ -729,7 +729,7 @@ rules:
     source:
       kind: record
       ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
-    status: proposed
+    status: confirmed
   only-a-person-deliveryrequest-verified:
     'on': DeliveryRequest.verified
     requires: human
@@ -738,4 +738,4 @@ rules:
     source:
       kind: record
       ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
-    status: proposed
+    status: confirmed

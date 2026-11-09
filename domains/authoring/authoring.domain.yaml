@@ -193,7 +193,7 @@ objects:
     source:
       kind: record
       ref: records:docs/experiments/M1-recheck.md#L54-L66
-    status: proposed
+    status: confirmed
 links:
   question:
     from: Answer
@@ -671,7 +671,7 @@ actions:
     source:
       kind: record
       ref: records:docs/experiments/M1-recheck.md#L54-L66
-    status: proposed
+    status: confirmed
   search:
     description: Search the sources (redacted; local-only never served); the result
       is on record.
@@ -1408,7 +1408,7 @@ rules:
     source:
       kind: record
       ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
-    status: proposed
+    status: confirmed
   only-a-person-commit-main:
     'on': Commit.main
     requires: human
@@ -1417,7 +1417,7 @@ rules:
     source:
       kind: record
       ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
-    status: proposed
+    status: confirmed
   only-a-person-decisionrequest-choice:
     'on': DecisionRequest.choice
     requires: human
@@ -1426,7 +1426,7 @@ rules:
     source:
       kind: record
       ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
-    status: proposed
+    status: confirmed
   only-a-person-decisionrequest-decided:
     'on': DecisionRequest.decided
     requires: human
@@ -1435,7 +1435,7 @@ rules:
     source:
       kind: record
       ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
-    status: proposed
+    status: confirmed
   only-a-person-element-confirmed:
     'on': Element.confirmed
     requires: human
@@ -1444,4 +1444,4 @@ rules:
     source:
       kind: record
       ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
-    status: proposed
+    status: confirmed
