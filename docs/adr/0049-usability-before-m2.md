@@ -14,8 +14,8 @@ Delivery (shipping it). M1 ran them end to end, and what it cost to use them sho
 - A change to the self domains takes many commands: propose, cite, commit, check, request,
   approve, deploy. Each one needs the full `toprope-run --composition … --kernel-root …
   --workspace … --env …` prefix.
-- A citation must name an exact chunk reference. A wrong one is refused, and the error does not
-  say how to find the right one.
+- A citation must name an exact chunk reference returned by `read_source` or `search_sources`. A
+  quote or a description of the passage is refused, so citing takes a search first.
 - A person confirms elements one at a time, then approves the commit, then approves the deploy.
   The person approves more often than the risk of the change calls for.
 - There is no way to start: no `init`, no template, no tutorial. The README's first steps assume
@@ -36,15 +36,18 @@ tools, M2 measures the tools' friction and not the claims. So the friction is re
    (`umbrella/m1-recheck`) and before M2's spec freezes. It gives no link verdict. M0b may run
    alongside it.
 2. **Step 0: a baseline, measured from records that already exist.**
-   - **F1. Friction in the change loop.** From the self domains' event, attempt and commit logs:
-     kernel commands per approved change; commands per change taken by a person; refused attempts
-     per command; commits whose checks failed or that were never approved. A command that fails
+   - **F1. Friction in the change loop.** From the self domains' command (idempotency), event and
+     commit logs, over the window the command log covers: commands by a person or an agent per
+     change approved in that window (`approve_commit` commands); of those, commands by a person;
+     refusals and failed effects per command by a person or an agent; commits whose checks
+     failed or that were never approved. The kernel's own replies (`record_*`) are not counted. A command that fails
      before the gate (a bad argument, an unresolved citation) leaves no record today. The
      baseline says so. Recording those failures is part of theme 1.
    - **F2. Time to a first rule.** From an empty directory to a first rule the gate enforces: the
      minutes it takes, the person's touches (commands typed, approvals), and the lines of YAML
-     written by hand. It is measured on a written script, and repeated at the end on the same
-     script.
+     written by hand. It is measured on a written script (one workflow, its rule stated in prose)
+     by a person who has not used Toprope, with only the docs. The end measurement uses another
+     such person on the same script, so it does not measure what the first one learned.
    - The tool that computes F1, and the recorded baseline, are one PR with tests.
 3. **Four themes, each an umbrella** (`umbrella/<theme>`, a draft PR into `develop` opened
    early with its targets; small sub-PRs, each with an adversarial review):
@@ -87,9 +90,11 @@ tools, M2 measures the tools' friction and not the claims. So the friction is re
    - a low-risk change takes one command and one approval by a person (F1; depends on C2's ADR.
      If that ADR keeps more approvals, this target is restated there);
    - every error the kernel and the CLI raise names its fix, enforced by a test;
-   - at least 80% of the interview's questions offer choices with a recommended answer;
-   - the self domains' refused or failed commands per command are at most half the baseline
-     (F1).
+   - at least 80% of the questions asked in F2's interview offer choices with a recommended
+     answer;
+   - the self domains' refusals and failed effects per command by a person or an agent are at
+     most half the baseline (F1). Once D1 records failures before the gate, the baseline is
+     measured again with them, on the logs before theme 1, and the target applies to that number.
 6. **What does not change.** Agents still write only `proposed`. Only a person confirms or
    approves, unless C2's ADR decides otherwise. Gold sets and sealed files stay human-only.
    Every theme states the link it serves.

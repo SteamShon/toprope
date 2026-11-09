@@ -24,7 +24,7 @@ A record is superseded rather than deleted when a decision changes. History befo
 | [0016](0016-authorization-and-actor-identity.md) | ③ ④ | Relationship-based permissions; agents act on behalf of a principal with grants |
 | [0017](0017-deployment-shapes.md) | ③ ④ | Core library, `toprope-server` first, shell, optional runtime; Aegra off the critical path until M4 |
 | [0018](0018-live-data-migration.md) | ① ③ | In-flight check and migration plans in the change check and deploy gate |
-| [0019](0019-thin-slice-first-and-milestone-specs.md) | all | Thin slice first (M0a → M1 → M0b), semantics before code, milestone spec PRs, third M1 arm |
+| [0019](0019-thin-slice-first-and-milestone-specs.md) | all | Thin slice first (M0a → M1 → M0b), semantics before code, milestone spec PRs, third M1 arm (order amended by 0049: a usability program before M2) |
 | [0020](0020-world-map.md) | ④ ① | World map: a compiled skill-tree view of states, transitions, unlock requirements and fog; for people, agents and docs |
 | [0021](0021-semantics-clarifications-from-the-oracle.md) | ① ③ | Semantics clarifications from the oracle: command validation, existence after role check, multi-role cells, principals are people, fail-closed effects, idempotency claims |
 | [0022](0022-two-self-domains-authoring-and-delivery.md) | ① ② ③ ⑥ | Two self domains, Authoring and Delivery, joined by a typed handoff; staged bootstrap |
