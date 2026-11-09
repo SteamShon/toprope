@@ -175,7 +175,16 @@ involves nine teams and more than 30 engineers over hours, and describes an oper
 ontology tells an agent what is connected. It does not say which fixes the agent may apply, in
 which incident state, and with whose approval.
 
-In both cases the hard part is not calling an API. It is the rules around the call.
+**A vendor says the same.** UiPath launched Cartographer in September 2026 to build a "Map of
+Work": the rules, exceptions and decision rights of a process, drafted by an agent from documents,
+process mining and interviews, approved change by change by a named owner, with a ledger of
+decisions and their reasons
+([announcement](https://www.uipath.com/newsroom/uipath-launches-uipath-cartographer-map-of-work),
+[the founder's post](https://www.uipath.com/blog/product-and-updates/map-of-work-uipath-cartographer)).
+Its premise is this page's: companies digitized their data but never recorded how the work on it
+is done, and agents need that record. How Toprope differs: [`how-it-works.md`](how-it-works.md#how-it-differs).
+
+In each case the hard part is not calling an API. It is the rules around the call.
 
 ## What this asks of a solution, and what Toprope does
 
