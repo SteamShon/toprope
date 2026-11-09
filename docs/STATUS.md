@@ -341,6 +341,7 @@ gate, a clean pipeline and the grader's measured noise.
 | The probes: each probe agent's grant adds what its task asks (`TASK_ACTIONS`; a person-only action stays refused); the gate in the scorer (`probe_gate`; `found_after_deploy_ungated` kept); the grader reads a probe's `examples`; the amended suite (P05, P07 judged on what the agent did and what its tools show; examples for P01, P04, P08), amended by the researcher's approved request (`FROZEN.json`, version 2) | ✅ | #191 |
 | The grader's second sitting (`grade --into scoring-2`) and its noise (`compare-gradings`, `grader-noise.json`); the recheck's steps in the RUNBOOK | ✅ | |
 | The self domains adopt the promoted rules (Authoring 5, Delivery 5): confirmed, approved, deployed and verified as `authoring@11-4961f900bb4663e1` and `delivery@6-c2678fc294429d48` (approval run 42605372607; three runs before it found and fixed TLC's state space, #195, and unseen proposed rules, #199) | ✅ | #192 |
+| No experiment words in what an arm sees: `Draft.questions` and `record_questions` cited the recheck's own doc (`docs/experiments/M1-recheck.md`), which the arms' materials would show; re-cited to ADR-0025 and ADR-0037 through the loop, approved as `authoring@12-acf2a5f6e362166c` | ✅ | #205 |
 | The baseline moves; Phase B rerun (local session); graded twice | ⬜ | |
 | The recheck report; M1 closed | ⬜ | |
 
