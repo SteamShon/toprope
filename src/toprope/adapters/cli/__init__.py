@@ -45,7 +45,8 @@ from ...exec import Execution
 from ...errors import fixed
 from ...identity import Caller, Identity
 
-READS = ("get", "history", "allowed", "whoami", "guide")
+READS = ("get", "history", "allowed", "whoami", "guide", "review")
+CONFIRMS = ("confirm_all_proposed", "confirm_element")   # a person confirms from one diff (B5)
 CONFIG = "toprope.yaml"
 # The keys `toprope.yaml` may set, and the option each one stands for.
 CONFIG_KEYS = {"composition": "--composition", "member": "--member", "kernel_root": "--kernel-root",
@@ -168,6 +169,8 @@ def infer_member(argv: list[str]) -> list[str]:
         print(f"\nmembers of {pre.composition}: {members}; `--member <member> --help` lists its actions")
         raise SystemExit(0)
     members = sorted(n for n, d in c.domains.items() if cmd in d.actions)
+    if cmd == "review":                                   # the member whose drafts a person confirms
+        members = sorted(n for n, d in c.domains.items() if set(CONFIRMS) & set(d.actions))
     if len(members) == 1:
         return ["--member", members[0], *argv]
     if cmd in READS:
@@ -214,6 +217,9 @@ def build_parser(d: Domain) -> argparse.ArgumentParser:
         sub.add_parser(cmd, help=what).add_argument("target")
     sub.add_parser("whoami", help="who you are here, and your roles")
     sub.add_parser("guide", help="the domain guide: how this domain works and who does what")
+    if "review" not in d.actions:            # a domain's own action named `review` keeps its name
+        sub.add_parser("review", help="the proposed elements of the authoring workspace, as one diff to "
+                       "confirm from (needs --workspace)")
     return ap
 
 
@@ -247,7 +253,16 @@ def _caller(identity: Identity, token: str | None) -> Caller:
     return caller
 
 
-def _confirm_on_terminal(identity: Identity, caller: Caller, action: str, target: str) -> None:
+def review_text(args: Any) -> str:
+    if not getattr(args, "workspace", None):
+        raise SystemExit(fixed("review needs the authoring workspace",
+                               "give --workspace, or set `workspace:` in toprope.yaml"))
+    from ...workspace import Workspace
+    return Workspace(args.workspace).render_review()
+
+
+def _confirm_on_terminal(identity: Identity, caller: Caller, action: str, target: str,
+                         preface: Any = None) -> None:
     """A git identity is self-asserted, so an action that requires a person is confirmed on a
     terminal: a process without one (an agent's ordinary shell, a script) cannot take it as you.
     It is a guard against mistakes, not a security boundary: a process can fake a terminal."""
@@ -257,6 +272,8 @@ def _confirm_on_terminal(identity: Identity, caller: Caller, action: str, target
     if not sys.stdin.isatty():
         raise SystemExit(fixed(f"{action} requires a person", "run it yourself on a terminal, or through a human "
                                 "request (tools/human_request.py)"))
+    if preface is not None:                      # built only now, for a person who will read it
+        print(preface() if callable(preface) else preface)
     if input(f"{action} {target} as {caller.actor.id}? [y/N] ").strip().lower() != "y":
         raise SystemExit(fixed("not taken", "answer `y` to take it"))
 
@@ -413,6 +430,9 @@ def _main(argv: list[str]) -> None:
                                     f"or put a {CONFIG} here"))
     d = _domain(pre)
     args = build_parser(d).parse_args(argv)
+    if args.cmd == "review" and "review" not in d.actions:
+        print(review_text(args), end="")
+        return
     if args.cmd == "guide":
         from ...worldmap.guide import build_domain_guide
         print(build_domain_guide(d), end="")
@@ -441,7 +461,8 @@ def _main(argv: list[str]) -> None:
     if isinstance(ex.identity, (GitIdentity, GitHubApprovalIdentity)):
         caller = _caller(ex.identity, token)          # says why the caller is not listed
         if d.actions[args.cmd].requires == "human":
-            _confirm_on_terminal(ex.identity, caller, args.cmd, args.target)
+            _confirm_on_terminal(ex.identity, caller, args.cmd, args.target,
+                                 (lambda: review_text(args)) if args.cmd in CONFIRMS and args.workspace else None)
     from ..mcp import outcome_json
     before = ex.store.version(args.target)
     try:

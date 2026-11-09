@@ -14,6 +14,7 @@ the error is raised.
 | no declaration given | give --domain, or --composition with --member, or put a {…} here |
 | no declaration given | give --domain, or --composition with --member, or put a {…} here |
 | not taken | answer `y` to take it |
+| review needs the authoring workspace | give --workspace, or set `workspace:` in toprope.yaml |
 | the declaration has {…} error(s), listed above | fix them, then run `toprope-harness --domain <file>` to check |
 | {…} is an action of {…} | give --member |
 | {…} reads one member | give --member, one of {…} |
@@ -25,6 +26,22 @@ the error is raised.
 | {…}: no such file | give the path of a {…}, or leave --config out |
 | {…}: not valid YAML ({…}) | fix the file, or give --no-config |
 | {…}: unknown key(s) {…} | use only the keys {…} |
+
+## `adapters/cli/change.py`
+
+| Error | Fix |
+|---|---|
+| --workspace {…} is not a workspace file | give the `*.workspace.yaml` file a human request can name |
+| a request is already waiting to be pushed: {…} | push it (one request per push), or remove it, then run the change |
+| cannot read the patch {…}: {…} | give a YAML list of elements |
+| element {…} of the patch has no {…} | give each element its `path`, `value` and `cites` |
+| no check ran on {…}'s working copy | check the draft with `toprope-run check_commit` after a commit, and report the problem |
+| no workspace to check | give --workspace, or set `workspace:` in toprope.yaml |
+| the change check found problems in {…}'s working copy: {…} (proposed and still in the draft: {…}) | fix the proposals and run the change again; nothing was requested |
+| the patch {…} lists no elements | write a YAML list of `{path, value, cites}`, one per element |
+| {…} exists | name a new request file, or leave --request out |
+| {…} names no origin | give it `origin:` (a Source object's id), or --origin for every element |
+| {…}{…} | fix that element and run the change again with the elements not yet proposed, or restore the draft with `git checkout -- <declaration>` |
 
 ## `adapters/mcp/cli.py`
 
@@ -109,7 +126,8 @@ the error is raised.
 | cannot read the working copy: {…} | fix the declaration file so it parses, or restore it with `git checkout -- <file>`, then check out again |
 | event_store: {…} | set `event_store:` in the workspace file to `sqlite:FILE`, `jsonl:DIR` or `memory` |
 | no branch {…}; branches: {…} | use one of the branches listed |
-| no chunk {…}: cite a ref returned by read_source or search_sources | run `search` with words from the passage, and cite the `ref` it returns |
+| no chunk {…} | run `search` with words from the passage, and cite the `ref` it returns, or quote the words |
+| no chunk {…}, and no passage contains those words | run `search` with words from the passage, and cite the `ref` it returns or words it shows |
 | no deploy environment at {…} | pass `--env` the directory of a local deploy environment, or set `env:` in toprope.yaml |
 | no source {…} | use a source id listed in the workspace file's `sources:`, or add the source there with a `path:` or `url:` |
 | no source {…} | use a source id listed in the workspace file's `sources:`, or add the source there with a `path:` or `url:` |
@@ -120,6 +138,7 @@ the error is raised.
 | only a person confirms: at their own terminal, or through a declared action the kernel checked was taken by that person | ask the person to run the confirm action themselves, at their terminal or through a human request |
 | only optional stages can be skipped: {…} | skip only an optional stage listed; answer the others |
 | source {…} is a path, not a link | fetch only a source with a `url:`; a `path:` source is read in place |
+| source {…} is local-only, so it is not searched for words | cite its chunk ref, as the owner gives it |
 | source {…} is local-only: its content is never sent to a model | read it yourself, or remove `local_only: true` from the source if its content may be shared |
 | source {…}: give either a path or a url | give the source exactly one of `path:` or `url:` in the workspace file |
 | the draft does not parse: {…} | fix the draft so it matches the schema (docs/domain-schema.md), then commit again |
@@ -130,10 +149,11 @@ the error is raised.
 | the draft names no `domain`, so there is no commit log to merge in | set `domain:` at the top of the draft |
 | the draft would not parse: {…}: {…} | fix the element at that location so the declaration matches the schema (docs/domain-schema.md) |
 | unknown question {…}: pass its text | pass the question's text with the answer, or use an id `next_questions` returned |
-| unknown source in ref {…} | cite a ref of the form `<source>:<chunk>`, as `search` returns it |
+| unknown source in ref {…} | cite a ref of the form `<source>:<chunk>`, as `search` returns it, or quote words from the passage |
 | unknown stage {…}: one of {…} | use one of the stages listed |
 | {…} is committed, and its tools refuse a declaration with errors; this change would add {…}. Propose what it refers to first. | propose the elements it refers to first, then this one |
 | {…} is not a drafted element with a source | confirm only elements that were proposed with a source; `next_questions` lists them |
 | {…} must be an object | give the value as a mapping |
+| {…} passages contain {…}: {…} | quote more of the passage, or cite one of those refs |
 | {…}: an item of {…} must be an object | give the item as a mapping, such as `{id: x, check: ...}` |
 | {…}: provenance is set by the tool; propose the element itself | propose the element at its own path; the tool records its source and status |

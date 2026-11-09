@@ -50,6 +50,19 @@ Workflow permissions: read and write.
 Install `uv` first (`brew install uv`, or `curl -LsSf https://astral.sh/uv/install.sh | sh`),
 then `uv sync`. Every command runs from the repository root as `uv run <command>`.
 
+## A change in one command (ADR-0049, C1)
+
+An agent writes the elements a change proposes to a patch file and runs
+
+```
+uv run toprope-change "Drafts name their declaration" --patch change.yaml
+```
+
+It proposes each element, checks the working copy (on a scratch copy of the commit store), prints the diff a person will
+confirm, and writes one human request (`.toprope/requests/<id>.yaml`). Push it: the person's one
+approval in GitHub confirms, commits, checks and approves. If a check fails, nothing is
+requested, and the message says which check and how to fix it. The steps one by one follow.
+
 ## The self domains, end to end
 
 ```
@@ -58,6 +71,8 @@ $R open_draft authoring --domain-id authoring \
    --declaration domains/authoring/authoring.domain.yaml --branch work   # once per domain
 $R next_questions authoring          # the current stage's questions
 $R propose_element E-1 --path ... --origin S-1 --cites REF --value JSON
+                                     # REF: a chunk ref, or words from the passage (B4)
+$R review                            # what you are about to confirm, as one diff
 $R confirm_all_proposed authoring    # you, on your terminal
 $R commit_draft authoring            # `then` names the new commit <id>
 $R check_commit <id>

@@ -22,6 +22,7 @@ MARK = "Fix: "
 # The modules whose errors reach a person or an agent in the change loop.
 COVERED = (
     "adapters/cli/__init__.py",
+    "adapters/cli/change.py",
     "adapters/mcp/cli.py",
     "commits/__init__.py",
     "identity/git.py",

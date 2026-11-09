@@ -202,11 +202,11 @@ class LocalKernel(KernelServices):
 
     def _cite_evidence(self, domain, commit, kind, ref):
         if kind in ("interview", "source"):
+            ref = self._ws().resolve_ref(ref)[0]             # words from the passage resolve (B4)
             spec = self._ws().sources.get(ref.split(":", 1)[0])
             if spec is not None and (spec.kind == "interview-log") != (kind == "interview"):
                 raise ValueError(fixed(f"{ref} is {'an interview line' if spec.kind == 'interview-log' else 'a source chunk'}:"
                                  f" not a {kind}", f"cite it with `--kind {'interview' if spec.kind == 'interview-log' else 'source'}`"))
-            self._ws().source_of(ref)                        # an unknown chunk is refused
         elif kind == "event":
             stream, _, version = ref.rpartition("@")
             if self.environment is None:

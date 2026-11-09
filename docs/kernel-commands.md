@@ -29,6 +29,22 @@ Its subcommands are the domain's actions, one per action, plus `get`, `history`,
 | `--no-config` | ignore toprope.yaml |
 | `--failures` `FAILURES` | a directory where a command that fails before the gate is recorded, one file per failure (ADR-0049, D1b) |
 
+## `toprope-change`
+
+`toprope-change`: one command takes a change from an agent's proposals to one request for a person (ADR-0049, C1).
+
+| Argument | What |
+|---|---|
+| `INTENT` | what the change is for, in a sentence; the request's summary |
+| `--patch` `PATCH` | a YAML list of {path, value, cites, origin} (required) |
+| `--draft` `DRAFT` | the draft the change is made in (default: authoring) (default `authoring`) |
+| `--member` `MEMBER` | the member whose actions these are (default `authoring`) |
+| `--origin` `ORIGIN` | the Source object an element came from, when it names none |
+| `--workspace` `WORKSPACE` | the draft's workspace, if not the one in toprope.yaml |
+| `--kernel-root` `KERNEL_ROOT` | where the commit store is (default: `kernel_root:` in toprope.yaml, or here) |
+| `--request` `REQUEST` | the request file to write (default: .toprope/requests/<id>.yaml) |
+| `--run-args` `RUN_ARGS` | options passed to every toprope-run step, e.g. "--identity static:ids.yaml" (default ``) |
+
 ## `toprope-server`
 
 `toprope-server`: serve a declaration over MCP (stdio or streamable HTTP).

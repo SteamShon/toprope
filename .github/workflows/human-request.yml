@@ -44,7 +44,7 @@ jobs:
         env:
           REQUEST: ${{ steps.find.outputs.request }}
         run: |
-          pip install --quiet pyyaml
+          pip install --quiet .   # the package, so the page can show what a confirm step confirms (B5)
           python tools/human_request.py check "$REQUEST"
           python tools/human_request.py render "$REQUEST" >> "$GITHUB_STEP_SUMMARY"
           echo "Commit: \`$GITHUB_SHA\`. Approve this run to take these steps as yourself." >> "$GITHUB_STEP_SUMMARY"

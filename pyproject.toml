@@ -23,6 +23,7 @@ toprope-harness = "toprope.harness.cli:main"
 toprope-worldmap = "toprope.worldmap.cli:main"
 toprope-commits = "toprope.commits.cli:main"
 toprope-run = "toprope.adapters.cli:main"
+toprope-change = "toprope.adapters.cli.change:main"
 
 [dependency-groups]
 dev = [
