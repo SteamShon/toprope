@@ -30,6 +30,9 @@ is deployed. It exits 1 when a check reports an error. The report is printed, wr
 | `capability` | who can reach each outcome (an object's state, or a property an effect sets), before and after: the actions, from which state, by which actors, whether a person is required, and the preconditions on the way (ADR-0048) | a widening of an outcome that existed before: warning (a new path, a new actor, a path that no longer requires a person, a dropped precondition); a narrowing, or a new outcome: info; skipped for a first version |
 | `nl` | natural-language conflicts, by an `NLChecker`. `check.nl_llm.CommandChecker` runs a model through a command (`TOPROPE_NL_COMMAND`, for the kernel). It gives the model the changed elements before and after, the capability diff, the outcome rules and the whole new declaration (M1-report) | warnings only; skipped when none is configured, and reported as not run when the checker fails or answers without the JSON |
 
+- **Grouped.** The report's `groups` gathers the problems by check, severity and message with times
+  and object ids taken out, with a count and up to three places. A log replay that re-decides 64
+  past actions the same way is one group of 64 (M1's precision counted each one).
 - **Without a structurally valid declaration**, the checks that need a model do not run.
 - **Without an event store**, log replay and the in-flight check do not run: nothing was
   deployed. The kernel uses the domain's own event log when it serves the domain (a self
