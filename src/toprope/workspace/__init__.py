@@ -100,6 +100,20 @@ def _bare(el: Any) -> Any:
     return out
 
 
+def _words_pattern(words: str) -> re.Pattern:
+    """The words as typed, matched whole: case and spacing ignored, never inside another word."""
+    parts = [re.escape(w) for w in words.split()]
+    return re.compile(r"(?<!\w)" + r"\s+".join(parts) + r"(?!\w)", re.IGNORECASE)
+
+
+def _answer_of(text: str) -> str | None:
+    """The owner's answer in an interview line (`question: …`, `answer: …`)."""
+    for line in text.splitlines():
+        if line.startswith("answer: "):
+            return line[len("answer: "):]
+    return None
+
+
 def _get(doc: Any, segs: list[str]) -> Any:
     cur = doc
     for i, s in enumerate(segs):
@@ -278,16 +292,62 @@ class Workspace:
     def _used(self, source_id: str, refs: list[str]) -> None:
         self._append(self.usage_path, {"at": _now(), "source": source_id, "refs": refs})
 
+    def resolve_ref(self, ref: str) -> tuple[str, str | None]:
+        """A citation as written: an exact chunk ref, or words from the passage (ADR-0049, B4).
+        Words resolve to the one chunk that contains them (case and spacing ignored), within the
+        source named before a colon if there is one. Returns (ref, the quote, if words were given)."""
+        sid, _, rest = ref.partition(":")
+        if sid in self.sources and any(c.ref == ref for c in self.chunks(sid)):
+            return ref, None
+        if len(ref.split()) < 2:                     # one token: meant as a ref, not as words
+            if sid not in self.sources or not rest:
+                raise AuthoringError(fixed(f"unknown source in ref {ref!r}",
+                                           "cite a ref of the form `<source>:<chunk>`, as `search` returns "
+                                           "it, or quote words from the passage"))
+            raise AuthoringError(fixed(f"no chunk {ref!r}", "run `search` with words from the passage, and "
+                                       "cite the `ref` it returns, or quote the words"))
+        if sid in self.sources and rest.strip():
+            specs, words = [self.sources[sid]], rest
+        else:
+            specs, words = list(self.sources.values()), ref
+        if any(s.local_only for s in specs) and len(specs) == 1:
+            # matching would tell a model whether a phrase is in content it may not read (#206's review)
+            raise AuthoringError(fixed(f"source {specs[0].id!r} is local-only, so it is not searched for words",
+                                       "cite its chunk ref, as the owner gives it"))
+        specs = [s for s in specs if not s.local_only]
+        words = words.strip().strip('"').strip()
+        pattern = _words_pattern(words)
+        hits: list[tuple[str, str, str]] = []           # (ref, the passage's own words, source)
+        for s in specs:
+            for c in self.chunks(s.id):
+                # in an interview line only the owner's answer is quoted, never the question asked
+                text = (_answer_of(c.text) if s.kind == "interview-log" else c.text) or ""
+                if m := pattern.search(text):
+                    hits.append((c.ref, m.group(0), s.id))
+        if len(hits) > 1:            # the same passage read through several sources: the first declared
+            places = {h[0].split(":", 1)[1] for h in hits}
+            if len(places) == 1:
+                hits = hits[:1]
+        if not hits:
+            raise AuthoringError(fixed(f"no chunk {ref!r}, and no passage contains those words",
+                                       "run `search` with words from the passage, and cite the `ref` it "
+                                       "returns or words it shows"))
+        if len(hits) > 1:
+            shown = ", ".join(h[0] for h in hits[:5]) + (f" and {len(hits) - 5} more" if len(hits) > 5 else "")
+            raise AuthoringError(fixed(f"{len(hits)} passages contain {words!r}: {shown}",
+                                       "quote more of the passage, or cite one of those refs"))
+        ref, said, source = hits[0]
+        self._used(source, [ref])
+        return ref, " ".join(said.split())             # the passage's own words, not what was typed
+
     def source_of(self, ref: str, quote: str | None = None) -> dict[str, Any]:
-        sid = ref.split(":", 1)[0]
-        spec = self.sources.get(sid)
-        if spec is None:
-            raise AuthoringError(fixed(f"unknown source in ref {ref!r}", "cite a ref of the form `<source>:<chunk>`, as `search` returns it"))
-        if not any(c.ref == ref for c in self.chunks(sid)):
-            raise AuthoringError(fixed(f"no chunk {ref!r}: cite a ref returned by read_source or search_sources", "run `search` with words from the passage, and cite the `ref` it returns"))
+        """Where an element came from: its chunk, and the owner's words if given. A citation by
+        quote records the chunk it resolved to, and the quote."""
+        ref, quoted = self.resolve_ref(ref)
+        spec = self.sources[ref.split(":", 1)[0]]
         out = {"kind": ELEMENT_KIND[spec.kind], "ref": ref}
-        if quote:
-            out["quote"] = quote
+        if quote or quoted:
+            out["quote"] = quote or quoted
         return out
 
     # -- the draft -------------------------------------------------------------------------

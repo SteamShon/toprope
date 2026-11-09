@@ -71,6 +71,7 @@ $R open_draft authoring --domain-id authoring \
    --declaration domains/authoring/authoring.domain.yaml --branch work   # once per domain
 $R next_questions authoring          # the current stage's questions
 $R propose_element E-1 --path ... --origin S-1 --cites REF --value JSON
+                                     # REF: a chunk ref, or words from the passage (B4)
 $R review                            # what you are about to confirm, as one diff
 $R confirm_all_proposed authoring    # you, on your terminal
 $R commit_draft authoring            # `then` names the new commit <id>
