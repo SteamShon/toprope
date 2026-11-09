@@ -70,6 +70,9 @@ $R run_probes authoring:<id>:local    # the deployed commit, checked in use
 $R verify authoring:<id>:local        # you, once its probes passed
 ```
 
+- **Failed commands are recorded.** A command that fails before the gate (a usage error, a
+  refused option, a crash) writes one file under `.toprope/failures/` (`failures:` in
+  toprope.yaml); commit them too, so the friction of the loop can be measured (ADR-0049, F1).
 - **Commit what changed.** Each domain's events go to its own append-only log,
   `domains/<domain>/events/`, and its commits, approvals and check records to
   `.toprope/commits/<domain>/`; commit both with your change, so decisions are shared and
