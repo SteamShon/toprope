@@ -1,2 +1,8 @@
 {"at": "2026-11-06T17:29:36+00:00", "source": "records", "refs": ["records:docs/commits.md#L24-L44"]}
 {"at": "2026-11-06T23:56:19+00:00", "source": "records", "refs": ["records:docs/commits.md#L106-L125"]}
+{"at": "2026-11-09T03:39:47+00:00", "source": "records", "refs": ["records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56"]}
+{"at": "2026-11-09T03:39:47+00:00", "source": "records", "refs": ["records:docs/experiments/M1-recheck.md#L54-L66"]}
+{"at": "2026-11-09T03:39:47+00:00", "source": "records", "refs": ["records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L26-L54"]}
+{"at": "2026-11-09T03:39:47+00:00", "source": "system", "refs": ["system:src/toprope/kernel/__init__.py#L1-L119", "system:src/toprope/kernel/services.py#L121-L240"]}
+{"at": "2026-11-09T03:40:17+00:00", "source": "system", "refs": ["system:src/toprope/kernel/services.py#L121-L240"]}
+{"at": "2026-11-09T03:40:32+00:00", "source": "records", "refs": ["records:docs/experiments/M1-recheck.md#L54-L66"]}
