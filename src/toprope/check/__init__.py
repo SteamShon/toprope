@@ -236,9 +236,11 @@ def check_commit(commits: Any, domain: str, commit_id: str, base: str | None = "
     rows = [(name, res.ok if res.ran else None, res.summary()) for name, res in report.checks.items()]
     rows.append(("change-check", report.ok, report.summary()))
     from .risk import assess, summary as risk_summary
-    level, reasons = assess(report, commits.domain(domain, c.id), old)
+    from .risk import warnings_of
+    level, reasons = assess(report, commits.domain(domain, c.id), old,
+                            base_warnings=warnings_of(commits.check_status(domain, base)) if base else None)
     report.risk = (level, reasons)
-    rows.append(("risk", True, risk_summary(level, reasons)))     # a finding, not a pass or fail (ADR-0050)
+    rows.append(("risk", level == "low", risk_summary(level, reasons)))     # ADR-0050
     from ..decl.provenance import proposed_elements
     left = proposed_elements(commits.declaration(domain, c.id))
     rows.append(("confirmed", not left, f"{len(left)} proposed element(s)"

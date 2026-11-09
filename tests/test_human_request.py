@@ -263,3 +263,28 @@ def test_a_run_step_can_name_the_workspace_of_the_draft_it_acts_on():
     assert "(workspace `toprope.delivery.workspace.yaml`)" in hr.render(req)
     bad = {"summary": "x", "steps": [{"run": {**step["run"], "workspace": "/etc/passwd"}}]}
     assert "run takes" in hr.check(bad)[0]
+
+
+def test_naming_the_commit_does_not_get_around_the_risk_gate(tmp_path, monkeypatch):
+    (tmp_path / "ids.yaml").write_text(yaml.safe_dump(IDS))
+    monkeypatch.setenv(hr.TLC_ENV, "tla2tools.jar")
+    monkeypatch.setattr(hr.subprocess, "run",
+                        lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0, json.dumps({"status": "ok"}), ""))
+    low_risk(tmp_path, "7-c0ffee", "low")
+    low_risk(tmp_path, "7-c0ffee", "high: the harness check failed")       # the newest record wins
+    req = {"summary": "s", "steps": [
+        {"run": {"member": "authoring", "action": "check_commit", "target": "7-c0ffee"}},
+        {"run": {"member": "authoring", "action": "approve_commit", "target": "7-c0ffee"}},
+        {"run": {"member": "authoring", "action": "deliver", "target": "7-c0ffee", "params": {"environment": "local"}}}]}
+    assert hr.check(req) == [] and "One approval ships this change" in hr.render(req)
+    with pytest.raises(SystemExit, match="7-c0ffee is not low risk"):
+        hr.run(req, "ana-gh", identity="ids.yaml", cwd=tmp_path)
+
+
+def test_a_second_request_ships_an_approved_commit(tmp_path):
+    out = tmp_path / "ship.yaml"
+    hr.main(["ship", str(out), "--commit", "7-c0ffee"])
+    req = hr.load(out)
+    assert hr.check(req) == []
+    assert [s["run"]["action"] for s in req["steps"]] == ["deliver", "preview", "deploy", "run_probes", "verify"]
+    assert "One approval ships" not in hr.render(req)       # it approves nothing: the person read the preview

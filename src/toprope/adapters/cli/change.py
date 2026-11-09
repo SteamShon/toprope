@@ -137,13 +137,21 @@ def dry_check(root: Path, workspace: str | None) -> tuple[str, list[str], str, t
         events = open_store(f"jsonl:{events_dir}") if events_dir.is_dir() else None
         r = check_commit(scratch, str(domain), c.id, events=events,
                          tlc=os.environ.get("TOPROPE_TLC_JAR") or None)
+        scratch_domain = scratch.domain(str(domain), c.id)
+        base = r.diff.get("from")
+        scratch_old = scratch.domain(str(domain), base) if base else None
+        from ...check.risk import warnings_of
+        base_warnings = warnings_of(scratch.check_status(str(domain), base)) if base else None
     ran = [n for n, x in r.checks.items() if x.ran]
     if not ran:
         raise SystemExit(fixed(f"no check ran on {domain}'s working copy", "check the draft with "
                                "`toprope-run check_commit` after a commit, and report the problem"))
     failing = [f"{n}: {x.summary() if hasattr(x, 'summary') else x}" for n, x in r.checks.items()
                if x.ran and not x.ok]
-    return str(domain), failing, r.summary(), r.risk or ("high", ["not assessed"])
+    from ...check.risk import assess
+    # TLC runs in the request's own check (the workflow sets it); that recorded risk is what ships
+    risk = assess(r, scratch_domain, scratch_old, pending=frozenset({"tla"}), base_warnings=base_warnings)
+    return str(domain), failing, r.summary(), risk
 
 
 def slug(text: str) -> str:
@@ -225,6 +233,9 @@ def main(argv: list[str] | None = None) -> None:
     print(review.get("text", "") if isinstance(review, dict) else str(review), end="")
     print(json.dumps({"proposed": proposed, "checked": summary, "risk": risk, "risk_reasons": reasons,
                       "request": str(path),
+                      **({"then": f"high risk: after this request is approved, read the preview, then write "
+                                  f"the delivery request with `python tools/human_request.py ship <request> "
+                                  f"--commit <the approved commit> --domain {domain}`"} if risk != "low" else {}),
                       "next": "commit the request with the draft and the event logs it changed, and push "
                               "them; the person approves the request in GitHub, and that one approval "
                               "confirms, commits, checks and approves (one loop at a time: AGENTS.md)"},

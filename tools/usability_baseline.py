@@ -32,7 +32,7 @@ SYSTEM_PREFIXES = ("external:", "handoff:")
 APPROVE = "approve_commit"
 # Checks whose `ok: false` is a state of the commit, not a finding: `confirmed` is false while
 # proposed elements are left (ADR-0041), and a skipped check did not run.
-NOT_FINDINGS = {"confirmed"}
+NOT_FINDINGS = {"confirmed", "risk"}   # risk: a classification (ADR-0050), not a finding
 
 
 def _jsonl(path: Path) -> list[dict]:
