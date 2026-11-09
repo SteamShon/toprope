@@ -303,14 +303,23 @@ Full schema: [`domain-schema.md`](domain-schema.md).
 
 Our reading of the alternatives, in broad strokes:
 
-| | Natural-language skills (`SKILL.md`, `AGENTS.md`) | Rules engines, BPMN/DMN, policy-as-code | Ontology platforms | Toprope (design) |
-|---|---|---|---|---|
-| Who authors | anyone, in prose | engineers | engineers, often deployed on site | domain experts through an interview, with agents drafting |
-| Conflicts found | after deployment | in tests of the rule set | at build time, by engineers | at compile time, reported in domain terms |
-| Behavior verified | not mechanically | per rule set | per project | designed to check every matrix cell and invariant on every surface |
-| Cost of a change | a text edit, unchecked | a code change | an engineering project | an edit, an impact report, a preview |
-| Agents | read text; nothing checks it | call it as a decision service | integrate via APIs | first-class users via generated MCP |
-| Decisions | lost in chat | decision logs, varies | varies | event-sourced and queryable |
+| | Natural-language skills (`SKILL.md`, `AGENTS.md`) | Rules engines, BPMN/DMN, policy-as-code | Ontology platforms | Governed process maps (e.g. UiPath Cartographer) | Toprope (design) |
+|---|---|---|---|---|---|
+| Who authors | anyone, in prose | engineers | engineers, often deployed on site | an agent drafts from documents, process mining and interviews; an owner approves | domain experts through an interview, with agents drafting |
+| Conflicts found | after deployment | in tests of the rule set | at build time, by engineers | surfaced for a person; past cases replayed against a change | at compile time, reported in domain terms |
+| Behavior verified | not mechanically | per rule set | per project | generated automations pass evaluations; how they are checked against the map is not described | designed to check every matrix cell and invariant on every surface |
+| Cost of a change | a text edit, unchecked | a code change | an engineering project | a proposal, owner approval, regenerated requirements and automations | an edit, an impact report, a preview |
+| Agents | read text; nothing checks it | call it as a decision service | integrate via APIs | read the map as context; the platform's rails enforce, separately from the map | first-class users via generated MCP |
+| Decisions | lost in chat | decision logs, varies | varies | a decision ledger (announced as preview or roadmap) | event-sourced and queryable |
+
+The closest of these are governed process maps. UiPath's Cartographer (announced September
+2026; the column above is from its public material, not from use) builds a "Map of Work" of
+rules, exceptions and decision rights through interviews and documents, has a named owner approve
+every change, and records decisions with their reasons: the same problem, and much the same split
+between what is declared and what explains it (ADR-0041). The difference is where the map sits.
+There the map is context and a separate platform enforces it; the public material does not say
+how the map's gates reach that platform, so nothing shown keeps the two from drifting apart.
+Here the declaration *is* the gate and the tests: what runs is compiled from what was approved.
 
 Agent orchestration frameworks (LangGraph and others) are a different layer. In them you
 engineer the **agent's** graph: which step the agent takes next. Toprope declares the

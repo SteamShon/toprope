@@ -100,6 +100,9 @@ In this example, approving updates Toprope's own record. Calling the ad platform
   or your own.
 - **Rules your agent cannot skip.** Every action passes one check that refuses what is not allowed,
   gives the reason, and records the attempt.
+- **The map is the gate.** The same declaration that documents the rules is compiled into the
+  check that enforces them and the tests that verify it, so what runs cannot drift from what was
+  approved.
 - **Rules reviewed like code.** A change is a commit, checked before review, approved by a person
   merging it into `main`, and deployed only if its tests pass. Why we think every workflow needs
   this loop: [`docs/problem.md`](docs/problem.md).
