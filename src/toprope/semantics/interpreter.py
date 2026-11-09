@@ -271,6 +271,13 @@ class Interpreter:
         else:
             next_state = None
 
+        from ..decl.rules import covering, meets                                            # step 5b (ADR-0048)
+        frm = None if creating or tr is None else current.get(tr.field)
+        principal = cmd.on_behalf_of if cmd.actor.kind == "agent" else None
+        for rid, rule in covering(d, cmd.action, frm):
+            if not meets(rule, cmd.actor.kind, cmd.actor.roles, principal.roles if principal else None):
+                return deny(rid, rule.reason)
+
         for pre in action.preconditions:                                                    # step 6
             try:
                 passed = evaluate(self._expr(pre.check), self._env(view, cmd.actor, cmd.params, principal=self._principal(cmd))) is True
@@ -456,6 +463,10 @@ class Interpreter:
                 c = self.cell(obj_type, state.get(tr.field), name, who)
                 if not isinstance(c, str) or c in ("n/a", "undecided"):
                     continue
+            from ..decl.rules import covering, meets
+            if not all(meets(r, actor.kind, actor.roles, on_behalf_of.roles if on_behalf_of else None)
+                       for _, r in covering(self.d, name, state.get(tr.field) if tr else None)):
+                continue
             ok = True
             for pre in a.preconditions:
                 if any(p.root == "params" for p in paths_read(self._expr(pre.check))):

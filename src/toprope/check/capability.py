@@ -32,6 +32,7 @@ class Path:
     actors: frozenset[str]
     human: bool
     preconditions: frozenset[str]
+    rules: frozenset[str] = frozenset()
 
 
 def _actors(action: Any, only: set[str] | None = None) -> frozenset[str]:
@@ -66,11 +67,17 @@ def capabilities(d: Domain) -> dict[str, dict[tuple[str, str], Path]]:
     out: dict[str, dict[tuple[str, str], Path]] = {}
 
     def add(outcome: str, action: str, frm: str, only: set[str] | None = None) -> None:
+        from ..decl.rules import covering
         a = d.actions.get(action)
         if a is None:
             return
+        held = covering(d, action, None if frm in ("*", "(new)") else frm)
+        human = a.requires == "human" or any(r.requires == "human" for _, r in held)
+        for _, r in held:                                   # a roles rule narrows who may
+            if not isinstance(r.requires, str):
+                only = (only or {x if isinstance(x, str) else x.role for x in a.actor}) & set(r.requires.roles)
         out.setdefault(outcome, {})[(action, frm)] = Path(
-            _actors(a, only), a.requires == "human", frozenset(p.id for p in a.preconditions))
+            _actors(a, only), human, frozenset(p.id for p in a.preconditions), frozenset(rid for rid, _ in held))
 
     for obj, tr in d.transitions.items():
         for state, row in tr.matrix.items():
@@ -111,6 +118,9 @@ def capability_diff(new: Domain, old: Domain) -> list[tuple[str, str, str]]:
                               f"{', '.join(sorted(p.actors - o.actors))}"))
             if o.human and not p.human:
                 found.append(("warning", where, f"{outcome} via {path} no longer requires a person"))
+            if o.rules - p.rules:
+                found.append(("warning", where, f"{outcome} via {path} is no longer held to rule(s) "
+                              f"{', '.join(sorted(o.rules - p.rules))}"))
             if o.preconditions - p.preconditions:
                 found.append(("warning", where, f"{outcome} via {path} no longer checks "
                               f"{', '.join(sorted(o.preconditions - p.preconditions))}"))
