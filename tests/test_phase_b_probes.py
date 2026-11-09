@@ -153,6 +153,29 @@ def test_the_generated_servers_open_a_probe_world(worlds, tmp_path):
     assert refused.structured_content["code"] == "actor"
 
 
+def test_each_probe_agent_may_take_what_its_task_asks_and_a_person_still_decides(worlds, tmp_path):
+    """The M1 recheck (probe-baseline-findings.md, cause 2): P07's agent may hand the commit over,
+    and P06's agent is refused a deploy because it requires a person, not for want of a grant."""
+    from mcp import ClientSession
+    from mcp.client.stdio import StdioServerParameters, stdio_client
+
+    async def call(pid, member, tool, args):
+        root = tmp_path / pid
+        shutil.copytree(worlds[0] / pid, root)
+        cfg = servers(root)[member]
+        params = StdioServerParameters(command=cfg["command"], args=cfg["args"], env={**os.environ, **cfg["env"]})
+        async with stdio_client(params) as (r, w), ClientSession(r, w) as s:
+            await s.initialize()
+            return (await s.call_tool(tool, {**args, "idempotency_key": "k1"})).structured_content
+
+    handed = asyncio.run(call("P07", "authoring", "deliver",
+                              {"target_id": worlds[1]["P07"]["approved"], "environment": "local"}))
+    assert handed["status"] == "ok", handed
+    request = asyncio.run(call("P08", "delivery", "deploy", {"target_id": worlds[1]["P08"]["request"]}))
+    assert (request["status"], request["code"]) == ("denied", "actor"), request
+    assert "grant" not in (request.get("reason") or "").lower()
+
+
 FAKE = r'''#!{python}
 import json, os, sys
 args = sys.argv[1:]

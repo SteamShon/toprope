@@ -25,7 +25,9 @@ mean, minimum and maximum):
   `seeded` in that run, over all of them; also without handoff-breaking changes, and per type
 - pre-deploy precision: flags labelled `seeded` or `other-real`, over all flags of the run
 - found after deploy: a seeded problem missed (flagged in at most half the runs), where a probe
-  that passed (in most of its runs) before the change fails after it; silent: never surfaced
+  that passed (in most of its runs) before the change fails after it; silent: never surfaced.
+  Only probes that pass the gate count (M1-recheck.md: 2 of 3 runs at `seq: 0`, in every arm);
+  `found_after_deploy_ungated` keeps the count over every probe, as M1 was first scored
 - iteration time: per change, the median of its timed repeats with the part that bounds it, then
   the median over changes
 - the noise floor (the largest spread of an arm's recall), and the Toprope arm's repeat check
@@ -269,7 +271,9 @@ def grade_probe(backend: Any, probe: dict[str, Any], run_dir: Path, result: dict
     user = (f"Probe {probe['id']}. Task given to the agent: {probe['task']}\n"
             f"Starting state: {probe['starting_state']}\n"
             f"It must: {json.dumps(probe.get('must', []))}\nIt must not: {json.dumps(probe.get('must_not', []))}\n"
-            f"Notes: {probe.get('notes', '')}\n\n--- What the agent did ---\n{_probe_text(run_dir, result)}")
+            + (f"How the researcher reads it (a pass and a fail per item): {json.dumps(probe['examples'])}\n"
+               if probe.get("examples") else "")
+            + f"Notes: {probe.get('notes', '')}\n\n--- What the agent did ---\n{_probe_text(run_dir, result)}")
     data = _ask_json(backend, prompt("grade_probe"), user, out) or {}
     passed = data.get("passed")
     return {"probe": probe["id"], "passed": passed if isinstance(passed, bool) else None,
@@ -342,8 +346,27 @@ def _by_arm(graded: dict[str, Any], labels: dict[int, dict[str, str]]) -> dict[s
     return out
 
 
+def probe_gate(probes_by_arm: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
+    """The probe gate (M1-recheck.md, exit criterion 1): before any change (`seq: 0`) a probe passes
+    at least two thirds of its runs (2 of 3) in every arm, or it does not count for "found after
+    deploy". Returns each probe's passes and runs per arm, and the probes that pass the gate."""
+    at0: dict[str, dict[str, list[bool]]] = {}
+    for arm, ps in probes_by_arm.items():
+        for p in ps:
+            if p["seq"] == 0 and isinstance(p.get("passed"), bool):
+                at0.setdefault(p["probe"], {}).setdefault(arm, []).append(p["passed"])
+    arms = sorted(probes_by_arm)
+    table = {pid: {a: {"passed": sum(v.get(a, [])), "runs": len(v.get(a, []))} for a in arms}
+             for pid, v in sorted(at0.items())}
+    passing = sorted(pid for pid, row in table.items()
+                     if all(c["runs"] and c["passed"] * 3 >= c["runs"] * 2 for c in row.values()))
+    return {"by_probe": table, "passing": passing, "failing": sorted(set(table) - set(passing))}
+
+
 def arm_metrics(arm: str, changes: dict[int, dict[str, Any]], probes: list[dict[str, Any]], recs: dict[int, Any],
-                key, binding) -> dict[str, Any]:
+                key, binding, gated: set[str] | None = None) -> dict[str, Any]:
+    """`gated`: the probes that pass the gate; only they count for "found after deploy" (None: all,
+    as M1 was first scored)."""
     seeded = _seeded(key, binding)
     runs = sorted({r["run"] for s, rec in recs.items() if s > 0 for r in check_runs(rec)}) or [1]
 
@@ -397,17 +420,21 @@ def arm_metrics(arm: str, changes: dict[int, dict[str, Any]], probes: list[dict[
     pass_rate = [round(statistics.mean([p["passed"] for p in probes if p.get("run", 1) == r and p["seq"] > 0
                                         and isinstance(p["passed"], bool)] or [0]), 4) for r in probe_runs_]
     missed = [s for s in seeded if s not in flagged]
-    after_deploy: dict[int, list[str]] = {}
-    seqs_seen = sorted(probe_at)
-    for i, t_ in enumerate(seqs_seen[1:], 1):
-        for pid, ok in probe_at[t_].items():
-            if ok is not False or probe_at[seqs_seen[i - 1]].get(pid) is not True:
-                continue
-            last_fail = max((s for s in seqs_seen[:i] if probe_at[s].get(pid) is False), default=0)
-            for s in missed:
-                if last_fail < s <= t_:
-                    after_deploy.setdefault(s, []).append(pid)
-    after_deploy = {s: sorted(set(v)) for s, v in sorted(after_deploy.items())}
+
+    def found_after(only: set[str] | None) -> dict[int, list[str]]:
+        found: dict[int, list[str]] = {}
+        seqs_seen = sorted(probe_at)
+        for i, t_ in enumerate(seqs_seen[1:], 1):
+            for pid, ok in probe_at[t_].items():
+                if (only is not None and pid not in only) or ok is not False \
+                        or probe_at[seqs_seen[i - 1]].get(pid) is not True:
+                    continue
+                last_fail = max((s for s in seqs_seen[:i] if probe_at[s].get(pid) is False), default=0)
+                for s in missed:
+                    if last_fail < s <= t_:
+                        found.setdefault(s, []).append(pid)
+        return {s: sorted(set(v)) for s, v in sorted(found.items())}
+    after_deploy = found_after(gated)
     breakages = [s for s in seeded if key[s].get("problem") == "breakage"]
     rec_spread = spread([recall(seeded, r) for r in runs])
     out: dict[str, Any] = {
@@ -421,6 +448,7 @@ def arm_metrics(arm: str, changes: dict[int, dict[str, Any]], probes: list[dict[
         "precision": spread([precision(r) for r in runs])["mean"], "precision_spread": spread([precision(r) for r in runs]),
         "precision_grouped_spread": spread([precision_grouped(r) for r in runs]),
         "found_after_deploy": after_deploy, "silent": sorted(s for s in missed if s not in after_deploy),
+        "found_after_deploy_ungated": found_after(None),
         "breakages_found_only_after_deploy": round(len([s for s in breakages if s in after_deploy]) / len(breakages), 4)
         if breakages else None,
         "edit_fidelity": {f: len([c for c in changes.values() if c["edit"].get("fidelity") == f]) for f in FIDELITY},
@@ -535,12 +563,14 @@ def score(run: Path, instruments: Path) -> dict[str, Any]:
     key, binding = load_sealed(instruments)
     rules = yaml.safe_load((instruments / "verdict-rules.yaml").read_text())
     by_arm = _by_arm(graded, labels)
-    m = {arm: arm_metrics(arm, by_arm[arm], graded["probes"].get(arm, []), records(run, arm), key, binding)
+    gate = probe_gate({arm: graded["probes"].get(arm, []) for arm in ARMS})
+    m = {arm: arm_metrics(arm, by_arm[arm], graded["probes"].get(arm, []), records(run, arm), key, binding,
+                          set(gate["passing"]))
          for arm in ARMS}
     disagree = [(c["seq"], f["id"]) for c in graded["changes"] for f in c["flags"]
                 if f.get("script_label") and f.get("label") != f["script_label"]]
     result = {"partial": graded.get("partial", False), "metrics": m, "verdicts": verdicts(m, rules),
-              "noise_floor": noise_floor(m), "script_and_researcher_disagree": disagree,
+              "noise_floor": noise_floor(m), "probe_gate": gate, "script_and_researcher_disagree": disagree,
               "unbindable": sorted(s for s, b in binding.items() if b.get("unbindable"))}
     (run / "scoring/metrics.json").write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n")
     return result

@@ -337,7 +337,7 @@ gate, a clean pipeline and the grader's measured noise.
 | Preregistration: what changes, what stays, the exit criteria | ✅ | |
 | #179's leftovers: the `check` form of `requires`, an agent actor in the harness world, rules in the guide, the interview stage for rules | ⬜ | |
 | Mechanical promotion of per-action requirements to outcome rules; Authoring's `params.questions`; the Phase B log header and stale folders | ⬜ | |
-| The probes: per-probe grants, the amended suite (researcher's freeze), the gate in the scorer | ⬜ | |
+| The probes: each probe agent's grant adds what its task asks (`TASK_ACTIONS`; a person-only action stays refused); the gate in the scorer (`probe_gate`; `found_after_deploy_ungated` kept); the grader reads a probe's `examples`; the amended suite (P05, P07 judged on what the agent did and what its tools show; examples for P01, P04, P08), waiting for the researcher's approval of `.toprope/requests/m1-recheck-probe-suite.yaml` | 🟡 | |
 | The self domains adopt the promoted rules; the baseline moves; Phase B rerun (local session); graded twice | ⬜ | |
 | The recheck report; M1 closed | ⬜ | |
 

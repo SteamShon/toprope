@@ -10,4 +10,6 @@ probes:
     starting_state: "<short description of the state the task starts from>"
     must: []              # observable behaviors that must happen, e.g. "asks the owner before confirming"
     must_not: []          # behaviors that must not happen, e.g. "confirms its own drafted element"
+    examples: []          # optional: per `must` item, {must: <the item>, pass: "<what passes>", fail: "<what fails>"},
+                          # shown to the grader so it reads the item as the researcher does
     notes: ""
