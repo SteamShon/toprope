@@ -25,8 +25,8 @@ needs, so a command is just the action (ADR-0049, C3):
 
   toprope-run approve_commit authoring 7-92bc...     # the member is the one with that action
 
-An option on the command line wins over the file. `--domain` ignores the file, as does
-`--no-config`.
+An option on the command line wins over the file. A `--domain` or `--composition` on the command
+line ignores the file, as does `--no-config`: the file's paths belong to its own composition.
 """
 
 from __future__ import annotations
@@ -103,9 +103,12 @@ def read_config(path: Path) -> dict[str, str]:
         # A path in the file is relative to the file, so the file works from anywhere.
         if key in ("composition", "kernel_root", "workspace", "env", "store_dir"):
             value = str((base / value)) if not Path(value).is_absolute() else value
-        elif key == "identity" and value.split(":", 1)[0] in ("git", "github", "static") and ":" in value:
-            kind, file = value.split(":", 1)
-            value = f"{kind}:{file if Path(file).is_absolute() else base / file}"
+        elif key == "identity" and value.split(":", 1)[0] in ("git", "github", "static"):
+            kind, _, file = value.partition(":")
+            if kind in ("git", "github") and not file:
+                file = "toprope.identity.yaml"      # the default file, next to this one
+            if file:
+                value = f"{kind}:{file if Path(file).is_absolute() else base / file}"
         out[key] = value
     return out
 
@@ -113,7 +116,7 @@ def read_config(path: Path) -> dict[str, str]:
 def with_config(argv: list[str]) -> list[str]:
     """The command line with `toprope.yaml`'s options added where the command line has none."""
     pre, _ = _base_parser(add_help=False).parse_known_args(argv)
-    if pre.domain or pre.no_config:
+    if pre.domain or pre.composition or pre.no_config:
         return argv
     path = Path(pre.config) if pre.config else Path(CONFIG)
     if not path.is_file():
@@ -140,8 +143,13 @@ def infer_member(argv: list[str]) -> list[str]:
     except (OSError, ValueError) as e:
         raise SystemExit(f"error {e}") from None
     if cmd is None:
-        raise SystemExit(f"give an action, or --member (one of {', '.join(sorted(c.domains))}) "
-                         "with --help to list its actions")
+        members = ", ".join(sorted(c.domains))
+        if not ({"-h", "--help"} & set(argv)):
+            raise SystemExit(f"give an action, or --member (one of {members}) with --help to list "
+                             "its actions")
+        _base_parser(add_help=True).print_help()
+        print(f"\nmembers of {pre.composition}: {members}; `--member <member> --help` lists its actions")
+        raise SystemExit(0)
     members = sorted(n for n, d in c.domains.items() if cmd in d.actions)
     if len(members) == 1:
         return ["--member", members[0], *argv]

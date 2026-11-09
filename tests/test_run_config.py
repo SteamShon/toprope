@@ -32,10 +32,12 @@ def test_the_file_in_the_current_directory_is_read(tmp_path, monkeypatch):
     assert with_config(["get", "x"])[:2] == ["--composition", "c.composition.yaml"]
 
 
-def test_a_domain_or_no_config_ignores_the_file(tmp_path, monkeypatch):
-    config(tmp_path, "composition: c.composition.yaml\n")
+def test_a_domain_a_composition_or_no_config_ignores_the_file(tmp_path, monkeypatch):
+    config(tmp_path, "composition: c.composition.yaml\nkernel_root: .\nenv: e\n")
     monkeypatch.chdir(tmp_path)
     assert with_config(["--domain", "d.yaml", "get", "x"]) == ["--domain", "d.yaml", "get", "x"]
+    # another composition must not run from this file's kernel root (#202's review)
+    assert with_config(["--composition", "o.yaml", "guide"]) == ["--composition", "o.yaml", "guide"]
     assert with_config(["--no-config", "get", "x"]) == ["--no-config", "get", "x"]
 
 
@@ -76,12 +78,30 @@ def test_a_read_or_an_unknown_action_asks_for_the_member():
         infer_member(self_argv())
 
 
+def test_help_without_a_member_prints_the_options_and_the_members(capsys):
+    with pytest.raises(SystemExit) as e:
+        infer_member(self_argv("--help"))
+    assert e.value.code == 0
+    out = capsys.readouterr().out
+    assert "--config" in out and "authoring, delivery" in out
+
+
+def test_a_git_identity_in_the_file_is_looked_up_next_to_it(tmp_path):
+    p = config(tmp_path, "composition: c.yaml\nidentity: git\n")
+    argv = with_config(["--config", str(p), "get", "x"])
+    assert argv[argv.index("--identity") + 1] == f"git:{tmp_path / 'toprope.identity.yaml'}"
+
+
 def test_a_command_with_only_the_file_reads_the_self_domains(tmp_path, capsys):
     p = config(tmp_path, "".join(f"{k}: {ROOT / v}\n" for k, v in SELF.items()))
     main(["--config", str(p), "--member", "authoring", "get", "authoring"])
     assert json.loads(capsys.readouterr().out)["id"] == "authoring"
 
 
-def test_the_repository_has_the_self_domains_file():
-    import yaml
-    assert yaml.safe_load((ROOT / "toprope.yaml").read_text()) == SELF
+def test_the_repositorys_file_points_at_the_self_domains(monkeypatch):
+    monkeypatch.chdir(ROOT)
+    argv = infer_member(with_config(["approve_commit", "x"]))
+    opts = dict(zip(argv[0::2], argv[1::2]))
+    assert opts["--member"] == "authoring"
+    for opt in ("--composition", "--workspace", "--kernel-root"):
+        assert Path(opts[opt]).exists(), opt
