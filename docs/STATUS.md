@@ -324,7 +324,7 @@ From [`M1-report.md`](experiments/M1-report.md), *What M2 takes from this*.
 | The natural-language check: an LLM reading the structured diff with the impact report (ADR-0009) | ⬜ | |
 | An editor that proposes a patch (several elements, checked at once) | ⬜ | |
 | Probes that pass before any change | ⬜ | |
-| M2's design: the full Toprope check against a structured spec reviewed by an LLM, preregistered | ⬜ | |
+| M2's design, a draft for the researcher ([`M2-design.md`](experiments/M2-design.md)): the full Toprope check against a structured spec reviewed by an LLM, the same edit checked both ways, grouped precision, the grader's noise, probes gated before any change, draft verdict rules | 🟡 | |
 
 ## M0b, M2 to M5
 
