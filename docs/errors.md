@@ -27,6 +27,17 @@ the error is raised.
 | {…}: not valid YAML ({…}) | fix the file, or give --no-config |
 | {…}: unknown key(s) {…} | use only the keys {…} |
 
+## `adapters/cli/change.py`
+
+| Error | Fix |
+|---|---|
+| cannot read the patch {…}: {…} | give a YAML list of elements |
+| commit_draft made no commit | check that the draft has changes to commit |
+| element {…} of the patch has no {…} | give each element its `path`, `value` and `cites` |
+| the patch {…} lists no elements | write a YAML list of `{path, value, cites}`, one per element |
+| {…} names no origin | give it `origin:` (a Source object's id), or --origin for every element |
+| {…}'s checks found problems: {…} | see `toprope-commits checks {…} {…}`, fix the proposals and run the change again |
+
 ## `adapters/mcp/cli.py`
 
 | Error | Fix |

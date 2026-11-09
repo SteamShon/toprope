@@ -45,6 +45,11 @@ def repo(tmp_path, monkeypatch):
     return tmp_path
 
 
+def a_ref(repo):
+    from toprope.workspace import Workspace
+    return Workspace(repo / "toprope.authoring.workspace.yaml").chunks("records")[0].ref
+
+
 def patch(tmp_path, items):
     p = tmp_path / "change.yaml"
     p.write_text(yaml.safe_dump(items, sort_keys=False))
@@ -53,7 +58,7 @@ def patch(tmp_path, items):
 
 def test_one_command_proposes_commits_checks_and_writes_one_request(repo, capsys):
     p = patch(repo, [{"path": f"invariants.{RULE['id']}", "value": RULE, "origin": "S-adr",
-                      "cites": "records: Toprope's own workflows"}])
+                      "cites": a_ref(repo)}])
     main(["Drafts name their declaration", "--patch", p, "--run-args", "--identity static:ids.yaml"])
     out = capsys.readouterr().out
     result = json.loads(out[out.index("{\n"):])
@@ -69,10 +74,10 @@ def test_one_command_proposes_commits_checks_and_writes_one_request(repo, capsys
     assert added["status"] == "proposed"                               # nothing is confirmed by the agent
 
 
-def test_a_failing_check_stops_before_any_request(repo, capsys):
+def test_a_refused_proposal_stops_before_any_request(repo, capsys):
     bad = {**RULE, "check": "target.no_such_property == 1"}
     p = patch(repo, [{"path": f"invariants.{RULE['id']}", "value": bad, "origin": "S-adr",
-                      "cites": "records: Toprope's own workflows"}])
+                      "cites": a_ref(repo)}])
     with pytest.raises(SystemExit) as e:
         main(["A broken rule", "--patch", p, "--run-args", "--identity static:ids.yaml"])
     assert "Fix:" in str(e.value)

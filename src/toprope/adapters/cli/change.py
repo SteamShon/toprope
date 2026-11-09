@@ -54,6 +54,7 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--member", default="authoring", help="the member whose actions these are")
     ap.add_argument("--origin", help="the Source object an element came from, when it names none")
     ap.add_argument("--workspace", help="the draft's workspace, if not the one in toprope.yaml")
+    ap.add_argument("--kernel-root", default=".", help="where the commit store is (default: here)")
     ap.add_argument("--request", help=f"the request file to write (default: {REQUESTS}/<id>.yaml)")
     ap.add_argument("--run-args", default="", help="options passed to every toprope-run step, "
                     "e.g. \"--identity static:ids.yaml\"")
@@ -96,6 +97,15 @@ def step(base: list[str], *args: str) -> dict[str, Any]:
     return out
 
 
+def failing_checks(kernel_root: Path, domain: str, commit: str) -> list[str]:
+    """The checks that found something. `confirmed` is not one: it fails until a person confirms
+    the proposals, which is what the request is for; a skipped check did not run."""
+    from ...commits import CommitStore
+    rows = CommitStore(kernel_root / ".toprope" / "commits").check_status(domain, commit)
+    return [f"{name}: {r.get('summary')}" for name, r in rows.items()
+            if not r.get("ok") and name != "confirmed" and not str(r.get("summary", "")).startswith("skipped")]
+
+
 def slug(text: str) -> str:
     s = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:40].strip("-")
     return f"{s or 'change'}-{uuid.uuid4().hex[:6]}"
@@ -129,10 +139,11 @@ def main(argv: list[str] | None = None) -> None:
     commit = commits[-1]
     step(base, "check_commit", commit)
     state = step(base, "get", commit)
-    if state.get("checks_passed") is not True:
-        raise SystemExit(fixed(f"{commit}'s checks did not pass: {state.get('checks_summary') or state}",
-                               f"see `toprope-commits checks <domain> {commit}`, fix the proposals and run "
-                               "the change again"))
+    failed = failing_checks(Path(a.kernel_root), state.get("domain_id") or a.draft, commit)
+    if failed:
+        raise SystemExit(fixed(f"{commit}'s checks found problems: " + "; ".join(failed),
+                               f"see `toprope-commits checks {state.get('domain_id') or a.draft} {commit}`, "
+                               "fix the proposals and run the change again"))
     review = step(base, "review").get("text", "")
     req = request_for(a.intent, a.draft, a.member, a.workspace)
     path = Path(a.request) if a.request else Path(REQUESTS) / f"{slug(a.intent)}.yaml"
