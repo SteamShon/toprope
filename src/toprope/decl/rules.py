@@ -9,9 +9,10 @@ allowed action asked, so rules do not apply to `system` actors.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
-from .models import ByRole, Deny, Domain, Rule, Target
+from .models import ByRole, Deny, Domain, Rule, RuleCheck, Target
 
 
 def _to(cell: Any) -> set[str]:
@@ -57,11 +58,17 @@ def covering(d: Domain, action: str, from_state: str | None) -> list[tuple[str, 
     return [(rid, r) for rid, r in d.rules.items() if r.on in hit]
 
 
-def meets(rule: Rule, kind: str, roles: tuple[str, ...] | set[str], principal_roles: Any = None) -> bool:
+def meets(rule: Rule, kind: str, roles: tuple[str, ...] | set[str], principal_roles: Any = None,
+          check: Callable[[str], bool] | None = None) -> bool:
     """Whether an actor of this kind and roles meets the rule. A `system` actor is not held to it.
-    An agent meets a roles rule only if its principal also holds one of the roles."""
+    An agent meets a roles rule only if its principal also holds one of the roles. A `check` rule
+    is decided by `check(expression)`, evaluated by the caller against the actor, target and
+    params; without one (a static reading: the capability diff, the TLA+ moves) it is left to the
+    guard that evaluates it, and counts as met here."""
     if kind == "system":
         return True
+    if isinstance(rule.requires, RuleCheck):
+        return True if check is None else check(rule.requires.check)
     if rule.requires == "human":
         return kind == "person"
     allowed = set(rule.requires.roles)

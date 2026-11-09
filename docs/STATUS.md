@@ -334,8 +334,8 @@ gate, a clean pipeline and the grader's measured noise.
 
 | Item | Status | PR |
 |---|---|---|
-| Preregistration: what changes, what stays, the exit criteria | ✅ | |
-| #179's leftovers: the `check` form of `requires`, an agent actor in the harness world, rules in the guide, the interview stage for rules | ⬜ | |
+| Preregistration: what changes, what stays, the exit criteria | ✅ | #187 |
+| #179's leftovers: the `check` form of `requires` (validator, interpreter, harness, TLA+ guard; the schema generated with rules), `rule-agent:` harness cases with an agent for the role's person, rules in the generated guide, the invariants stage asks for rules | ✅ | |
 | Mechanical promotion of per-action requirements to outcome rules; Authoring's `params.questions`; the Phase B log header and stale folders | ⬜ | |
 | The probes: per-probe grants, the amended suite (researcher's freeze), the gate in the scorer | ⬜ | |
 | The self domains adopt the promoted rules; the baseline moves; Phase B rerun (local session); graded twice | ⬜ | |
@@ -401,10 +401,6 @@ it; each release's cleanup PR handles items older than one release.
 
 - The Phase B harness: `phase-b-runs.tsv` has a second header where two arms created it at once; `phase_b
   status` lists the superseded `*.stale-1` folders too (#166, #170, 2026-11-08)
-
-- Outcome rules (#179): the `check`-expression form of `requires`, an agent actor in the harness
-  world (a `human` rule is tested at the interpreter for now), rules in the generated guide, and the
-  interview stage that asks for them (ADR-0048 §4) are not done yet (#179, 2026-11-09)
 
 ## Open questions
 

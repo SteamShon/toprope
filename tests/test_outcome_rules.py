@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+from datetime import datetime, timezone
 
 from test_decl import schema_doc_domain
 
@@ -72,3 +73,63 @@ def test_the_harness_agrees_with_the_interpreter_on_a_rule():
     d = with_bypass({"on": "Experiment.approved", "requires": {"roles": ["approver"]}, "reason": "r"})
     report = change_check(d, examples=20)
     assert report.checks["harness"].ok, [p.message for p in report.checks["harness"].problems][:3]
+
+
+# -- the check form of `requires`, and an agent in the harness world (#179's leftovers) --------
+
+NOT_ELI = {"on": "Experiment.approved", "requires": {"check": 'actor.id != "eli"'},
+           "reason": "Eli does not approve experiments."}
+
+
+def test_a_check_rule_is_evaluated_on_the_actor():
+    d = with_bypass(NOT_ELI)
+    out = decide(d, Command(Actor("eli", "person", ("eng",)), "approve_quickly", "E1", {}))
+    assert (out.status, out.code) == ("denied", RULE)
+    assert decide(d, Command(Actor("eve", "person", ("eng",)), "approve_quickly", "E1", {})).status == "ok"
+
+
+def test_the_validator_reads_a_check_rule():
+    bad = {**NOT_ELI, "requires": {"check": "nobody.id == 1"}}
+    assert ("unknown-root", f"rules.{RULE}.requires.check") in {(i.code, i.where) for i in validate_domain(with_bypass(bad))}
+    assert not [i for i in validate_domain(with_bypass(NOT_ELI)) if i.where.startswith("rules.")]
+
+
+def test_the_harness_agrees_with_the_interpreter_on_a_check_rule():
+    report = change_check(with_bypass(NOT_ELI), examples=20)
+    assert report.checks["harness"].ok, [p.message for p in report.checks["harness"].problems][:3]
+
+
+def test_a_check_rule_guards_the_moves_it_covers_in_tla():
+    from toprope.tla import export
+    module = export(with_bypass(NOT_ELI)).module
+    step = module[module.index("Step_approve_quickly"):]
+    assert '\\notin {"draft"}' in step.split("\n\n")[0] and "Pass(" in step.split("\n\n")[0]
+
+
+def test_the_harness_tries_a_person_rule_with_an_agent():
+    from toprope.harness.cases import Planner
+    from toprope.harness.world import grow_world
+    d = with_bypass({"on": "Experiment.approved", "requires": "human", "reason": "Only a person approves."})
+    cases = {c.id: c for c in Planner(grow_world(d), lambda: datetime(2026, 1, 1, tzinfo=timezone.utc)).cases() if c.kind == "rule-agent"}
+    case = cases["rule-agent:Experiment.draft.approve_quickly.eng"]
+    assert case.agent and case.expect == {"status": "denied", "code": RULE}
+    report = change_check(d, examples=20)
+    assert report.checks["harness"].ok, [p.message for p in report.checks["harness"].problems][:3]
+
+
+def test_the_harness_catches_an_interpreter_that_lets_an_agent_through(monkeypatch):
+    from toprope.decl import rules
+    d = with_bypass({"on": "Experiment.approved", "requires": "human", "reason": "Only a person approves."})
+    real = rules.meets
+    planned = real
+
+    def lenient(rule, kind, *a, **k):                 # the interpreter forgets the person rule
+        return True if kind == "agent" and rule.requires == "human" else planned(rule, kind, *a, **k)
+    from toprope.harness import cases as cases_mod
+    from toprope.harness.world import grow_world
+    expected = cases_mod.Planner(grow_world(d), lambda: datetime(2026, 1, 1, tzinfo=timezone.utc)).cases()          # planned with the real rule
+    monkeypatch.setattr(rules, "meets", lenient)
+    monkeypatch.setattr(cases_mod.Planner, "cases", lambda self: expected)
+    report = change_check(d, examples=20)
+    assert not report.checks["harness"].ok
+    assert any("rule-agent:" in p.message or "rule-agent:" in str(p.where) for p in report.checks["harness"].problems)

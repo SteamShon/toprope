@@ -199,7 +199,7 @@ A rule about an outcome holds every action that reaches it, an action added late
 rules:
   only-a-person-confirms:
     on: Element.confirmed            # <Object>.<state>, or <Object>.<property> an effect sets
-    requires: human                  # or {roles: [owner]}
+    requires: human                  # or {roles: [owner]}, or {check: 'actor.id != target.proposer'}
     reason: Only a person confirms an element.
 ```
 
@@ -210,6 +210,14 @@ rules:
 - The interpreter checks rules after the matrix cell and before the preconditions; a refusal's
   code is the rule's id and its reason the rule's. The harness expects the same, cell by cell.
 - An agent meets a roles rule only when its principal also holds one of the roles.
+- A `check` rule is a check-language expression over `actor`, `target` and `params` (with the
+  params of every action it covers); it fails closed. The TLA+ export adds it as a guard on the
+  moves it covers. The capability diff does not read it: it never narrows who may act there.
+- The harness tries every cell a rule covers with an agent acting for the role's person, under a
+  grant for the action (`rule-agent:` cases): `requires: human` on the action refuses it (`actor`),
+  else the first rule it does not meet, else it is allowed as the person is. The generated guide
+  lists each rule and the actions it covers, and the interview asks for rules at the invariants
+  stage.
 - The validator refuses a rule whose `on` names no state or property (`unknown-path`), and warns
   about one that no action reaches (`rule-covers-nothing`). The change check's `capability` diff
   reports a path that is no longer held to a rule.

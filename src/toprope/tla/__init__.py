@@ -41,7 +41,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from ..decl.models import ActorRule, ByRole, Deny, Domain, Target
+from ..decl.models import ActorRule, ByRole, Deny, Domain, RuleCheck, Target
+from ..decl.rules import covering
 from ..expr import parse
 from ..expr.ast import Arith, Call, Compare, ListLit, Literal, Logical, Neg, Not, Path
 from ..harness.world import world_actors
@@ -418,7 +419,7 @@ def _action(d: Domain, name: str, a: Any, tr: Any, actors: dict[str, Any], ids: 
         else:
             who = " \\/ ".join(f"Pass({ex(r.where)})" for r in rules)
         moves = []
-        from ..decl.rules import covering, meets
+        from ..decl.rules import meets
         for state, cells in tr.matrix.items():
             to = _resolve(cells.get(name, "undecided"), actor.roles)
             if to is not None and all(meets(r, actor.kind, actor.roles) for _, r in covering(d, name, state)):
@@ -426,6 +427,12 @@ def _action(d: Domain, name: str, a: Any, tr: Any, actors: dict[str, Any], ids: 
         if not moves:
             continue
         pre = [f"Pass({ex(p.check)})" for p in a.preconditions]
+        for rid, rule in sorted(d.rules.items()):       # a `check` rule guards the moves it covers
+            if isinstance(rule.requires, RuleCheck):
+                held = sorted(st for st in tr.matrix if any(r == rid for r, _ in covering(d, name, st)))
+                if held:
+                    pre.append(f"(mv[1] \\notin {{{', '.join(tla_str(st) for st in held)}}} \\/ "
+                               f"Pass({ex(rule.requires.check)}))")
         sets = {}
         for e in a.effects:
             for key, v in (e.set or {}).items():
@@ -476,7 +483,7 @@ def _create(d: Domain, name: str, a: Any, actors: dict[str, Any], ids: list[str]
     if tr is not None and tr.initial:
         base[tr.field] = value(tr.initial)
     out = []
-    from ..decl.rules import covering, meets
+    from ..decl.rules import meets
     for role, actor in sorted(actors.items()):
         if a.requires == "human" and actor.kind != "person":
             continue
@@ -489,6 +496,7 @@ def _create(d: Domain, name: str, a: Any, actors: dict[str, Any], ids: list[str]
         who = "TRUE" if any(isinstance(r, str) or not r.where for r in rules) else \
             " \\/ ".join(f"Pass({ex(r.where)})" for r in rules)
         pre = [f"Pass({ex(p.check)})" for p in a.preconditions]
+        pre += [f"Pass({ex(r.requires.check)})" for _, r in covering(d, name, None) if isinstance(r.requires, RuleCheck)]
         sets = {}
         for e in a.effects:
             for key, v in (e.set or {}).items():

@@ -16,16 +16,25 @@ from typing import Any
 from ..decl.models import Action, ActorRule, ByRole, Deny, Domain, Target
 from ..expr import parse, paths_read
 from ..semantics.interpreter import Interpreter
-from ..semantics.types import Command
+from ..semantics.types import Actor, Command, Grant
 from .world import Instance, SmallWorld, default_params
 
 MATRIX_CODES = {"matrix", "not-applicable", "undecided"}
 
 
+def agent_of(person: Actor) -> Actor:
+    """The harness's agent for a person: the same roles, acting on the person's behalf."""
+    return Actor(f"{person.id}~agent", "agent", person.roles)
+
+
+def agent_grant(action: str) -> Grant:
+    return Grant("harness", frozenset({action}))
+
+
 @dataclass
 class Case:
     id: str
-    kind: str                         # cell | precondition | create
+    kind: str                         # cell | precondition | create | rule-agent
     obj: str
     state: str | None
     action: str
@@ -34,6 +43,7 @@ class Case:
     params: dict[str, Any] = field(default_factory=dict)
     expect: dict[str, Any] = field(default_factory=dict)
     gap: str | None = None
+    agent: bool = False               # taken by an agent on behalf of the role's person (rule cases)
 
 
 def raw_cell(d: Domain, obj: str, state: str, action: str, role: str) -> Any:
@@ -74,15 +84,26 @@ class Planner:
     def params(self, a: Action) -> dict[str, Any]:
         return default_params(self.d, a, self.w.fixtures, self.interp.clock)
 
-    def rule_refusing(self, name: str, a: Action, role: str, inst: Instance | None) -> str | None:
+    def rule_refusing(self, name: str, a: Action, role: str, inst: Instance | None,
+                      agent: bool = False) -> str | None:
         """The outcome rule (ADR-0048) that refuses this actor here, if any: checked after the
         cell and before the preconditions, as the interpreter does."""
         from ..decl.rules import covering, meets
-        actor = self.w.actors[role]
+        from ..expr import EvalError, evaluate
+        from ..semantics.interpreter import ObjectView
+        person = self.w.actors[role]
+        actor = agent_of(person) if agent else person
         tr = self.d.transitions.get(a.object_type)
         frm = inst.data.get(tr.field) if (tr is not None and inst is not None and a.target) else None
-        return next((rid for rid, r in covering(self.d, name, frm) if not meets(r, actor.kind, actor.roles, actor.roles)),
-                    None)
+        view = ObjectView(self.d, a.object_type, (inst.data if inst else {}), self.lookup)
+
+        def check(src: str) -> bool:
+            try:
+                return evaluate(parse(src), self.interp._env(view, actor, self.params(a), principal=person)) is True
+            except EvalError:
+                return False
+        return next((rid for rid, r in covering(self.d, name, frm)
+                     if not meets(r, actor.kind, actor.roles, person.roles, check)), None)
 
     def actor_ok(self, name: str, a: Action, role: str, inst: Instance | None, rules: bool = True) -> bool:
         actor = self.w.actors[role]
@@ -125,6 +146,7 @@ class Planner:
                 out += self._create_cases(name, a)
             elif a.target in self.d.transitions:
                 out += self._cell_cases(name, a)
+                out += self._rule_agent_cases(name, a)
                 out += self._param_cases(name, a)
                 out += self._precondition_cases(name, a)
         return out
@@ -150,6 +172,37 @@ class Planner:
                     elif expect["status"] == "ok" and (pre := self.first_failing(a, inst.data, role)):
                         expect = {"status": "denied", "code": pre}
                 out.append(Case(cid, "cell", obj, state, name, role, inst, self.params(a), expect))
+        return out
+
+    def _rule_agent_cases(self, name: str, a: Action) -> list[Case]:
+        """Each cell an outcome rule covers, where the role's person may act, taken instead by an
+        agent on the person's behalf with a grant for the action (ADR-0048 §2). The agent is
+        refused by `requires: human` on the action (`actor`), else by the first rule it does not
+        meet, else it is allowed as the person is. Roles whose actor rules name a relation are
+        skipped: the relation reads the person's id, which the agent does not have."""
+        from ..decl.rules import covering
+        out = []
+        obj = a.object_type
+        if any(isinstance(r, ActorRule) and r.where for r in a.actor):
+            return out
+        for state in self.d.transitions[obj].matrix:
+            if not covering(self.d, name, state):
+                continue
+            for role in self.w.actors:
+                if self.w.actors[role].kind != "person":
+                    continue
+                insts = [i for i in self.w.in_state(obj, state) if self.first_failing(a, i.data, role) is None]
+                if not insts or not self.actor_ok(name, a, role, insts[0]):
+                    continue
+                expect = cell_expectation(raw_cell(self.d, obj, state, name, role), state)
+                if expect["status"] != "ok":
+                    continue
+                if a.requires == "human":
+                    expect = {"status": "denied", "code": "actor"}
+                elif rule := self.rule_refusing(name, a, role, insts[0], agent=True):
+                    expect = {"status": "denied", "code": rule}
+                out.append(Case(f"rule-agent:{obj}.{state}.{name}.{role}", "rule-agent", obj, state, name, role,
+                                insts[0], self.params(a), expect, agent=True))
         return out
 
     def _param_cases(self, name: str, a: Action) -> list[Case]:

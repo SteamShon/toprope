@@ -46,6 +46,10 @@ class Surface(ABC):
     @abstractmethod
     def do(self, actor: Actor, action: str, target: str, params: dict[str, Any], key: str) -> Observed: ...
 
+    def do_as(self, caller: Caller, action: str, target: str, params: dict[str, Any], key: str) -> Observed:
+        """An agent's command, on behalf of a person under a grant (ADR-0016)."""
+        raise NotImplementedError
+
     @abstractmethod
     def state(self, oid: str) -> dict[str, Any] | None: ...
 
@@ -76,6 +80,10 @@ class ModelSurface(Surface):
     def do(self, actor, action, target, params, key):
         return observed(self.m.execute(Command(actor, action, target, dict(params), key)))
 
+    def do_as(self, caller, action, target, params, key):
+        return observed(self.m.execute(Command(caller.actor, action, target, dict(params), key,
+                                               on_behalf_of=caller.on_behalf_of, grant=caller.grant)))
+
     def state(self, oid):
         return self.m.state(oid)
 
@@ -99,6 +107,10 @@ class _Identities(StaticIdentity):
         self._callers.setdefault(token(actor), Caller(actor))
         return token(actor)
 
+    def add_caller(self, caller: Caller) -> str:
+        self._callers[token(caller.actor)] = caller
+        return token(caller.actor)
+
 
 class ExecutionSurface(Surface):
     name = "execution"
@@ -114,6 +126,9 @@ class ExecutionSurface(Surface):
         if actor.id == KERNEL:   # a kernel reply never comes through credentials (ADR-0028)
             return observed(self.ex.receive_kernel_reply(key, action, target, dict(params)))
         return observed(self.ex.submit(self.ids.add(actor), action, target, dict(params), key))
+
+    def do_as(self, caller, action, target, params, key):
+        return observed(self.ex.submit(self.ids.add_caller(caller), action, target, dict(params), key))
 
     def state(self, oid):
         return self.ex.state(oid)
@@ -179,6 +194,12 @@ class MCPSurface(ExecutionSurface):
         spec = self.ex.d.actions[action]
         arg = "new_id" if spec.creates else "target_id"
         return self._tool(actor, action, {arg: target, "idempotency_key": key, **params})
+
+    def do_as(self, caller, action, target, params, key):
+        self.ids.add_caller(caller)
+        spec = self.ex.d.actions[action]
+        arg = "new_id" if spec.creates else "target_id"
+        return self._tool(caller.actor, action, {arg: target, "idempotency_key": key, **params})
 
     def allowed(self, actor, oid):
         if actor.id == KERNEL:
