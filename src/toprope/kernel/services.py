@@ -161,8 +161,10 @@ class LocalKernel(KernelServices):
 
     def _stage_questions(self):
         q = self._ws().questions()
+        texts = [x["text"] for x in q.get("questions", [])]
+        # `text`: the bundle as one string, for a declaration to keep (a property holds no list).
         return {"stage": q.get("stage") or "", "bundle": q.get("bundle_id") or "",
-                "questions": [x["text"] for x in q.get("questions", [])]}
+                "questions": texts, "text": "\n".join(f"- {t}" for t in texts)}
 
     def _propose_element(self, path, value, source):
         import json
