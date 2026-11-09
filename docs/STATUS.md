@@ -339,6 +339,7 @@ gate, a clean pipeline and the grader's measured noise.
 | Mechanical promotion (`python -m toprope.decl.rules suggest`: an outcome every non-system action reaches only with `requires: human` gets that rule; the self domains get 5 and 5, and pass their checks with them); the Phase B log keeps one header under a lock and `phase_b status` leaves out runs moved aside | ✅ | #190 |
 | Authoring's `record_questions` sets `params.questions` (a self-domain change: with the rules, in the loop) | ⬜ | |
 | The probes: each probe agent's grant adds what its task asks (`TASK_ACTIONS`; a person-only action stays refused); the gate in the scorer (`probe_gate`; `found_after_deploy_ungated` kept); the grader reads a probe's `examples`; the amended suite (P05, P07 judged on what the agent did and what its tools show; examples for P01, P04, P08), amended by the researcher's approved request (`FROZEN.json`, version 2) | ✅ | #191 |
+| The grader's second sitting (`grade --into scoring-2`) and its noise (`compare-gradings`, `grader-noise.json`); the recheck's steps in the RUNBOOK | ✅ | |
 | The self domains adopt the promoted rules; the baseline moves; Phase B rerun (local session); graded twice | ⬜ | |
 | The recheck report; M1 closed | ⬜ | |
 
