@@ -25,14 +25,20 @@
       "frozen_at": "2026-11-06T04:36:25+00:00"
     },
     "binding.yaml": {
-      "sha256": "808b45371a8851cf7a504fa81160ce55bc66330b3b4339a1f01a377c8f698805",
-      "frozen_at": "2026-11-07T22:57:13+00:00",
+      "sha256": "215cd940cc15c297fd7f0a46a64427d640eb5ab2854cd3106e2f8ad1b938b744",
+      "frozen_at": "2026-11-09T15:53:27+00:00",
       "history": [
         {
           "sha256": "0c5fcf0eecc711b98d978c050c796a6b1abad1a9e191aecd41c9481d47ac4e8d",
           "frozen_at": "2026-11-06T04:56:06+00:00",
           "replaced_at": "2026-11-07T22:57:13+00:00",
           "reason": "Re-baseline Phase B on authoring@9-b4ec65433222f096 (researcher's instruction, 2026-11-07): today's harness finds an invariant break in authoring@4, so the deploy floor refuses it; @8 fixed it and @9 is the first approved commit after the fix. Only domain_version changed; @4 to @9 only added elements."
+        },
+        {
+          "sha256": "808b45371a8851cf7a504fa81160ce55bc66330b3b4339a1f01a377c8f698805",
+          "frozen_at": "2026-11-07T22:57:13+00:00",
+          "replaced_at": "2026-11-09T15:53:27+00:00",
+          "reason": "M1 recheck: the arms start from authoring@12 and delivery@6 (#192, #205); every element the binding names exists there"
         }
       ]
     },
