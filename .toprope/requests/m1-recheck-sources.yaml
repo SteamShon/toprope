@@ -1,0 +1,41 @@
+summary: Confirm, approve, deploy and verify Authoring's re-cited bundle questions
+  (no experiment words in what an arm sees; M1 recheck)
+steps:
+- run:
+    member: authoring
+    action: confirm_all_proposed
+    target: authoring
+- run:
+    member: authoring
+    action: commit_draft
+    target: authoring
+- run:
+    member: authoring
+    action: check_commit
+    target: $commit
+- run:
+    member: authoring
+    action: approve_commit
+    target: $commit
+- run:
+    member: authoring
+    action: deliver
+    target: $commit
+    params:
+      environment: local
+- run:
+    member: delivery
+    action: preview
+    target: authoring:$commit:local
+- run:
+    member: delivery
+    action: deploy
+    target: authoring:$commit:local
+- run:
+    member: delivery
+    action: run_probes
+    target: authoring:$commit:local
+- run:
+    member: delivery
+    action: verify
+    target: authoring:$commit:local
