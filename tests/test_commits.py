@@ -336,6 +336,19 @@ def test_a_commit_with_a_proposed_element_is_not_approved(store):
     assert st.approve("example", c2.id, "ana") == c2
 
 
+def test_a_commit_with_a_proposed_outcome_rule_is_not_approved_and_confirm_all_finds_it(store, tmp_path):
+    """Found when the M1 recheck's approval confirmed everything proposed but the rules (ADR-0048)."""
+    from toprope.decl.provenance import proposed_elements
+    st, wc = store
+    raw = schema_doc_domain()
+    raw["rules"] = {"only-approvers": {"on": "Experiment.approved", "requires": {"roles": ["approver"]},
+                                       "reason": "r", "status": "proposed"}}
+    assert proposed_elements(raw) == ["rules.only-approvers"]
+    c, _ = st.commit(write(wc, raw))
+    with pytest.raises(CommitError, match=r"1 proposed element\(s\): rules.only-approvers"):
+        st.approve("example", c.id, "ana")
+
+
 def test_a_merge_that_brings_in_a_proposed_element_is_not_approved(store, tmp_path):
     st, wc = store
     raw = schema_doc_domain()
