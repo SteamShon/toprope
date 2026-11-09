@@ -16,6 +16,7 @@ Legend: ✅ done · 🟡 in part · ⬜ not started
 |---|---|---|---|
 | M0a thin slice | none (enabler) | ✅ | released as `v0.1.0` (#65); the tag is not pushed yet |
 | M1 self-compile | ① ⑥ pilot, no verdict | ✅ | reported ([`M1-report.md`](experiments/M1-report.md)): with its LLM review Toprope's recall is 0.84 against 0.64 for the NL skill (at the noise floor) and level with the structured spec; the compiler alone weakens ①; ⑥ inconclusive; self-compile not shown (probes) |
+| U usability before M2 (ADR-0049) | none (enabler) | 🟡 | ADR accepted; baseline next |
 | M0b surfaces and effects | none (enabler) | ⬜ | |
 | M2 dogfood | ① ② ③ | ⬜ | the first ① and ② verdicts |
 | M3 shared language | ④ | ⬜ | |
@@ -326,24 +327,40 @@ From [`M1-report.md`](experiments/M1-report.md), *What M2 takes from this*.
 | Probes that pass before any change: why they fail at `seq: 0` ([`probe-baseline-findings.md`](../experiments/m1/probe-baseline-findings.md)): criteria the right behaviour fails (P05, P07), unequal worlds (the Toprope agent's grant lacks `deliver`/`deploy`), strict readings; proposals wait for the researcher (the suite is an instrument) | 🟡 | |
 | M2's design, a draft for the researcher ([`M2-design.md`](experiments/M2-design.md)): the full Toprope check against a structured spec reviewed by an LLM, the same edit checked both ways, grouped precision, the grader's noise, probes gated before any change, draft verdict rules | 🟡 | |
 
+## Usability before M2 (ADR-0049, link: none)
+
+Four umbrellas after a baseline. A sub-PR that runs the self domains' loop waits until no other
+open PR changes their commit store or logs (`umbrella/m1-recheck` has them now).
+
+| Item | Status | PR |
+|---|---|---|
+| ADR-0049: the program, its order and targets | ✅ | this PR |
+| Baseline: F1 (friction in the change loop, from the logs) and F2 (time to a first enforced rule) | ⬜ | |
+| Theme 1, the change loop: B4 citations from a query, C1 `toprope change`, C3 `toprope.yaml`, B5 one diff to confirm, D1 a fix in every error, C2 approvals by risk (its own ADR first) | ⬜ | |
+| Theme 2, getting started: A4 `init` and `try`, A3 templates, E1 docs, E2 a tutorial | ⬜ | |
+| Theme 3, interview and feedback: B1 choice questions, B2 examples first, B3 a live map, D2 impact as decisions, D3 counterexamples as stories | ⬜ | |
+| Theme 4, import and wrap: A1 from `AGENTS.md`, skills, OpenAPI, enums, tickets; A2 an MCP proxy (its own ADR first) | ⬜ | |
+
 ## M0b, M2 to M5
 
 Not started. Plans: [`roadmap.md`](roadmap.md).
 
 ## Next
 
-1. M2's spec, from the draft (`docs/experiments/M2-design.md`): the researcher decides each point,
+1. ADR-0049's baseline (F1, F2), then theme 1 (the change loop). M2's spec waits for the
+   program.
+2. M2's spec, from the draft (`docs/experiments/M2-design.md`): the researcher decides each point,
    freezes the verdict rules, and finds the domain expert who is not the builder; the expert
    writes the change list, seeds it and keeps the key. The probe proposals
    (`experiments/m1/probe-baseline-findings.md`) are the researcher's to adopt. The self domains
    adopt outcome rules through their own reviewed changes (ADR-0048 §5).
-2. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
-3. When a domain is shared by several people or agents (M2, or a hosted server): its event
+3. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
+4. When a domain is shared by several people or agents (M2, or a hosted server): its event
    log moves from git to a database (`--store postgres:DSN` for a composition, one schema per
    member), through a new ADR superseding decision 29A for that case; an export to git can
    keep the audit trail (decided 2026-11-06). Until then the self domains keep their logs in
    git (`domains/<domain>/events/`).
-4. ADR-0041's follow-up work (decided 2026-11-06), the third on in
+5. ADR-0041's follow-up work (decided 2026-11-06), the third on in
    `umbrella/adr-0041-follow-ups` (#114). Done: approval refuses commits with proposed
    elements, and the change check records how many are left (#110); every decision action takes
    an optional `rationale` (#111); a check can read `actor.principal` (#113);
@@ -351,7 +368,7 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    permissions it ran under (#116); a commit may cite its evidence (#117, #118: free strings
    on `commit`, Authoring commit `5-c8fd1b8fc98be17c`), replaced by typed evidence that must
    resolve, cited with `cite_evidence` (#124, in the pstack umbrella).
-5. ADR-0042's follow-up work (accepted 2026-11-07): done: `domain_version` with the deployment
+6. ADR-0042's follow-up work (accepted 2026-11-07): done: `domain_version` with the deployment
    log gives the rule in force when an event was decided, documented, the self domains too
    (ADR-0045, #150); read visibility defined in the schema (`read`, refused until M0b); in M0b,
    deadlines with timers, read visibility enforced by the query and MCP read tools, an observed
@@ -361,11 +378,11 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    (recommendation, evidence, rules and version applied, the person's decision and reason, the
    action, the outcome). A source kind for process mining (event logs of existing systems) is a
    candidate for the authoring interview's sources, with the adapters (M0b).
-6. ADR-0043's follow-ups: make `tla` a required check on `develop` (maintainer). Creation
+7. ADR-0043's follow-ups: make `tla` a required check on `develop` (maintainer). Creation
    (#155), link paths to what no action changes (#156) and time, frozen at the harness's clock
    (#157), are modeled; no declaration in the repository leaves anything out.
 
-7. Before M2's Phase B: a probe's starting state written as conditions on objects (for example
+8. Before M2's Phase B: a probe's starting state written as conditions on objects (for example
    a Commit with `checks_passed` true and `approved` false), and generated from the declarations
    by searching their actions for a way to reach it, instead of a hand-written setup per probe.
    This needs a format change to the probe suite (an ADR). M1 keeps the hand-written setups in
