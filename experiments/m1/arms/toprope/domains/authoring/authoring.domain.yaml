@@ -26,6 +26,7 @@ objects:
         type: string
       local_only:
         type: boolean
+        optional: true
       sha256:
         type: string
         optional: true
@@ -34,9 +35,8 @@ objects:
         - added
         - fetched
     source:
-      kind: interview
-      ref: interview:domains/authoring/interview.jsonl#L5
-      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+      kind: record
+      ref: records:docs/adr/0014-interview-design.md#L11-L41
     status: confirmed
   Question:
     description: A question in a stage's bundle, for the owner to answer.
@@ -186,9 +186,12 @@ objects:
       conflicts:
         type: integer
         optional: true
+      questions:
+        type: string
+        optional: true
     source:
       kind: record
-      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+      ref: records:docs/adr/0025-staged-authoring-interview.md#L16-L58
     status: confirmed
 links:
   question:
@@ -645,7 +648,7 @@ actions:
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
     status: confirmed
   record_questions:
-    description: Record the current stage and its bundle.
+    description: Record the current stage, its bundle and its questions.
     actor:
     - external:kernel
     target: Draft
@@ -657,10 +660,13 @@ actions:
       questions:
         type: string
         many: true
+      text:
+        type: string
     effects:
     - set:
         target.current_stage: params.stage
         target.bundle: params.bundle
+        target.questions: params.text
     source:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
@@ -1392,4 +1398,50 @@ glossary:
     harness, past actions, stranded objects.'
   unknown: An element marked as not known yet, instead of guessed. It stays visible
     until someone answers it.
-version: 9
+rules:
+  only-a-person-commit-approved:
+    'on': Commit.approved
+    requires: human
+    reason: 'Only a person sets the approved of a Commit: every action that does so
+      today requires a person (approve_commit).'
+    source:
+      kind: record
+      ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
+    status: confirmed
+  only-a-person-commit-main:
+    'on': Commit.main
+    requires: human
+    reason: 'Only a person sets the main of a Commit: every action that does so today
+      requires a person (approve_commit).'
+    source:
+      kind: record
+      ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
+    status: confirmed
+  only-a-person-decisionrequest-choice:
+    'on': DecisionRequest.choice
+    requires: human
+    reason: 'Only a person sets the choice of a DecisionRequest: every action that
+      does so today requires a person (decide).'
+    source:
+      kind: record
+      ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
+    status: confirmed
+  only-a-person-decisionrequest-decided:
+    'on': DecisionRequest.decided
+    requires: human
+    reason: 'Only a person brings a DecisionRequest to decided: every action that
+      does so today requires a person (decide).'
+    source:
+      kind: record
+      ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
+    status: confirmed
+  only-a-person-element-confirmed:
+    'on': Element.confirmed
+    requires: human
+    reason: 'Only a person brings an Element to confirmed: every action that does
+      so today requires a person (confirm_element).'
+    source:
+      kind: record
+      ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
+    status: confirmed
+version: 12
