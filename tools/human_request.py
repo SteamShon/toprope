@@ -137,7 +137,22 @@ def render(req: dict) -> str:
             lines.append(f"{i}. **amend** `{arg['file']}` in `{arg['dir']}`: {arg['reason']}")
         else:
             lines.append(f"{i}. **{kind}** `{arg}`")
+    for st in req["steps"]:                      # what a confirm step confirms, as one diff (B5)
+        (kind, arg), = st.items()
+        if kind == "run" and arg.get("action") in ("confirm_all_proposed", "confirm_element"):
+            lines += ["", f"#### What `{arg['action']}` confirms", "", "```diff",
+                      review(arg.get("workspace") or f"toprope.{arg['member']}.workspace.yaml").rstrip(), "```"]
     return "\n".join(lines) + "\n"
+
+
+def review(workspace: str, cwd: str | Path = ".") -> str:
+    """The proposed elements a confirm step would confirm, against the domain's `main`."""
+    sys.path.insert(0, str(ROOT / "src"))
+    from toprope.workspace import Workspace
+    try:
+        return Workspace(Path(cwd) / workspace).render_review()
+    except Exception as e:                       # noqa: BLE001 - the page still shows the steps
+        return f"(the review could not be made: {e})"
 
 
 def commands(req: dict) -> list[list[str]]:

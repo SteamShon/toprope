@@ -83,6 +83,19 @@ def is_element(segs: list[str]) -> bool:
             or (len(segs) == 5 and segs[0] == "transitions" and segs[2] == "matrix"))
 
 
+def _show(x: Any) -> str:
+    return yaml.safe_dump(x, sort_keys=False, allow_unicode=True, default_flow_style=False, width=100)
+
+
+def _bare(el: Any) -> Any:
+    """An element without its provenance, as a person reads it."""
+    if isinstance(el, dict):
+        return {k: _bare(v) for k, v in el.items() if k not in ("source", "status")}
+    if isinstance(el, list):
+        return [_bare(v) for v in el]
+    return el
+
+
 def _get(doc: Any, segs: list[str]) -> Any:
     cur = doc
     for i, s in enumerate(segs):
@@ -420,6 +433,47 @@ class Workspace:
         issues = self._write(doc)
         self._append(self.log_path, {"at": _now(), "kind": "confirm", "paths": paths, "via": via, "who": who})
         return {"confirmed": paths, "issues": issues}
+
+    # -- one diff to confirm (ADR-0049, B5) ---------------------------------------------------
+    def review(self) -> list[dict[str, Any]]:
+        """Every element still proposed in the working copy: what it says now, what the domain's
+        approved `main` says there (None: new), and where it came from. A person confirms from this
+        one view instead of reading the draft element by element."""
+        doc = self.draft()
+        before: dict[str, Any] = {}
+        d = doc.get("domain")
+        main = self.commits.main(d) if isinstance(d, str) and d and self.commits.log(d) else None
+        if main is not None:
+            before = self.commits.declaration(d, main.id)
+        out = []
+        for path in self._proposed(doc):
+            segs = element_path(path)
+            el = _get(doc, segs)
+            old = _get(before, segs) if before else None
+            out.append({"path": path, "now": _bare(el), "before": _bare(old) if old is not None else None,
+                        "source": (el or {}).get("source") if isinstance(el, dict) else None,
+                        "main": main.id if main else None})
+        return out
+
+    def render_review(self) -> str:
+        items = self.review()
+        if not items:
+            return "Nothing is proposed: there is nothing to confirm.\n"
+        lines = [f"{len(items)} proposed element(s), against main "
+                 f"{items[0]['main'] or '(none yet: every element is new)'}:", ""]
+        for it in items:
+            src = it["source"] or {}
+            lines.append(f"{'~' if it['before'] is not None else '+'} {it['path']}"
+                         f"    (from {src.get('ref', '?')})")
+            if src.get("quote"):
+                lines.append(f'    "{src["quote"]}"')
+            if it["before"] is not None:
+                for ln in _show(it["before"]).rstrip().splitlines():
+                    lines.append(f"    - {ln}")
+            for ln in _show(it["now"]).rstrip().splitlines():
+                lines.append(f"    + {ln}")
+            lines.append("")
+        return "\n".join(lines)
 
     # -- interview questions (ADR-0014) ----------------------------------------------------
     def attempts_by_action(self) -> dict[str, int]:
