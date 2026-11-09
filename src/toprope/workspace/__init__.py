@@ -261,16 +261,45 @@ class Workspace:
     def _used(self, source_id: str, refs: list[str]) -> None:
         self._append(self.usage_path, {"at": _now(), "source": source_id, "refs": refs})
 
+    def resolve_ref(self, ref: str) -> tuple[str, str | None]:
+        """A citation as written: an exact chunk ref, or words from the passage (ADR-0049, B4).
+        Words resolve to the one chunk that contains them (case and spacing ignored), within the
+        source named before a colon if there is one. Returns (ref, the quote, if words were given)."""
+        sid, _, rest = ref.partition(":")
+        if sid in self.sources and any(c.ref == ref for c in self.chunks(sid)):
+            return ref, None
+        if len(ref.split()) < 2:                     # one token: meant as a ref, not as words
+            if sid not in self.sources or not rest:
+                raise AuthoringError(fixed(f"unknown source in ref {ref!r}",
+                                           "cite a ref of the form `<source>:<chunk>`, as `search` returns "
+                                           "it, or quote words from the passage"))
+            raise AuthoringError(fixed(f"no chunk {ref!r}", "run `search` with words from the passage, and "
+                                       "cite the `ref` it returns, or quote the words"))
+        if sid in self.sources and rest.strip():
+            specs, words = [self.sources[sid]], rest
+        else:
+            specs, words = [s for s in self.sources.values() if not s.local_only], ref
+        norm = " ".join(words.split()).strip().strip('"').strip().lower()
+        hits = [c.ref for s in specs for c in self.chunks(s.id) if norm in " ".join(c.text.split()).lower()]
+        if not hits:
+            raise AuthoringError(fixed(f"no chunk {ref!r}, and no passage contains those words",
+                                       "run `search` with words from the passage, and cite the `ref` it "
+                                       "returns or words it shows"))
+        if len(hits) > 1:
+            shown = ", ".join(hits[:5]) + (f" and {len(hits) - 5} more" if len(hits) > 5 else "")
+            raise AuthoringError(fixed(f"{len(hits)} passages contain {words.strip()!r}: {shown}",
+                                       "quote more of the passage, or cite one of those refs"))
+        self._used(hits[0].split(":", 1)[0], hits)
+        return hits[0], words.strip().strip('"')
+
     def source_of(self, ref: str, quote: str | None = None) -> dict[str, Any]:
-        sid = ref.split(":", 1)[0]
-        spec = self.sources.get(sid)
-        if spec is None:
-            raise AuthoringError(fixed(f"unknown source in ref {ref!r}", "cite a ref of the form `<source>:<chunk>`, as `search` returns it"))
-        if not any(c.ref == ref for c in self.chunks(sid)):
-            raise AuthoringError(fixed(f"no chunk {ref!r}: cite a ref returned by read_source or search_sources", "run `search` with words from the passage, and cite the `ref` it returns"))
+        """Where an element came from: its chunk, and the owner's words if given. A citation by
+        quote records the chunk it resolved to, and the quote."""
+        ref, quoted = self.resolve_ref(ref)
+        spec = self.sources[ref.split(":", 1)[0]]
         out = {"kind": ELEMENT_KIND[spec.kind], "ref": ref}
-        if quote:
-            out["quote"] = quote
+        if quote or quoted:
+            out["quote"] = quote or quoted
         return out
 
     # -- the draft -------------------------------------------------------------------------

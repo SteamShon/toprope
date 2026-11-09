@@ -108,7 +108,8 @@ the error is raised.
 | cannot read the working copy: {…} | fix the declaration file so it parses, or restore it with `git checkout -- <file>`, then check out again |
 | event_store: {…} | set `event_store:` in the workspace file to `sqlite:FILE`, `jsonl:DIR` or `memory` |
 | no branch {…}; branches: {…} | use one of the branches listed |
-| no chunk {…}: cite a ref returned by read_source or search_sources | run `search` with words from the passage, and cite the `ref` it returns |
+| no chunk {…} | run `search` with words from the passage, and cite the `ref` it returns, or quote the words |
+| no chunk {…}, and no passage contains those words | run `search` with words from the passage, and cite the `ref` it returns or words it shows |
 | no deploy environment at {…} | pass `--env` the directory of a local deploy environment, or set `env:` in toprope.yaml |
 | no source {…} | use a source id listed in the workspace file's `sources:`, or add the source there with a `path:` or `url:` |
 | no source {…} | use a source id listed in the workspace file's `sources:`, or add the source there with a `path:` or `url:` |
@@ -129,10 +130,11 @@ the error is raised.
 | the draft names no `domain`, so there is no commit log to merge in | set `domain:` at the top of the draft |
 | the draft would not parse: {…}: {…} | fix the element at that location so the declaration matches the schema (docs/domain-schema.md) |
 | unknown question {…}: pass its text | pass the question's text with the answer, or use an id `next_questions` returned |
-| unknown source in ref {…} | cite a ref of the form `<source>:<chunk>`, as `search` returns it |
+| unknown source in ref {…} | cite a ref of the form `<source>:<chunk>`, as `search` returns it, or quote words from the passage |
 | unknown stage {…}: one of {…} | use one of the stages listed |
 | {…} is committed, and its tools refuse a declaration with errors; this change would add {…}. Propose what it refers to first. | propose the elements it refers to first, then this one |
 | {…} is not a drafted element with a source | confirm only elements that were proposed with a source; `next_questions` lists them |
 | {…} must be an object | give the value as a mapping |
+| {…} passages contain {…}: {…} | quote more of the passage, or cite one of those refs |
 | {…}: an item of {…} must be an object | give the item as a mapping, such as `{id: x, check: ...}` |
 | {…}: provenance is set by the tool; propose the element itself | propose the element at its own path; the tool records its source and status |
