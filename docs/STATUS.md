@@ -16,7 +16,7 @@ Legend: ✅ done · 🟡 in part · ⬜ not started
 |---|---|---|---|
 | M0a thin slice | none (enabler) | ✅ | released as `v0.1.0` (#65); the tag is not pushed yet |
 | M1 self-compile | ① ⑥ pilot, no verdict | ✅ | reported ([`M1-report.md`](experiments/M1-report.md)): with its LLM review Toprope's recall is 0.84 against 0.64 for the NL skill (at the noise floor) and level with the structured spec; the compiler alone weakens ①; ⑥ inconclusive; self-compile not shown (probes) |
-| U usability before M2 (ADR-0049) | none (enabler) | 🟡 | ADR accepted; baseline next |
+| U usability before M2 (ADR-0049) | none (enabler) | 🟡 | ADR accepted; F1 baseline recorded; F2 next |
 | M0b surfaces and effects | none (enabler) | ⬜ | |
 | M2 dogfood | ① ② ③ | ⬜ | the first ① and ② verdicts |
 | M3 shared language | ④ | ⬜ | |
@@ -333,10 +333,11 @@ Four umbrellas after a baseline. A sub-PR that runs the self domains' loop waits
 open PR changes their commit store or logs (`umbrella/m1-recheck` has them now).
 
 F1 baseline (2026-11-09, `uv run python tools/usability_baseline.py`; the self domains' logs as
-of M1): per approved commit, 10.3 kernel commands by a person or an agent, 4.5 of them by a
-person; 6 approved human requests for 11 approved commits; 1 refusal and 5 failed effects in 215
-commands (0.028). The logs do not see commands that fail before the gate, so that rate is low;
-once theme 1 records those (D1), the rate is measured again before it is compared.
+of M1, from 2026-11-06 05:12, when the command log begins): per change approved in that window (6),
+18.8 commands by a person or an agent, 8.3 of them by a person; 6 approved human requests; 1
+refusal and 5 failed effects in 113 commands by a person or an agent (0.053); 1 commit with a
+failed check. The logs do not see commands that fail before the gate, so that rate is low; once
+theme 1 records those (D1), it is measured again before it is compared (ADR-0049, 5).
 
 | Item | Status | PR |
 |---|---|---|
