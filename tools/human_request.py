@@ -137,6 +137,11 @@ def render(req: dict) -> str:
             lines.append(f"{i}. **amend** `{arg['file']}` in `{arg['dir']}`: {arg['reason']}")
         else:
             lines.append(f"{i}. **{kind}** `{arg}`")
+    if any((st.get("run") or {}).get("action") in SHIPS and MADE in str((st.get("run") or {}).get("target"))
+           for st in req["steps"]):
+        lines += ["", "**One approval ships this change** (ADR-0050): the delivery steps run only if the "
+                  "check in this request finds it low risk, and `verify` runs only if the probes passed; "
+                  "approving verifies in advance on that condition."]
     for st in req["steps"]:                      # what a confirm step confirms, as one diff (B5)
         (kind, arg), = st.items()
         if kind == "run" and arg.get("action") in ("confirm_all_proposed", "confirm_element"):
@@ -206,6 +211,20 @@ def _unmet(stdout: str) -> list[str]:
             for t in then if t.get("status") != "ok"]
 
 
+SHIPS = ("deliver", "preview", "deploy", "run_probes", "verify")
+
+
+def recorded_risk(commit: str, cwd: str | Path = ".") -> str | None:
+    """The risk `check_commit` last recorded on a commit (ADR-0050), from any domain's checks."""
+    level = None
+    for path in sorted((Path(cwd) / ".toprope" / "commits").glob("*/checks.jsonl")):
+        for line in path.read_text().splitlines():
+            row = json.loads(line) if line.strip() else {}
+            if row.get("commit") == commit and row.get("check") == "risk":
+                level = str(row.get("summary", "")).split(":", 1)[0].strip()
+    return level
+
+
 def run(req: dict, approver: str, identity: str = "toprope.identity.yaml", cwd: str | Path = ".") -> list[dict]:
     """Run every step as the approver; stop at the first that fails."""
     sys.path.insert(0, str(ROOT / "src"))
@@ -222,6 +241,13 @@ def run(req: dict, approver: str, identity: str = "toprope.identity.yaml", cwd: 
         arg = st.get("run") or {}
         if MADE in str(arg.get("target")) and made is None:
             raise SystemExit(f"step {len(done) + 1}: {MADE}, but no commit_draft step before it made a commit")
+        if arg.get("action") in SHIPS and made and MADE in str(arg.get("target")) \
+                and recorded_risk(made, cwd) != "low":
+            # ADR-0050: one approval ships only a low-risk change, as checked inside this request
+            print(json.dumps(done, indent=2), file=sys.stderr)
+            raise SystemExit(f"step {len(done) + 1}: {made} is not low risk ({recorded_risk(made, cwd)}), so this "
+                             "approval does not ship it. Fix: read the preview, then approve a second request "
+                             "with the delivery steps")
         cmd = command(st, made)
         r = subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True, check=False)
         done.append({"step": st, "returncode": r.returncode, "stdout": r.stdout[-4000:], "stderr": r.stderr[-4000:]})

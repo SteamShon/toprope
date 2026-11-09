@@ -61,7 +61,11 @@ uv run toprope-change "Drafts name their declaration" --patch change.yaml
 It proposes each element, checks the working copy (on a scratch copy of the commit store), prints the diff a person will
 confirm, and writes one human request (`.toprope/requests/<id>.yaml`). Push it: the person's one
 approval in GitHub confirms, commits, checks and approves. If a check fails, nothing is
-requested, and the message says which check and how to fix it. The steps one by one follow.
+requested, and the message says which check and how to fix it. A low-risk change (ADR-0050:
+no widening, nothing removed, no invariant or rule changed, nothing about who takes a person-only
+step) ships on the same approval: deliver, preview, deploy, the probes and verify, which runs only
+if the probes pass. A high-risk change stops at approval; a second request ships it after the
+preview. The steps one by one follow.
 
 ## The self domains, end to end
 

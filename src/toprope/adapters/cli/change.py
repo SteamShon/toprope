@@ -112,10 +112,10 @@ def kernel_root(given: str | None) -> Path:
     return Path(".")
 
 
-def dry_check(root: Path, workspace: str | None) -> tuple[str, list[str], str]:
+def dry_check(root: Path, workspace: str | None) -> tuple[str, list[str], str, tuple[str, list[str]]]:
     """The change check `check_commit` runs, on a scratch copy of the domain's commit store: the
     working copy is committed there, checked against the same base, with the domain's own event
-    log replayed, and the copy is thrown away. Returns (domain, what failed, summary). A check
+    log replayed, and the copy is thrown away. Returns (domain, what failed, summary, risk). A check
     that did not run is not a pass: no check at all is an error."""
     from ...check import check_commit
     from ...commits import CommitStore
@@ -143,7 +143,7 @@ def dry_check(root: Path, workspace: str | None) -> tuple[str, list[str], str]:
                                "`toprope-run check_commit` after a commit, and report the problem"))
     failing = [f"{n}: {x.summary() if hasattr(x, 'summary') else x}" for n, x in r.checks.items()
                if x.ran and not x.ok]
-    return str(domain), failing, r.summary()
+    return str(domain), failing, r.summary(), r.risk or ("high", ["not assessed"])
 
 
 def slug(text: str) -> str:
@@ -151,13 +151,29 @@ def slug(text: str) -> str:
     return f"{s or 'change'}-{uuid.uuid4().hex[:6]}"
 
 
-def request_for(intent: str, draft: str, member: str, workspace: str | None) -> dict[str, Any]:
-    """The human request that takes the change through (ADR-0039; tools/human_request.py)."""
+SHIP = (("authoring", "deliver", "$commit", {"environment": "local"}),
+        ("delivery", "preview", "{draft}:$commit:local", None),
+        ("delivery", "deploy", "{draft}:$commit:local", None),
+        ("delivery", "run_probes", "{draft}:$commit:local", None),
+        ("delivery", "verify", "{draft}:$commit:local", None))
+
+
+def request_for(intent: str, draft: str, member: str, workspace: str | None,
+                risk: str | None = None) -> dict[str, Any]:
+    """The human request that takes the change through (ADR-0039; tools/human_request.py). A
+    low-risk change also ships on the same approval, verify included, which runs only if the
+    probes passed (ADR-0050); a high-risk one stops at approval, and ships on a second request
+    after the person has read the preview."""
     base = {"member": member, **({"workspace": workspace} if workspace else {})}
-    return {"summary": intent,
-            "steps": [{"run": {**base, "action": a, "target": t}} for a, t in (
-                ("confirm_all_proposed", draft), ("commit_draft", draft),
-                ("check_commit", "$commit"), ("approve_commit", "$commit"))]}
+    steps = [{"run": {**base, "action": a, "target": t}} for a, t in (
+        ("confirm_all_proposed", draft), ("commit_draft", draft),
+        ("check_commit", "$commit"), ("approve_commit", "$commit"))]
+    if risk == "low":
+        for m, action, target, params in SHIP:
+            steps.append({"run": {"member": m, "action": action, "target": target.format(draft=draft),
+                                  **({"params": params} if params else {})}})
+    head = {"low": "[low risk: one approval ships it] ", "high": "[high risk: approval only] "}.get(risk or "", "")
+    return {"summary": head + intent, "steps": steps}
 
 
 def pending_requests() -> list[str]:
@@ -196,18 +212,19 @@ def main(argv: list[str] | None = None) -> None:
                                    "<declaration>`")) from None
         proposed.append(str(it["path"]))
         print(f"proposed {it['path']}", file=sys.stderr)
-    domain, failing, summary = dry_check(kernel_root(a.kernel_root), a.workspace)
+    domain, failing, summary, (risk, reasons) = dry_check(kernel_root(a.kernel_root), a.workspace)
     if failing:
         raise SystemExit(fixed(f"the change check found problems in {domain}'s working copy: "
                                + "; ".join(failing) + f" (proposed and still in the draft: {', '.join(proposed)})",
                                "fix the proposals and run the change again; nothing was requested"))
     review = step(base, "review")
-    req = request_for(a.intent, a.draft, a.member, a.workspace)
+    req = request_for(a.intent, a.draft, a.member, a.workspace, risk)
     path = Path(a.request) if a.request else Path(REQUESTS) / f"{slug(a.intent)}.yaml"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.safe_dump(req, sort_keys=False, allow_unicode=True))
     print(review.get("text", "") if isinstance(review, dict) else str(review), end="")
-    print(json.dumps({"proposed": proposed, "checked": summary, "request": str(path),
+    print(json.dumps({"proposed": proposed, "checked": summary, "risk": risk, "risk_reasons": reasons,
+                      "request": str(path),
                       "next": "commit the request with the draft and the event logs it changed, and push "
                               "them; the person approves the request in GitHub, and that one approval "
                               "confirms, commits, checks and approves (one loop at a time: AGENTS.md)"},

@@ -85,6 +85,7 @@ class ChangeReport:
     impact: dict[str, Any] | None = None       # the impact report (ADR-0013), computed first
     timings: dict[str, Any] = field(default_factory=dict)
     selection_misses: list[str] | None = None   # with a full run: tests the cache wrongly passed
+    risk: tuple[str, list[str]] | None = None   # ADR-0050: set by check_commit
 
     @property
     def sound(self) -> bool:
@@ -234,6 +235,10 @@ def check_commit(commits: Any, domain: str, commit_id: str, base: str | None = "
     report.diff["from"], report.diff["to"] = base, c.id
     rows = [(name, res.ok if res.ran else None, res.summary()) for name, res in report.checks.items()]
     rows.append(("change-check", report.ok, report.summary()))
+    from .risk import assess, summary as risk_summary
+    level, reasons = assess(report, commits.domain(domain, c.id), old)
+    report.risk = (level, reasons)
+    rows.append(("risk", True, risk_summary(level, reasons)))     # a finding, not a pass or fail (ADR-0050)
     from ..decl.provenance import proposed_elements
     left = proposed_elements(commits.declaration(domain, c.id))
     rows.append(("confirmed", not left, f"{len(left)} proposed element(s)"
