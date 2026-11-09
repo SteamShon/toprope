@@ -1,5 +1,8 @@
 # Example: an agent proposes ad budget changes
 
+This is the `budget` template (`toprope-init <name> --template budget`); the template is the
+source of `paid-media`'s declaration and tokens (`src/toprope/templates/README.md`).
+
 Link: none (an example for the README). An agent analyses campaigns and proposes budget
 changes; a person approves them. The rules are the team's: holdout campaigns are never
 touched unless a media lead grants a one-time exception, a budget rises by at most 500 a day at

@@ -49,7 +49,8 @@ READS = ("get", "history", "allowed", "whoami", "guide", "review")
 CONFIRMS = ("confirm_all_proposed", "confirm_element")   # a person confirms from one diff (B5)
 CONFIG = "toprope.yaml"
 # The keys `toprope.yaml` may set, and the option each one stands for.
-CONFIG_KEYS = {"composition": "--composition", "member": "--member", "kernel_root": "--kernel-root",
+CONFIG_KEYS = {"domain": "--domain", "store": "--store",
+               "composition": "--composition", "member": "--member", "kernel_root": "--kernel-root",
                "workspace": "--workspace", "env": "--env", "store_dir": "--store-dir",
                "identity": "--identity", "failures": "--failures"}
 
@@ -108,6 +109,9 @@ def read_config(path: Path) -> dict[str, str]:
     if not isinstance(data, dict):
         raise SystemExit(fixed(f"{path}: expected a mapping such as `composition: x.composition.yaml`",
                                "fix the file, or give --no-config"))
+    if data.get("domain") and data.get("composition"):
+        raise SystemExit(fixed(f"{path}: both `domain` and `composition`",
+                               "keep one: `domain` for one declaration, `composition` for several"))
     unknown = sorted(set(data) - set(CONFIG_KEYS))
     if unknown:
         raise SystemExit(fixed(f"{path}: unknown key(s) {', '.join(unknown)}",
@@ -119,7 +123,10 @@ def read_config(path: Path) -> dict[str, str]:
             raise SystemExit(fixed(f"{path}: `{key}` must be a single value", "give one value, such as a path"))
         value = str(value)
         # A path in the file is relative to the file, so the file works from anywhere.
-        if key in ("composition", "kernel_root", "workspace", "env", "store_dir", "failures"):
+        if key == "store" and value.split(":", 1)[0] in ("sqlite", "jsonl") and ":" in value:
+            kind, _, where = value.partition(":")
+            value = f"{kind}:{where if Path(where).is_absolute() else base / where}"
+        elif key in ("domain", "composition", "kernel_root", "workspace", "env", "store_dir", "failures"):
             value = str((base / value)) if not Path(value).is_absolute() else value
         elif key == "identity" and value.split(":", 1)[0] in ("git", "github", "static"):
             kind, _, file = value.partition(":")
@@ -146,6 +153,25 @@ def with_config(argv: list[str]) -> list[str]:
         if getattr(pre, key) in (None, False):
             added += [CONFIG_KEYS[key], value]
     return added + argv
+
+
+HOISTED = ("--token", "--identity")      # who you are: accepted after the action too (ADR-0049, A4)
+
+
+def hoist(argv: list[str]) -> list[str]:
+    """`toprope-run submit_request R-1 --token t-mia` means the same as with `--token` first: the
+    options that say who you are are moved before the action, where argparse reads them."""
+    front, rest, i = [], [], 0
+    while i < len(argv):
+        a = argv[i]
+        name = a.split("=", 1)[0]
+        if name in HOISTED:
+            front += [a] if "=" in a else argv[i:i + 2]
+            i += 1 if "=" in a else 2
+        else:
+            rest.append(a)
+            i += 1
+    return front + rest
 
 
 def infer_member(argv: list[str]) -> list[str]:
@@ -405,7 +431,7 @@ def main(argv: list[str] | None = None) -> None:
     failures = failures_dir(raw)
     _USAGE.clear()
     try:
-        _main(infer_member(with_config(raw)))
+        _main(infer_member(with_config(hoist(raw))))
     except SystemExit as e:
         declined = isinstance(e.code, str) and e.code.startswith("not taken")
         if failures and e.code not in (None, 0, 1) and not declined:

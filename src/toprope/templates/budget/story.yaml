@@ -1,0 +1,13 @@
+title: An agent proposes ad budget changes; a person approves them
+about: >
+  Holdout campaigns keep their budget, a budget rises by at most 500 at a time, and whoever
+  proposed a change cannot approve it.
+next: >
+  Try a step limit of 1000: change `<= 500` in domain.yaml, and see what the change check says
+  with `toprope-try --check`.
+steps:
+  - {who: t-bot, as: the agent, action: propose_budget_change, target: C-holdout, params: {daily_budget: 1200, reason: best CPA}, says: "raise the holdout campaign to 1200", expect: denied, code: not-a-holdout}
+  - {who: t-bot, as: the agent, action: propose_budget_change, target: C-search, params: {daily_budget: 2500, reason: best CPA}, says: "raise C-search from 1000 to 2500", expect: denied, code: step-limit}
+  - {who: t-bot, as: the agent, action: propose_budget_change, target: C-search, params: {daily_budget: 1400, reason: best CPA}, says: "raise C-search to 1400", expect: ok}
+  - {who: t-bot, as: the agent, action: approve_budget_change, target: C-search, says: "approve it", expect: denied}
+  - {who: t-ana, as: ana (media lead), action: approve_budget_change, target: C-search, says: "approve it", expect: ok}

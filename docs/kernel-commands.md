@@ -29,6 +29,27 @@ Its subcommands are the domain's actions, one per action, plus `get`, `history`,
 | `--no-config` | ignore toprope.yaml |
 | `--failures` `FAILURES` | a directory where a command that fails before the gate is recorded, one file per failure (ADR-0049, D1b) |
 
+## `toprope-init`
+
+Start a domain from a template and see its rules work (ADR-0049, A3 and A4).
+
+| Argument | What |
+|---|---|
+| `NAME` | the new domain's name, and its directory |
+| `--template` `TEMPLATE` | the template to start from (see --list) |
+| `--dir` `DIR` | where to write the domain's directory (default: here) (default `.`) |
+| `--list` | list the templates |
+
+## `toprope-try`
+
+Start a domain from a template and see its rules work (ADR-0049, A3 and A4).
+
+| Argument | What |
+|---|---|
+| `--dir` `DIR` | the domain's directory (default: here) (default `.`) |
+| `--check` | compare domain.yaml with its template |
+| `--json` | the steps as JSON |
+
 ## `toprope-change`
 
 `toprope-change`: one command takes a change from an agent's proposals to one request for a person (ADR-0049, C1).

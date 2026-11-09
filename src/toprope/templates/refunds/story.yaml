@@ -1,0 +1,9 @@
+title: A refund window
+about: Support may refund a paid order within 7 days of purchase.
+next: >
+  Try a 30-day window: change `<= 7` to `<= 30` in domain.yaml, and see what the change check
+  says with `toprope-try --check`.
+steps:
+  - {who: t-sam, as: sam (support), action: refund_order, target: O-8, says: "refund an order from day 8", expect: denied, code: within-window}
+  - {who: t-sam, as: sam (support), action: refund_order, target: O-3, says: "refund an order from day 3", expect: ok}
+  - {who: t-sam, as: sam (support), action: refund_order, target: O-3, says: "refund it again", expect: denied}
