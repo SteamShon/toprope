@@ -84,7 +84,7 @@ def test_toprope_run_uses_your_git_identity_by_default(tmp_path):
 def test_an_action_that_requires_a_person_needs_your_terminal(tmp_path, monkeypatch):
     root = repo(tmp_path, "ana@example.com")
     out = cli(root, "--seed", "approve_experiment", "E-onboarding", "--note", "ok")   # no terminal here
-    assert out.returncode == 1 and "requires a person: run it yourself on a terminal" in out.stderr
+    assert out.returncode == 1 and "requires a person. Fix: run it yourself on a terminal" in out.stderr
     monkeypatch.chdir(root)
     monkeypatch.setattr("sys.stdin", type("Tty", (io.StringIO,), {"isatty": lambda self: True})("y\n"))
     main(["--domain", "d.domain.yaml", "--store", "sqlite:e.db", "approve_experiment", "E-onboarding", "--note", "ok"])

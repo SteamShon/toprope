@@ -42,7 +42,7 @@ def test_a_domain_a_composition_or_no_config_ignores_the_file(tmp_path, monkeypa
 
 
 @pytest.mark.parametrize("text, says", [
-    ("compositon: c.yaml\n", "unknown key(s) compositon; the keys are composition"),
+    ("compositon: c.yaml\n", "unknown key(s) compositon. Fix: use only the keys composition"),
     ("- a\n- b\n", "expected a mapping"),
     ("composition: [a, b]\n", "`composition` must be a single value"),
     ("composition: : :\n", "not valid YAML"),
@@ -70,11 +70,11 @@ def test_the_member_is_the_one_whose_actions_include_the_command():
 
 
 def test_a_read_or_an_unknown_action_asks_for_the_member():
-    with pytest.raises(SystemExit, match="get: give --member, one of authoring, delivery"):
+    with pytest.raises(SystemExit, match="get reads one member. Fix: give --member, one of authoring, delivery"):
         infer_member(self_argv("get", "x"))
     with pytest.raises(SystemExit, match="no member of .* has this action"):
         infer_member(self_argv("aprove_commit", "x"))
-    with pytest.raises(SystemExit, match="give an action, or --member"):
+    with pytest.raises(SystemExit, match="no action given. Fix: give an action, or --member"):
         infer_member(self_argv())
 
 

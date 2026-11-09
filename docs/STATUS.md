@@ -346,6 +346,7 @@ theme 1 records those (D1), it is measured again before it is compared (ADR-0049
 | Baseline F2: time to a first enforced rule, on a written script | ⬜ | |
 | Theme 1, the change loop (umbrella #201, plan: [`U-theme1-change-loop.md`](experiments/U-theme1-change-loop.md)): B4 citations from a query, C1 `toprope change`, C3 `toprope.yaml`, B5 one diff to confirm, D1 a fix in every error, C2 approvals by risk (its own ADR first) | 🟡 | |
 | … C3: `toprope.yaml` gives `toprope-run` its options, and the member is found from the action, so a self-domain command is `toprope-run <action> <target>` | ✅ | #202 |
+| … D1a: every error on the loop's path (CLI, MCP CLI, kernel services, workspace, commits, git identity) names its fix; a test scans for one that does not; the catalog is [`errors.md`](errors.md) | ✅ | #203 |
 | Theme 2, getting started: A4 `init` and `try`, A3 templates, E1 docs, E2 a tutorial | ⬜ | |
 | Theme 3, interview and feedback: B1 choice questions, B2 examples first, B3 a live map, D2 impact as decisions, D3 counterexamples as stories | ⬜ | |
 | Theme 4, import and wrap: A1 from `AGENTS.md`, skills, OpenAPI, enums, tickets; A2 an MCP proxy (its own ADR first) | ⬜ | |
