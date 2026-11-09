@@ -187,9 +187,12 @@ objects:
       conflicts:
         type: integer
         optional: true
+      questions:
+        type: string
+        optional: true
     source:
       kind: record
-      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+      ref: records:docs/experiments/M1-recheck.md#L54-L66
     status: confirmed
 links:
   question:
@@ -646,7 +649,7 @@ actions:
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
     status: confirmed
   record_questions:
-    description: Record the current stage and its bundle.
+    description: Record the current stage, its bundle and its questions.
     actor:
     - external:kernel
     target: Draft
@@ -658,13 +661,16 @@ actions:
       questions:
         type: string
         many: true
+      text:
+        type: string
     effects:
     - set:
         target.current_stage: params.stage
         target.bundle: params.bundle
+        target.questions: params.text
     source:
       kind: record
-      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+      ref: records:docs/experiments/M1-recheck.md#L54-L66
     status: confirmed
   search:
     description: Search the sources (redacted; local-only never served); the result
@@ -1393,3 +1399,49 @@ glossary:
     harness, past actions, stranded objects.'
   unknown: An element marked as not known yet, instead of guessed. It stays visible
     until someone answers it.
+rules:
+  only-a-person-commit-approved:
+    'on': Commit.approved
+    requires: human
+    reason: 'Only a person sets the approved of a Commit: every action that does so
+      today requires a person (approve_commit).'
+    source:
+      kind: record
+      ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
+    status: confirmed
+  only-a-person-commit-main:
+    'on': Commit.main
+    requires: human
+    reason: 'Only a person sets the main of a Commit: every action that does so today
+      requires a person (approve_commit).'
+    source:
+      kind: record
+      ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
+    status: confirmed
+  only-a-person-decisionrequest-choice:
+    'on': DecisionRequest.choice
+    requires: human
+    reason: 'Only a person sets the choice of a DecisionRequest: every action that
+      does so today requires a person (decide).'
+    source:
+      kind: record
+      ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
+    status: confirmed
+  only-a-person-decisionrequest-decided:
+    'on': DecisionRequest.decided
+    requires: human
+    reason: 'Only a person brings a DecisionRequest to decided: every action that
+      does so today requires a person (decide).'
+    source:
+      kind: record
+      ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
+    status: confirmed
+  only-a-person-element-confirmed:
+    'on': Element.confirmed
+    requires: human
+    reason: 'Only a person brings an Element to confirmed: every action that does
+      so today requires a person (confirm_element).'
+    source:
+      kind: record
+      ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
+    status: confirmed

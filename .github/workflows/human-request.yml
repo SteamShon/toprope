@@ -52,7 +52,7 @@ jobs:
   act:
     needs: plan
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 120        # uncached checks of two changed declarations can take tens of minutes
     environment: researcher
     permissions:
       contents: write
