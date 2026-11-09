@@ -217,8 +217,9 @@ def build_parser(d: Domain) -> argparse.ArgumentParser:
         sub.add_parser(cmd, help=what).add_argument("target")
     sub.add_parser("whoami", help="who you are here, and your roles")
     sub.add_parser("guide", help="the domain guide: how this domain works and who does what")
-    sub.add_parser("review", help="the proposed elements of the authoring workspace, as one diff to "
-                   "confirm from (needs --workspace)")
+    if "review" not in d.actions:            # a domain's own action named `review` keeps its name
+        sub.add_parser("review", help="the proposed elements of the authoring workspace, as one diff to "
+                       "confirm from (needs --workspace)")
     return ap
 
 
@@ -261,7 +262,7 @@ def review_text(args: Any) -> str:
 
 
 def _confirm_on_terminal(identity: Identity, caller: Caller, action: str, target: str,
-                         preface: str = "") -> None:
+                         preface: Any = None) -> None:
     """A git identity is self-asserted, so an action that requires a person is confirmed on a
     terminal: a process without one (an agent's ordinary shell, a script) cannot take it as you.
     It is a guard against mistakes, not a security boundary: a process can fake a terminal."""
@@ -271,8 +272,8 @@ def _confirm_on_terminal(identity: Identity, caller: Caller, action: str, target
     if not sys.stdin.isatty():
         raise SystemExit(fixed(f"{action} requires a person", "run it yourself on a terminal, or through a human "
                                 "request (tools/human_request.py)"))
-    if preface:
-        print(preface)
+    if preface is not None:                      # built only now, for a person who will read it
+        print(preface() if callable(preface) else preface)
     if input(f"{action} {target} as {caller.actor.id}? [y/N] ").strip().lower() != "y":
         raise SystemExit(fixed("not taken", "answer `y` to take it"))
 
@@ -429,7 +430,7 @@ def _main(argv: list[str]) -> None:
                                     f"or put a {CONFIG} here"))
     d = _domain(pre)
     args = build_parser(d).parse_args(argv)
-    if args.cmd == "review":
+    if args.cmd == "review" and "review" not in d.actions:
         print(review_text(args), end="")
         return
     if args.cmd == "guide":
@@ -461,7 +462,7 @@ def _main(argv: list[str]) -> None:
         caller = _caller(ex.identity, token)          # says why the caller is not listed
         if d.actions[args.cmd].requires == "human":
             _confirm_on_terminal(ex.identity, caller, args.cmd, args.target,
-                                 review_text(args) if args.cmd in CONFIRMS and args.workspace else "")
+                                 (lambda: review_text(args)) if args.cmd in CONFIRMS and args.workspace else None)
     from ..mcp import outcome_json
     before = ex.store.version(args.target)
     try:

@@ -148,8 +148,8 @@ def render(req: dict) -> str:
 def review(workspace: str, cwd: str | Path = ".") -> str:
     """The proposed elements a confirm step would confirm, against the domain's `main`."""
     sys.path.insert(0, str(ROOT / "src"))
-    from toprope.workspace import Workspace
-    try:
+    try:                                         # the page shows the steps even if this cannot run
+        from toprope.workspace import Workspace
         return Workspace(Path(cwd) / workspace).render_review()
     except Exception as e:                       # noqa: BLE001 - the page still shows the steps
         return f"(the review could not be made: {e})"

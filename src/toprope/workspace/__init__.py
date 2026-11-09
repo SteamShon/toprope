@@ -88,12 +88,16 @@ def _show(x: Any) -> str:
 
 
 def _bare(el: Any) -> Any:
-    """An element without its provenance, as a person reads it."""
-    if isinstance(el, dict):
-        return {k: _bare(v) for k, v in el.items() if k not in ("source", "status")}
-    if isinstance(el, list):
-        return [_bare(v) for v in el]
-    return el
+    """An element without its provenance, as a person reads it. Provenance sits on the element
+    itself and on a matrix cell's per-role parts; a property named `status` or `source` deeper
+    inside is the element's content and stays (#207's review)."""
+    if not isinstance(el, dict):
+        return el
+    out = {k: v for k, v in el.items() if k not in ("source", "status")}
+    if isinstance(out.get("by_role"), dict):
+        out["by_role"] = {r: ({k: v for k, v in part.items() if k not in ("source", "status")}
+                              if isinstance(part, dict) else part) for r, part in out["by_role"].items()}
+    return out
 
 
 def _get(doc: Any, segs: list[str]) -> Any:
