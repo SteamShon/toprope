@@ -336,7 +336,8 @@ gate, a clean pipeline and the grader's measured noise.
 |---|---|---|
 | Preregistration: what changes, what stays, the exit criteria | ✅ | #187 |
 | #179's leftovers: the `check` form of `requires` (validator, interpreter, harness, TLA+ guard; the schema generated with rules), `rule-agent:` harness cases with an agent for the role's person, rules in the generated guide, the invariants stage asks for rules | ✅ | |
-| Mechanical promotion of per-action requirements to outcome rules; Authoring's `params.questions`; the Phase B log header and stale folders | ⬜ | |
+| Mechanical promotion (`python -m toprope.decl.rules suggest`: an outcome every non-system action reaches only with `requires: human` gets that rule; the self domains get 5 and 5, and pass their checks with them); the Phase B log keeps one header under a lock and `phase_b status` leaves out runs moved aside | ✅ | |
+| Authoring's `record_questions` sets `params.questions` (a self-domain change: with the rules, in the loop) | ⬜ | |
 | The probes: per-probe grants, the amended suite (researcher's freeze), the gate in the scorer | ⬜ | |
 | The self domains adopt the promoted rules; the baseline moves; Phase B rerun (local session); graded twice | ⬜ | |
 | The recheck report; M1 closed | ⬜ | |
@@ -398,9 +399,6 @@ it; each release's cleanup PR handles items older than one release.
   generated tools never show the bundle's questions (`next_questions` returns only the bundle id).
   Found building probe P04's starting state (#103, 2026-11-06). Not fixed in M1: the self domains
   are the experiment's baseline
-
-- The Phase B harness: `phase-b-runs.tsv` has a second header where two arms created it at once; `phase_b
-  status` lists the superseded `*.stale-1` folders too (#166, #170, 2026-11-08)
 
 ## Open questions
 

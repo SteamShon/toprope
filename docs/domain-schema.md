@@ -213,6 +213,10 @@ rules:
 - A `check` rule is a check-language expression over `actor`, `target` and `params` (with the
   params of every action it covers); it fails closed. The TLA+ export adds it as a guard on the
   moves it covers. The capability diff does not read it: it never narrows who may act there.
+- `python -m toprope.decl.rules suggest <domain.yaml>` promotes, mechanically, every outcome that
+  every non-system action reaching it today reaches only with `requires: human` to a
+  `requires: human` rule (`proposed`, its source naming those actions). It judges nothing: the rule
+  says what the actions already say, so that an action added later is held to it too.
 - The harness tries every cell a rule covers with an agent acting for the role's person, under a
   grant for the action (`rule-agent:` cases): `requires: human` on the action refuses it (`actor`),
   else the first rule it does not meet, else it is allowed as the person is. The generated guide

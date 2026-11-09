@@ -345,6 +345,16 @@ def test_status_shows_how_far_each_arm_got(tmp_path, capsys):
     assert row["arm"] == "nl" and row["done"] == 2 and row["of"] == 20 and row["last_stopped"] is None
 
 
+def test_status_leaves_out_a_run_moved_aside(tmp_path, capsys):
+    inst = instruments(tmp_path)
+    runner.main(arm_args(tmp_path, inst, "nl", "--seqs", "1"), backend=api()[0])
+    capsys.readouterr()
+    import shutil
+    shutil.copytree(tmp_path / "run/nl", tmp_path / "run/nl.stale-1")
+    runner.main(["status", "--out", str(tmp_path / "run")])
+    assert [r["arm"] for r in json.loads(capsys.readouterr().out)] == ["nl"]
+
+
 def test_the_seq_option_names_existing_requests():
     assert runner.seqs("1-2,5", list(range(1, 21))) == [1, 2, 5]
     with pytest.raises(SystemExit, match="21"):
