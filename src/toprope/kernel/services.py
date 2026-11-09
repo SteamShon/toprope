@@ -245,18 +245,20 @@ class LocalKernel(KernelServices):
 
     def _change_check(self, domain, commit):
         from ..check import check_commit
+        from ..check.nl_llm import from_env
         from ..incremental import ResultCache
         rc = ResultCache(self.root / ".toprope" / "cache")
+        nl = from_env()                                  # TOPROPE_NL_COMMAND: the natural-language check
         own = self.domain_events.get(domain)
         if own is not None:
-            r = check_commit(self.commits, domain, commit, events=own, examples=self.examples, cache=rc,
+            r = check_commit(self.commits, domain, commit, events=own, examples=self.examples, cache=rc, nl=nl,
                              tlc=self.tlc_jar)
         elif self.environment is not None:
             with self.environment.events(domain) as store:
-                r = check_commit(self.commits, domain, commit, events=store, examples=self.examples, cache=rc,
+                r = check_commit(self.commits, domain, commit, events=store, examples=self.examples, cache=rc, nl=nl,
                                  tlc=self.tlc_jar)
         else:
-            r = check_commit(self.commits, domain, commit, examples=self.examples, cache=rc, tlc=self.tlc_jar)
+            r = check_commit(self.commits, domain, commit, examples=self.examples, cache=rc, nl=nl, tlc=self.tlc_jar)
         from ..decl.provenance import proposed_elements
         left = proposed_elements(self.commits.declaration(domain, commit))
         failing = [n for n, c in r.checks.items() if not c.ok] + (["confirmed"] if left else [])

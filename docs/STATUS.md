@@ -321,7 +321,7 @@ From [`M1-report.md`](experiments/M1-report.md), *What M2 takes from this*.
 | The capability diff (a check over two declarations; no schema change) | ⬜ | |
 | Outcome rules: schema, validator, interpreter, harness, TLA+ export, guide | ⬜ | |
 | Grouped warnings in the change report (one per check and element, with a count; carried apart) | ⬜ | |
-| The natural-language check: an LLM reading the structured diff with the impact report (ADR-0009) | ⬜ | |
+| The natural-language check: `CommandChecker` (`TOPROPE_NL_COMMAND`) gives an LLM the changed elements, the capability diff, the rules and the declaration (ADR-0009) | 🟡 | |
 | An editor that proposes a patch (several elements, checked at once) | ⬜ | |
 | Probes that pass before any change | ⬜ | |
 | M2's design: the full Toprope check against a structured spec reviewed by an LLM, preregistered | ⬜ | |
