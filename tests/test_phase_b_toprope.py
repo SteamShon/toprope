@@ -70,7 +70,8 @@ def test_the_sandbox_holds_the_approved_domains_and_two_callers(materials):
 def test_the_editors_tools_propose_and_nothing_more(materials, tmp_path):
     arm = TopropeArm(materials, tmp_path / "w", Editor(lambda a: a.update(description="Verify it.")))
     tools = build_tools(ToolSpec("toprope", str(arm.sb.root), json.dumps({"seq": 1, "cites": {}})))
-    assert sorted(t.name for t in tools) == ["propose_element", "read_declaration", "read_guide"]
+    assert sorted(t.name for t in tools) == ["check_draft", "propose_element", "propose_patch", "read_declaration",
+                                            "read_guide"]                        # read, check, propose: no more
     refused = arm.sb.run("editor", "authoring", "delivery", "confirm_all_proposed", "delivery")
     assert refused["status"] != "ok"
 
@@ -417,3 +418,26 @@ def test_the_combined_arm_reviews_the_toprope_edits_and_adds_the_compilers_flags
     assert (tmp_path / "combined/nl/manifest.json").exists()
     combine(src, tmp_path / "combined", ApiBackend(FakeModel(reviewer)), materials=materials)
     assert len(seen) == 5                                                 # resumed: not reviewed again
+
+
+def test_the_editor_proposes_a_patch_and_checks_its_draft(materials, tmp_path):
+    """M1-report, *What M2 takes from this* 5: several elements at once, stopping at the first the
+    kernel refuses; and the draft validated before anything is committed."""
+    arm = TopropeArm(materials, tmp_path / "w", Editor(lambda a: None))
+
+    from phase_b.toolserver import ToolSpec
+    REQ1 = {**REQ, "seq": 1}
+    arm.edit(REQ1, tmp_path / "w/seq-01")                     # records the request, so proposals can cite it
+    spec = ToolSpec("toprope", str(arm.sb.root), json.dumps({"seq": 1, "cites": arm._cites}))
+    tools = {t.name: t for t in build_tools(spec)}
+    decl = yaml.safe_load(tools["read_declaration"].fn(domain="delivery"))
+    verify = {k: v for k, v in decl["actions"]["verify"].items() if k not in ("source", "status")}
+    bad = {**verify, "preconditions": [{"id": "x", "check": "target.nonexistent == true", "reason": "r"}]}
+    out = tools["propose_patch"].fn(domain="delivery", changes=json.dumps([
+        {"path": "actions.verify", "value": {**verify, "description": "Verify it in use."}},
+        {"path": "actions.verify", "value": bad}]))
+    assert out["proposed"] == ["actions.verify"] and out["refused"]["index"] == 1
+    assert "nonexistent" in out["refused"]["why"]
+    draft = tools["check_draft"].fn(domain="delivery")
+    assert draft["parses"] and all(i["severity"] != "error" for i in draft["issues"])
+
