@@ -99,3 +99,22 @@ def test_an_actor_not_seen_in_the_events_is_kept_apart(tmp_path):
     m = ub.measure(tmp_path)
     assert m["domains"]["authoring"]["commands_by_actor"] == {"unknown": 1}
     assert m["commands_by_person_agent_unknown"] == [0, 0, 1]
+
+
+def test_failures_before_the_gate_are_counted_per_change_approved_since_the_first(tmp_path):
+    domain(tmp_path, "authoring", [command(PERSON, "approve_commit")], [event("X", PERSON, "person")],
+           ["1-a", "2-b"], [])
+    write(tmp_path / ".toprope/commits/authoring/approvals.jsonl",
+          [{"commit": "1-a", "at": "2026-11-01T00:00:00+00:00"},      # before any failure was recorded
+           {"commit": "2-b", "at": "2026-11-10T00:00:00+00:00"}])
+    f = tmp_path / ".toprope/failures"
+    f.mkdir(parents=True)
+    (f / "a.json").write_text(json.dumps({"at": "2026-11-09T00:00:00+00:00", "kind": "usage", "has_fix": False}))
+    (f / "b.json").write_text(json.dumps({"at": "2026-11-09T01:00:00+00:00", "kind": "refused", "has_fix": True}))
+    (f / "c.json").write_text("{not json")
+    m = ub.measure(tmp_path)
+    assert m["failed_before_the_gate"] == {"usage": 1, "refused": 1}
+    assert m["failed_before_the_gate_without_a_fix"] == 1 and m["failed_before_the_gate_unreadable"] == 1
+    assert m["failed_before_the_gate_since"] == "2026-11-09T00:00:00+00:00"
+    assert m["failed_before_the_gate_per_change_approved_since"] == 2.0
+    assert m["refused_or_failed_per_command"] == 0.0        # the first rate is unchanged by them
