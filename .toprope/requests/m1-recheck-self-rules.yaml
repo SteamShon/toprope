@@ -1,5 +1,5 @@
 summary: Confirm, approve, deploy and verify the self domains' promoted outcome rules
-  and Authoring's bundle questions (M1 recheck)
+  and Authoring's bundle questions (M1 recheck; again, after the 20-minute limit cancelled the first run)
 steps:
 - run:
     member: authoring
