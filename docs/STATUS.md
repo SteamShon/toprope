@@ -343,7 +343,7 @@ theme 1 records those (D1), it is measured again before it is compared (ADR-0049
 |---|---|---|
 | ADR-0049: the program, its order and targets | ✅ | #196 |
 | Baseline F1: friction in the change loop, from the logs (`tools/usability_baseline.py`) | ✅ | #197 |
-| Baseline F2: time to a first enforced rule. The script is written ([`U-f2-first-rule.md`](experiments/U-f2-first-rule.md)); the run needs an operator who has not used Toprope (the researcher finds one) | 🟡 | #198 |
+| Baseline F2: time to a first enforced rule. The script is written ([`U-f2-first-rule.md`](experiments/U-f2-first-rule.md)); the run needs an operator who has not used Toprope (the researcher finds one) | 🟡 | #200 |
 | Theme 1, the change loop: B4 citations from a query, C1 `toprope change`, C3 `toprope.yaml`, B5 one diff to confirm, D1 a fix in every error, C2 approvals by risk (its own ADR first) | ⬜ | |
 | Theme 2, getting started: A4 `init` and `try`, A3 templates, E1 docs, E2 a tutorial | ⬜ | |
 | Theme 3, interview and feedback: B1 choice questions, B2 examples first, B3 a live map, D2 impact as decisions, D3 counterexamples as stories | ⬜ | |
