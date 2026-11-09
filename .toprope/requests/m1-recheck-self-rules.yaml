@@ -1,5 +1,5 @@
 summary: Confirm, approve, deploy and verify the self domains' promoted outcome rules
-  and Authoring's bundle questions (M1 recheck; again, after the 20-minute limit cancelled the first run)
+  and Authoring's bundle questions (M1 recheck; third run, after TLC's state space was fixed in #195)
 steps:
 - run:
     member: authoring
