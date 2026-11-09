@@ -63,7 +63,8 @@ def test_structural_errors_stop_the_checks_that_need_a_valid_model(base):
     raw["transitions"]["Experiment"]["matrix"]["draft"]["approve_experiment"] = "aproved"
     r = change_check(dom(raw), dom(base), events=history(base), examples=10)
     assert not r.ok and ("error", "transitions.Experiment.matrix.draft.approve_experiment") in problems(r, "structural")
-    assert [n for n, c in r.checks.items() if not c.ran] == ["semantic", "scenarios", "harness", "tla", "log_replay", "nl"]
+    assert [n for n, c in r.checks.items() if not c.ran] == ["semantic", "scenarios", "harness", "tla", "log_replay", "capability",
+                                                                  "nl"]
 
 
 def test_semantic_conflicts_newly_unreachable_states_and_dead_actions(base):

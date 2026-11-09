@@ -286,6 +286,36 @@ def toprope_tools(root: Path, ctx: dict[str, Any]) -> list[Tool]:
             raise ToolError("the proposal was not written: " + "; ".join(failed))
         return {"proposed": eid, "path": path, "element": sb.get("authoring", d, eid)}
 
+    def propose_patch(domain: str, changes: str) -> dict[str, Any]:
+        """Several elements in one go, in order (M1-report, *What M2 takes from this* 5): each is
+        proposed as `propose_element` would; it stops at the first the kernel refuses, and says
+        which went in, so the editor can propose what an element refers to first."""
+        try:
+            items = json.loads(changes) if isinstance(changes, str) else changes
+        except json.JSONDecodeError as e:
+            raise ToolError(f"changes must be a JSON list: {e}") from None
+        if not isinstance(items, list) or not all(isinstance(c, dict) and "path" in c and "value" in c for c in items):
+            raise ToolError('changes is a JSON list of {"path": ..., "value": ...}')
+        done = []
+        for i, c in enumerate(items):
+            try:
+                done.append(propose_element(domain, c["path"], c["value"])["path"])
+            except ToolError as e:
+                return {"proposed": done, "refused": {"index": i, "path": c["path"], "why": str(e)}}
+        return {"proposed": done, "refused": None}
+
+    def check_draft(domain: str) -> dict[str, Any]:
+        """The declaration as it is now, proposals included, validated: what the compiler would
+        refuse or warn about before anything is committed."""
+        from toprope.decl.validate import validate_domain
+        from toprope.decl import load_domain
+        try:
+            issues = validate_domain(load_domain(sb.declaration(domain_of(domain))))
+        except Exception as e:                                   # noqa: BLE001 - shown to the editor
+            return {"parses": False, "error": str(e)[:1000]}
+        return {"parses": True, "issues": [{"severity": i.severity, "where": i.where, "message": i.message}
+                                           for i in issues]}
+
     s = {"type": "string"}
     dom = {"type": "string", "enum": list(DOMAINS)}
     return [
@@ -299,6 +329,16 @@ def toprope_tools(root: Path, ctx: dict[str, Any]) -> list[Tool]:
              "as JSON. The proposal cites the change request.",
              {"type": "object", "properties": {"domain": dom, "path": s, "value": s},
               "required": ["domain", "path", "value"]}, propose_element),
+        Tool("propose_patch",
+             "Propose several elements of one domain at once, in order: `changes` is a JSON list of "
+             "{\"path\": ..., \"value\": ...}, each value an element's whole new value. It stops at the first "
+             "one refused and says which went in, so you can propose what it refers to first.",
+             {"type": "object", "properties": {"domain": dom, "changes": s}, "required": ["domain", "changes"]},
+             propose_patch),
+        Tool("check_draft",
+             "Validate a domain's declaration as it is now, proposals included: the errors and warnings "
+             "the compiler would report.",
+             {"type": "object", "properties": {"domain": dom}, "required": ["domain"]}, check_draft),
     ]
 
 

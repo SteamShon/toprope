@@ -45,7 +45,7 @@ from ..semantics.types import Actor, Command, Event, Grant
 from ..store import EventStore, MemoryEventStore
 
 EPOCH = datetime.min.replace(tzinfo=timezone.utc)   # for events without a time
-CHECKS = ("structural", "semantic", "scenarios", "harness", "tla", "log_replay", "in_flight", "nl")
+CHECKS = ("structural", "semantic", "scenarios", "harness", "tla", "log_replay", "in_flight", "capability", "nl")
 
 
 @dataclass(frozen=True)
@@ -107,8 +107,27 @@ class ChangeReport:
         head = "passes" if self.ok else f"fails: {', '.join(failing)}"
         return f"{head}; {self.errors} error(s), {self.warnings} warning(s)"
 
+    def groups(self) -> list[dict[str, Any]]:
+        """The problems grouped (M1-report, *What M2 takes from this* 4): one per check, severity
+        and message once its times and object ids are taken out, with a count and a few places.
+        A log replay that re-decides 64 past actions the same way is one group of 64."""
+        import re
+        out: dict[tuple[str, str, str], dict[str, Any]] = {}
+        for name, res in self.checks.items():
+            for p in res.problems:
+                msg = re.sub(r"\d{4}-\d\d-\d\dT[\d:.]+(?:[+-]\d\d:\d\d|Z)?", "<time>", p.message)
+                msg = re.sub(r"\b[\w-]+@\d+\b", "<object>", msg)
+                g = out.setdefault((name, p.severity, msg), {"check": name, "severity": p.severity, "problem": msg,
+                                                            "count": 0, "where": []})
+                g["count"] += 1
+                if len(g["where"]) < 3:
+                    g["where"].append(p.where)
+        order = {"error": 0, "warning": 1, "info": 2}
+        return sorted(out.values(), key=lambda g: (order.get(g["severity"], 3), g["check"], -g["count"]))
+
     def to_json(self) -> dict[str, Any]:
         return {"domain": self.domain, "ok": self.ok, "errors": self.errors, "warnings": self.warnings,
+                "groups": self.groups(),
                 "summary": self.summary(), "diff": self.diff, "impact": self.impact, "timings": self.timings,
                 **({"selection_misses": self.selection_misses} if self.selection_misses is not None else {}),
                 "checks": {n: {"ok": c.ok, "ran": c.ran, "summary": c.summary(), "note": c.note,
@@ -177,6 +196,15 @@ def change_check(new: Domain, old: Domain | None = None, *, events: EventStore |
         checks["log_replay"] = log_replay(new, old, events, roles_of,
                                           only=set(impact["actions"]) if impact and old is not None else None) \
             if structurally_ok else CheckResult("log_replay", ran=False, note="the declaration has structural errors")
+    if old is None:
+        checks["capability"] = CheckResult("capability", ran=False, note="a first version: nothing to compare with")
+    elif not structurally_ok:
+        checks["capability"] = CheckResult("capability", ran=False, note="the declaration has structural errors")
+    else:
+        from .capability import capability_diff
+        checks["capability"] = CheckResult("capability")
+        for severity, where, message in capability_diff(new, old):
+            checks["capability"].add(severity, where, message)
     diff = _diff(new, old)
     checks["nl"] = _nl(new, old, nl, diff["to_review"])
     report = ChangeReport(new.domain, diff, {n: checks[n] for n in CHECKS})
@@ -507,7 +535,11 @@ def _nl(new: Domain, old: Domain | None, nl: NLChecker | None, changed: list[str
     if nl is None:
         return CheckResult("nl", ran=False, note="no natural-language checker configured")
     res = CheckResult("nl")
-    for where, message in nl.conflicts(old, new, changed):
+    try:
+        found = nl.conflicts(old, new, changed)
+    except Exception as e:                                       # noqa: BLE001 - a failed checker is not a pass
+        return CheckResult("nl", ran=False, note=f"the natural-language checker failed: {str(e)[:300]}")
+    for where, message in found:
         res.add("warning", where, message)                     # never an error (ADR-0009)
     return res
 

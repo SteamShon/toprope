@@ -311,16 +311,32 @@ declaration makes the commit store refuse an approval by the commit's author, wi
 from `main`. Off by default, and off for the self domains in M1 (one owner); turn it on with a
 second owner.
 
+## M1's findings, before M2 (umbrella `umbrella/m1-findings`, link: ① ③)
+
+From [`M1-report.md`](experiments/M1-report.md), *What M2 takes from this*.
+
+| Item | Status | PR |
+|---|---|---|
+| ADR-0048: outcome rules, and a capability diff in the change check | ✅ | #176 |
+| The capability diff (a check over two declarations; no schema change): the change check's `capability` | ✅ | #177 |
+| Outcome rules: schema, validator, interpreter, harness, TLA+ export (`requires: human` or roles; the generated guide and the self domains' adoption follow) | 🟡 | |
+| Grouped findings in the change report (`groups`: one per check, severity and message, with a count) | 🟡 | |
+| The natural-language check: `CommandChecker` (`TOPROPE_NL_COMMAND`) gives an LLM the changed elements, the capability diff, the rules and the declaration (ADR-0009) | 🟡 | |
+| An editor that proposes a patch: the Toprope arm's editor gets `propose_patch` (several elements, in order, stopping at the first refused) and `check_draft` (the draft validated before a commit) | 🟡 | |
+| Probes that pass before any change: why they fail at `seq: 0` ([`probe-baseline-findings.md`](../experiments/m1/probe-baseline-findings.md)): criteria the right behaviour fails (P05, P07), unequal worlds (the Toprope agent's grant lacks `deliver`/`deploy`), strict readings; proposals wait for the researcher (the suite is an instrument) | 🟡 | |
+| M2's design, a draft for the researcher ([`M2-design.md`](experiments/M2-design.md)): the full Toprope check against a structured spec reviewed by an LLM, the same edit checked both ways, grouped precision, the grader's noise, probes gated before any change, draft verdict rules | 🟡 | |
+
 ## M0b, M2 to M5
 
 Not started. Plans: [`roadmap.md`](roadmap.md).
 
 ## Next
 
-1. M1's findings, before M2 (umbrella `umbrella/m1-findings`; [`M1-report.md`](experiments/M1-report.md),
-   *What M2 takes from this*): rules bound to outcomes (ADR), a capability diff in the change
-   check, the natural-language check, grouped warnings, an editor that proposes a patch, probes
-   that pass before any change. Then M2's design and its preregistered question.
+1. M2's spec, from the draft (`docs/experiments/M2-design.md`): the researcher decides each point,
+   freezes the verdict rules, and finds the domain expert who is not the builder; the expert
+   writes the change list, seeds it and keeps the key. The probe proposals
+   (`experiments/m1/probe-baseline-findings.md`) are the researcher's to adopt. The self domains
+   adopt outcome rules through their own reviewed changes (ADR-0048 §5).
 2. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
 3. When a domain is shared by several people or agents (M2, or a hosted server): its event
    log moves from git to a database (`--store postgres:DSN` for a composition, one schema per
@@ -370,6 +386,10 @@ it; each release's cleanup PR handles items older than one release.
 
 - The Phase B harness: `phase-b-runs.tsv` has a second header where two arms created it at once; `phase_b
   status` lists the superseded `*.stale-1` folders too (#166, #170, 2026-11-08)
+
+- Outcome rules (#179): the `check`-expression form of `requires`, an agent actor in the harness
+  world (a `human` rule is tested at the interpreter for now), rules in the generated guide, and the
+  interview stage that asks for them (ADR-0048 §4) are not done yet (#179, 2026-11-09)
 
 ## Open questions
 

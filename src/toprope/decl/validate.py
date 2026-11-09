@@ -77,10 +77,39 @@ def _check_expr(d: Domain, src: str, where: str, obj: str | None, params: set[st
     return out
 
 
+def _rules(d: Domain) -> list[Issue]:
+    """Outcome rules (ADR-0048): each names a state or a property of a declared object, its roles
+    are declared, and it covers at least one action."""
+    from .rules import reaches
+    out: list[Issue] = []
+    for rid, r in d.rules.items():
+        where = f"rules.{rid}"
+        obj, _, part = r.on.partition(".")
+        tr = d.transitions.get(obj)
+        states = set(tr.matrix) | ({tr.initial} if tr and tr.initial else set()) if tr else set()
+        props = set(d.objects[obj].properties) if obj in d.objects else set()
+        if obj not in d.objects or not part:
+            out.append(Issue("unknown-object", where, f"`on` names <Object>.<state or property>: '{r.on}'"))
+            continue
+        if part not in states and part not in props:
+            out.append(Issue("unknown-path", where, f"{obj} has no state or property '{part}'"))
+            continue
+        if not isinstance(r.requires, str):
+            for role in r.requires.roles:
+                if d.roles and role not in d.roles:
+                    out.append(Issue("unknown-role", where, f"unknown role '{role}'"))
+        froms = list(tr.matrix) if tr else [None]
+        if not any(r.on in reaches(d, a, f) for a in d.actions for f in froms + [None]):
+            out.append(Issue("rule-covers-nothing", where, f"no action reaches {r.on}", "warning"))
+    return out
+
+
 def validate_domain(d: Domain) -> list[Issue]:
     issues: list[Issue] = []
     add = issues.append
     roles = set(d.roles)
+
+    issues += _rules(d)
 
     for name, link in d.links.items():
         for end in (link.from_, link.to):

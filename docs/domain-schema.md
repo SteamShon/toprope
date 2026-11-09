@@ -191,6 +191,29 @@ world:                      # the expert's examples; the compiler grows a small 
   state, every role as an actor, and boundary values for each non-state precondition. It
   reports unreachable states.
 
+## Outcome rules (ADR-0048)
+
+A rule about an outcome holds every action that reaches it, an action added later too:
+
+```yaml
+rules:
+  only-a-person-confirms:
+    on: Element.confirmed            # <Object>.<state>, or <Object>.<property> an effect sets
+    requires: human                  # or {roles: [owner]}
+    reason: Only a person confirms an element.
+```
+
+- An action reaches `Object.state` when its matrix cell moves the object there (not when it stays),
+  and `Object.property` when an effect sets it; a kernel-service call reaches what its reply
+  reaches, and the rule is checked on the action that made the call. A `system` actor (the
+  kernel's reply, a handoff) is not held to rules: it carries out what an allowed action asked.
+- The interpreter checks rules after the matrix cell and before the preconditions; a refusal's
+  code is the rule's id and its reason the rule's. The harness expects the same, cell by cell.
+- An agent meets a roles rule only when its principal also holds one of the roles.
+- The validator refuses a rule whose `on` names no state or property (`unknown-path`), and warns
+  about one that no action reaches (`rule-covers-nothing`). The change check's `capability` diff
+  reports a path that is no longer held to a rule.
+
 ## Generated harness (ADR-0009, ADR-0010)
 
 From the matrix, invariants, world and flows, the compiler generates a harness that runs at
