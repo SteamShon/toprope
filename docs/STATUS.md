@@ -369,11 +369,14 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    resolve, cited with `cite_evidence` (#124, in the pstack umbrella).
 6. ADR-0042's follow-up work (accepted 2026-11-07): done: `domain_version` with the deployment
    log gives the rule in force when an event was decided, documented, the self domains too
-   (ADR-0045, #150); read visibility defined in the schema (`read`, refused
-   until M0b); in M0b, deadlines with timers, read visibility enforced by the query and MCP
-   read tools, an observed time on facts from adapters, identity mappings on adapters; in M2,
-   `confirmed_at` and `review_by` warnings; in the M4 spec, goals, expected outcomes and the
-   outcome-to-decision link.
+   (ADR-0045, #150); read visibility defined in the schema (`read`, refused until M0b); in M0b,
+   deadlines with timers, read visibility enforced by the query and MCP read tools, an observed
+   time on facts from adapters, identity mappings on adapters; in M2, `confirmed_at` and
+   `review_by` warnings; in the M4 spec, goals, expected outcomes and the outcome-to-decision
+   link, with UiPath's Decision Ledger as a reference for what a decision record holds
+   (recommendation, evidence, rules and version applied, the person's decision and reason, the
+   action, the outcome). A source kind for process mining (event logs of existing systems) is a
+   candidate for the authoring interview's sources, with the adapters (M0b).
 7. ADR-0043's follow-ups: make `tla` a required check on `develop` (maintainer). Creation
    (#155), link paths to what no action changes (#156) and time, frozen at the harness's clock
    (#157), are modeled; no declaration in the repository leaves anything out.
