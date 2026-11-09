@@ -337,10 +337,10 @@ gate, a clean pipeline and the grader's measured noise.
 | Preregistration: what changes, what stays, the exit criteria | ✅ | #187 |
 | #179's leftovers: the `check` form of `requires` (validator, interpreter, harness, TLA+ guard; the schema generated with rules), `rule-agent:` harness cases with an agent for the role's person, rules in the generated guide, the invariants stage asks for rules | ✅ | |
 | Mechanical promotion (`python -m toprope.decl.rules suggest`: an outcome every non-system action reaches only with `requires: human` gets that rule; the self domains get 5 and 5, and pass their checks with them); the Phase B log keeps one header under a lock and `phase_b status` leaves out runs moved aside | ✅ | |
-| Authoring's `record_questions` keeps the bundle's questions: `stage_questions` also returns them as one string (`text`), and `Draft.questions` holds it; proposed in the loop with the rules | 🟡 | |
+| Authoring's `record_questions` keeps the bundle's questions: `stage_questions` also returns them as one string (`text`), and `Draft.questions` holds it; proposed in the loop with the rules; approved in `authoring@11-4961f900bb4663e1` | ✅ | #192 |
 | The probes: each probe agent's grant adds what its task asks (`TASK_ACTIONS`; a person-only action stays refused); the gate in the scorer (`probe_gate`; `found_after_deploy_ungated` kept); the grader reads a probe's `examples`; the amended suite (P05, P07 judged on what the agent did and what its tools show; examples for P01, P04, P08), amended by the researcher's approved request (`FROZEN.json`, version 2) | ✅ | #191 |
 | The grader's second sitting (`grade --into scoring-2`) and its noise (`compare-gradings`, `grader-noise.json`); the recheck's steps in the RUNBOOK | ✅ | |
-| The self domains adopt the promoted rules: proposed through the loop (Authoring 5, Delivery 5; both pass every check with them), waiting for the researcher's approval of `.toprope/requests/m1-recheck-self-rules.yaml` | 🟡 | |
+| The self domains adopt the promoted rules (Authoring 5, Delivery 5): confirmed, approved, deployed and verified as `authoring@11-4961f900bb4663e1` and `delivery@6-c2678fc294429d48` (approval run 42605372607; three runs before it found and fixed TLC's state space, #195, and unseen proposed rules, #199) | ✅ | #192 |
 | The baseline moves; Phase B rerun (local session); graded twice | ⬜ | |
 | The recheck report; M1 closed | ⬜ | |
 
