@@ -332,10 +332,17 @@ From [`M1-report.md`](experiments/M1-report.md), *What M2 takes from this*.
 Four umbrellas after a baseline. A sub-PR that runs the self domains' loop waits until no other
 open PR changes their commit store or logs (`umbrella/m1-recheck` has them now).
 
+F1 baseline (2026-11-09, `uv run python tools/usability_baseline.py`; the self domains' logs as
+of M1): per approved commit, 10.3 kernel commands by a person or an agent, 4.5 of them by a
+person; 6 approved human requests for 11 approved commits; 1 refusal and 5 failed effects in 215
+commands (0.028). The logs do not see commands that fail before the gate, so that rate is low;
+once theme 1 records those (D1), the rate is measured again before it is compared.
+
 | Item | Status | PR |
 |---|---|---|
 | ADR-0049: the program, its order and targets | ✅ | #196 |
-| Baseline: F1 (friction in the change loop, from the logs) and F2 (time to a first enforced rule) | ⬜ | |
+| Baseline F1: friction in the change loop, from the logs (`tools/usability_baseline.py`) | ✅ | #197 |
+| Baseline F2: time to a first enforced rule, on a written script | ⬜ | |
 | Theme 1, the change loop: B4 citations from a query, C1 `toprope change`, C3 `toprope.yaml`, B5 one diff to confirm, D1 a fix in every error, C2 approvals by risk (its own ADR first) | ⬜ | |
 | Theme 2, getting started: A4 `init` and `try`, A3 templates, E1 docs, E2 a tutorial | ⬜ | |
 | Theme 3, interview and feedback: B1 choice questions, B2 examples first, B3 a live map, D2 impact as decisions, D3 counterexamples as stories | ⬜ | |
@@ -347,7 +354,7 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 
 ## Next
 
-1. ADR-0049's baseline (F1, F2), then theme 1 (the change loop). M2's spec waits for the
+1. ADR-0049's F2 baseline, then theme 1 (the change loop). M2's spec waits for the
    program.
 2. M2's spec, from the draft (`docs/experiments/M2-design.md`): the researcher decides each point,
    freezes the verdict rules, and finds the domain expert who is not the builder; the expert
