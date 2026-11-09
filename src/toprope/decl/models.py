@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Literal, Union
+from typing import Annotated, Any, Literal, Union
 
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, StringConstraints, field_serializer, model_validator
-from typing import Annotated
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    StringConstraints,
+    field_serializer,
+    model_validator,
+)
 
 Ident = Annotated[str, StringConstraints(pattern=r"^[A-Za-z_][A-Za-z0-9_-]*$")]
 RESERVED_ACTORS = {"system", "external:kernel"}   # other `external:<source>` actors: M0b (ADR-0028)
@@ -264,12 +271,17 @@ class RuleRoles(Strict):
     roles: Annotated[list[str], Field(min_length=1)]
 
 
+class RuleCheck(Strict):
+    """A check-language expression over `actor`, `target` and `params` (ADR-0048 §1)."""
+    check: str
+
+
 class Rule(Provenance):
     """An outcome rule (ADR-0048): whatever action brings it about, `on` (an object's state, or a
     property an effect sets) may be reached only by an actor that meets `requires`."""
 
     on: str
-    requires: Union[Literal["human"], RuleRoles]
+    requires: Union[Literal["human"], RuleRoles, RuleCheck]
     reason: str
 
 

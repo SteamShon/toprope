@@ -203,6 +203,22 @@ def build_domain_guide(d: Domain, harness: dict[str, Any] | None = None) -> str:
         L += ["## Always true (invariants)", ""]
         L += [f"- **{i.id}** on {i.on}: {i.reason}" for i in d.invariants] + [""]
 
+    if d.rules:
+        from ..decl.models import RuleCheck
+        from ..decl.rules import reaches
+        L += ["## Who may bring about an outcome (rules)", "",
+              "Every action that reaches the outcome is held to the rule, an action added later too.", ""]
+        for rid, r in d.rules.items():
+            who = ("a person" if r.requires == "human" else
+                   f"`{r.requires.check}`" if isinstance(r.requires, RuleCheck) else
+                   " or ".join(f"`{x}`" for x in r.requires.roles))
+            tr = d.transitions.get(r.on.split(".", 1)[0])
+            froms = (list(tr.matrix) if tr else []) + [None]
+            by = sorted({a for a in d.actions if any(r.on in reaches(d, a, f) for f in froms)})
+            L += [f"- **{rid}** on `{r.on}`: only {who}. {r.reason}"
+                  + (f" Covers: {', '.join(f'`{a}`' for a in by)}." if by else " No action reaches it yet.")]
+        L += [""]
+
     if d.world.fixtures or d.scenarios:
         L += ["## Examples and scenarios", ""]
         if d.world.fixtures:
