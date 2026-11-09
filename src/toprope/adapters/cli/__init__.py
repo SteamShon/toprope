@@ -226,7 +226,8 @@ def _caller(identity: Identity, token: str | None) -> Caller:
     caller = identity.resolve(token)
     if caller is None:
         explain = getattr(identity, "explain", None)    # the local identities say why
-        raise SystemExit(explain() if explain else "TOPROPE_TOKEN (or --token) does not resolve to a caller")
+        raise SystemExit(explain() if explain else fixed("TOPROPE_TOKEN (or --token) does not resolve to a caller",
+                                                         "give a token the identity file lists"))
     return caller
 
 

@@ -9,6 +9,7 @@ the error is raised.
 | Error | Fix |
 |---|---|
 | --identity is required for this command | give --identity, or put {…} here |
+| TOPROPE_TOKEN (or --token) does not resolve to a caller | give a token the identity file lists |
 | no action given | give an action, or --member (one of {…}) with --help to list its actions |
 | no declaration given | give --domain, or --composition with --member, or put a {…} here |
 | no declaration given | give --domain, or --composition with --member, or put a {…} here |
@@ -28,37 +29,37 @@ the error is raised.
 
 | Error | Fix |
 |---|---|
-| error: --seed loads example objects; use it with --store memory or --store-dir | add `--store memory` or `--store-dir DIR`, or drop `--seed` |
-| error: members share a directory, so their event logs would mix; keep each member under its own directory (domains/<domain>/), or give --store-dir | keep each member under its own directory (domains/<domain>/), or give `--store-dir` |
-| error: no member {…} in {…} | use one of the members listed in the composition |
-| error: with --composition, give --store-dir DIR or --store memory (or neither, for each member's own event log) | give `--store-dir DIR` or `--store memory`, or neither for each member's own event log |
+| error: --seed loads example objects into the store | add `--store memory` or `--store-dir DIR`, or drop `--seed` |
+| error: members share a directory, so their event logs would mix | keep each member under its own directory (domains/<domain>/), or give `--store-dir` |
+| error: no member {…} | use one of {…} |
+| error: with --composition, the store is a directory of stores or memory | give --store-dir DIR or --store memory, or neither for each member's own event log |
 | id must be a string | give the caller an `id:` that is a string |
-| unknown identity {…}: use static:FILE or jwt | use `--identity static:FILE` or `--identity jwt` |
+| unknown identity {…} | use `git`, `github`, `static:FILE` or `jwt` (`toprope-server`: `static:FILE` or `jwt`) |
 
 ## `commits/__init__.py`
 
 | Error | Fix |
 |---|---|
-| `main` is protected: commit to a branch, and approving merges it into main | commit to a work branch, such as `work`; approving merges it into main |
+| `main` is protected | commit to a work branch, such as `work`; approving merges it into main |
 | a commit in this merge does not parse: {…} | fix the declaration in that commit, or merge a commit that parses |
 | bad domain name {…} | use the domain's name as its declaration's `domain:` gives it, with no path separators |
-| cannot read the working copy: {…} | fix the declaration file so it parses, or check out with `force` |
+| cannot read the working copy: {…} | fix the declaration file so it parses, or restore it with `git checkout -- <file>`, then check out again |
 | cannot read {…}: {…} | fix or remove that `*.representation.yaml` next to the declaration |
-| evidence kind {…}: use one of {…} | use one of the kinds listed |
-| evidence needs a ref: a pointer, not prose | give a ref the kind can resolve: a source chunk, a check id, an event `<stream>@<version>` or a run URL |
+| evidence needs a ref, a pointer and not prose | give a ref the kind can resolve: a source chunk, a check id, an event `<stream>@<version>` or a run URL |
 | main with {…} does not parse: {…} | fix the working copy so it parses, commit, check and approve the new commit |
 | main with {…} does not validate: {…} | fix the errors listed in the working copy, commit, check and approve the new commit |
-| no check {…} recorded on {…}: run it first, then cite it | run `check_commit` on this commit, then cite the check it records |
+| no check {…} recorded on {…} | run `check_commit` on this commit, then cite the check it records |
 | no commit {…} in {…} | use a commit id from the domain's commit log, `.toprope/commits/<domain>/log.jsonl` |
 | no commit {…} in {…} | use a commit id from the domain's commit log, `.toprope/commits/<domain>/log.jsonl` |
+| no evidence kind {…} | use one of {…} |
 | nothing to merge: {…} has no commits | commit to the branch first, then merge |
 | the working copy changed its domain while committing | keep the declaration's `domain:` unchanged while a commit is made, then commit again |
-| the working copy has changes not committed to {…}: commit them first | commit the working copy with `commit_draft`, then merge |
-| {…} has changes no commit holds: commit them first | commit them with `commit_draft` first, or check out with `force` to drop them |
-| {…} is already in main at {…}, which supersedes it; approve a newer commit | approve the newer commit on the branch instead |
-| {…} names no author, so its approver cannot be told apart: this domain's approver must not be the commit's author (ADR-0046) | commit it again with `commit_draft`, which records the author, and have someone else approve it |
-| {…} still holds {…} proposed element(s): {…}; confirm them, then commit and approve again | confirm the proposed elements (`confirm_all_proposed`, a person only), commit, check and approve again |
-| {…} wrote {…}: this domain's approver must not be the commit's author (ADR-0046); ask another approver | have an approver other than the author approve it |
+| the working copy has changes not committed to {…} | commit the working copy with `commit_draft`, then merge |
+| {…} has changes no commit holds | commit them with `commit_draft`, or drop them with `git checkout -- <file>`, then check out again |
+| {…} is already in main at {…}, which supersedes it | approve the newer commit on the branch instead |
+| {…} names no author, so its approver cannot be told apart: this domain's approver must not be the commit's author (ADR-0046) | change the draft and commit it with `commit_draft`, which records its author; then have someone else approve it |
+| {…} still holds {…} proposed element(s): {…} | confirm the proposed elements (`confirm_all_proposed`, a person only), commit, check and approve again |
+| {…} wrote {…}: this domain's approver must not be the commit's author (ADR-0046) | have an approver other than the author approve it |
 
 ## `identity/git.py`
 
@@ -76,6 +77,7 @@ the error is raised.
 
 | Error | Fix |
 |---|---|
+| missing inputs {…} | map them in the effect's `inputs` in the declaration |
 | no approved human request ran as {…} ({…}) | cite the run URL of an approved human request, as `.toprope/approval-runs.jsonl` lists it |
 | no authoring workspace configured | pass `--workspace` the workspace file, or set `workspace:` in toprope.yaml |
 | no authoring workspace configured | pass `--workspace` the workspace file, or set `workspace:` in toprope.yaml |
@@ -84,14 +86,15 @@ the error is raised.
 | no deploy environment configured | pass `--env` the local deploy environment, or set `env:` in toprope.yaml |
 | no deploy environment configured | pass `--env` the local deploy environment, or set `env:` in toprope.yaml |
 | no deploy environment configured: no events to cite | pass `--env` the local deploy environment, or set `env:` in toprope.yaml |
-| no event {…}: give <stream>@<version> of a stored event | give `<stream>@<version>` of an event, as `toprope-run history <id>` lists them |
+| no event {…} in the deployed domain's event log | give `<stream>@<version>`: an object's id and the version of one of its events there |
 | no kernel service {…} | use a service the kernel's catalog lists (src/toprope/kernel/__init__.py) |
 | no source {…} | use a source id listed in the workspace file's `sources:` |
 | nothing to confirm: no paths given, or nothing is proposed | propose elements first, or name the paths to confirm |
-| {…} has no passing TLC check ({…}): run check_commit here, where TLC is configured, then approve | run `check_commit` here, where TLC is configured (TOPROPE_TLC_JAR), then approve |
+| {…} has no passing TLC check ({…}) | run `check_commit` here, where TLC is configured (TOPROPE_TLC_JAR), then approve |
 | {…} is not deployed here: no events to cite | deploy it here first, or cite another kind of evidence |
 | {…} is outside the kernel's root | give a path inside the repository the kernel runs on (`--kernel-root`) |
-| {…} is {…}: cite it as {…} | cite it with the kind named |
+| {…} is {…}: not a {…} | cite it with `--kind {…}` |
+| {…} records a person's decision: the calling person must be the approver | the person named as approver takes the action themselves |
 
 ## `workspace/__init__.py`
 
@@ -102,15 +105,15 @@ the error is raised.
 | a skip quotes the owner's reason | pass the owner's reason for skipping, in their words |
 | an answer quotes the owner's words | pass the owner's answer, in their words, as the answer text |
 | bad element path {…} | write the path as dot-separated names, such as `actions.approve.preconditions` |
-| cannot read the working copy: {…} | fix the declaration file so it parses, then check out again |
+| cannot read the working copy: {…} | fix the declaration file so it parses, or restore it with `git checkout -- <file>`, then check out again |
 | event_store: {…} | set `event_store:` in the workspace file to `sqlite:FILE`, `jsonl:DIR` or `memory` |
 | no branch {…}; branches: {…} | use one of the branches listed |
 | no chunk {…}: cite a ref returned by read_source or search_sources | run `search` with words from the passage, and cite the `ref` it returns |
 | no deploy environment at {…} | pass `--env` the directory of a local deploy environment, or set `env:` in toprope.yaml |
-| no source {…} | use a source id listed in the workspace file's `sources:`, or add one with `add_source` |
-| no source {…} | use a source id listed in the workspace file's `sources:`, or add one with `add_source` |
-| no source {…} | use a source id listed in the workspace file's `sources:`, or add one with `add_source` |
-| no {…} in {…} | pass `--workspace` the path of a workspace file, or put `toprope.yaml` with a `workspace:` key here |
+| no source {…} | use a source id listed in the workspace file's `sources:`, or add the source there with a `path:` or `url:` |
+| no source {…} | use a source id listed in the workspace file's `sources:`, or add the source there with a `path:` or `url:` |
+| no source {…} | use a source id listed in the workspace file's `sources:`, or add the source there with a `path:` or `url:` |
+| no {…} in {…} | check the path given by `--workspace` or by `workspace:` in toprope.yaml; it names a workspace file or its directory |
 | nothing to check: commit first | run `commit_draft` first, then check the commit it makes |
 | only a person approves: at their own terminal, or through a declared action | ask the person to run `approve_commit` themselves, at their terminal or through a human request |
 | only a person confirms: at their own terminal, or through a declared action the kernel checked was taken by that person | ask the person to run the confirm action themselves, at their terminal or through a human request |

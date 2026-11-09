@@ -3,7 +3,12 @@
     raise AuthoringError(fixed(f"no source {sid!r}", "list the sources with `search_sources`"))
 
 `tests/test_error_fixes.py` scans the modules on the change loop's path and fails on an error
-raised with a message that does not go through `fixed`. `docs/errors.md` is the catalog, generated
+raised with a message that does not go through `fixed`, and on a kernel service's `failure(…)`
+reply without one.
+
+What the scan cannot see: a message held in a variable (`raise E(msg)`), and the text of an error
+passed on from a module outside the scan (`f"identity file: {e}"`, where `e` came from YAML or the
+OS). Those are named here so they are not mistaken for covered. `docs/errors.md` is the catalog, generated
 from the same scan (`python -m toprope.errors --out docs/errors.md`).
 """
 from __future__ import annotations
@@ -31,8 +36,8 @@ SRC = Path(__file__).resolve().parent
 
 def fixed(message: str, fix: str) -> str:
     """`message`, then what to do about it."""
-    message = message.rstrip()
-    return f"{message}{'' if message.endswith(('.', ':', '?')) else '.'} {MARK}{fix}"
+    message = message.rstrip().rstrip(":;,").rstrip()
+    return f"{message}{'' if message.endswith(('.', '?', '!')) else '.'} {MARK}{fix}"
 
 
 @dataclass(frozen=True)
@@ -50,6 +55,11 @@ def _text(node: ast.AST) -> str | None:
         return node.value
     if isinstance(node, ast.JoinedStr):
         return "".join(v.value if isinstance(v, ast.Constant) else "{…}" for v in node.values)
+    if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "format"
+            and (fmt := _text(node.func.value)) is not None):
+        return fmt
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mod) and (fmt := _text(node.left)) is not None:
+        return fmt
     if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
         left, right = _text(node.left), _text(node.right)
         if left is not None or right is not None:
@@ -76,25 +86,37 @@ def scan(src: Path = SRC, modules: tuple[str, ...] = COVERED) -> list[Raised]:
         for h in ast.walk(tree):
             if isinstance(h, ast.ExceptHandler) and h.name:
                 for n in ast.walk(h):
-                    if isinstance(n, ast.Raise):
+                    if isinstance(n, (ast.Raise, ast.Call)):
                         caught.setdefault(id(n), set()).add(h.name)
         for node in ast.walk(tree):
-            if not (isinstance(node, ast.Raise) and isinstance(node.exc, ast.Call)):
+            if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                    and node.func.attr == "failure" and node.args):
+                call, name = node, "failure"              # a kernel service's failed reply
+            elif isinstance(node, ast.Raise) and isinstance(node.exc, ast.Call):
+                call = node.exc
+                func = call.func
+                name = func.id if isinstance(func, ast.Name) else getattr(func, "attr", None)
+                if name not in SHOWN or not call.args:
+                    continue
+            else:
                 continue
-            func = node.exc.func
-            name = func.id if isinstance(func, ast.Name) else getattr(func, "attr", None)
-            if name not in SHOWN or not node.exc.args:
-                continue
-            arg = node.exc.args[0]
-            if (isinstance(arg, ast.Call) and isinstance(arg.func, ast.Name) and arg.func.id == "fixed"
-                    and len(arg.args) == 2):
-                out.append(Raised(mod, node.lineno, name, _text(arg.args[0]) or "{…}",
-                                  _text(arg.args[1]) or "{…}"))
-            elif _passes_on(arg, caught.get(id(node), set())):
-                continue
-            elif (text := _text(arg)) is not None:
-                out.append(Raised(mod, node.lineno, name, text, None))
+            branches = [call.args[0]]
+            while any(isinstance(b, ast.IfExp) for b in branches):   # either branch may be shown
+                branches = [x for b in branches for x in ((b.body, b.orelse) if isinstance(b, ast.IfExp) else (b,))]
+            for arg in branches:
+                out += _one(mod, node, name, arg, caught.get(id(node), set()))
     return out
+
+
+def _one(mod: str, node: ast.AST, name: str, arg: ast.AST, caught: set[str]) -> list[Raised]:
+    if isinstance(arg, ast.Constant) and arg.value == "":      # an empty default, not a message
+        return []
+    if isinstance(arg, ast.Call) and isinstance(arg.func, ast.Name) and arg.func.id == "fixed" and len(arg.args) == 2:
+        return [Raised(mod, node.lineno, name, _text(arg.args[0]) or "{…}", _text(arg.args[1]) or "{…}")]
+    if _passes_on(arg, caught):
+        return []
+    text = _text(arg)
+    return [] if text is None else [Raised(mod, node.lineno, name, text, None)]
 
 
 def catalog(raised: list[Raised] | None = None) -> str:
