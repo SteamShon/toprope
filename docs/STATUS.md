@@ -322,7 +322,7 @@ From [`M1-report.md`](experiments/M1-report.md), *What M2 takes from this*.
 | Outcome rules: schema, validator, interpreter, harness, TLA+ export, guide | ⬜ | |
 | Grouped warnings in the change report (one per check and element, with a count; carried apart) | ⬜ | |
 | The natural-language check: an LLM reading the structured diff with the impact report (ADR-0009) | ⬜ | |
-| An editor that proposes a patch (several elements, checked at once) | ⬜ | |
+| An editor that proposes a patch: the Toprope arm's editor gets `propose_patch` (several elements, in order, stopping at the first refused) and `check_draft` (the draft validated before a commit) | 🟡 | |
 | Probes that pass before any change | ⬜ | |
 | M2's design: the full Toprope check against a structured spec reviewed by an LLM, preregistered | ⬜ | |
 
