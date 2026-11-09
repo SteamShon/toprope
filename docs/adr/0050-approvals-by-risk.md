@@ -1,7 +1,7 @@
 # ADR-0050: How much one approval covers depends on the change's risk
 
-- Link: ① iterate safely, ⑥ org productivity · Status: **proposed** · 2026-11-09 · drafted by the
-  assistant for the researcher's decision (ADR-0049, C2)
+- Link: ① iterate safely, ⑥ org productivity · Status: accepted · 2026-11-09 · decided by:
+  SteamShon ("추천대로": the recommendation on each open point; drafted by the assistant; ADR-0049, C2)
 - Builds on: ADR-0039 (human requests), ADR-0041 (the one way across), ADR-0045 (the self domains
   run their deployed commit), ADR-0048 (the capability diff), ADR-0049 (usability before M2)
 
@@ -22,7 +22,7 @@ Two things must not change: only a person confirms, approves, deploys and verifi
 `requires: human`), and an agent never takes those steps. This ADR changes how many of a
 person's steps one approval covers. It changes nothing about who takes them.
 
-## Decision (proposed)
+## Decision
 1. **Risk is computed, not declared.** `check_commit` classifies the commit it checks:
    - **low** when every check passed, the capability diff (ADR-0048) has no warning (no new
      path to an outcome, no dropped `requires: human`, precondition or rule), no element was
@@ -57,14 +57,15 @@ person's steps one approval covers. It changes nothing about who takes them.
   high risk.
 - F1 measures the result: approvals per approved change, by risk.
 
-## Open, for the researcher
-1. Is "verify in advance, if the probes pass" acceptable, or should `verify` always be a
-   second approval? (Recommended: in advance for low risk. The probes are the evidence a
-   person would read, and a failed probe stops the run before `verify`.)
-2. Should a change to the self domains' own `requires: human` or approval rules ever be low
-   risk? (Recommended: never. Any change to who may take a person-only step is high, even a
-   narrowing.)
-3. Does a narrowing (the capability diff's info) stay low? (Recommended: yes.)
+## Resolved (researcher, 2026-11-09: the recommendation in each case)
+1. **Verify in advance.** For a low-risk change, the one approval covers `verify`, on the
+   condition that the probes pass: the probes are the evidence a person would read, and a
+   failed probe stops the run before `verify`. A high-risk change verifies on its second
+   approval, as written above.
+2. **Who may take a person-only step.** A change to `requires: human`, to an `approval` rule
+   (ADR-0046), to an outcome rule whose `requires` names a person or a role (ADR-0048), or to
+   the roles on a person-only action is always **high**, even when it narrows.
+3. **Narrowings.** Otherwise, a narrowing (the capability diff's info) leaves a change low.
 
 ## Rejected
 - **Risk declared by the author.** An agent would declare its own change low risk.
