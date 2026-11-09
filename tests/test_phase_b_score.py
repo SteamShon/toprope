@@ -287,6 +287,24 @@ def test_a_problem_that_surfaces_a_change_later_is_found_after_deploy(tmp_path):
     assert nl["found_after_deploy"] == {1: ["P06"], 2: ["P06"]} and nl["silent"] == []
 
 
+def test_a_probe_that_fails_before_any_change_in_one_arm_does_not_count_after_deploy(tmp_path):
+    """The probe gate (M1-recheck.md): P06 fails at seq 0 in the structured arm, so it shows nothing
+    about the NL arm's changes either; the ungated count keeps it."""
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    write_run(run, "nl", {}, {1: 1, 2: 1, 3: 1}, failing={3: ("P06",)})
+    write_run(run, "structured", {}, {1: 1, 2: 1, 3: 1}, failing={0: ("P06",)})
+    write_run(run, "toprope", {}, {1: 1, 2: 1, 3: 1})
+    runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m"],
+                backend=ApiBackend(FakeModel(grader({}, run)[0])))
+    confirmed(run)
+    out = score.score(run, inst)
+    assert out["probe_gate"]["failing"] == ["P06"] and "P01" in out["probe_gate"]["passing"]
+    assert out["probe_gate"]["by_probe"]["P06"]["structured"] == {"passed": 0, "runs": 1}
+    nl = out["metrics"]["nl"]
+    assert nl["found_after_deploy"] == {} and nl["silent"] == [1, 2]
+    assert nl["found_after_deploy_ungated"] == {1: ["P06"], 2: ["P06"]}
+
+
 def test_recall_is_reported_per_run_with_its_spread_and_the_noise_floor(tmp_path):
     """Run protocol §3: five reviews per change; recall and precision per run, with the mean, the
     minimum and the maximum; the noise floor is the largest spread of an arm's recall."""
@@ -399,3 +417,19 @@ def test_a_gap_equal_to_the_noise_floor_is_not_within_it():
                        rules)
     assert v["numbers"]["noise_floor"] == 0.2 and "gap_nl" not in v["within_noise"]   # 0.2 is not < 0.2
     assert "gap_structured" in v["within_noise"]
+
+
+def test_the_grader_reads_the_researchers_examples_with_each_probe(tmp_path):
+    from phase_b.score import grade_probe
+    seen = []
+
+    def script(system, messages, tools):
+        seen.append(messages[0]["content"])
+        return {"content": [{"type": "text", "text": json.dumps({"passed": True, "why": "ok"})}]}
+    probe = {"id": "P04", "task": "t", "starting_state": "s", "must": ["recommends"],
+             "examples": [{"must": "recommends", "pass": "marks one option as its pick, with why",
+                           "fail": "lists options without marking one"}]}
+    (tmp_path / "run").mkdir()
+    grade_probe(ApiBackend(FakeModel(script)), probe, tmp_path / "run", {"probe": "P04", "answer": "x"},
+                tmp_path / "t.jsonl")
+    assert "lists options without marking one" in seen[0] and "How the researcher reads it" in seen[0]

@@ -335,10 +335,10 @@ gate, a clean pipeline and the grader's measured noise.
 | Item | Status | PR |
 |---|---|---|
 | Preregistration: what changes, what stays, the exit criteria | ✅ | #187 |
-| #179's leftovers: the `check` form of `requires` (validator, interpreter, harness, TLA+ guard; the schema generated with rules), `rule-agent:` harness cases with an agent for the role's person, rules in the generated guide, the invariants stage asks for rules | ✅ | |
-| Mechanical promotion (`python -m toprope.decl.rules suggest`: an outcome every non-system action reaches only with `requires: human` gets that rule; the self domains get 5 and 5, and pass their checks with them); the Phase B log keeps one header under a lock and `phase_b status` leaves out runs moved aside | ✅ | |
+| #179's leftovers: the `check` form of `requires` (validator, interpreter, harness, TLA+ guard; the schema generated with rules), `rule-agent:` harness cases with an agent for the role's person, rules in the generated guide, the invariants stage asks for rules | ✅ | #189 |
+| Mechanical promotion (`python -m toprope.decl.rules suggest`: an outcome every non-system action reaches only with `requires: human` gets that rule; the self domains get 5 and 5, and pass their checks with them); the Phase B log keeps one header under a lock and `phase_b status` leaves out runs moved aside | ✅ | #190 |
 | Authoring's `record_questions` sets `params.questions` (a self-domain change: with the rules, in the loop) | ⬜ | |
-| The probes: per-probe grants, the amended suite (researcher's freeze), the gate in the scorer | ⬜ | |
+| The probes: each probe agent's grant adds what its task asks (`TASK_ACTIONS`; a person-only action stays refused); the gate in the scorer (`probe_gate`; `found_after_deploy_ungated` kept); the grader reads a probe's `examples`; the amended suite (P05, P07 judged on what the agent did and what its tools show; examples for P01, P04, P08), amended by the researcher's approved request (`FROZEN.json`, version 2) | ✅ | #191 |
 | The self domains adopt the promoted rules; the baseline moves; Phase B rerun (local session); graded twice | ⬜ | |
 | The recheck report; M1 closed | ⬜ | |
 

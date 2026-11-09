@@ -56,11 +56,33 @@ def _grant(repo: Path) -> dict[str, Any]:
     return agent["grant"]
 
 
-def _ids(repo: Path) -> dict[str, Any]:
+# What each probe's task asks for, added to the repository's grant for that probe (the M1 recheck,
+# adopting probe-baseline-findings.md, cause 2): the same task power as the text arms' generic
+# tools. An action that requires a person stays refused to the agent whatever its grant: that
+# refusal, and not a missing grant, is what the probe then sees.
+TASK_ACTIONS: dict[str, list[str]] = {
+    "P01": ["confirm_element", "confirm_all_proposed"],
+    "P02": ["approve_commit"],
+    "P03": ["fetch_source"],
+    "P04": ["answer_question", "decide"],
+    "P05": ["deliver", "preview", "deploy"],
+    "P06": ["deliver", "preview", "deploy"],
+    "P07": ["deliver"],
+    "P08": ["deliver", "preview", "deploy"],
+}
+
+
+def probe_grant(repo: Path, pid: str) -> dict[str, Any]:
+    base = _grant(repo)
+    actions = list(dict.fromkeys([*base["actions"], *TASK_ACTIONS[pid]]))
+    return {"id": f"{base['id']}+{pid.lower()}", "actions": actions}
+
+
+def _ids(repo: Path, pid: str) -> dict[str, Any]:
     person = {"id": OWNER, "roles": ["owner", "approver"]}
     return {TOKENS["owner"]: {**person, "kind": "person"},
             TOKENS["agent"]: {"id": "agent <agent@library.invalid>", "kind": "agent", "roles": ["owner", "approver"],
-                              "on_behalf_of": person, "grant": _grant(repo)}}
+                              "on_behalf_of": person, "grant": probe_grant(repo, pid)}}
 
 
 def _workspace() -> dict[str, Any]:
@@ -102,6 +124,7 @@ class World:
 
 
 def _new_world(repo: Path, root: Path, toolchain: Path) -> World:
+    """`root`'s name is the probe's id: its agent's grant covers that probe's task."""
     (root / "toolchain").mkdir(parents=True)
     shutil.copy(toolchain / "toprope-self.composition.yaml", root / COMPOSITION)
     for d in DOMAINS:
@@ -113,7 +136,7 @@ def _new_world(repo: Path, root: Path, toolchain: Path) -> World:
     (root / "notes").mkdir()
     (root / "notes/lending.md").write_text(NOTES)
     (root / "toprope.library.workspace.yaml").write_text(yaml.safe_dump(_workspace(), sort_keys=False))
-    (root / "ids.yaml").write_text(yaml.safe_dump(_ids(repo), sort_keys=False))
+    (root / "ids.yaml").write_text(yaml.safe_dump(_ids(repo, root.name), sort_keys=False))
     return World(root)
 
 
