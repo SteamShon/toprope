@@ -193,7 +193,7 @@ objects:
     source:
       kind: record
       ref: records:docs/adr/0025-staged-authoring-interview.md#L16-L58
-    status: proposed
+    status: confirmed
 links:
   question:
     from: Answer
@@ -671,7 +671,7 @@ actions:
     source:
       kind: record
       ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
-    status: proposed
+    status: confirmed
   search:
     description: Search the sources (redacted; local-only never served); the result
       is on record.
