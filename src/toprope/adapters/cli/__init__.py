@@ -42,6 +42,7 @@ from typing import Any
 from ...decl import load_domain, validate_domain
 from ...decl.models import Domain
 from ...exec import Execution
+from ...errors import fixed
 from ...identity import Caller, Identity
 
 READS = ("get", "history", "allowed", "whoami", "guide")
@@ -84,21 +85,21 @@ def read_config(path: Path) -> dict[str, str]:
     try:
         data = yaml.safe_load(path.read_text()) or {}
     except OSError as e:
-        raise SystemExit(f"{path}: cannot read it ({e.strerror}); give --config FILE or --no-config") from None
+        raise SystemExit(fixed(f"{path}: cannot read it ({e.strerror})", "give --config FILE, or --no-config")) from None
     except yaml.YAMLError as e:
-        raise SystemExit(f"{path}: not valid YAML ({e}); fix the file, or give --no-config") from None
+        raise SystemExit(fixed(f"{path}: not valid YAML ({e})", "fix the file, or give --no-config")) from None
     if not isinstance(data, dict):
-        raise SystemExit(f"{path}: expected a mapping such as `composition: x.composition.yaml`; "
-                         "fix the file, or give --no-config")
+        raise SystemExit(fixed(f"{path}: expected a mapping such as `composition: x.composition.yaml`",
+                               "fix the file, or give --no-config"))
     unknown = sorted(set(data) - set(CONFIG_KEYS))
     if unknown:
-        raise SystemExit(f"{path}: unknown key(s) {', '.join(unknown)}; the keys are "
-                         f"{', '.join(CONFIG_KEYS)}")
+        raise SystemExit(fixed(f"{path}: unknown key(s) {', '.join(unknown)}",
+                               f"use only the keys {', '.join(CONFIG_KEYS)}"))
     base = path.parent
     out = {}
     for key, value in data.items():
         if not isinstance(value, (str, int, float)):
-            raise SystemExit(f"{path}: `{key}` must be a single value, such as a path")
+            raise SystemExit(fixed(f"{path}: `{key}` must be a single value", "give one value, such as a path"))
         value = str(value)
         # A path in the file is relative to the file, so the file works from anywhere.
         if key in ("composition", "kernel_root", "workspace", "env", "store_dir"):
@@ -121,7 +122,7 @@ def with_config(argv: list[str]) -> list[str]:
     path = Path(pre.config) if pre.config else Path(CONFIG)
     if not path.is_file():
         if pre.config:
-            raise SystemExit(f"{path}: no such file; give the path of a {CONFIG}, or leave --config out")
+            raise SystemExit(fixed(f"{path}: no such file", f"give the path of a {CONFIG}, or leave --config out"))
         return argv
     added = []
     for key, value in read_config(path).items():
@@ -145,8 +146,8 @@ def infer_member(argv: list[str]) -> list[str]:
     if cmd is None:
         members = ", ".join(sorted(c.domains))
         if not ({"-h", "--help"} & set(argv)):
-            raise SystemExit(f"give an action, or --member (one of {members}) with --help to list "
-                             "its actions")
+            raise SystemExit(fixed("no action given", f"give an action, or --member (one of {members}) "
+                                     "with --help to list its actions"))
         _base_parser(add_help=True).print_help()
         print(f"\nmembers of {pre.composition}: {members}; `--member <member> --help` lists its actions")
         raise SystemExit(0)
@@ -154,11 +155,11 @@ def infer_member(argv: list[str]) -> list[str]:
     if len(members) == 1:
         return ["--member", members[0], *argv]
     if cmd in READS:
-        raise SystemExit(f"{cmd}: give --member, one of {', '.join(sorted(c.domains))}")
+        raise SystemExit(fixed(f"{cmd} reads one member", f"give --member, one of {', '.join(sorted(c.domains))}"))
     if members:
-        raise SystemExit(f"{cmd} is an action of {', '.join(members)}; give --member")
-    raise SystemExit(f"{cmd}: no member of {pre.composition} has this action; the actions are listed by "
-                     "`toprope-run --member <member> --help`")
+        raise SystemExit(fixed(f"{cmd} is an action of {', '.join(members)}", "give --member"))
+    raise SystemExit(fixed(f"{cmd}: no member of {pre.composition} has this action",
+                           "check the spelling; `toprope-run --member <member> --help` lists the actions"))
 
 
 def _param_option(sub: argparse.ArgumentParser, name: str, spec: Any) -> None:
@@ -206,7 +207,7 @@ def _identity(spec: str | None, token: str | None = None) -> Identity:
     if spec is None and token is None and Path(FILE).is_file():     # a given token is never ignored
         spec = "git"
     if not spec:
-        raise SystemExit(f"--identity is required for this command (or put {FILE} here)")
+        raise SystemExit(fixed("--identity is required for this command", f"give --identity, or put {FILE} here"))
     if spec == "git" or spec.startswith("git:"):
         try:
             return GitIdentity(spec[4:] or FILE, once=True)        # one command per process
@@ -225,7 +226,8 @@ def _caller(identity: Identity, token: str | None) -> Caller:
     caller = identity.resolve(token)
     if caller is None:
         explain = getattr(identity, "explain", None)    # the local identities say why
-        raise SystemExit(explain() if explain else "TOPROPE_TOKEN (or --token) does not resolve to a caller")
+        raise SystemExit(explain() if explain else fixed("TOPROPE_TOKEN (or --token) does not resolve to a caller",
+                                                         "give a token the identity file lists"))
     return caller
 
 
@@ -237,9 +239,10 @@ def _confirm_on_terminal(identity: Identity, caller: Caller, action: str, target
     if not isinstance(identity, GitIdentity) or caller.actor.kind != "person":
         return
     if not sys.stdin.isatty():
-        raise SystemExit(f"{action} requires a person: run it yourself on a terminal")
+        raise SystemExit(fixed(f"{action} requires a person", "run it yourself on a terminal, or through a human "
+                                "request (tools/human_request.py)"))
     if input(f"{action} {target} as {caller.actor.id}? [y/N] ").strip().lower() != "y":
-        raise SystemExit("not taken")
+        raise SystemExit(fixed("not taken", "answer `y` to take it"))
 
 
 def _execution(args: Any, d: Domain) -> Execution:
@@ -264,7 +267,8 @@ def followed(ex: Execution, d: Domain, target: str, before: int) -> list[dict[st
 
 def _domain(args: Any) -> Domain:
     if bool(args.domain) == bool(args.composition) or bool(args.composition) != bool(args.member):
-        raise SystemExit("give --domain, or --composition with --member")
+        raise SystemExit(fixed("no declaration given", "give --domain, or --composition with --member, "
+                                    f"or put a {CONFIG} here"))
     if args.domain:
         d = load_domain(args.domain)
     else:
@@ -284,7 +288,8 @@ def main(argv: list[str] | None = None) -> None:
     pre, _ = _base_parser(add_help=False).parse_known_args(argv)
     if not (pre.domain or pre.composition):
         _base_parser(add_help=True).parse_args(argv or ["--help"])
-        raise SystemExit("give --domain, or --composition with --member")
+        raise SystemExit(fixed("no declaration given", "give --domain, or --composition with --member, "
+                                    f"or put a {CONFIG} here"))
     d = _domain(pre)
     args = build_parser(d).parse_args(argv)
     if args.cmd == "guide":
