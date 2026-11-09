@@ -192,8 +192,8 @@ objects:
         optional: true
     source:
       kind: record
-      ref: records:docs/experiments/M1-recheck.md#L54-L66
-    status: confirmed
+      ref: records:docs/adr/0025-staged-authoring-interview.md#L16-L58
+    status: proposed
 links:
   question:
     from: Answer
@@ -670,8 +670,8 @@ actions:
         target.questions: params.text
     source:
       kind: record
-      ref: records:docs/experiments/M1-recheck.md#L54-L66
-    status: confirmed
+      ref: records:docs/adr/0037-switch-over-to-the-generated-self-domains.md#L8-L25
+    status: proposed
   search:
     description: Search the sources (redacted; local-only never served); the result
       is on record.
