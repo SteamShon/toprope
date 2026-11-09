@@ -11,6 +11,8 @@ opens the key, the binding or the blind labels, and never takes a role:
   uv run python -m phase_b arm nl --model M                      every change; resumes a stopped run
   uv run python -m phase_b status                                 how far each arm got
   uv run python -m phase_b grade --model M                        propose the grades (opens the key)
+  uv run python -m phase_b grade --model M --into scoring-2       the second sitting (the M1 recheck)
+  uv run python -m phase_b compare-gradings                       the grader's noise between the two
   uv run python -m phase_b to-decide                              what the researcher must decide
   uv run python -m phase_b score                                  the metrics, from confirmed.yaml
 
@@ -487,6 +489,10 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     g.add_argument("--out", type=Path, default=DEFAULT_OUT)
     g.add_argument("--instruments", type=Path, default=INSTRUMENTS)
     g.add_argument("--partial", action="store_true", help="grade an incomplete run (tests; never for the report)")
+    g.add_argument("--into", default="scoring", help="the scoring directory: `scoring-2` for the second sitting")
+    cg = sub.add_parser("compare-gradings", help="the grader's noise: each arm's recall from two sittings")
+    cg.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    cg.add_argument("--instruments", type=Path, default=INSTRUMENTS)
     sc = sub.add_parser("score", help="the metrics and pilot verdicts, from scoring/confirmed.yaml")
     sc.add_argument("--out", type=Path, default=DEFAULT_OUT)
     sc.add_argument("--instruments", type=Path, default=INSTRUMENTS)
@@ -494,6 +500,10 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
 
     if args.cmd == "freeze-prompts":
         print(json.dumps(freeze_prompts(args.instruments, args.reason), indent=2))
+        return
+    if args.cmd == "compare-gradings":
+        from .score import compare_gradings
+        print(json.dumps(compare_gradings(args.out, args.instruments), indent=2))
         return
     if args.cmd == "recheck-toprope":
         print(json.dumps(recheck_toprope(args.out), indent=2))
@@ -529,7 +539,8 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
         errs = verify_instruments(args.instruments)
         if errs:
             raise SystemExit("the instruments do not verify; nothing is graded:\n" + "\n".join(errs))
-        path = grade_run(args.out, args.instruments, backend, change_requests(args.instruments), args.partial)
+        path = grade_run(args.out, args.instruments, backend, change_requests(args.instruments), args.partial,
+                         into=args.into)
         print(json.dumps({"proposed": str(path), "usage": backend.report()}))
         return
     if args.cmd == "render":
