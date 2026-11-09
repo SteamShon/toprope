@@ -317,14 +317,14 @@ From [`M1-report.md`](experiments/M1-report.md), *What M2 takes from this*.
 
 | Item | Status | PR |
 |---|---|---|
-| ADR-0048: outcome rules, and a capability diff in the change check | 🟡 | |
-| The capability diff (a check over two declarations; no schema change) | ⬜ | |
-| Outcome rules: schema, validator, interpreter, harness, TLA+ export, guide | ⬜ | |
+| ADR-0048: outcome rules, and a capability diff in the change check | ✅ | #176 |
+| The capability diff (a check over two declarations; no schema change): the change check's `capability` | ✅ | #177 |
+| Outcome rules: schema, validator, interpreter, harness, TLA+ export (`requires: human` or roles; the generated guide and the self domains' adoption follow) | 🟡 | |
 | Grouped warnings in the change report (one per check and element, with a count; carried apart) | ⬜ | |
-| The natural-language check: an LLM reading the structured diff with the impact report (ADR-0009) | ⬜ | |
+| The natural-language check: `CommandChecker` (`TOPROPE_NL_COMMAND`) gives an LLM the changed elements, the capability diff, the rules and the declaration (ADR-0009) | 🟡 | |
 | An editor that proposes a patch (several elements, checked at once) | ⬜ | |
-| Probes that pass before any change | ⬜ | |
-| M2's design, a draft for the researcher ([`M2-design.md`](experiments/M2-design.md)): the full Toprope check against a structured spec reviewed by an LLM, the same edit checked both ways, grouped precision, the grader's noise, probes gated before any change, draft verdict rules | 🟡 | |
+| Probes that pass before any change: why they fail at `seq: 0` ([`probe-baseline-findings.md`](../experiments/m1/probe-baseline-findings.md)): criteria the right behaviour fails (P05, P07), unequal worlds (the Toprope agent's grant lacks `deliver`/`deploy`), strict readings; proposals wait for the researcher (the suite is an instrument) | 🟡 | |
+| M2's design: the full Toprope check against a structured spec reviewed by an LLM, preregistered | ⬜ | |
 
 ## M0b, M2 to M5
 
