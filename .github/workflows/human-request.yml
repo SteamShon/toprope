@@ -52,7 +52,7 @@ jobs:
   act:
     needs: plan
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 120        # harness and TLC on a changed declaration take over 20 minutes per domain
     environment: researcher
     permissions:
       contents: write
