@@ -133,3 +133,46 @@ def test_the_harness_catches_an_interpreter_that_lets_an_agent_through(monkeypat
     report = change_check(d, examples=20)
     assert not report.checks["harness"].ok
     assert any("rule-agent:" in p.message or "rule-agent:" in str(p.where) for p in report.checks["harness"].problems)
+
+
+# -- mechanical promotion (ADR-0048, Consequences; the M1 recheck) ----------------------------
+
+def test_person_only_outcomes_are_promoted_to_rules_and_nothing_else():
+    from toprope.decl.rules import suggest_rules
+    raw = schema_doc_domain()
+    raw["actions"]["approve_experiment"]["requires"] = "human"
+    got = suggest_rules(Domain.model_validate(raw))
+    rule = got["only-a-person-experiment-approved"]
+    assert (rule["on"], rule["requires"], rule["status"]) == ("Experiment.approved", "human", "proposed")
+    assert rule["reason"].startswith("Only a person brings an Experiment to approved:")
+    assert "approve_experiment" in rule["source"]["ref"]
+    assert all(r["on"].startswith("Experiment.") for r in got.values())
+    raw["rules"] = {"x": {"on": "Experiment.approved", "requires": "human", "reason": "r"}}
+    assert "only-a-person-experiment-approved" not in suggest_rules(Domain.model_validate(raw))   # guarded already
+
+
+def test_an_outcome_another_action_reaches_without_a_person_is_not_promoted():
+    from toprope.decl.rules import suggest_rules
+    d = with_bypass(None)
+    raw = d.model_dump(by_alias=True, exclude_none=True)
+    raw["actions"]["approve_experiment"]["requires"] = "human"
+    assert "only-a-person-experiment-approved" not in suggest_rules(Domain.model_validate(raw))
+
+
+def test_the_promoted_rules_hold_the_self_domains_as_they_are():
+    """Each self domain with its promoted rules validates and passes its harness: a promoted rule
+    only says what the actions already say."""
+    from pathlib import Path
+
+    from toprope.decl import load_domain
+    from toprope.decl.rules import suggest_rules
+    root = Path(__file__).resolve().parents[1] / "domains"
+    for name in ("authoring", "delivery"):
+        d = load_domain(root / name / f"{name}.domain.yaml")
+        raw = d.model_dump(by_alias=True, exclude_none=True)
+        raw["rules"] = suggest_rules(d)
+        assert raw["rules"], name
+        n = Domain.model_validate(raw)
+        assert not [i for i in validate_domain(n) if i.severity == "error"]
+        report = change_check(n, d, examples=10)
+        assert report.checks["harness"].ok and report.checks["capability"].ok, name

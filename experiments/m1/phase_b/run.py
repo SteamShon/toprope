@@ -395,6 +395,8 @@ def _progress(arm: str, i: int, n: int, seq: int, step: str, what: str) -> None:
 def status(out: Path) -> list[dict[str, Any]]:
     rows = []
     for m in sorted(out.glob("*/manifest.json")):
+        if ".stale-" in m.parent.name:          # a run moved aside (`<arm>.stale-N`) is not the arm's
+            continue
         man = json.loads(m.read_text())
         last = (man.get("sessions") or [{}])[-1]
         tokens = sum(sum((s.get("usage") or {}).get("tokens", {}).values()) for s in man.get("sessions", []))

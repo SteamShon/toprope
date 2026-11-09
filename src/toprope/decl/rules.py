@@ -75,3 +75,63 @@ def meets(rule: Rule, kind: str, roles: tuple[str, ...] | set[str], principal_ro
     if not allowed & set(roles):
         return False
     return kind != "agent" or bool(allowed & set(principal_roles or ()))
+
+
+def _reserved(role: str) -> bool:
+    return role == "system" or role.startswith(("external:", "handoff:"))
+
+
+def suggest_rules(d: Domain) -> dict[str, dict[str, Any]]:
+    """Outcome rules promoted mechanically from the declaration as it is (ADR-0048, Consequences):
+    an outcome that every non-system action reaching it today reaches only with `requires: human`
+    gets a `requires: human` rule. Nothing is judged: the rule says what the actions already say,
+    so that an action added later is held to it too. An outcome a rule already guards is left out.
+    Returned as declaration entries, `proposed`, with the actions they came from in the reason."""
+    guarded = {r.on for r in d.rules.values()}
+    by: dict[str, set[str]] = {}
+    for name, a in d.actions.items():
+        if all(_reserved(r if isinstance(r, str) else r.role) for r in a.actor):
+            continue                                    # the kernel's replies, handoffs: not held to rules
+        tr = d.transitions.get(a.object_type)
+        froms = [None] if (a.creates or tr is None) else list(tr.matrix)
+        for frm in froms:
+            for outcome in reaches(d, name, frm):
+                by.setdefault(outcome, set()).add(name)
+    out: dict[str, dict[str, Any]] = {}
+    for outcome, names in sorted(by.items()):
+        if outcome in guarded or not all(d.actions[n].requires == "human" for n in names):
+            continue
+        obj, part = outcome.split(".", 1)
+        rid = f"only-a-person-{obj.lower()}-{part.replace('_', '-').lower()}"
+        acts = ", ".join(sorted(names))
+        tr = d.transitions.get(obj)
+        art = "an" if obj[:1].lower() in "aeiou" else "a"
+        what = (f"brings {art} {obj} to {part}" if tr is not None and part in tr.matrix
+                else f"sets the {part} of {art} {obj}")
+        out[rid] = {"on": outcome, "requires": "human",
+                    "reason": f"Only a person {what}: every action that does so today requires a person "
+                              f"({acts}).",
+                    "source": {"kind": "system", "ref": f"promoted from requires: human on {acts}"},
+                    "status": "proposed"}
+    return out
+
+
+def main(argv: list[str] | None = None) -> int:
+    """`python -m toprope.decl.rules suggest <domain.yaml>`: print the promoted rules as YAML."""
+    import argparse
+    import sys
+
+    import yaml
+
+    from . import load_domain
+    ap = argparse.ArgumentParser(prog="python -m toprope.decl.rules")
+    ap.add_argument("cmd", choices=["suggest"])
+    ap.add_argument("declaration")
+    args = ap.parse_args(argv)
+    rules = suggest_rules(load_domain(args.declaration))
+    sys.stdout.write(yaml.safe_dump({"rules": rules}, sort_keys=False, allow_unicode=True) if rules else "rules: {}\n")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
