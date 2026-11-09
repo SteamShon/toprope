@@ -53,21 +53,20 @@ then `uv sync`. Every command runs from the repository root as `uv run <command>
 ## The self domains, end to end
 
 ```
-R="uv run toprope-run --composition domains/toprope-self.composition.yaml --kernel-root . \
-   --workspace toprope.authoring.workspace.yaml --env .toprope/env"
-$R --member authoring open_draft authoring --domain-id authoring \
+R="uv run toprope-run"     # the options come from toprope.yaml (ADR-0049, C3)
+$R open_draft authoring --domain-id authoring \
    --declaration domains/authoring/authoring.domain.yaml --branch work   # once per domain
-$R --member authoring next_questions authoring          # the current stage's questions
-$R --member authoring propose_element E-1 --path ... --origin S-1 --cites REF --value JSON
-$R --member authoring confirm_all_proposed authoring    # you, on your terminal
-$R --member authoring commit_draft authoring            # `then` names the new commit <id>
-$R --member authoring check_commit <id>
-$R --member authoring approve_commit <id>               # you, on your terminal
-$R --member authoring deliver <id> --environment local  # hands off to Delivery
-$R --member delivery preview authoring:<id>:local
-$R --member delivery deploy authoring:<id>:local        # you, on your terminal
-$R --member delivery run_probes authoring:<id>:local    # the deployed commit, checked in use
-$R --member delivery verify authoring:<id>:local        # you, once its probes passed
+$R next_questions authoring          # the current stage's questions
+$R propose_element E-1 --path ... --origin S-1 --cites REF --value JSON
+$R confirm_all_proposed authoring    # you, on your terminal
+$R commit_draft authoring            # `then` names the new commit <id>
+$R check_commit <id>
+$R approve_commit <id>               # you, on your terminal
+$R deliver <id> --environment local  # hands off to Delivery
+$R preview authoring:<id>:local
+$R deploy authoring:<id>:local        # you, on your terminal
+$R run_probes authoring:<id>:local    # the deployed commit, checked in use
+$R verify authoring:<id>:local        # you, once its probes passed
 ```
 
 - **Commit what changed.** Each domain's events go to its own append-only log,

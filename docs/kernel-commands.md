@@ -25,6 +25,8 @@ Its subcommands are the domain's actions, one per action, plus `get`, `history`,
 | `--seed` | load the declaration's example fixtures first |
 | `--key` `KEY` | idempotency key (default: a new one); reuse it to retry safely |
 | `--working-copy` | with --composition and --kernel-root: run each member from its working-copy file, not from its deployed commit (ADR-0045) |
+| `--config` `CONFIG` | the options file (default: toprope.yaml in the current directory, if any) |
+| `--no-config` | ignore toprope.yaml |
 
 ## `toprope-server`
 
