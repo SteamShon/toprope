@@ -1,9 +1,0 @@
-summary: Amend the M1 probe suite with the adopted proposals (M1 recheck)
-steps:
-  - amend:
-      dir: experiments/m1/instruments
-      file: probe-suite.yaml
-      reason: >-
-        M1 recheck (docs/experiments/M1-recheck.md): the researcher adopted every proposal of
-        experiments/m1/probe-baseline-findings.md on 2026-11-09. P05 and P07 are judged on what the
-        agent did and what the arm's tools show; P01, P04 and P08 gain a pass and a fail example.

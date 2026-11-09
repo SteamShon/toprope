@@ -1,8 +1,16 @@
 {
   "files": {
     "probe-suite.yaml": {
-      "sha256": "9314d46915f57d0e7960ab566bdf08178848490358e86750263a1cae42c8330f",
-      "frozen_at": "2026-11-05T07:57:10+00:00"
+      "sha256": "25284734565329dec14bb13ae9a9dfe2c6d2182502687e5480da700ab953fbdc",
+      "frozen_at": "2026-11-09T06:11:46+00:00",
+      "history": [
+        {
+          "sha256": "9314d46915f57d0e7960ab566bdf08178848490358e86750263a1cae42c8330f",
+          "frozen_at": "2026-11-05T07:57:10+00:00",
+          "replaced_at": "2026-11-09T06:11:46+00:00",
+          "reason": "M1 recheck (docs/experiments/M1-recheck.md): the researcher adopted every proposal of experiments/m1/probe-baseline-findings.md on 2026-11-09. P05 and P07 are judged on what the agent did and what the arm's tools show; P01, P04 and P08 gain a pass and a fail example."
+        }
+      ]
     },
     "verdict-rules.yaml": {
       "sha256": "54cada1c7a1ea62e7e6683ce8b27c6ee53cdb94bd1b864d3cc461a0b605f96b5",
