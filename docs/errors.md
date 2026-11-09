@@ -14,6 +14,7 @@ the error is raised.
 | no declaration given | give --domain, or --composition with --member, or put a {…} here |
 | no declaration given | give --domain, or --composition with --member, or put a {…} here |
 | not taken | answer `y` to take it |
+| review needs the authoring workspace | give --workspace, or set `workspace:` in toprope.yaml |
 | the declaration has {…} error(s), listed above | fix them, then run `toprope-harness --domain <file>` to check |
 | {…} is an action of {…} | give --member |
 | {…} reads one member | give --member, one of {…} |
