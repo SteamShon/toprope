@@ -14,6 +14,19 @@ directory and no token is given), your repository's git email, looked up in that
 (ADR-0037). An action that requires a person asks you to confirm on your terminal, so an agent's
 ordinary shell cannot take it as you. With `static:FILE` or `jwt`, the caller comes from TOPROPE_TOKEN (or --token), as for the server.
 Exit status 1 when the command is denied or rejected.
+
+A `toprope.yaml` in the current directory (or `--config FILE`) gives the options a composition
+needs, so a command is just the action (ADR-0049, C3):
+
+  composition: domains/toprope-self.composition.yaml
+  kernel_root: .
+  workspace: toprope.authoring.workspace.yaml
+  env: .toprope/env
+
+  toprope-run approve_commit authoring 7-92bc...     # the member is the one with that action
+
+An option on the command line wins over the file. `--domain` ignores the file, as does
+`--no-config`.
 """
 
 from __future__ import annotations
@@ -32,6 +45,11 @@ from ...exec import Execution
 from ...identity import Caller, Identity
 
 READS = ("get", "history", "allowed", "whoami", "guide")
+CONFIG = "toprope.yaml"
+# The keys `toprope.yaml` may set, and the option each one stands for.
+CONFIG_KEYS = {"composition": "--composition", "member": "--member", "kernel_root": "--kernel-root",
+               "workspace": "--workspace", "env": "--env", "store_dir": "--store-dir",
+               "identity": "--identity"}
 
 
 def _base_parser(add_help: bool) -> argparse.ArgumentParser:
@@ -55,7 +73,84 @@ def _base_parser(add_help: bool) -> argparse.ArgumentParser:
     ap.add_argument("--key", help="idempotency key (default: a new one); reuse it to retry safely")
     ap.add_argument("--working-copy", action="store_true", help="with --composition and --kernel-root: run "
                     "each member from its working-copy file, not from its deployed commit (ADR-0045)")
+    ap.add_argument("--config", help=f"the options file (default: {CONFIG} in the current directory, if any)")
+    ap.add_argument("--no-config", action="store_true", help=f"ignore {CONFIG}")
     return ap
+
+
+def read_config(path: Path) -> dict[str, str]:
+    """`toprope.yaml`: option defaults for a composition. Every error names the fix."""
+    import yaml
+    try:
+        data = yaml.safe_load(path.read_text()) or {}
+    except OSError as e:
+        raise SystemExit(f"{path}: cannot read it ({e.strerror}); give --config FILE or --no-config") from None
+    except yaml.YAMLError as e:
+        raise SystemExit(f"{path}: not valid YAML ({e}); fix the file, or give --no-config") from None
+    if not isinstance(data, dict):
+        raise SystemExit(f"{path}: expected a mapping such as `composition: x.composition.yaml`; "
+                         "fix the file, or give --no-config")
+    unknown = sorted(set(data) - set(CONFIG_KEYS))
+    if unknown:
+        raise SystemExit(f"{path}: unknown key(s) {', '.join(unknown)}; the keys are "
+                         f"{', '.join(CONFIG_KEYS)}")
+    base = path.parent
+    out = {}
+    for key, value in data.items():
+        if not isinstance(value, (str, int, float)):
+            raise SystemExit(f"{path}: `{key}` must be a single value, such as a path")
+        value = str(value)
+        # A path in the file is relative to the file, so the file works from anywhere.
+        if key in ("composition", "kernel_root", "workspace", "env", "store_dir"):
+            value = str((base / value)) if not Path(value).is_absolute() else value
+        elif key == "identity" and value.split(":", 1)[0] in ("git", "github", "static") and ":" in value:
+            kind, file = value.split(":", 1)
+            value = f"{kind}:{file if Path(file).is_absolute() else base / file}"
+        out[key] = value
+    return out
+
+
+def with_config(argv: list[str]) -> list[str]:
+    """The command line with `toprope.yaml`'s options added where the command line has none."""
+    pre, _ = _base_parser(add_help=False).parse_known_args(argv)
+    if pre.domain or pre.no_config:
+        return argv
+    path = Path(pre.config) if pre.config else Path(CONFIG)
+    if not path.is_file():
+        if pre.config:
+            raise SystemExit(f"{path}: no such file; give the path of a {CONFIG}, or leave --config out")
+        return argv
+    added = []
+    for key, value in read_config(path).items():
+        if getattr(pre, key) in (None, False):
+            added += [CONFIG_KEYS[key], value]
+    return added + argv
+
+
+def infer_member(argv: list[str]) -> list[str]:
+    """With a composition and no --member: the member whose actions include the command."""
+    pre, rest = _base_parser(add_help=False).parse_known_args(argv)
+    if not pre.composition or pre.member:
+        return argv
+    cmd = next((a for a in rest if not a.startswith("-")), None)
+    from ...compose import load_composition
+    from ..mcp.cli import running_commits
+    try:
+        c = load_composition(pre.composition, running_commits(pre))
+    except (OSError, ValueError) as e:
+        raise SystemExit(f"error {e}") from None
+    if cmd is None:
+        raise SystemExit(f"give an action, or --member (one of {', '.join(sorted(c.domains))}) "
+                         "with --help to list its actions")
+    members = sorted(n for n, d in c.domains.items() if cmd in d.actions)
+    if len(members) == 1:
+        return ["--member", members[0], *argv]
+    if cmd in READS:
+        raise SystemExit(f"{cmd}: give --member, one of {', '.join(sorted(c.domains))}")
+    if members:
+        raise SystemExit(f"{cmd} is an action of {', '.join(members)}; give --member")
+    raise SystemExit(f"{cmd}: no member of {pre.composition} has this action; the actions are listed by "
+                     "`toprope-run --member <member> --help`")
 
 
 def _param_option(sub: argparse.ArgumentParser, name: str, spec: Any) -> None:
@@ -177,7 +272,7 @@ def _domain(args: Any) -> Domain:
 
 
 def main(argv: list[str] | None = None) -> None:
-    argv = list(sys.argv[1:] if argv is None else argv)
+    argv = infer_member(with_config(list(sys.argv[1:] if argv is None else argv)))
     pre, _ = _base_parser(add_help=False).parse_known_args(argv)
     if not (pre.domain or pre.composition):
         _base_parser(add_help=True).parse_args(argv or ["--help"])

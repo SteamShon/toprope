@@ -1,0 +1,6 @@
+# Options for `toprope-run` in this repository: the self domains (ADR-0049, C3).
+# A command is then just the action, e.g. `uv run toprope-run next_questions authoring`.
+composition: domains/toprope-self.composition.yaml
+kernel_root: .
+workspace: toprope.authoring.workspace.yaml
+env: .toprope/env
