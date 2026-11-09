@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from . import CATALOG, Service
+from ..errors import fixed
 
 
 def complete(svc: Service, result: dict[str, Any]) -> dict[str, Any]:
@@ -41,7 +42,7 @@ class KernelServices(ABC):
         an agent, the system or the kernel approve or deploy (the fixed floor)."""
         svc = CATALOG.get(service)
         if svc is None:
-            raise KeyError(f"no kernel service {service!r}")
+            raise KeyError(fixed(f"no kernel service {service!r}", "use a service the kernel's catalog lists (src/toprope/kernel/__init__.py)"))
         missing = [i for i in svc.required() if i not in inputs]
         if missing:
             return svc.failure(f"missing inputs {missing}")
@@ -91,7 +92,7 @@ class LocalKernel(KernelServices):
     def _path(self, rel: str) -> Path:
         p = (self.root / str(rel)).resolve()
         if not p.is_relative_to(self.root):
-            raise ValueError(f"{rel} is outside the kernel's root")
+            raise ValueError(fixed(f"{rel} is outside the kernel's root", "give a path inside the repository the kernel runs on (`--kernel-root`)"))
         return p
 
 
@@ -138,22 +139,22 @@ class LocalKernel(KernelServices):
 
     def _read_source(self, source):
         if self.workspace is None:
-            raise RuntimeError("no authoring workspace configured")
+            raise RuntimeError(fixed("no authoring workspace configured", "pass `--workspace` the workspace file, or set `workspace:` in toprope.yaml"))
         spec = self.workspace.sources.get(source)
         if spec is None:
-            raise KeyError(f"no source {source!r}")
+            raise KeyError(fixed(f"no source {source!r}", "use a source id listed in the workspace file's `sources:`"))
         return {"chunks": len(self.workspace.chunks(source)), "local_only": spec.local_only}
 
     def _fetch_source(self, source):
         if self.workspace is None:
-            raise RuntimeError("no authoring workspace configured")
+            raise RuntimeError(fixed("no authoring workspace configured", "pass `--workspace` the workspace file, or set `workspace:` in toprope.yaml"))
         (meta,) = self.workspace.fetch(source)
         return {"sha256": meta["sha256"]}
 
     # -- the interview (ADR-0025, ADR-0037) ------------------------------------------------------
     def _ws(self):
         if self.workspace is None:
-            raise RuntimeError("no authoring workspace configured")
+            raise RuntimeError(fixed("no authoring workspace configured", "pass `--workspace` the workspace file, or set `workspace:` in toprope.yaml"))
         return self.workspace
 
     def _search_sources(self, query):
@@ -179,7 +180,7 @@ class LocalKernel(KernelServices):
         ws = self._ws()
         chosen = ws._proposed(ws.draft()) if paths.strip() == "all" else paths.split()
         if not chosen:
-            raise ValueError("nothing to confirm: no paths given, or nothing is proposed")
+            raise ValueError(fixed("nothing to confirm: no paths given, or nothing is proposed", "propose elements first, or name the paths to confirm"))
         ws.confirm(chosen, via="kernel", who=approver)
         return {"confirmed": chosen}
 
@@ -202,18 +203,18 @@ class LocalKernel(KernelServices):
         if kind in ("interview", "source"):
             spec = self._ws().sources.get(ref.split(":", 1)[0])
             if spec is not None and (spec.kind == "interview-log") != (kind == "interview"):
-                raise ValueError(f"{ref} is {'an interview line' if spec.kind == 'interview-log' else 'a source chunk'}:"
-                                 f" cite it as {'interview' if spec.kind == 'interview-log' else 'source'}")
+                raise ValueError(fixed(f"{ref} is {'an interview line' if spec.kind == 'interview-log' else 'a source chunk'}:"
+                                 f" cite it as {'interview' if spec.kind == 'interview-log' else 'source'}", "cite it with the kind named"))
             self._ws().source_of(ref)                        # an unknown chunk is refused
         elif kind == "event":
             stream, _, version = ref.rpartition("@")
             if self.environment is None:
-                raise RuntimeError("no deploy environment configured: no events to cite")
+                raise RuntimeError(fixed("no deploy environment configured: no events to cite", "pass `--env` the local deploy environment, or set `env:` in toprope.yaml"))
             with self.environment.events(domain) as store:
                 if store is None:
-                    raise RuntimeError(f"{domain} is not deployed here: no events to cite")
+                    raise RuntimeError(fixed(f"{domain} is not deployed here: no events to cite", "deploy it here first, or cite another kind of evidence"))
                 if not stream or not version.isdigit() or not 1 <= int(version) <= store.version(stream):
-                    raise ValueError(f"no event {ref!r}: give <stream>@<version> of a stored event")
+                    raise ValueError(fixed(f"no event {ref!r}: give <stream>@<version> of a stored event", "give `<stream>@<version>` of an event, as `toprope-run history <id>` lists them"))
         elif kind == "approval-run":
             self._approval_run(ref)
         e = self.commits.cite(domain, commit, kind, ref, by=str((self.caller or {}).get("id") or ""))
@@ -227,7 +228,7 @@ class LocalKernel(KernelServices):
         log = self.root / APPROVAL_RUNS
         runs = {json.loads(x).get("run") for x in log.read_text().splitlines() if x.strip()} if log.exists() else set()
         if url not in runs:
-            raise ValueError(f"no approved human request ran as {url!r} ({APPROVAL_RUNS})")
+            raise ValueError(fixed(f"no approved human request ran as {url!r} ({APPROVAL_RUNS})", "cite the run URL of an approved human request, as `.toprope/approval-runs.jsonl` lists it"))
 
     def run(self, service, inputs):
         if service == "diff":   # `from` is a Python keyword
@@ -238,8 +239,8 @@ class LocalKernel(KernelServices):
         if self.tlc_jar:
             tla = self.commits.check_status(domain, commit).get("tla") or {}
             if tla.get("ok") is not True:
-                raise ValueError(f"{commit} has no passing TLC check ({tla.get('summary') or 'never run with TLC'}):"
-                                 " run check_commit here, where TLC is configured, then approve")
+                raise ValueError(fixed(f"{commit} has no passing TLC check ({tla.get('summary') or 'never run with TLC'}):"
+                                 " run check_commit here, where TLC is configured, then approve", "run `check_commit` here, where TLC is configured (TOPROPE_TLC_JAR), then approve"))
         self.commits.approve(domain, commit, approver)   # conflicts fail the call, as any error does
         return {"approved": True, "main": self.commits.main(domain).id}
 
@@ -279,7 +280,7 @@ class LocalKernel(KernelServices):
 
     def _preview(self, domain, commit):
         if self.environment is None:
-            raise RuntimeError("no deploy environment configured")
+            raise RuntimeError(fixed("no deploy environment configured", "pass `--env` the local deploy environment, or set `env:` in toprope.yaml"))
         b = self.environment.preview_commit(self.commits, domain, commit, examples=self.examples)
         return {"ok": b.harness_ok, "build": b.id, "harness_ok": b.harness_ok}
 
@@ -287,7 +288,7 @@ class LocalKernel(KernelServices):
         from ..deploy import DeployRefused
         from ..types import Actor
         if self.environment is None:
-            raise RuntimeError("no deploy environment configured")
+            raise RuntimeError(fixed("no deploy environment configured", "pass `--env` the local deploy environment, or set `env:` in toprope.yaml"))
         try:
             self.environment.deploy_commit(self.commits, domain, commit, Actor(approver, "person"))
         except DeployRefused as e:
@@ -296,7 +297,7 @@ class LocalKernel(KernelServices):
 
     def _probe(self, domain, commit):
         if self.environment is None:
-            raise RuntimeError("no deploy environment configured")
+            raise RuntimeError(fixed("no deploy environment configured", "pass `--env` the local deploy environment, or set `env:` in toprope.yaml"))
         return self.environment.probe_commit(self.commits, domain, commit, events=self.domain_events.get(domain))
 
 

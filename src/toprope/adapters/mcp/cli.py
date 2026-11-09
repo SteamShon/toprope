@@ -26,6 +26,7 @@ from ...identity import Caller, Identity, StaticIdentity, str_list
 from ...store import EventStore
 from ...store import open_store as _open_store
 from ...types import Actor, Grant
+from ...errors import fixed
 
 
 def open_store(spec: str) -> EventStore:
@@ -37,7 +38,7 @@ def open_store(spec: str) -> EventStore:
 
 def _actor(d: dict[str, Any], kind: str | None = None) -> Actor:
     if not isinstance(d.get("id"), str):
-        raise ValueError("id must be a string")
+        raise ValueError(fixed("id must be a string", "give the caller an `id:` that is a string"))
     return Actor(d["id"], kind or d.get("kind", "person"), str_list(d.get("roles", []), "roles"))
 
 
@@ -66,7 +67,7 @@ def open_identity(spec: str) -> Identity:
                                issuer=os.environ.get("TOPROPE_JWT_ISSUER"))
         except ValueError as e:
             raise SystemExit(f"jwt identity: {e} (TOPROPE_JWT_KEY, TOPROPE_JWT_AUDIENCE, TOPROPE_JWT_ALG)") from None
-    raise SystemExit(f"unknown identity {spec!r}: use static:FILE or jwt")
+    raise SystemExit(fixed(f"unknown identity {spec!r}: use static:FILE or jwt", "use `--identity static:FILE` or `--identity jwt`"))
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -185,11 +186,11 @@ def _member(args, identity, services):
             print(f"error {i.code} at {i.where}: {i.message}", file=sys.stderr)
         raise SystemExit(1)
     if args.member not in c.domains:
-        raise SystemExit(f"error: no member {args.member!r} in {sorted(c.domains)}")
+        raise SystemExit(fixed(f"error: no member {args.member!r} in {sorted(c.domains)}", "use one of the members listed in the composition"))
     store = getattr(args, "store", None)
     if store not in (None, "memory"):
-        raise SystemExit("error: with --composition, give --store-dir DIR or --store memory (or neither, "
-                         "for each member's own event log)")
+        raise SystemExit(fixed("error: with --composition, give --store-dir DIR or --store memory (or neither, "
+                         "for each member's own event log)", "give `--store-dir DIR` or `--store memory`, or neither for each member's own event log"))
     if args.store_dir:
         Path(args.store_dir).mkdir(parents=True, exist_ok=True)
         stores = {n: open_store(f"sqlite:{Path(args.store_dir) / (n + '.db')}") for n in c.domains}
@@ -198,11 +199,11 @@ def _member(args, identity, services):
     else:   # each member's own event log, next to its declaration and kept in git (ADR-0037)
         logs = {n: member_events(c, n).resolve() for n in c.domains}
         if len(set(logs.values())) < len(logs):
-            raise SystemExit("error: members share a directory, so their event logs would mix; keep each "
-                             "member under its own directory (domains/<domain>/), or give --store-dir")
+            raise SystemExit(fixed("error: members share a directory, so their event logs would mix; keep each "
+                             "member under its own directory (domains/<domain>/), or give --store-dir", "keep each member under its own directory (domains/<domain>/), or give `--store-dir`"))
         if not args.no_seed:   # the examples are not records: they never go into a log kept in git
             if getattr(args, "seed", False):
-                raise SystemExit("error: --seed loads example objects; use it with --store memory or --store-dir")
+                raise SystemExit(fixed("error: --seed loads example objects; use it with --store memory or --store-dir", "add `--store memory` or `--store-dir DIR`, or drop `--seed`"))
             args.no_seed = True
         stores = {n: open_store(f"jsonl:{p}") for n, p in logs.items()}
     if hasattr(services, "domain_events"):   # the change check replays each member's own history
