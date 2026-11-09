@@ -159,9 +159,10 @@ def test_an_outcome_another_action_reaches_without_a_person_is_not_promoted():
     assert "only-a-person-experiment-approved" not in suggest_rules(Domain.model_validate(raw))
 
 
-def test_the_promoted_rules_hold_the_self_domains_as_they_are():
-    """Each self domain with its promoted rules validates and passes its harness: a promoted rule
-    only says what the actions already say."""
+def test_the_self_domains_carry_exactly_the_promoted_rules_and_pass_with_them():
+    """The self domains adopted the promoted rules (the M1 recheck): nothing is left to promote, the
+    rules they carry are what promotion gives from their actions alone, and with them each passes
+    its harness and capability check against its declaration without rules."""
     from pathlib import Path
 
     from toprope.decl import load_domain
@@ -169,10 +170,13 @@ def test_the_promoted_rules_hold_the_self_domains_as_they_are():
     root = Path(__file__).resolve().parents[1] / "domains"
     for name in ("authoring", "delivery"):
         d = load_domain(root / name / f"{name}.domain.yaml")
+        assert d.rules and suggest_rules(d) == {}, name
         raw = d.model_dump(by_alias=True, exclude_none=True)
-        raw["rules"] = suggest_rules(d)
-        assert raw["rules"], name
-        n = Domain.model_validate(raw)
-        assert not [i for i in validate_domain(n) if i.severity == "error"]
-        report = change_check(n, d, examples=10)
+        raw.pop("rules")
+        bare = Domain.model_validate(raw)
+        promoted = suggest_rules(bare)
+        assert {rid: (r["on"], r["requires"]) for rid, r in promoted.items()} == \
+            {rid: (r.on, r.requires) for rid, r in d.rules.items()}, name
+        assert not [i for i in validate_domain(d) if i.severity == "error"]
+        report = change_check(d, bare, examples=10)
         assert report.checks["harness"].ok and report.checks["capability"].ok, name
