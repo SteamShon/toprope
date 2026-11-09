@@ -324,7 +324,7 @@ From [`M1-report.md`](experiments/M1-report.md), *What M2 takes from this*.
 | The natural-language check: `CommandChecker` (`TOPROPE_NL_COMMAND`) gives an LLM the changed elements, the capability diff, the rules and the declaration (ADR-0009) | 🟡 | |
 | An editor that proposes a patch (several elements, checked at once) | ⬜ | |
 | Probes that pass before any change: why they fail at `seq: 0` ([`probe-baseline-findings.md`](../experiments/m1/probe-baseline-findings.md)): criteria the right behaviour fails (P05, P07), unequal worlds (the Toprope agent's grant lacks `deliver`/`deploy`), strict readings; proposals wait for the researcher (the suite is an instrument) | 🟡 | |
-| M2's design: the full Toprope check against a structured spec reviewed by an LLM, preregistered | ⬜ | |
+| M2's design, a draft for the researcher ([`M2-design.md`](experiments/M2-design.md)): the full Toprope check against a structured spec reviewed by an LLM, the same edit checked both ways, grouped precision, the grader's noise, probes gated before any change, draft verdict rules | 🟡 | |
 
 ## M0b, M2 to M5
 
