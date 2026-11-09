@@ -16,8 +16,10 @@ replies (`record_*`, taken by `external:` and `handoff:` actors) are not frictio
 out of the rates.
 
 A command that fails before the gate (a bad argument, a refused option, a crash) is recorded
-since ADR-0049's D1b, one file each under `.toprope/failures/`; they are counted separately, and
-in a second rate. Failures from before D1b were never recorded.
+since ADR-0049's D1b, one file each under `.toprope/failures/`. They are counted apart from the
+rates above, and per change approved since the first one was recorded: a successful read leaves
+no record, so failures cannot share a denominator with the commands. Failures from before D1b
+were never recorded.
 """
 from __future__ import annotations
 
@@ -123,8 +125,16 @@ def measure(root: Path) -> dict:
     taken = person + agent + unknown
     approvals = total(lambda m: m["approvals_in_window"])
     bad = total(lambda m: m["refused"] - m["refused_by_actor"].get("system", 0) + m["effects_failed"])
-    failures = [json.loads(p.read_text()) for p in sorted((root / ".toprope" / "failures").glob("*.json"))]
+    failures, malformed = [], 0
+    for path in sorted((root / ".toprope" / "failures").glob("*.json")):
+        try:
+            failures.append(json.loads(path.read_text()))
+        except (OSError, ValueError):
+            malformed += 1
     by_kind = Counter(f.get("kind") for f in failures)
+    since = min((f["at"] for f in failures if isinstance(f.get("at"), str)), default=None)
+    approved_since = sum(1 for d in per for r in _jsonl(root / ".toprope" / "commits" / d / "approvals.jsonl")
+                         if since is not None and str(r.get("at", "")) >= since)
     return {
         "domains": per,
         "commands_by_person_agent_unknown": [person, agent, unknown],
@@ -137,8 +147,9 @@ def measure(root: Path) -> dict:
         "refused_or_failed_per_command": _ratio(bad, taken),
         "failed_before_the_gate": dict(by_kind),
         "failed_before_the_gate_without_a_fix": sum(1 for f in failures if not f.get("has_fix")),
-        # A failed command never reached the gate, so it is not among `taken`: add it to both sides.
-        "refused_or_failed_per_command_with_failures": _ratio(bad + len(failures), taken + len(failures)),
+        "failed_before_the_gate_unreadable": malformed,
+        "failed_before_the_gate_since": since,
+        "failed_before_the_gate_per_change_approved_since": _ratio(len(failures), approved_since),
     }
 
 
@@ -165,8 +176,9 @@ def render(m: dict) -> str:
              f"Approved human requests: {m['approval_runs']}. Refused or failed per command by a "
              f"person or agent: {m['refused_or_failed_per_command']}.",
              f"Failed before the gate (recorded since D1b): {m['failed_before_the_gate'] or 'none'}, "
-             f"{m['failed_before_the_gate_without_a_fix']} without a fix; with them, refused or failed "
-             f"per command: {m['refused_or_failed_per_command_with_failures']}."]
+             f"{m['failed_before_the_gate_without_a_fix']} without a fix; per change approved since "
+             f"{m['failed_before_the_gate_since'] or 'the first'}: "
+             f"{m['failed_before_the_gate_per_change_approved_since']}."]
     return "\n".join(rows)
 
 

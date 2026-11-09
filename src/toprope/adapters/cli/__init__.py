@@ -53,9 +53,23 @@ CONFIG_KEYS = {"composition": "--composition", "member": "--member", "kernel_roo
                "identity": "--identity", "failures": "--failures"}
 
 
+_USAGE: list[str] = []          # the last usage error argparse reported, for the failure record
+
+
+class _Parser(argparse.ArgumentParser):
+    """Keeps argparse's own message, so a usage error is recorded with it. Subcommands use the
+    same class."""
+
+    def error(self, message: str):  # type: ignore[override]
+        _USAGE[:] = [message]
+        super().error(message)
+
+
 def _base_parser(add_help: bool) -> argparse.ArgumentParser:
-    ap = argparse.ArgumentParser(prog="toprope-run", description=__doc__, add_help=add_help,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    # allow_abbrev=False: `--tok` is not `--token`, so a shortened option cannot carry a secret
+    # past the redaction of the failure record (#204's review).
+    ap = _Parser(prog="toprope-run", description=__doc__, add_help=add_help, allow_abbrev=False,
+                 formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--domain", help="one declaration (or --composition with --member)")
     ap.add_argument("--composition", help="a *.composition.yaml: every member wired in this process")
     ap.add_argument("--member", help="with --composition: the member whose actions these are")
@@ -286,55 +300,105 @@ def _domain(args: Any) -> Domain:
     return d
 
 
-SECRET_OPTIONS = ("--token",)
+def _is_secret_option(a: str) -> bool:
+    """`--token`, or any start of it long enough to be meant as it (`--tok`)."""
+    name = a.split("=", 1)[0]
+    return len(name) >= 4 and "--token".startswith(name)
 
 
-def record_failure(directory: str | Path, argv: list[str], kind: str, message: str) -> Path:
-    """One file per failed command, so two branches never write the same file. The command line
-    is kept without secrets; who ran it is the git email, when there is one."""
-    import datetime
-    import subprocess
+def redact(argv: list[str]) -> list[str]:
     shown, skip = [], False
     for a in argv:
         if skip:
             shown.append("***")
             skip = False
-        elif a in SECRET_OPTIONS:
+        elif _is_secret_option(a) and "=" in a:
+            shown.append(a.split("=", 1)[0] + "=***")
+        elif _is_secret_option(a):
             shown.append(a)
             skip = True
-        elif any(a.startswith(o + "=") for o in SECRET_OPTIONS):
-            shown.append(a.split("=", 1)[0] + "=***")
         else:
             shown.append(a)
+    return shown
+
+
+def record_failure(directory: str | Path, argv: list[str], kind: str, message: str) -> Path | None:
+    """One file per failed command, so two branches never write the same file. The command line
+    is kept without secrets; who ran it is the git email, when there is one. A record that cannot
+    be written never hides the failure itself: it is skipped, with a warning."""
+    import datetime
+    import subprocess
     try:
         who = subprocess.run(["git", "config", "user.email"], capture_output=True, text=True,
                              timeout=5).stdout.strip() or None
     except (OSError, subprocess.SubprocessError):
         who = None
     now = datetime.datetime.now(datetime.timezone.utc)
-    entry = {"at": now.isoformat(timespec="seconds"), "by": who, "argv": shown, "kind": kind,
+    secrets = [x for a, x in zip(["", *argv], argv) if _is_secret_option(a) and "=" not in a]
+    secrets += [a.split("=", 1)[1] for a in argv if _is_secret_option(a) and "=" in a]
+    for s in sorted(filter(None, secrets), key=len, reverse=True):   # argparse may echo a value back
+        message = message.replace(s, "***")
+    entry = {"at": now.isoformat(timespec="seconds"), "by": who, "argv": redact(argv), "kind": kind,
              "message": message, "has_fix": "Fix: " in message}
-    d = Path(directory)
-    d.mkdir(parents=True, exist_ok=True)
-    path = d / f"{now:%Y%m%dT%H%M%S}-{uuid.uuid4().hex[:8]}.json"
-    path.write_text(json.dumps(entry, ensure_ascii=False, indent=1) + "\n")
-    return path
+    try:
+        d = Path(directory)
+        d.mkdir(parents=True, exist_ok=True)
+        path = d / f"{now:%Y%m%dT%H%M%S}-{uuid.uuid4().hex[:8]}.json"
+        path.write_text(json.dumps(entry, ensure_ascii=False, indent=1) + "\n")
+        return path
+    except OSError as err:
+        print(f"warning: the failure was not recorded in {directory}: {err}", file=sys.stderr)
+        return None
+
+
+def failures_dir(raw: list[str]) -> str | None:
+    """Where failures go, found before anything else can fail: `--failures DIR` on the command
+    line, then TOPROPE_FAILURES, then `failures:` in the toprope.yaml here (or `--config`). It is
+    a setting of the repository, so it holds whatever composition the command names."""
+    for i, a in enumerate(raw):
+        if a == "--failures" and i + 1 < len(raw):
+            return raw[i + 1]
+        if a.startswith("--failures="):
+            return a.split("=", 1)[1]
+    if os.environ.get("TOPROPE_FAILURES"):
+        return os.environ["TOPROPE_FAILURES"]
+    if "--no-config" in raw:
+        return None
+    cfg = next((raw[i + 1] for i, a in enumerate(raw) if a == "--config" and i + 1 < len(raw)), None)
+    path = Path(cfg) if cfg else Path(CONFIG)
+    try:
+        import yaml
+        value = (yaml.safe_load(path.read_text()) or {}).get("failures") if path.is_file() else None
+    except Exception:                                      # noqa: BLE001 - read_config reports it
+        return None
+    if not isinstance(value, str) or not value:
+        return None
+    return value if Path(value).is_absolute() else str(path.parent / value)
+
+
+class _AtTheGate(Exception):
+    """A crash after the command reached the gate: not a failure before it."""
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Run one command. A command that fails before the gate (a usage error, a refused option,
-    a crash) is recorded under `--failures` (or `failures:` in toprope.yaml), so F1 counts it."""
+    """Run one command. A command that fails before the gate (a usage error, a refused option or
+    file, a crash) is recorded under `failures_dir`, so F1 counts it (ADR-0049, D1b). A denial at
+    the gate (exit 1) is the gate's own record, and a person declining to confirm is no failure."""
     raw = list(sys.argv[1:] if argv is None else argv)
-    failures = None
+    failures = failures_dir(raw)
+    _USAGE.clear()
     try:
-        args = with_config(raw)
-        failures = _base_parser(add_help=False).parse_known_args(args)[0].failures
-        _main(infer_member(args))
+        _main(infer_member(with_config(raw)))
     except SystemExit as e:
-        if failures and e.code not in (None, 0, 1):        # 1: denied or rejected at the gate, recorded there
-            record_failure(failures, raw, "usage" if e.code == 2 else "refused",
-                           "argparse usage error" if e.code == 2 else str(e.code))
+        declined = isinstance(e.code, str) and e.code.startswith("not taken")
+        if failures and e.code not in (None, 0, 1) and not declined:
+            if e.code == 2:
+                record_failure(failures, raw, "usage", _USAGE[0] if _USAGE else "usage error")
+            else:
+                record_failure(failures, raw, "refused", str(e.code))
         raise
+    except _AtTheGate as e:
+        raise e.__cause__ from None                         # type: ignore[misc]
     except Exception as e:                                  # noqa: BLE001 - a crash is a failure too
         if failures:
             record_failure(failures, raw, "crash", f"{type(e).__name__}: {e}")
@@ -380,10 +444,13 @@ def _main(argv: list[str]) -> None:
             _confirm_on_terminal(ex.identity, caller, args.cmd, args.target)
     from ..mcp import outcome_json
     before = ex.store.version(args.target)
-    o = ex.submit(token, args.cmd, args.target, params, idempotency_key=args.key or str(uuid.uuid4()))
-    out = outcome_json(o)
-    if o.ok and (follow := followed(ex, d, args.target, before)):
-        out["then"] = follow
+    try:
+        o = ex.submit(token, args.cmd, args.target, params, idempotency_key=args.key or str(uuid.uuid4()))
+        out = outcome_json(o)
+        if o.ok and (follow := followed(ex, d, args.target, before)):
+            out["then"] = follow
+    except Exception as e:                                   # noqa: BLE001 - reached the gate
+        raise _AtTheGate() from e
     print(json.dumps(out, indent=2, ensure_ascii=False, default=str))
     if not o.ok:
         raise SystemExit(1)
