@@ -317,7 +317,8 @@ The closest of these are governed process maps. UiPath's Cartographer (announced
 rules, exceptions and decision rights through interviews and documents, has a named owner approve
 every change, and records decisions with their reasons: the same problem, and much the same split
 between what is declared and what explains it (ADR-0041). The difference is where the map sits.
-There the map is context, and a separate platform enforces it, so the two can drift apart.
+There the map is context and a separate platform enforces it; the public material does not say
+how the map's gates reach that platform, so nothing shown keeps the two from drifting apart.
 Here the declaration *is* the gate and the tests: what runs is compiled from what was approved.
 
 Agent orchestration frameworks (LangGraph and others) are a different layer. In them you
