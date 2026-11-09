@@ -77,7 +77,7 @@ def write_run(run: Path, arm: str, findings: dict[int, list], seconds: dict[int,
         (d / "record.json").write_text(json.dumps(rec))
 
 
-def grader(labels: dict[tuple[str, int], list[str]], run: Path | None = None):
+def grader(labels: dict[tuple[str, int], list[str]], run: Path | None = None, scoring: str = "scoring"):
     """A fake grader: each arm's findings labelled as given, by index in every run (it looks the arm up in the
     blind labels, which a real grader never sees); a probe fails when the agent's answer says FAIL."""
     calls = []
@@ -88,7 +88,7 @@ def grader(labels: dict[tuple[str, int], list[str]], run: Path | None = None):
         if "grade one run of a probe" in system:
             return json.dumps({"passed": "FAIL" not in user, "why": "w"})
         seq = int(user.split("Change request ")[1].split(":")[0])
-        mapping = yaml.safe_load((run / "scoring/blind-labels.yaml").read_text())["labels"][seq] if run else {}
+        mapping = yaml.safe_load((run / scoring / "blind-labels.yaml").read_text())["labels"][seq] if run else {}
         flags, edits = [], []
         for letter, arm in mapping.items():
             edits.append({"label": letter, "fidelity": "implements", "why": "w"})
@@ -433,3 +433,19 @@ def test_the_grader_reads_the_researchers_examples_with_each_probe(tmp_path):
     grade_probe(ApiBackend(FakeModel(script)), probe, tmp_path / "run", {"probe": "P04", "answer": "x"},
                 tmp_path / "t.jsonl")
     assert "lists options without marking one" in seen[0] and "How the researcher reads it" in seen[0]
+
+
+def test_two_sittings_of_the_grader_give_its_noise(tmp_path):
+    """M1-recheck.md, criterion 3: the same run graded twice; each arm's recall from each sitting's
+    proposed labels, and whether they differ by at most 0.1."""
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    three_arms(run)
+    runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m"],
+                backend=ApiBackend(FakeModel(grader(LABELS, run)[0])))
+    second = {**LABELS, ("nl", 1): ["false-alarm", "false-alarm"]}       # the grader reads nl's flag otherwise
+    runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m", "--into", "scoring-2"],
+                backend=ApiBackend(FakeModel(grader(second, run, scoring="scoring-2")[0])))
+    out = score.compare_gradings(run, inst)
+    assert out["first"]["nl"] == 0.5 and out["second"]["nl"] == 0.0
+    assert out["difference"]["toprope"] == 0.0 and out["largest"] == 0.5 and out["within_limit"] is False
+    assert json.loads((run / "grader-noise.json").read_text()) == out

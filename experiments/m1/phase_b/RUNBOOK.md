@@ -157,3 +157,32 @@ Report `runs/phase-b/scoring/metrics.json` to the researcher:
 - the Toprope arm's iteration time and its limiter
 
 The M1 report (`docs/experiments/M1-self-compile.md`) comes next, in its own PR.
+
+## The M1 recheck (`umbrella/m1-recheck`)
+
+The improved Toprope reruns the same change list from the new baseline (the self domains with their
+promoted rules; [`M1-recheck.md`](../../../docs/experiments/M1-recheck.md)). The steps above hold,
+with these differences:
+
+- **Branch.** `git fetch origin && git switch umbrella/m1-recheck && git pull`, then
+  `git switch -c exp/m1-recheck-run`. PRs go into `umbrella/m1-recheck`.
+- **Prompts.** Already frozen: skip step 1. `instruments.py verify --run` must print `ok`.
+- **The NL skill** (step 2) is rendered again from the new `arms/structured/` (the old one is
+  removed with the re-baseline). The researcher reviews it as before.
+- **Every run writes to `runs/phase-b-recheck`**: add `--out runs/phase-b-recheck` to `arm`,
+  `status`, `grade`, `to-decide` and `score`. M1's own runs stay as they are.
+- **After the three arms**, the combined arm (the Toprope arm with its LLM review):
+  ```bash
+  uv run python -m phase_b combine-toprope --model MODEL --out runs/phase-b-recheck --to runs/phase-b-recheck-combined
+  ```
+- **Grade the combined run twice**, in two sittings (exit criterion 3), then compare:
+  ```bash
+  uv run python -m phase_b grade --model MODEL --out runs/phase-b-recheck-combined
+  uv run python -m phase_b grade --model MODEL --out runs/phase-b-recheck-combined --into scoring-2
+  uv run python -m phase_b compare-gradings --out runs/phase-b-recheck-combined
+  ```
+  Report `grader-noise.json`. **STOP** if `within_limit` is false: the researcher grades the
+  labels the two sittings disagree on, and that grade counts.
+- Then step 5's `to-decide` and confirmation, and step 6's `score`, on
+  `runs/phase-b-recheck-combined` (its `scoring/`). Report `metrics.json` with its `probe_gate`
+  (exit criterion 1): the probes that fail the gate, and the grader's reason for each failing run.

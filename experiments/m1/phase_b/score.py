@@ -281,14 +281,15 @@ def grade_probe(backend: Any, probe: dict[str, Any], run_dir: Path, result: dict
 
 
 def grade(run: Path, instruments: Path, backend: Any, requests: list[dict[str, Any]], partial: bool = False,
-          seed: int | None = None) -> Path:
+          seed: int | None = None, into: str = "scoring") -> Path:
+    """`into`: the scoring directory; a second sitting writes `scoring-2` (M1-recheck.md, criterion 3)."""
     seqs = [r["seq"] for r in requests]
     missing = complete(run, seqs)
     if missing and not partial:
         raise SystemExit("the key opens only after every arm has run every change:\n" + "\n".join(missing))
     key, binding = load_sealed(instruments)
     probes = {p["id"]: p for p in yaml.safe_load((instruments / "probe-suite.yaml").read_text())["probes"]}
-    out = run / "scoring"
+    out = run / into
     tr = out / "transcripts"
     recs = {arm: records(run, arm) for arm in ARMS}
     seed = secrets.randbits(32) if seed is None else seed
@@ -574,6 +575,29 @@ def score(run: Path, instruments: Path) -> dict[str, Any]:
               "unbindable": sorted(s for s, b in binding.items() if b.get("unbindable"))}
     (run / "scoring/metrics.json").write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n")
     return result
+
+
+def grader_recall(run: Path, scoring: str, key: dict[int, Any], binding: dict[int, Any]) -> dict[str, float | None]:
+    """Each arm's mean recall from one sitting's proposed labels, before the researcher decides
+    anything: the grader's own reading (a flag with no label counts as not seeded)."""
+    graded = yaml.safe_load((run / scoring / "proposed.yaml").read_text())
+    labels = {int(s): v for s, v in yaml.safe_load((run / scoring / "blind-labels.yaml").read_text())["labels"].items()}
+    by_arm = _by_arm(graded, labels)
+    return {arm: arm_metrics(arm, by_arm[arm], [], records(run, arm), key, binding)["recall"] for arm in ARMS}
+
+
+def compare_gradings(run: Path, instruments: Path, first: str = "scoring", second: str = "scoring-2",
+                     limit: float = 0.1) -> dict[str, Any]:
+    """The grader's noise (M1-recheck.md, exit criterion 3): the same run graded in two sittings,
+    each arm's recall from each, and whether they differ by at most `limit`."""
+    key, binding = load_sealed(instruments)
+    a, b = grader_recall(run, first, key, binding), grader_recall(run, second, key, binding)
+    diff = {arm: None if a[arm] is None or b[arm] is None else round(abs(a[arm] - b[arm]), 4) for arm in ARMS}
+    worst = max((d for d in diff.values() if d is not None), default=None)
+    out = {"first": a, "second": b, "difference": diff, "largest": worst, "limit": limit,
+           "within_limit": worst is not None and worst <= limit}
+    (run / "grader-noise.json").write_text(json.dumps(out, indent=2) + "\n")
+    return out
 
 
 def to_decide(run: Path) -> dict[str, Any]:
