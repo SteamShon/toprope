@@ -32,7 +32,11 @@ def repo(tmp_path, monkeypatch):
     approved = CommitStore(ROOT / ".toprope" / "commits")
     for d in ("authoring", "delivery"):
         approved.export(d, approved.main(d).id, tmp_path / f"domains/{d}/{d}.domain.yaml")
-    (tmp_path / "ids.yaml").write_text(yaml.safe_dump({"t-owen": {"id": ME, "roles": ["owner", "approver"]}}))
+    (tmp_path / "ids.yaml").write_text(yaml.safe_dump({
+        "t-owen": {"id": ME, "roles": ["owner", "approver"]},
+        "t-bot": {"id": "bot <bot@example.com>", "kind": "agent", "roles": ["owner"],   # an agent, drafting only
+                  "on_behalf_of": {"id": ME, "roles": ["owner", "approver"]},
+                  "grant": {"id": "drafting", "actions": ["propose_element", "add_source", "next_questions"]}}}))
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("TOPROPE_TOKEN", "t-owen")
     run = [sys.executable, "-c", "from toprope.adapters.cli import main; main()", "--identity", "static:ids.yaml",
@@ -56,10 +60,14 @@ def patch(tmp_path, items):
     return str(p)
 
 
-def test_one_command_proposes_commits_checks_and_writes_one_request(repo, capsys):
+def test_an_agent_proposes_checks_and_writes_one_request_and_no_commit(repo, capsys, monkeypatch):
+    from toprope.commits import CommitStore
+    before = len(CommitStore(repo / ".toprope/commits").log("authoring"))
+    monkeypatch.setenv("TOPROPE_TOKEN", "t-bot")                       # the agent, with its drafting grant
     p = patch(repo, [{"path": f"invariants.{RULE['id']}", "value": RULE, "origin": "S-adr",
                       "cites": a_ref(repo)}])
     main(["Drafts name their declaration", "--patch", p, "--run-args", "--identity static:ids.yaml"])
+    assert len(CommitStore(repo / ".toprope/commits").log("authoring")) == before   # checked on a scratch copy
     out = capsys.readouterr().out
     result = json.loads(out[out.index("{\n"):])
     assert result["proposed"] == [f"invariants.{RULE['id']}"]
@@ -72,6 +80,28 @@ def test_one_command_proposes_commits_checks_and_writes_one_request(repo, capsys
     decl = yaml.safe_load((repo / "domains/authoring/authoring.domain.yaml").read_text())
     (added,) = [i for i in decl["invariants"] if i["id"] == RULE["id"]]
     assert added["status"] == "proposed"                               # nothing is confirmed by the agent
+
+
+def test_a_check_that_finds_a_problem_stops_before_any_request(repo, capsys):
+    broken = {"id": "drafts-are-never-open", "on": "Draft", "check": "target.stage != 'open'",
+              "reason": "Never open."}                                  # valid, and false of every new draft
+    p = patch(repo, [{"path": f"invariants.{broken['id']}", "value": broken, "origin": "S-adr",
+                      "cites": a_ref(repo)}])
+    with pytest.raises(SystemExit) as e:
+        main(["A rule nothing can satisfy", "--patch", p, "--run-args", "--identity static:ids.yaml"])
+    msg = str(e.value)
+    assert "the change check found problems" in msg and "Fix: fix the proposals" in msg
+    assert f"invariants.{broken['id']}" in msg                          # what was left in the draft
+    assert not (repo / ".toprope/requests").exists() or not list((repo / ".toprope/requests").glob("*.yaml"))
+
+
+def test_a_request_waiting_to_be_pushed_stops_a_second_one(repo, capsys):
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    (repo / ".toprope/requests").mkdir(parents=True, exist_ok=True)
+    (repo / ".toprope/requests/first.yaml").write_text("summary: x\nsteps: []\n")
+    p = patch(repo, [{"path": f"invariants.{RULE['id']}", "value": RULE, "origin": "S-adr", "cites": a_ref(repo)}])
+    with pytest.raises(SystemExit, match="a request is already waiting to be pushed"):
+        main(["x", "--patch", p, "--run-args", "--identity static:ids.yaml"])
 
 
 def test_a_refused_proposal_stops_before_any_request(repo, capsys):

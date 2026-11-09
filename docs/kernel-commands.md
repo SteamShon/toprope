@@ -41,7 +41,7 @@ Its subcommands are the domain's actions, one per action, plus `get`, `history`,
 | `--member` `MEMBER` | the member whose actions these are (default `authoring`) |
 | `--origin` `ORIGIN` | the Source object an element came from, when it names none |
 | `--workspace` `WORKSPACE` | the draft's workspace, if not the one in toprope.yaml |
-| `--kernel-root` `KERNEL_ROOT` | where the commit store is (default: here) (default `.`) |
+| `--kernel-root` `KERNEL_ROOT` | where the commit store is (default: `kernel_root:` in toprope.yaml, or here) |
 | `--request` `REQUEST` | the request file to write (default: .toprope/requests/<id>.yaml) |
 | `--run-args` `RUN_ARGS` | options passed to every toprope-run step, e.g. "--identity static:ids.yaml" (default ``) |
 

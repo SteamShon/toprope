@@ -12,12 +12,14 @@ words from the passage):
       cites: "interview: The working copy of a declaration."
       origin: S-adr                      # the Source object it came from (default: --origin)
 
-It runs, through `toprope-run` and as whoever runs it (an agent, with its drafting grant):
-`propose_element` for each element, `commit_draft`, and `check_commit` on that commit. If a
-check fails it stops there and says which, with the fix. If they pass it prints the diff a
-person will confirm (`toprope-run review`) and writes one human request,
-`.toprope/requests/<id>.yaml`, whose steps confirm, commit, check and approve (ADR-0039). The
-person approves that one request; nothing an agent did is enforced before they do (ADR-0041).
+It proposes each element through `toprope-run`, as whoever runs it (an agent, with its drafting
+grant). Then it checks the working copy as `check_commit` would, on a scratch copy of the
+domain's commit store, so the tracked store gains no commit until the person's request makes
+the one that is approved (#208's review). If a check finds something it stops there and says
+which, with the fix. If not, it prints the diff a person will confirm (`toprope-run review`)
+and writes one human request, `.toprope/requests/<id>.yaml`, whose steps confirm, commit, check
+and approve (ADR-0039). The person approves that one request; nothing an agent did is enforced
+before they do (ADR-0041).
 
 Every step runs as its own process, as `toprope-run` does, so the identity and the kernel are
 the same as by hand. Options a step needs come from toprope.yaml, as for `toprope-run`.
@@ -26,8 +28,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import shlex
+import shutil
 import subprocess
+import tempfile
 import sys
 import uuid
 from pathlib import Path
@@ -54,7 +60,7 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--member", default="authoring", help="the member whose actions these are")
     ap.add_argument("--origin", help="the Source object an element came from, when it names none")
     ap.add_argument("--workspace", help="the draft's workspace, if not the one in toprope.yaml")
-    ap.add_argument("--kernel-root", default=".", help="where the commit store is (default: here)")
+    ap.add_argument("--kernel-root", help="where the commit store is (default: `kernel_root:` in toprope.yaml, or here)")
     ap.add_argument("--request", help=f"the request file to write (default: {REQUESTS}/<id>.yaml)")
     ap.add_argument("--run-args", default="", help="options passed to every toprope-run step, "
                     "e.g. \"--identity static:ids.yaml\"")
@@ -97,13 +103,47 @@ def step(base: list[str], *args: str) -> dict[str, Any]:
     return out
 
 
-def failing_checks(kernel_root: Path, domain: str, commit: str) -> list[str]:
-    """The checks that found something. `confirmed` is not one: it fails until a person confirms
-    the proposals, which is what the request is for; a skipped check did not run."""
+def kernel_root(given: str | None) -> Path:
+    if given:
+        return Path(given)
+    from . import CONFIG, read_config
+    if Path(CONFIG).is_file():
+        return Path(read_config(Path(CONFIG)).get("kernel_root", "."))
+    return Path(".")
+
+
+def dry_check(root: Path, workspace: str | None) -> tuple[str, list[str], str]:
+    """The change check `check_commit` runs, on a scratch copy of the domain's commit store: the
+    working copy is committed there, checked against the same base, with the domain's own event
+    log replayed, and the copy is thrown away. Returns (domain, what failed, summary). A check
+    that did not run is not a pass: no check at all is an error."""
+    from ...check import check_commit
     from ...commits import CommitStore
-    rows = CommitStore(kernel_root / ".toprope" / "commits").check_status(domain, commit)
-    return [f"{name}: {r.get('summary')}" for name, r in rows.items()
-            if not r.get("ok") and name != "confirmed" and not str(r.get("summary", "")).startswith("skipped")]
+    from ...store import open_store
+    from ...workspace import Workspace
+    from . import CONFIG, read_config
+    ws_path = workspace or (read_config(Path(CONFIG)).get("workspace") if Path(CONFIG).is_file() else None)
+    if not ws_path:
+        raise SystemExit(fixed("no workspace to check", "give --workspace, or set `workspace:` in toprope.yaml"))
+    ws = Workspace(ws_path)
+    domain = ws.draft().get("domain")
+    store_dir = root / ".toprope" / "commits" / str(domain)
+    with tempfile.TemporaryDirectory() as tmp:
+        if store_dir.is_dir():
+            shutil.copytree(store_dir, Path(tmp) / str(domain), ignore=shutil.ignore_patterns(".lock"))
+        scratch = CommitStore(Path(tmp))
+        c, _ = scratch.commit(ws.domain_path, author="toprope-change")
+        events_dir = ws.domain_path.parent / "events"
+        events = open_store(f"jsonl:{events_dir}") if events_dir.is_dir() else None
+        r = check_commit(scratch, str(domain), c.id, events=events,
+                         tlc=os.environ.get("TOPROPE_TLC_JAR") or None)
+    ran = [n for n, x in r.checks.items() if x.ran]
+    if not ran:
+        raise SystemExit(fixed(f"no check ran on {domain}'s working copy", "check the draft with "
+                               "`toprope-run check_commit` after a commit, and report the problem"))
+    failing = [f"{n}: {x.summary() if hasattr(x, 'summary') else x}" for n, x in r.checks.items()
+               if x.ran and not x.ok]
+    return str(domain), failing, r.summary()
 
 
 def slug(text: str) -> str:
@@ -120,40 +160,58 @@ def request_for(intent: str, draft: str, member: str, workspace: str | None) -> 
                 ("check_commit", "$commit"), ("approve_commit", "$commit"))]}
 
 
+def pending_requests() -> list[str]:
+    """Request files not yet committed: the workflow takes exactly one per push."""
+    r = subprocess.run(["git", "status", "--porcelain", "--", REQUESTS], capture_output=True, text=True)
+    return [line[3:] for line in r.stdout.splitlines() if line.strip()]
+
+
 def main(argv: list[str] | None = None) -> None:
     a = build_parser().parse_args(argv)
     items = read_patch(a.patch)
-    base = [*a.run_args.split(), "--member", a.member, *(["--workspace", a.workspace] if a.workspace else [])]
+    if a.workspace and not a.workspace.endswith(".workspace.yaml"):
+        raise SystemExit(fixed(f"--workspace {a.workspace} is not a workspace file",
+                               "give the `*.workspace.yaml` file a human request can name"))
+    if (waiting := pending_requests()):
+        raise SystemExit(fixed(f"a request is already waiting to be pushed: {', '.join(waiting)}",
+                               "push it (one request per push), or remove it, then run the change"))
+    if a.request and Path(a.request).exists():
+        raise SystemExit(fixed(f"{a.request} exists", "name a new request file, or leave --request out"))
+    base = [*shlex.split(a.run_args), "--member", a.member,
+            *(["--workspace", a.workspace] if a.workspace else []),
+            *(["--kernel-root", a.kernel_root] if a.kernel_root else [])]
+    proposed: list[str] = []
     for it in items:
         origin = it.get("origin") or a.origin
         if not origin:
             raise SystemExit(fixed(f"{it['path']} names no origin", "give it `origin:` (a Source object's id), "
                                    "or --origin for every element"))
-        step(base, "propose_element", f"E-{uuid.uuid4().hex[:8]}", "--path", str(it["path"]), "--origin",
-             str(origin), "--cites", str(it["cites"]), "--value", json.dumps(it["value"]))
+        try:
+            step(base, "propose_element", f"E-{uuid.uuid4().hex[:8]}", "--path", str(it["path"]), "--origin",
+                 str(origin), "--cites", str(it["cites"]), "--value", json.dumps(it["value"]))
+        except StepFailed as e:
+            left = f"; already proposed and still in the draft: {', '.join(proposed)}" if proposed else ""
+            raise SystemExit(fixed(f"{e.code}{left}", "fix that element and run the change again with the "
+                                   "elements not yet proposed, or restore the draft with `git checkout -- "
+                                   "<declaration>`")) from None
+        proposed.append(str(it["path"]))
         print(f"proposed {it['path']}", file=sys.stderr)
-    made = step(base, "commit_draft", a.draft)
-    commits = [t["object"] for t in made.get("then", []) if t.get("object")]
-    if not commits:
-        raise SystemExit(fixed("commit_draft made no commit", "check that the draft has changes to commit"))
-    commit = commits[-1]
-    step(base, "check_commit", commit)
-    state = step(base, "get", commit)
-    failed = failing_checks(Path(a.kernel_root), state.get("domain_id") or a.draft, commit)
-    if failed:
-        raise SystemExit(fixed(f"{commit}'s checks found problems: " + "; ".join(failed),
-                               f"see `toprope-commits checks {state.get('domain_id') or a.draft} {commit}`, "
-                               "fix the proposals and run the change again"))
-    review = step(base, "review").get("text", "")
+    domain, failing, summary = dry_check(kernel_root(a.kernel_root), a.workspace)
+    if failing:
+        raise SystemExit(fixed(f"the change check found problems in {domain}'s working copy: "
+                               + "; ".join(failing) + f" (proposed and still in the draft: {', '.join(proposed)})",
+                               "fix the proposals and run the change again; nothing was requested"))
+    review = step(base, "review")
     req = request_for(a.intent, a.draft, a.member, a.workspace)
     path = Path(a.request) if a.request else Path(REQUESTS) / f"{slug(a.intent)}.yaml"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.safe_dump(req, sort_keys=False, allow_unicode=True))
-    print(review, end="")
-    print(json.dumps({"proposed": [it["path"] for it in items], "checked": commit, "request": str(path),
-                      "next": "commit and push the branch with the request; the person approves it in "
-                              "GitHub, and that one approval confirms, commits, checks and approves"},
+    print(review.get("text", "") if isinstance(review, dict) else str(review), end="")
+    print(json.dumps({"proposed": proposed, "checked": summary, "request": str(path),
+                      "next": "commit the request with the draft and the event logs it changed, and push "
+                              "them; the person approves the request in GitHub, and that one approval "
+                              "confirms, commits, checks and approves (one loop at a time: AGENTS.md)"},
                      indent=2))
 
 
-__all__ = ["build_parser", "main", "read_patch", "request_for"]
+__all__ = ["build_parser", "dry_check", "main", "read_patch", "request_for"]

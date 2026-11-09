@@ -58,7 +58,7 @@ An agent writes the elements a change proposes to a patch file and runs
 uv run toprope-change "Drafts name their declaration" --patch change.yaml
 ```
 
-It proposes each element, commits the draft, checks the commit, prints the diff a person will
+It proposes each element, checks the working copy (on a scratch copy of the commit store), prints the diff a person will
 confirm, and writes one human request (`.toprope/requests/<id>.yaml`). Push it: the person's one
 approval in GitHub confirms, commits, checks and approves. If a check fails, nothing is
 requested, and the message says which check and how to fix it. The steps one by one follow.
