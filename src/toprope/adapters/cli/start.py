@@ -63,6 +63,15 @@ def init(name: str, template: str, where: Path) -> Path:
     if out.exists():
         raise SystemExit(fixed(f"{out} exists", "choose another name, or remove that directory"))
     out.mkdir(parents=True)
+    try:
+        _write(out, src, name, template)
+    except BaseException:
+        shutil.rmtree(out, ignore_errors=True)          # nothing half-written is left to block a retry
+        raise
+    return out
+
+
+def _write(out: Path, src: Any, name: str, template: str) -> None:
     for f in ("domain.yaml", "tokens.yaml", "story.yaml"):
         (out / f).write_text((src / f).read_text())
     decl = (out / "domain.yaml").read_text()
@@ -83,7 +92,6 @@ def init(name: str, template: str, where: Path) -> Path:
     ex = Execution(load_domain(out / "domain.yaml"), open_store(f"sqlite:{out / '.toprope' / 'events.db'}"),
                    StaticIdentity({}))
     ex.seed_world()                                        # the examples, once, into its own store
-    return out
 
 
 def load(domain_file: Path):
@@ -129,6 +137,10 @@ def play(where: Path) -> tuple[bool, list[dict[str, Any]]]:
     d, ex = _execution(domain_file, tokens)
     rows, ok = [], True
     for st in story.get("steps", []):
+        if st.get("expect") == "denied" and not st.get("code"):
+            raise SystemExit(fixed(f"a step of story.yaml expects a refusal without saying which ({st['action']} "
+                                   f"{st['target']})", "give the step the `code` of the refusal it expects, so "
+                                   "any other refusal (a wrong token, a missing grant) does not pass for it"))
         if st["action"] not in d.actions:
             raise SystemExit(fixed(f"the story names {st['action']!r}, which domain.yaml does not declare",
                                    "rename the step's action in story.yaml, or put the action back"))

@@ -96,6 +96,6 @@ invariants exercised: 1/1
 with the current rules before anything ships:
 
 ```
-changes 1 precondition(s); affects 4 cell test(s), 14 param test(s), 2 precondition test(s), exploration; replays past propose_budget_change
+changes 1 precondition(s); affects 4 cell test(s), 14 param test(s), 3 precondition test(s), exploration; replays past propose_budget_change
 passes; 0 error(s), 0 warning(s)
 ```

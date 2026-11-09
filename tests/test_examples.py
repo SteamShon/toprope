@@ -84,7 +84,7 @@ def test_paid_media_raising_the_step_limit_gets_an_impact_report():
     r = change_check(load_domain(PM / "paid-media.step-1000.domain.yaml"), load_domain(PM / "paid-media.domain.yaml"))
     assert r.ok and r.diff["to_review"] == ["precondition:propose_budget_change.step-limit"]
     assert r.impact["summary"] == ("changes 1 precondition(s); affects 4 cell test(s), "
-                                   "14 param test(s), 2 precondition test(s), exploration; replays past propose_budget_change")
+                                   "14 param test(s), 3 precondition test(s), exploration; replays past propose_budget_change")
 
 
 def test_paid_media_an_approval_records_the_rationale_given(capsys, tmp_path):

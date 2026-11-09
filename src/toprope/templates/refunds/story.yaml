@@ -6,4 +6,4 @@ next: >
 steps:
   - {who: t-sam, as: sam (support), action: refund_order, target: O-8, says: "refund an order from day 8", expect: denied, code: within-window}
   - {who: t-sam, as: sam (support), action: refund_order, target: O-3, says: "refund an order from day 3", expect: ok}
-  - {who: t-sam, as: sam (support), action: refund_order, target: O-3, says: "refund it again", expect: denied}
+  - {who: t-sam, as: sam (support), action: refund_order, target: O-3, says: "refund it again", expect: denied, code: matrix}

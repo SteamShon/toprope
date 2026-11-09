@@ -106,3 +106,59 @@ def test_the_examples_are_copies_of_their_template(template, example, name):
     assert (examples / example).read_text() == want, \
         f"examples/{example} differs from the {template} template: copy the template's domain.yaml there"
     assert (examples / Path(example).parent / "tokens.yaml").read_text() == (root / "tokens.yaml").read_text()
+
+
+def test_an_action_param_named_token_keeps_its_value(tmp_path):
+    from toprope.adapters.cli import build_parser
+    from toprope.decl import Domain
+    raw = yaml.safe_load((init("my-refunds", "refunds", tmp_path) / "domain.yaml").read_text())
+    raw["actions"]["refund_order"]["params"] = {"token": {"type": "string"}}
+    p = build_parser(Domain.model_validate(raw))
+    a = p.parse_args(["--token", "t-sam", "refund_order", "O-3", "--token", "gift-card"])
+    assert (a.token, a.p_token) == ("t-sam", "gift-card")        # the param, not the credential
+    b = p.parse_args(["refund_order", "O-3", "--token", "gift-card"])
+    assert b.p_token == "gift-card" and b.token is None
+
+
+def test_who_you_are_given_after_the_action_is_used_and_does_not_erase_one_before(tmp_path):
+    from toprope.adapters.cli import build_parser
+    d = load_domain(init("my-access", "approval", tmp_path) / "domain.yaml")
+    p = build_parser(d)
+    assert p.parse_args(["submit_request", "R-1", "--token", "t-mia"]).token == "t-mia"
+    assert p.parse_args(["--token", "t-mia", "submit_request", "R-1"]).token == "t-mia"
+
+
+def test_an_in_memory_sqlite_store_is_not_made_a_file(tmp_path):
+    p = tmp_path / "toprope.yaml"
+    p.write_text("domain: d.yaml\nstore: 'sqlite::memory:'\n")
+    assert read_config(p)["store"] == "sqlite::memory:"
+
+
+def test_a_story_refusal_must_say_which(tmp_path):
+    out = init("my-refunds", "refunds", tmp_path)
+    story = out / "story.yaml"
+    story.write_text(story.read_text().replace("expect: denied, code: within-window", "expect: denied"))
+    with pytest.raises(SystemExit, match="expects a refusal without saying which.*Fix: give the step the `code`"):
+        play(out)
+
+
+def test_a_failed_init_leaves_nothing_behind(tmp_path, monkeypatch):
+    import toprope.adapters.cli.start as start
+    monkeypatch.setattr(start, "_write", lambda *a: (_ for _ in ()).throw(RuntimeError("disk")))
+    with pytest.raises(RuntimeError):
+        init("my-access", "approval", tmp_path)
+    assert not (tmp_path / "my-access").exists()
+
+
+def test_a_budget_exception_is_used_up_by_a_rejection_too(tmp_path):
+    from toprope.adapters.cli.start import _execution
+    out = init("my-budget", "budget", tmp_path)
+    _, ex = _execution(out / "domain.yaml", out / "tokens.yaml")
+    go = lambda tok, act, tgt, **p: ex.submit(tok, act, tgt, p, idempotency_key=f"{act}-{len(ex.history(tgt))}")  # noqa: E731
+    assert go("t-ana", "grant_exception", "C-holdout").ok
+    assert go("t-bot", "propose_budget_change", "C-holdout", daily_budget=900, reason="x").ok
+    assert go("t-ana", "reject_budget_change", "C-holdout").ok
+    again = go("t-bot", "propose_budget_change", "C-holdout", daily_budget=900, reason="x")
+    assert (again.status, again.code) == ("denied", "not-a-holdout")
+    neg = go("t-bot", "propose_budget_change", "C-search", daily_budget=-5, reason="x")
+    assert (neg.status, neg.code) == ("denied", "positive-budget")

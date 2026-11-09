@@ -125,7 +125,8 @@ def read_config(path: Path) -> dict[str, str]:
         # A path in the file is relative to the file, so the file works from anywhere.
         if key == "store" and value.split(":", 1)[0] in ("sqlite", "jsonl") and ":" in value:
             kind, _, where = value.partition(":")
-            value = f"{kind}:{where if Path(where).is_absolute() else base / where}"
+            if not where.startswith(":"):                  # `sqlite::memory:` is no path
+                value = f"{kind}:{where if Path(where).is_absolute() else base / where}"
         elif key in ("domain", "composition", "kernel_root", "workspace", "env", "store_dir", "failures"):
             value = str((base / value)) if not Path(value).is_absolute() else value
         elif key == "identity" and value.split(":", 1)[0] in ("git", "github", "static"):
@@ -153,25 +154,6 @@ def with_config(argv: list[str]) -> list[str]:
         if getattr(pre, key) in (None, False):
             added += [CONFIG_KEYS[key], value]
     return added + argv
-
-
-HOISTED = ("--token", "--identity")      # who you are: accepted after the action too (ADR-0049, A4)
-
-
-def hoist(argv: list[str]) -> list[str]:
-    """`toprope-run submit_request R-1 --token t-mia` means the same as with `--token` first: the
-    options that say who you are are moved before the action, where argparse reads them."""
-    front, rest, i = [], [], 0
-    while i < len(argv):
-        a = argv[i]
-        name = a.split("=", 1)[0]
-        if name in HOISTED:
-            front += [a] if "=" in a else argv[i:i + 2]
-            i += 1 if "=" in a else 2
-        else:
-            rest.append(a)
-            i += 1
-    return front + rest
 
 
 def infer_member(argv: list[str]) -> list[str]:
@@ -238,6 +220,12 @@ def build_parser(d: Domain) -> argparse.ArgumentParser:
         p.add_argument("target", help=target)
         for pname, spec in a.params.items():
             _param_option(p, pname, spec)
+        # Who you are may also follow the action (`act T --token t-mia`), unless the action has a
+        # param of that name (ADR-0049, A4). SUPPRESS keeps the value given before the action.
+        if "token" not in a.params:
+            p.add_argument("--token", default=argparse.SUPPRESS, help="your credential, as before the action")
+        if "identity" not in a.params:
+            p.add_argument("--identity", default=argparse.SUPPRESS, help="as before the action")
     for cmd, what in (("get", "an object's current state"), ("history", "an object's events"),
                       ("allowed", "the actions you may take on an object now")):
         sub.add_parser(cmd, help=what).add_argument("target")
@@ -431,7 +419,7 @@ def main(argv: list[str] | None = None) -> None:
     failures = failures_dir(raw)
     _USAGE.clear()
     try:
-        _main(infer_member(with_config(hoist(raw))))
+        _main(infer_member(with_config(raw)))
     except SystemExit as e:
         declined = isinstance(e.code, str) and e.code.startswith("not taken")
         if failures and e.code not in (None, 0, 1) and not declined:

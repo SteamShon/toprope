@@ -9,5 +9,5 @@ steps:
   - {who: t-bot, as: the agent, action: propose_budget_change, target: C-holdout, params: {daily_budget: 1200, reason: best CPA}, says: "raise the holdout campaign to 1200", expect: denied, code: not-a-holdout}
   - {who: t-bot, as: the agent, action: propose_budget_change, target: C-search, params: {daily_budget: 2500, reason: best CPA}, says: "raise C-search from 1000 to 2500", expect: denied, code: step-limit}
   - {who: t-bot, as: the agent, action: propose_budget_change, target: C-search, params: {daily_budget: 1400, reason: best CPA}, says: "raise C-search to 1400", expect: ok}
-  - {who: t-bot, as: the agent, action: approve_budget_change, target: C-search, says: "approve it", expect: denied}
+  - {who: t-bot, as: the agent, action: approve_budget_change, target: C-search, says: "approve it", expect: denied, code: actor}
   - {who: t-ana, as: ana (media lead), action: approve_budget_change, target: C-search, says: "approve it", expect: ok}

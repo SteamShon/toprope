@@ -49,6 +49,7 @@ the error is raised.
 | Error | Fix |
 |---|---|
 | a step did not end as the story says | if you changed domain.yaml on purpose, update the step's `expect` in story.yaml; otherwise undo the change |
+| a step of story.yaml expects a refusal without saying which ({…} {…}) | give the step the `code` of the refusal it expects, so any other refusal (a wrong token, a missing grant) does not pass for it |
 | no --template | choose one of {…} |
 | no template recorded in {…} | run --check in a directory toprope-init wrote |
 | no template {…} | use one of {…} (`toprope-init --list` describes them) |

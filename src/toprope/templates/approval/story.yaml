@@ -7,7 +7,7 @@ next: >
   `toprope-try` again.
 steps:
   - {who: t-bot, as: the agent, action: submit_request, target: R-prod, says: "ask for prod access for dana", expect: ok}
-  - {who: t-bot, as: the agent, action: approve_request, target: R-prod, says: "approve it", expect: denied}
+  - {who: t-bot, as: the agent, action: approve_request, target: R-prod, says: "approve it", expect: denied, code: actor}
   - {who: t-max, as: max (manager), action: approve_request, target: R-prod, says: "approve it", expect: denied, code: prod-needs-security}
   - {who: t-sec, as: sec (security), action: approve_request, target: R-prod, says: "approve it", expect: ok}
   - {who: t-max, as: max (manager), action: submit_request, target: R-wiki, says: "ask for wiki access for dana", expect: ok}
