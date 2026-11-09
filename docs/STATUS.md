@@ -334,7 +334,7 @@ open PR changes their commit store or logs (`umbrella/m1-recheck` has them now).
 
 | Item | Status | PR |
 |---|---|---|
-| ADR-0049: the program, its order and targets | ✅ | this PR |
+| ADR-0049: the program, its order and targets | ✅ | #196 |
 | Baseline: F1 (friction in the change loop, from the logs) and F2 (time to a first enforced rule) | ⬜ | |
 | Theme 1, the change loop: B4 citations from a query, C1 `toprope change`, C3 `toprope.yaml`, B5 one diff to confirm, D1 a fix in every error, C2 approvals by risk (its own ADR first) | ⬜ | |
 | Theme 2, getting started: A4 `init` and `try`, A3 templates, E1 docs, E2 a tutorial | ⬜ | |
