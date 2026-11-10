@@ -8,7 +8,8 @@ from toprope.adapters.cli.prose import choose_template
 from toprope.adapters.cli.start import init_main, play
 from toprope.decl import load_domain
 
-SENTENCE = ("Staff submit purchase orders; a lead approves or rejects them. An order over 5,000 needs a director. "
+SENTENCE = ("Staff submit purchase orders; a lead approves or rejects them. An order over 5,000 needs a director "
+            "approver. "
             "Nobody approves an order they submitted. Orders are approved within 14 days. We like coffee.")
 
 
@@ -33,13 +34,14 @@ def test_a_sentence_becomes_a_working_draft_with_its_rules_proposed(tmp_path, ca
     assert pres["amount-over-5000-needs-director"].check == \
         "not (target.amount > 5000) or 'director' in actor.roles"
     assert pres["amount-over-5000-needs-director"].status.value == "proposed"
-    assert pres["amount-over-5000-needs-director"].source.quote == "An order over 5,000 needs a director."
+    assert pres["amount-over-5000-needs-director"].source.quote == "An order over 5,000 needs a director approver."
     assert pres["within-14-days"].status.value == "proposed"
     assert pres["not-the-requester"].status is None                # the template had it: no proposal made
     assert "your sentence says what the template already has:\n  not-the-requester" in said
     assert "kept from the template, not from your sentence" in said and "prod-needs-security" in said
     assert 'who is "staff"?' in said and "toprope-add role staff --may submit_purchase_order" in said
     assert 'who is "lead"?' in said
+    assert 'who is "director"' not in said                         # a role the rule added is no question
     assert 'I did not understand "We like coffee."' in said
     assert "This is a draft" in said and "toprope-rule confirm" in said
     ok, rows = play(out)                                            # toprope-try shows it, and passes

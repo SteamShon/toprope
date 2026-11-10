@@ -20,7 +20,6 @@ from __future__ import annotations
 import re
 import shutil
 from pathlib import Path
-from typing import Any
 
 from ...errors import fixed
 from .rule import (Draft, add_field, add_no_self_approval, add_person_only, add_threshold, add_window,
@@ -221,9 +220,9 @@ def _draft(out: Path, text: str, tname: str, matched: list[str], noun: str | Non
         for a in (draft.raw.get("actions") or {}):
             verb = a.split("_")[0]
             for sm in re.finditer(rf"\b([a-z]+)\s+(?:can\s+|may\s+|must\s+|will\s+|also\s+)?({verb}[a-z]*)\b", low):
-                who = sm.group(1)
-                if verb not in _stems(sm.group(2)) and sm.group(2) != verb:
-                    continue
+                who, roles = sm.group(1), set(draft.raw.get("roles") or [])
+                if sm.group(2).endswith(("er", "ers")) or verb not in _stems(sm.group(2)):
+                    continue                              # "a finance approver" names a role, not who acts
                 if who in NOT_ROLES or _singular(who) in roles or who in roles:
                     if _singular(who) in roles or who in roles:
                         understood.add(clause)
