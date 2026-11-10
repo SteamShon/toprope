@@ -353,7 +353,8 @@ theme 1 records those (D1), it is measured again before it is compared (ADR-0049
 | … C1: `toprope-change "<intent>" --patch FILE` proposes the patch's elements, checks the working copy on a scratch copy of the commit store (no commit is added), prints the diff to confirm and writes one human request whose one approval confirms, commits, checks and approves; a failing check stops it before any request | ✅ | #208 |
 | … C2: ADR-0050 (accepted): one approval covers a low-risk change from confirm to verify (verify on the condition that the probes pass), two for a high-risk one; risk computed by `check_commit`; any change to who may take a person-only step is high. `check_commit` records `risk` with its reasons; `toprope-change` writes the one-approval request for low risk; a request's delivery steps run only on a commit checked low risk inside it | ✅ | #209, #210 |
 | Theme 2, getting started: A4 `init` and `try`, A3 templates, E1 docs, E2 a tutorial | ⬜ | |
-| Theme 3, interview and feedback: B1 choice questions, B2 examples first, B3 a live map, D2 impact as decisions, D3 counterexamples as stories | ⬜ | |
+| Theme 3, interview and feedback (umbrella #218, stacked on #201; plan: [`U-theme3-interview.md`](experiments/U-theme3-interview.md)): B1 choice questions, B2 examples first, B3 a live map, D2 impact as decisions, D3 counterexamples as stories | 🟡 | |
+| … B1: transition questions offer choices with their decisions, one recommended with its reason (the column's existing target, else refused: fail-closed); optional stages offer to skip; answering by `choice:<id>` applies them, citing the owner's words, also through the kernel's `record_answer`; `choice_share` measures the target | ✅ | #219 |
 | Theme 4, import and wrap: A1 from `AGENTS.md`, skills, OpenAPI, enums, tickets; A2 an MCP proxy (its own ADR first) | ⬜ | |
 
 ## M0b, M2 to M5

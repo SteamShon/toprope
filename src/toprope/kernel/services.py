@@ -174,7 +174,9 @@ class LocalKernel(KernelServices):
 
     def _record_answer(self, question, answer, decisions):
         import json
-        out = self._ws().answer(question, answer, json.loads(decisions or "[]"), question=question)
+        chosen = (decisions or "").strip()            # `choice:<id>`: a ready answer (ADR-0049, B1)
+        out = self._ws().answer(question, answer, chosen if chosen.startswith("choice:") else json.loads(chosen or "[]"),
+                                question=question)
         return {"ref": out["ref"]}
 
     def _confirm_element(self, paths, approver):

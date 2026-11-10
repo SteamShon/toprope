@@ -62,7 +62,8 @@ CATALOG: dict[str, Service] = {s.name: s for s in (
             "always `proposed`. `value` is JSON.", {"path": "string", "value": "string", "source": "string"},
             {"issues": "integer", "summary": "string"}),
     Service("record_answer", "Record the owner's answer in their words; its decisions (JSON list of "
-            "{path, value}) become proposed elements citing it.",
+            "{path, value}, or `choice:<id>` for a choice the question offered) become proposed elements "
+            "citing it.",
             {"question": "string", "answer": "string", "decisions": "string"}, {"ref": "string"}),
     Service("confirm_element", "Confirm drafted elements (space-separated paths, or `all` for every "
             "proposed one). The calling person must be the approver.",

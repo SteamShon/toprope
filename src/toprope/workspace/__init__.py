@@ -18,7 +18,7 @@ import copy
 import hashlib
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -50,16 +50,48 @@ class AuthoringError(ValueError):
 
 
 @dataclass
+class Choice:
+    """A ready answer to a question (ADR-0049, B1): the decisions it makes, and whether it is the
+    one recommended, with why. Choosing it still records the owner's words."""
+    id: str
+    label: str
+    decisions: list[dict[str, Any]]
+    recommended: bool = False
+    why: str = ""
+    skip: str | None = None          # a stage this choice skips, instead of deciding elements
+
+    def as_dict(self) -> dict[str, Any]:
+        out = {"id": self.id, "label": self.label, "decisions": self.decisions}
+        if self.recommended:
+            out |= {"recommended": True, "why": self.why}
+        if self.skip:
+            out["skip"] = self.skip
+        return out
+
+
+@dataclass
 class Question:
     id: str
     kind: str          # purpose | default | row | conflict | confirm
     text: str
     decides: list[str]  # element paths the answer would settle
     priority: float
+    choices: list[Choice] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
-        return {"id": self.id, "kind": self.kind, "text": self.text, "decides": self.decides,
-                "priority": self.priority}
+        out = {"id": self.id, "kind": self.kind, "text": self.text, "decides": self.decides,
+               "priority": self.priority}
+        if self.choices:
+            out["choices"] = [c.as_dict() for c in self.choices]
+        return out
+
+
+def choice_share(questions: list[dict[str, Any]]) -> float:
+    """The share of questions that offer choices with a recommended one (ADR-0049's target)."""
+    if not questions:
+        return 0.0
+    offered = sum(1 for q in questions if any(c.get("recommended") for c in q.get("choices") or []))
+    return offered / len(questions)
 
 
 
@@ -112,6 +144,28 @@ def _answer_of(text: str) -> str | None:
         if line.startswith("answer: "):
             return line[len("answer: "):]
     return None
+
+
+def _a(word: str) -> str:
+    return f"{'an' if word[:1].lower() in 'aeiou' else 'a'} {word}"
+
+
+def _target(cell: Any) -> str | None:
+    """The state a matrix cell moves to, or None if it does not allow the action."""
+    if isinstance(cell, str):
+        return None if cell in ("n/a", UNDECIDED) else cell
+    return getattr(cell, "to", None)
+
+
+def _recommend(tr: Any, state: str, action: str, obj: str) -> tuple[Any, str, str]:
+    """A recommended cell, its label and why (ADR-0049, B1): where the action already leads to
+    one state from every state it is allowed in, the same; otherwise refused, the safe default."""
+    leads = {_target(row.get(action)) for s, row in tr.matrix.items() if s != state} - {None}
+    if len(leads) == 1:
+        (to,) = leads
+        return to, f"moves it to {to}", f"from every other state it is allowed in, it moves it to {to}"
+    return ({"deny": f"Not while {_a(obj)} is {state}."}, "refused",
+            "refusing is the safe default (fail-closed): a reviewed change can open it later")
 
 
 def _get(doc: Any, segs: list[str]) -> Any:
@@ -409,12 +463,37 @@ class Workspace:
                                          "source": src.get("ref")})
         return {"path": path, "status": "proposed", "marked": marked, "issues": issues}
 
-    def answer(self, question_id: str, answer: str, decisions: list[dict[str, Any]],
+    def choice(self, choice_id: str) -> tuple[Question, Choice]:
+        """A choice by its id (`<question id>/<n>`), from the questions of every stage."""
+        from .stages import STAGES
+        plan = self._plan()
+        if plan.d is not None:
+            for st in STAGES:
+                for q in plan.bundle(st):
+                    for c in q.choices:
+                        if c.id == choice_id:
+                            return q, c
+        raise AuthoringError(fixed(f"no choice {choice_id!r} among the open questions",
+                                   "pick a choice id `next_questions` returned now; an answered question's "
+                                   "choices are gone"))
+
+    def answer(self, question_id: str, answer: str, decisions: list[dict[str, Any]] | str,
                question: str | None = None) -> dict[str, Any]:
         """Record the owner's answer (their words) and apply its decisions as proposed
-        elements citing the answer. Confirmation is a separate, human-only step."""
+        elements citing the answer. Confirmation is a separate, human-only step. `decisions` may
+        be `"choice:<id>"`: the decisions of a choice the question offered (B1); a choice that
+        skips a stage skips it, with the owner's words as the reason."""
         if not answer.strip():
             raise AuthoringError(fixed("an answer quotes the owner's words", "pass the owner's answer, in their words, as the answer text"))
+        if isinstance(decisions, str):
+            if not decisions.startswith("choice:"):
+                raise AuthoringError(fixed(f"decisions {decisions[:40]!r} are neither a list nor a choice",
+                                           "pass a list of {path, value}, or `choice:<id>`"))
+            q, c = self.choice(decisions[len("choice:"):])
+            question = question or q.text
+            if c.skip:
+                self.skip_stage(c.skip, answer)
+            decisions = c.decisions
         text = question or self._all_questions().get(question_id)
         if text is None:
             raise AuthoringError(fixed(f"unknown question {question_id!r}: pass its text", "pass the question's text with the answer, or use an id `next_questions` returned"))
@@ -638,9 +717,12 @@ class Workspace:
         """ADR-0014 within the transitions stage: defaults first, then grouped rows, by priority."""
         qs: list[Question] = []
 
-        def q(kind: str, subject: str, text: str, decides: list[str], priority: float) -> None:
+        def q(kind: str, subject: str, text: str, decides: list[str], priority: float,
+              choices: list[tuple[str, list[dict[str, Any]], bool, str]] = ()) -> None:
             qid = hashlib.sha1(f"{kind}:{subject}".encode()).hexdigest()[:10]
-            qs.append(Question(qid, kind, text, decides, priority))
+            qs.append(Question(qid, kind, text, decides, priority,
+                               [Choice(f"{qid}/{i}", label, dec, rec, why)
+                                for i, (label, dec, rec, why) in enumerate(choices, 1)]))
 
         for obj, tr in d.transitions.items():
             acts = {n: a for n, a in d.actions.items() if a.target == obj and a.creates is None}
@@ -648,20 +730,42 @@ class Workspace:
             for name, a in acts.items():
                 undecided = [s for s in tr.matrix if tr.matrix[s].get(name, UNDECIDED) == UNDECIDED]
                 if len(undecided) >= 2 and a.applies_in is None:
-                    q("default", f"{obj}.{name}", f"In which states can someone '{a.description.rstrip('.').lower()}' "
-                      f"at all? Everywhere else it will be not applicable.",
-                      [f"transitions.{obj}.matrix.{s}.{name}" for s in undecided],
-                      self._priority(undecided, a, attempts.get(name, 0)))
+                    allowed = sorted(s for s in tr.matrix if _target(tr.matrix[s].get(name)) is not None)
+                    paths = [f"transitions.{obj}.matrix.{s}.{name}" for s in undecided]
+                    verb = a.description.rstrip(".").lower()
+                    deny = [{"path": p_, "value": {"deny": f"Not while {_a(obj)} is {s}."}} for p_, s in zip(paths, undecided)]
+                    na = [{"path": p_, "value": "n/a"} for p_ in paths]
+                    choices = [
+                        (f"only where it is already allowed ({', '.join(allowed)}); not applicable in "
+                         f"{', '.join(undecided)}", na, bool(allowed),
+                         "the action is already settled where it applies; elsewhere the question does not arise"),
+                        (f"refused in {', '.join(undecided)}, with a reason", deny, not allowed,
+                         "refusing is the safe default (fail-closed): a reviewed change can open it later"),
+                    ]
+                    q("default", f"{obj}.{name}", f"In which states can someone '{verb}' "
+                      f"at all? Everywhere else it will be not applicable.", paths,
+                      self._priority(undecided, a, attempts.get(name, 0)), choices)
             # Then grouped rows: one question per state with undecided cells.
             for state, cells in tr.matrix.items():
                 undecided = [n for n in acts if cells.get(n, UNDECIDED) == UNDECIDED]
                 if not undecided:
                     continue
                 names = ", ".join(acts[n].description.rstrip(".").lower() for n in undecided)
+                paths = [f"transitions.{obj}.matrix.{state}.{n}" for n in undecided]
+                recs = [_recommend(tr, state, n, obj) for n in undecided]
+                choices = [
+                    ("; ".join(f"{n}: {label}" for n, (_, label, _) in zip(undecided, recs)),
+                     [{"path": p_, "value": v} for p_, (v, _, _) in zip(paths, recs)], True,
+                     "; ".join(f"{n}: {why}" for n, (_, _, why) in zip(undecided, recs))),
+                    (f"none of them: each is refused while {_a(obj)} is {state}",
+                     [{"path": p_, "value": {"deny": f"Not while {_a(obj)} is {state}."}} for p_ in paths], False, ""),
+                    (f"none of them applies to {_a(state)} {obj}", [{"path": p_, "value": "n/a"} for p_ in paths],
+                     False, ""),
+                ]
                 q("row", f"{obj}.{state}", f"Once a {obj} is {state}, can anyone still: {names}? "
-                  "If so, who, and what does it become?",
-                  [f"transitions.{obj}.matrix.{state}.{n}" for n in undecided],
-                  max(self._priority([state], acts[n], attempts.get(n, 0)) for n in undecided) + len(undecided))
+                  "If so, who, and what does it become?", paths,
+                  max(self._priority([state], acts[n], attempts.get(n, 0)) for n in undecided) + len(undecided),
+                  choices)
         return qs
 
     @staticmethod
