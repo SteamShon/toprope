@@ -1,0 +1,10 @@
+# Which tools of the payments server the agent gets, and which declared action each one is.
+upstream:
+  command: [python, examples/proxy/payments_server.py]
+tools:
+  refund_order:
+    action: refund
+    target: order_id
+    result: {refund_id: string}
+  get_order:
+    read: true

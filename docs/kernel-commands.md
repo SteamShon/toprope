@@ -83,6 +83,19 @@ Its subcommands are the domain's actions, one per action, plus `get`, `history`,
 | `--harness-report` `HARNESS_REPORT` | harness report JSON (toprope-harness --json) shown in the world map |
 | `--working-copy` | with --composition and --kernel-root: run each member from its working-copy file, not from its deployed commit (ADR-0045) |
 
+## `toprope-proxy`
+
+`toprope-proxy`: a declaration's rules in front of an existing MCP server (ADR-0052).
+
+| Argument | What |
+|---|---|
+| `--domain` `DOMAIN` | the declaration whose rules gate the calls (required) |
+| `--binding` `BINDING` | the binding: the upstream server and which tool is which action (required) |
+| `--identity` `IDENTITY` | static:FILE (token -> caller) or jwt, as for toprope-server (required) |
+| `--store` `STORE` | memory (default), sqlite:FILE, postgres:DSN or jsonl:DIR (default `memory`) |
+| `--audit` `AUDIT` | append every call, gated or read, to this JSONL file |
+| `--no-seed` | do not load the declaration's example fixtures |
+
 ## `toprope-harness`
 
 `toprope-harness`: run the generated harness on a declaration.

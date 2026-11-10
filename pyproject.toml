@@ -25,6 +25,7 @@ toprope-commits = "toprope.commits.cli:main"
 toprope-run = "toprope.adapters.cli:main"
 toprope-change = "toprope.adapters.cli.change:main"
 toprope-import = "toprope.importers.cli:main"
+toprope-proxy = "toprope.proxy.cli:main"
 
 [dependency-groups]
 dev = [

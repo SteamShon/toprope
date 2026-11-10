@@ -202,9 +202,11 @@ class Outbox:
         return self._resolve(p, etype, detail)
 
     def _effect(self, p: Pending, services: Any) -> dict[str, Any]:
-        from ..kernel import CATALOG
+        from ..kernel import service
         pl = p.event.payload
-        svc = CATALOG[pl["service"]]
+        svc = service(pl["service"])
+        if svc is None:      # an upstream tool, but no proxy registered it: stays pending
+            return {"id": p.id, "result": "pending", "reason": f"no service {pl['service']} in this process"}
         result = (svc.failure(f"mapping-error: {pl['error']}") if pl.get("error")
                   else services.call(pl["service"], pl["inputs"], caller=p.event.actor))
         reply = self.ex.d.actions[pl["reply"]]

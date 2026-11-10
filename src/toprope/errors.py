@@ -26,6 +26,8 @@ COVERED = (
     "importers/cli.py",
     "importers/port.py",
     "importers/readers.py",
+    "proxy/__init__.py",
+    "proxy/cli.py",
     "adapters/mcp/cli.py",
     "commits/__init__.py",
     "identity/git.py",

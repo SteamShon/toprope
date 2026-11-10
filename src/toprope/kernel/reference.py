@@ -17,10 +17,11 @@ from pathlib import Path
 def _commands() -> list[tuple[str, Callable[[], argparse.ArgumentParser], str]]:
     from ..adapters.cli import _base_parser
     from ..adapters.cli.change import build_parser as change
-    from ..importers.cli import build_parser as importer
     from ..adapters.mcp.cli import build_parser as server
     from ..commits.cli import build_parser as commits
     from ..harness.cli import build_parser as harness
+    from ..importers.cli import build_parser as importer
+    from ..proxy.cli import build_parser as proxy
     from ..worldmap.cli import build_parser as worldmap
     return [
         ("toprope-run", lambda: _base_parser(add_help=True),
@@ -29,6 +30,7 @@ def _commands() -> list[tuple[str, Callable[[], argparse.ArgumentParser], str]]:
         ("toprope-change", change, ""),
         ("toprope-import", importer, ""),
         ("toprope-server", server, ""),
+        ("toprope-proxy", proxy, ""),
         ("toprope-harness", harness, ""),
         ("toprope-worldmap", worldmap, ""),
         ("toprope-commits", commits, ""),
