@@ -115,14 +115,26 @@ def enforced(path: str) -> bool:
     return segs[0] == "transitions" and len(segs) == 5 and segs[2] == "matrix"
 
 
+RULE_KINDS = {"actor", "guard", "limit", "rule", "default", "row", "rest"}   # their answer is a rule, or none
+
+
 def interview_share(entries: list[dict[str, Any]]) -> dict[str, Any]:
-    """ADR-0053's choice target, from an interview log: of the questions whose answer became an
-    enforced element, the share that offered choices with a recommended one (`share`), and how
-    many were answered by a choice (`by_choice`) and by the recommended one (`recommended`)."""
-    rows = [e for e in entries if e.get("kind") == "answer" and any(enforced(p) for p in e.get("decisions") or [])]
-    n = len(rows)
+    """ADR-0053's choice target, from an interview log. The denominator is every question whose
+    answer became an enforced element or could have (one that decides rules, answered "none"), plus
+    every refused or abandoned attempt at one (#242's review: a person who could not give the answer
+    they meant must lower the share, not vanish from it). `share` is the answers that offered a
+    recommended choice, over that denominator; `by_choice` and `recommended` say how they were given."""
+    rows = [e for e in entries if e.get("kind") == "answer" and (any(enforced(p) for p in e.get("decisions") or [])
+                                                                  or e.get("qkind") in RULE_KINDS)]
+    tried = [e for e in entries if e.get("kind") in ("refused-answer", "abandoned")
+             and (e.get("qkind") in RULE_KINDS or e.get("offered"))]
+    n = len(rows) + len(tried)
     offered = sum(1 for e in rows if e.get("offered"))
-    return {"enforced_questions": n, "offered": offered, "share": offered / n if n else 0.0,
+    return {"questions": n, "enforced_questions": sum(1 for e in rows if any(enforced(p) for p in e.get("decisions") or [])),
+            "declined": sum(1 for e in rows if not e.get("decisions")),
+            "refused": sum(1 for e in tried if e["kind"] == "refused-answer"),
+            "abandoned": sum(1 for e in tried if e["kind"] == "abandoned"),
+            "offered": offered, "share": offered / n if n else 0.0,
             "by_choice": sum(1 for e in rows if e.get("choice")),
             "recommended": sum(1 for e in rows if e.get("recommended")),
             "open": [e.get("question") for e in rows if not e.get("offered")]}
@@ -277,27 +289,28 @@ def _recommend(tr: Any, state: str, action: str, obj: str) -> tuple[Any, str, st
 
 def _moves(d: Domain, obj: str, tr: Any, name: str, a: Any, undecided: list[str]) -> list[tuple[str, str, str, bool, str]]:
     """Moves to offer for a whole column (ADR-0053 §2): to the stage named after the action's verb
-    (`approved` for “Approve the request”), from each undecided stage; recommended from the stage the
-    owner listed last before it that no other action is named after. Empty when no stage is named
-    after the verb."""
-    from .ruling import stem, verbs
+    (`approved` for “Approve the request”, `paid` for “Pay the order”), from every undecided stage.
+    Recommended from the last stage the owner listed before it that is not the outcome of a rival
+    decision (`rejected` for an approval, `approved` for a refusal): `submitted`, named after the
+    step that leads to the decision, stays a candidate. Empty when no stage is named after the verb."""
+    from .ruling import ALLOWING, REFUSING, stem, verbs
     states = list(tr.matrix)
     mine = verbs(name, a)
     to = next((s for s in states if stem(s) in mine), None)
     if to is None:
         return []
-    others = {stem(s) for s in states} & set().union(*(verbs(n, x) for n, x in d.actions.items()
-                                                      if n != name and x.target == obj))
-    before = [s for s in states[:states.index(to)] if stem(s) not in others]
+    kind = mine & ALLOWING and ALLOWING or mine & REFUSING and REFUSING or set()
+    rival = ALLOWING if kind is REFUSING else REFUSING if kind is ALLOWING else set()
+    rivals = {stem(s) for s in states for n, x in d.actions.items()
+              if n != name and x.target == obj and stem(s) in verbs(n, x) and verbs(n, x) & rival}
+    before = [s for s in states[:states.index(to)] if stem(s) not in rivals]
     best = before[-1] if before else None
     out = []
-    for frm in [s for s in undecided if s != to][:4]:
+    for frm in [s for s in undecided if s != to]:
         rec = frm == best
         out.append((f"from {frm} it moves it to {to}; refused in every other open stage", frm, to, rec,
                     f"the stage {to!r} is named after “{a.description.rstrip('.')}”, and {frm} is the last stage you "
-                    f"listed before it that no other action is named after" if rec else ""))
-    if best not in undecided:              # nothing to recommend among them
-        out = [(lbl, f, t, False, "") for lbl, f, t, _, _ in out]
+                    "listed before it that is not another decision's outcome" if rec else ""))
     return out
 
 
@@ -665,12 +678,53 @@ class Workspace:
                                      "question": text, "answer": answer, "decisions": applied,
                                      # what ADR-0053's choice target counts (`interview_share`)
                                      "offered": offered, "choice": chosen.id if chosen else None,
+                                     "qkind": q.kind if q is not None else None,
                                      "recommended": bool(chosen and chosen.recommended),
                                      **({"asked": f"{q.kind}:{q.subject}"} if q is not None and q.subject else {}),
                                      **({"named": named} if named else {}),
                                      **({"examples": examples} if examples else {})})
         return {"ref": ref, "applied": applied, "issues": issues, "named": sorted(named),
                 "map": self.live_map()["text"]}
+
+    def note_attempt(self, kind: str, q: Question, error: str = "") -> None:
+        """An answer the interview refused, or a question left when the person stopped: logged so the
+        choice measure counts it (`interview_share`). The typed words are not kept as an answer."""
+        self._append(self.log_path, {"at": _now(), "kind": kind, "question_id": q.id, "qkind": q.kind,
+                                     "offered": any(c.recommended for c in q.choices),
+                                     **({"error": error} if error else {})})
+
+    def limit_answer(self, q: Question, text: str) -> list[dict[str, Any]]:
+        """A limit as the person states it at a limit question: `over 1,000`, `over 1,000, only finance`,
+        `amount over 1000 only finance`. Only the facts the question is about, and declared roles."""
+        from .ruling import number
+        plan = self._plan({})
+        d = plan.d
+        action, _, prop = q.subject.partition(".")
+        m = re.fullmatch(r"(?:(?P<fact>[A-Za-z_ ]+?)\s+)?(?:over|above|more than)\s+(?P<n>\d[\d.,]*\d|\d)"
+                         r"(?:\s*,?\s*only\s+(?:the\s+|a\s+|an\s+)?(?P<role>[A-Za-z_ -]+?))?\s*\.?", text.strip(),
+                         re.IGNORECASE)
+        if not m or d is None or action not in d.actions:
+            raise AuthoringError(fixed(f"{text!r} is not a limit", "type `over N`, or `over N, only ROLE`; or a choice's number"))
+        props = [prop] if prop else [p for p, s_ in d.objects[d.actions[action].target].properties.items()
+                                     if s_.type in ("number", "integer")]
+        if m.group("fact"):
+            from ..decl.words import normal, term
+            want = normal(m.group("fact"))
+            props = [p for p in props if want in (normal(p), normal(term(d, p)))]
+        if len(props) != 1:
+            raise AuthoringError(fixed("which number is limited is not clear", "name the fact first, such as "
+                                       f"`{(props or ['amount'])[0]} over 1000`"))
+        v = number(m.group("n"))
+        if v is None:
+            raise AuthoringError(fixed(f"{m.group('n')!r} is not a clear number", "write it as 1000 or 1,000"))
+        role = None
+        if m.group("role"):
+            from ..decl.words import normal
+            role = next((r for r in d.roles if normal(r) == normal(m.group("role"))
+                         or normal(d.glossary.get(r, "")) == normal(m.group("role"))), None)
+            if role is None:
+                raise AuthoringError(fixed(f"{m.group('role')!r} is not a role", f"use one of {', '.join(d.roles)}"))
+        return plan.limit_decisions(action, props[0], v, role)
 
     def _find_question(self, question_id: str) -> Question | None:
         from .stages import STAGES
@@ -1030,7 +1084,10 @@ class Workspace:
                                         for s in undecided], rec, why)
                                for label, frm, to, rec, why in moves]
                     choices += [
-                        (f"refused in {', '.join(undecided)}, with a reason", deny, not any(m[3] for m in moves),
+                        # refusing the whole column is recommended only once the action is allowed somewhere:
+                        # for an action that is allowed nowhere, refusing everywhere is never the answer
+                        (f"refused in {', '.join(undecided)}, with a reason", deny,
+                         bool(allowed) and not any(m[3] for m in moves),
                          "refusing is the safe default (fail-closed), and each refusal is proposed for a "
                          "person to confirm; a reviewed change can open it later"),
                         (f"not applicable in {', '.join(undecided)}"

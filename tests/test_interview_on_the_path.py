@@ -23,7 +23,7 @@ def run(tmp_path, answers: str, capsys, where: str = "leave") -> tuple[Workspace
     from toprope.adapters.cli.interview import main
     d = tmp_path / where
     if not d.exists():
-        shutil.copytree(HERE / "leave", d)
+        shutil.copytree(HERE / where, d)
     f = tmp_path / "answers.txt"
     f.write_text(answers)
     with pytest.raises(SystemExit) as e:
@@ -42,7 +42,7 @@ def test_the_interview_runs_on_a_directory_with_only_a_domain_and_its_sources(tm
     assert ws.check()["harness"]["ok"] is True                         # what the answers built works
     assert d.actions["approve_leave"].requires == "human"
     assert {p.id for p in d.actions["approve_leave"].preconditions} == {"limit-days", "not-the-creator"}
-    assert d.rules["approved-needs-a-person"].requires == "human"
+    assert d.rules["LeaveRequest-approved-needs-a-person"].requires == "human"
 
 
 def test_nothing_is_confirmed_without_an_explicit_yes(tmp_path, capsys):
@@ -138,19 +138,20 @@ def test_who_must_not_approve_is_built_from_the_sources(tmp_path):
     doc = ws.draft()
     assert doc["actions"]["approve_leave"]["requires"] == "human"
     pre = {p["id"]: p for p in doc["actions"]["approve_leave"]["preconditions"]}
-    assert pre["not-the-creator"]["check"] == "target.created_by != actor.principal.id"
+    assert pre["not-the-creator"]["check"] == "exists(target.created_by) and target.created_by != actor.principal.id"
+    assert "while who made it is not recorded, nobody can" in pre["not-the-creator"]["reason"]
     assert doc["actions"]["request_leave"]["effects"] == [{"set": {"new.created_by": "actor.principal.id"}}]
     assert doc["objects"]["LeaveRequest"]["properties"]["created_by"] == {"type": "string", "optional": True}
 
 
-def test_a_limit_offers_the_sources_number_and_the_examples_and_recommends_with_why(tmp_path):
+def test_a_limit_offers_the_sources_number_and_recommends_it_with_why(tmp_path):
     ws = leave(tmp_path)
     name_actions(ws)
     for q in qs(ws, "actor"):
         ws.answer(q["id"], "Yes.", f"choice:{rec(q)['id']}")
     (limit,) = qs(ws, "limit")
     labels = [c["label"] for c in limit["choices"]]
-    assert "over 12 days, nobody may approve the request" in labels    # the example's own value
+    assert "over 12 days, nobody may approve the request" not in labels  # an example states no limit
     assert labels[-1] == "no limit on days"
     r = rec(limit)
     assert r["label"] == "over 10 days, only the hr may approve the request"
@@ -161,7 +162,7 @@ def test_a_limit_offers_the_sources_number_and_the_examples_and_recommends_with_
     assert pre["limit-days"]["status"] == "proposed"
 
 
-def test_without_a_source_the_example_value_is_the_recommended_threshold(tmp_path):
+def test_without_a_stated_limit_no_limit_is_recommended(tmp_path):
     ws = leave(tmp_path)
     (ws.root / "sources" / "policy.md").write_text("# Leave\nEmployees ask for time off.\n")
     name_actions(ws)
@@ -169,8 +170,10 @@ def test_without_a_source_the_example_value_is_the_recommended_threshold(tmp_pat
         ws.answer(q["id"], "Yes.", f"choice:{rec(q)['id']}")
     (limit,) = qs(ws, "limit")
     r = rec(limit)
-    assert r["label"] == "over 12 days, nobody may approve the request"
-    assert r["why"].startswith("LR-7 has days 12, the largest example you gave") and "fail-closed" in r["why"]
+    assert r["label"] == "no limit (the default)" and r["decisions"] == []
+    assert r["why"] == "no passage or answer states a limit on days"
+    assert "No limit is the default" in limit["text"]
+    assert "over 12 days (like LR-7), nobody may approve the request" in [c["label"] for c in limit["choices"]]
     (guard,) = qs(ws, "guard")
     assert rec(guard)["label"] == "anyone with the role, agents too"      # nothing said: nothing assumed
     assert rec(guard)["decisions"] == []
@@ -182,7 +185,7 @@ def test_a_declined_limit_is_not_asked_again(tmp_path):
     for q in qs(ws, "actor"):
         ws.answer(q["id"], "Yes.", f"choice:{rec(q)['id']}")
     (limit,) = qs(ws, "limit")
-    no = next(c for c in limit["choices"] if c["label"] == "no limit on days")
+    no = next(c for c in limit["choices"] if c["label"] == "no limit on days")    # declined: not asked again
     ws.answer(limit["id"], "No limit.", f"choice:{no['id']}")
     assert qs(ws, "limit") == []
 
@@ -229,8 +232,8 @@ def test_an_outcome_rule_is_offered_once_the_cells_are_settled_and_needs_confirm
     assert r["label"] == "only a person may bring a leave request to approved"
     assert f"{L}Only a person approves a request, never an agent on its own.{R}" in r["why"]
     ws.answer(rule["id"], "Yes.", f"choice:{r['id']}")
-    assert ws.draft()["rules"]["approved-needs-a-person"]["status"] == "proposed"
-    assert "rules.approved-needs-a-person" in ws._proposed(ws.draft())  # a person confirms it
+    assert ws.draft()["rules"]["LeaveRequest-approved-needs-a-person"]["status"] == "proposed"
+    assert "rules.LeaveRequest-approved-needs-a-person" in ws._proposed(ws.draft())  # a person confirms it
     assert ws.progress()["current"] == "invariants"
 
 
@@ -260,3 +263,108 @@ def test_the_map_shows_who_does_what_before_there_is_a_matrix(tmp_path):
     q = next(q for q in qs(ws, "actor") if "request_leave" in q["text"])
     out = ws.answer(q["id"], "Yes.", f"choice:{rec(q)['id']}")
     assert "  employee: request_leave* -> new LeaveRequest" in out["map"]
+
+
+# -- #242's review: a stated rule must be enforced, not only offered ------------------------------
+def test_a_stated_threshold_in_the_things_own_words_is_enforced(tmp_path, capsys):
+    """F2-like wording, in another domain: "A purchase over 2,500 needs a director" names the thing,
+    not the fact, and writes the number with a thousands separator."""
+    from toprope.semantics.interpreter import Interpreter
+    from toprope.types import Actor, Command
+    from toprope.workspace import interview_share
+    ws, out = run(tmp_path, (HERE / "purchase.answers").read_text(), capsys, where="purchase")
+    d = Domain.model_validate(ws.draft())
+    pre = {p.id: p.check for p in d.actions["approve_purchase"].preconditions}
+    assert pre["limit-amount"] == "target.amount <= 2500 or 'director' in actor.roles"
+    assert "limit-items" not in pre                                      # nobody stated one: none invented
+    assert ws.check()["harness"]["ok"] is True                           # its flow: the team lead is refused
+    state = {"id": "P-1", "status": "submitted", "amount": 3000, "items": 2, "created_by": "sam"}
+
+    def ask(who, roles):
+        return Interpreter(d).decide(Command(Actor(who, "person", roles), "approve_purchase", "P-1", {}),
+                                     state, lambda _id: None).outcome
+    lead = ask("tia", ("team_lead",))
+    assert (lead.status, lead.code) == ("denied", "limit-amount") and "director" in lead.reason
+    assert ask("dora", ("director",)).status == "ok"
+    assert ask("sam", ("director",)).code == "not-the-creator"          # nor whoever raised it
+    m = interview_share(ws._read(ws.log_path))
+    assert m["questions"] == 10 and m["declined"] == 1 and m["share"] == 1.0   # the outcome rule, declined
+
+
+def test_numbers_are_read_as_written_or_not_at_all():
+    from toprope.workspace.ruling import number
+    assert [number(x) for x in ("1,000", "1,000,000", "2500", "1.5", "1.000.000", "1,000.50")] == \
+        [1000, 1000000, 2500, 1.5, 1000000, 1000.5]
+    assert number("1.000") is None and number("1,5") is None              # ambiguous: never guessed
+
+
+def test_a_typed_limit_is_taken_and_a_refused_answer_is_asked_again(tmp_path, capsys):
+    answers = (HERE / "purchase.answers").read_text().splitlines()
+    i = answers.index("# who may (four actions), the limit, who must not: the recommended choices")
+    (tmp_path / "purchase").mkdir()
+    (tmp_path / "purchase" / "sources").mkdir()
+    (tmp_path / "purchase" / "sources" / "policy.md").write_text("# Purchases\nStaff raise purchase requests.\n")
+    # four actors and the guard; then at the limit question a refused line, then the person's own limit
+    script = answers[:i + 1] + [""] * 5 + ["maybe later", "amount over 2,500, only director"]
+    ws, out = run(tmp_path, "\n".join(script) + "\n", capsys, where="purchase")
+    assert "'maybe later' is not a limit" in out and "(asked again)" in out and "Stopped" in out
+    pre = {p["id"]: p["check"] for p in ws.draft()["actions"]["approve_purchase"]["preconditions"]}
+    assert pre["limit-amount"] == "target.amount <= 2500 or 'director' in actor.roles"
+    from toprope.workspace import interview_share
+    m = interview_share(ws._read(ws.log_path))
+    assert m["refused"] == 1 and m["questions"] == 7 and m["offered"] == 6   # the refused try lowers the share
+    assert m["share"] == 6 / 7
+
+
+def flow(ws, states, actions):
+    doc = {"domain": "orders", "version": 1, "roles": ["clerk"],
+           "objects": {"Order": {"description": "An order.", "properties": {"status": {"enum": states}}}},
+           "actions": {n: {"description": desc, "actor": ["clerk"], "target": "Order", "status": "proposed",
+                           "source": {"kind": "record", "ref": "x"}} for n, desc in actions.items()},
+           "transitions": {"Order": {"field": "status", "initial": states[0],
+                                     "matrix": {s: {n: "undecided" for n in actions} for s in states}}}}
+    put(ws, doc)
+    return {q["decides"][0].split(".")[-1]: q for q in ws.questions(limit=50, stage="transitions")["questions"]
+            if q["kind"] == "default"}
+
+
+def test_columns_on_a_longer_flow_start_from_the_step_before_the_decision(ws):  # noqa: F811
+    cols = flow(ws, ["draft", "submitted", "approved", "paid", "rejected"],
+                {"submit": "Submit the order.", "approve": "Approve the order.", "pay_order": "Pay the order.",
+                 "reject": "Reject the order.", "note": "Add a note."})
+    assert rec(cols["submit"])["label"].startswith("from draft it moves it to submitted")
+    assert rec(cols["approve"])["label"].startswith("from submitted it moves it to approved")
+    assert rec(cols["reject"])["label"].startswith("from submitted it moves it to rejected")
+    assert rec(cols["pay_order"])["label"].startswith("from approved it moves it to paid")   # paid is pay's
+    froms = [c["label"].split(" it moves")[0] for c in cols["approve"]["choices"] if c["label"].startswith("from ")]
+    assert froms == ["from draft", "from submitted", "from paid", "from rejected"]            # every stage
+    assert not any(c.get("recommended") for c in cols["note"]["choices"])                  # ask, never refuse all
+
+
+def test_not_whoever_made_it_compares_the_person_with_the_person(tmp_path):
+    ws = leave(tmp_path)
+    doc = ws.draft()
+    doc["objects"]["LeaveRequest"]["properties"]["asked_by"] = {"type": "string", "optional": True}
+    doc["actions"] = {
+        "request_leave": {"description": "Ask for time off", "actor": ["employee"], "creates": "LeaveRequest",
+                          "effects": [{"set": {"new.asked_by": "actor.id"}}]},
+        "approve_leave": {"description": "Approve the request", "actor": ["manager"], "target": "LeaveRequest",
+                          "requires": "human", "status": "proposed", "source": {"kind": "record", "ref": "x"}}}
+    ws.domain_path.write_text(yaml.safe_dump(doc, sort_keys=False))
+    (guard,) = qs(ws, "guard")
+    own = next(c for c in guard["choices"] if c["label"].startswith("not whoever"))
+    by = {d_["path"]: d_["value"] for d_ in own["decisions"]}
+    assert by["actions.request_leave.effects"] == [{"set": {"new.asked_by": "actor.principal.id"}}]
+    assert by["actions.approve_leave.preconditions.not-the-creator"]["check"] == \
+        "exists(target.asked_by) and target.asked_by != actor.principal.id"
+
+
+def test_the_guard_is_asked_once_whatever_the_answer(tmp_path):
+    ws = leave(tmp_path)
+    name_actions(ws)
+    for q in qs(ws, "actor"):
+        ws.answer(q["id"], "Yes.", f"choice:{rec(q)['id']}")
+    (guard,) = qs(ws, "guard")
+    own = next(c for c in guard["choices"] if c["label"].startswith("not whoever"))
+    ws.answer(guard["id"], "Only that.", f"choice:{own['id']}")          # "only a person" is still open
+    assert qs(ws, "guard") == []

@@ -52,6 +52,8 @@ HINTS = {
     "actions": "`name: what it does -> Thing; name: what it does -> new Thing` (`new`: it makes the thing)",
     "transitions": "`field: stage, stage, stage; starts stage`",
     "invariants": "a number to choose, or your own rule: `check | why`",
+    "default": "a number to choose, or `from STAGE to STAGE`",
+    "limit": "a number to choose, or `over N`, `over N, only ROLE`, `<fact> over N, only ROLE`",
     "world:fixtures": "`Thing ID: fact value, fact value; ...`",
     "world:actors": "`role: name, name; role: name`",
     "world:scenarios": "`role action ID [fact=value] -> stage|refused [code]; ...`",
@@ -298,6 +300,20 @@ def parse_open(ws, q, line: str) -> list[dict[str, Any]]:
                            "type the number of a choice; for anything else, ask your agent to draft it (Authoring)"))
 
 
+def column(q, line: str) -> list[dict[str, Any]]:
+    """`from submitted to approved`: the whole column, one move and refused in its other open stages."""
+    m = re.fullmatch(r"(?:from\s+)?(\S+)\s*(?:->|to)\s*(\S+)", line.strip(), re.IGNORECASE)
+    if not m:
+        raise ValueError(fixed(f"{line!r} is not a move", "type a choice's number, or `from STAGE to STAGE`"))
+    frm, to = m.groups()
+    cells = {p.split(".")[3]: p for p in q.decides}
+    obj = q.decides[0].split(".")[1]
+    if frm not in cells:
+        raise ValueError(fixed(f"{frm!r} is not an open stage here", f"use one of {', '.join(cells)}"))
+    return [{"path": p, "value": to if s == frm else {"deny": f"Not while {'an' if obj[:1].lower() in 'aeiou' else 'a'} "
+                                                      f"{obj} is {s}."}} for s, p in cells.items()]
+
+
 # -- the session -------------------------------------------------------------------------------
 class Session:
     def __init__(self, where: Path, read: Callable[[str], str], out=None, scripted: bool = False):
@@ -333,8 +349,8 @@ class Session:
             q = qs[0]
             lines = self.ws._lines(self.ws.log_path)
             if last == (q.id, lines):
-                raise SystemExit(fixed(f"the question {q.text!r} came back unchanged",
-                                       "answer it differently, or ask your agent to draft it (Authoring)"))
+                self.say("  " + fixed("that answer left the question open", "answer it differently, or ask your agent "
+                                      "to draft it (Authoring)"))
             m = self.ws.live_map()["text"]
             if m and m != self.last_map:
                 self.say("\n" + m)
@@ -350,14 +366,16 @@ class Session:
                 else:
                     self.one(q)
             except Stop:
+                self.ws.note_attempt("abandoned", q)
                 self.say("\nStopped: the answers ran out. What you answered is kept, proposed; run again to go on.")
                 return 0
             except (AuthoringError, ValueError) as e:
-                if self.scripted:
-                    raise SystemExit(str(e)) from None
+                # a refused answer never ends the session: say why, and ask again (#242's review)
+                self.ws.note_attempt("refused-answer", q, str(e))
                 self.say(f"  {e}")
+                self.say("  (asked again)")
                 continue
-            last = (q.id, lines)
+            last = (q.id, self.ws._lines(self.ws.log_path))
 
     def one(self, q) -> None:
         recommended = next((i for i, c in enumerate(q.choices, 1) if c.recommended), None)
@@ -366,7 +384,7 @@ class Session:
             if c.recommended and c.why:
                 self.say(f"       why: {c.why}")
         hint = HINTS.get(f"{q.kind}:{q.subject}") or HINTS.get(q.kind)
-        if hint and q.kind not in ("default", "row", "rest", "actor", "guard", "limit", "rule"):
+        if hint and q.kind not in ("row", "rest", "actor", "guard", "rule"):
             self.say(f"  ({hint})")
         prompt = (f"  choice [Enter = {recommended}]: " if recommended else
                   "  choice: " if q.choices and not hint else "  > ")
@@ -375,6 +393,9 @@ class Session:
             c = q.choices[recommended - 1]
             self.ws.answer(q.id, f"Yes: {c.label}", f"choice:{c.id}")
             return
+        if not line and q.choices and not hint:
+            raise ValueError(fixed("nothing is recommended here", f"type a number from 1 to {len(q.choices)}"
+                                   + (", or `from STAGE to STAGE`" if q.kind == "default" else "")))
         if line.isdigit() and q.choices:
             k = int(line)
             if not 1 <= k <= len(q.choices):
@@ -394,8 +415,14 @@ class Session:
         if line.lower() in NONE and skip is not None:          # "nothing here": the stage's skip
             self.ws.answer(q.id, line, f"choice:{skip.id}")
             return
-        if line.lower() in NONE:
+        if line.lower() in NONE and q.kind not in ("actor", "default", "row"):
             self.ws.answer(q.id, line, [])
+            return
+        if q.kind == "limit":
+            self.ws.answer(q.id, line, self.ws.limit_answer(q, line))
+            return
+        if q.kind == "default":
+            self.ws.answer(q.id, line, column(q, line))
             return
         self.ws.answer(q.id, line, parse_open(self.ws, q, line))
 

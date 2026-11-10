@@ -56,6 +56,8 @@ BY_NAME = {s.name: s for s in STAGES}
 BUDGET = "the time budget is spent"
 # Questions the owner may answer with "nothing here": once answered so, they are not asked again.
 DECLINABLE = {"guard", "limit", "rule", "rest", "role", "object", "relate"}
+# Questions asked once: whatever the answer, a later draft does not bring them back (#242's review).
+ONCE = {"guard", "limit", "rule"}
 
 
 def _qid(kind: str, subject: str) -> str:
@@ -73,6 +75,7 @@ class Plan:
         # A question answered with nothing to apply ("no limit", "no outcome rule") is not asked again.
         self.declined = {e.get("question_id") for e in log if e.get("kind") == "answer" and not e.get("decisions")
                          and not e.get("named") and not e.get("examples")}
+        self.answered = {e.get("question_id") for e in log if e.get("kind") == "answer"}
         self.named, self.named_role = ws._named(log)
         self._ps: list[Any] | None = None
 
@@ -261,7 +264,7 @@ class Plan:
                   choices: list[tuple[str, list[dict[str, Any]], bool, str]]) -> Question | None:
         from . import Choice, Question, choice_id
         qid = _qid(kind, subject)
-        if kind in DECLINABLE and qid in self.declined:
+        if (kind in DECLINABLE and qid in self.declined) or (kind in ONCE and qid in self.answered):
             return None
         return Question(qid, kind, text, decides, priority,
                         [Choice(choice_id(qid, i, dec), label, dec, rec, why if rec else "")
@@ -296,11 +299,12 @@ class Plan:
 
     def rule_questions(self) -> list[Question]:
         """For each action the interview drafted that lets a thing go ahead (approve, pay, grant):
-        who must not take it (only a person; not whoever made the thing), and a limit on each
-        numeric fact, built from the examples and the sources."""
+        who must not take it (only a person; not whoever made the thing), asked once; and a limit
+        on a number where the owner's words state one, or else one question whose default is no
+        limit (#242's review: a cap nobody stated is not recommended)."""
         from ..decl.words import term
-        from .ruling import (HUMAN_CUES, OWN_CUES, about, allowing, creator, fmt, mentions, thresholds,
-                             verbs)
+        from .ruling import (HUMAN_CUES, OWN_CUES, about, allowing, creator, example_value, fmt, mentions,
+                             thresholds, verbs)
         d, out = self.d, []
         if d is None:
             return out
@@ -310,26 +314,13 @@ class Plan:
             obj = a.target
             desc = a.description.rstrip(".")
             desc = desc[:1].lower() + desc[1:]
-            raw = (self.doc.get("actions") or {}).get(n) or {}
             said = about(self.ps, verbs(n, a))
             # who must not
             need_human = a.requires != "human"
             cr = None if any("actor.principal.id" in p.check for p in a.preconditions) else creator(d, obj)
             if need_human or cr is not None:
                 human = [{"path": f"actions.{n}.requires", "value": "human"}]
-                own: list[dict[str, Any]] = []
-                if cr is not None:
-                    prop, maker = cr
-                    if maker is not None:
-                        if prop not in d.objects[obj].properties:
-                            own.append({"path": f"objects.{obj}.properties.{prop}",
-                                        "value": {"type": "string", "optional": True}})
-                        effects = list(((self.doc.get("actions") or {}).get(maker) or {}).get("effects") or [])
-                        own.append({"path": f"actions.{maker}.effects",
-                                    "value": effects + [{"set": {f"new.{prop}": "actor.principal.id"}}]})
-                    own.append({"path": f"actions.{n}.preconditions.not-the-creator", "value": {
-                        "check": f"target.{prop} != actor.principal.id",
-                        "reason": f"Whoever made the {term(d, obj)}, or had their agent make it, cannot {desc}."}})
+                own = self.own_decisions(n, a, cr) if cr is not None else []
                 hp = next((p for p in said if mentions(p, HUMAN_CUES)), None) if need_human else None
                 op = next((p for p in said if mentions(p, OWN_CUES)), None) if own else None
                 quote = "; ".join(f"your words say “{p.text}” ({p.ref})" for p in (hp, op) if p is not None)
@@ -348,39 +339,97 @@ class Plan:
                                    [f"actions.{n}"], 2, choices)
                 if q is not None:
                     out.append(q)
-            # a limit on each numeric fact
-            for prop, spec in d.objects[obj].properties.items():
-                if spec.type not in ("number", "integer") or any(f"target.{prop}" in p.check for p in a.preconditions):
-                    continue
-                found = thresholds(d, obj, prop, self.ps)
+            # a limit on a number
+            every = [p for p, spec in d.objects[obj].properties.items() if spec.type in ("number", "integer")]
+            numeric = [p for p in every if not any(f"target.{p}" in x.check for x in a.preconditions)]
+            # a limit already set, or one the owner's words state, is the limit: no question on the others
+            stated = len(numeric) < len(every)
+            for prop in numeric:
+                found = thresholds(d, obj, prop, self.ps, n)
                 if not found:
                     continue
+                stated = True
                 pt = term(d, prop)
-                actor = list(raw.get("actor") or [])
-                roles_now = {r if isinstance(r, str) else r.get("role") for r in actor}
                 choices, picked = [], False
                 for v, why, passage, named_roles in found:
                     for r in d.roles:
-                        dec = [{"path": f"actions.{n}.preconditions.limit-{prop}", "value": {
-                            "check": f"target.{prop} <= {fmt(v)} or '{r}' in actor.roles",
-                            "reason": f"Over {fmt(v)} {pt}, only the {term(d, r)} may {desc}."}}]
-                        if r not in roles_now:
-                            dec.append({"path": f"actions.{n}.actor", "value": actor + [r]})
-                        rec = not picked and passage is not None and named_roles[:1] == [r]
+                        rec = not picked and named_roles[:1] == [r]
                         picked |= rec
-                        choices.append((f"over {fmt(v)} {pt}, only the {term(d, r)} may {desc}", dec, rec, why))
+                        choices.append((f"over {fmt(v)} {pt}, only the {term(d, r)} may {desc}",
+                                        self.limit_decisions(n, prop, v, r), rec, why))
                     rec = not picked and not named_roles
                     picked |= rec
-                    choices.append((f"over {fmt(v)} {pt}, nobody may {desc}", [{
-                        "path": f"actions.{n}.preconditions.limit-{prop}",
-                        "value": {"check": f"target.{prop} <= {fmt(v)}",
-                                  "reason": f"Over {fmt(v)} {pt}, nobody may {desc}."}}], rec, why))
+                    choices.append((f"over {fmt(v)} {pt}, nobody may {desc}", self.limit_decisions(n, prop, v, None),
+                                    rec, why))
                 choices.append((f"no limit on {pt}", [], False, ""))
-                q = self._question("limit", f"{n}.{prop}", f"Is there a limit on {pt} before someone may {desc}? "
-                                   f"Over it, who may still {desc}? (the action {n})",
+                q = self._question("limit", f"{n}.{prop}", f"Your words state a limit on {pt}. Over it, who may still "
+                                   f"{desc}? (the action {n}; or type `over N` or `over N, only ROLE`)",
                                    [f"actions.{n}.preconditions"], 2, choices)
                 if q is not None:
                     out.append(q)
+            if numeric and not stated:
+                choices = [("no limit (the default)", [], True,
+                            "no passage or answer states a limit on " + ", ".join(term(d, p) for p in numeric))]
+                for prop in numeric:
+                    ex = example_value(d, obj, prop)
+                    if ex is not None:
+                        choices.append((f"over {fmt(ex[0])} {term(d, prop)} (like {ex[1]}), nobody may {desc}",
+                                        self.limit_decisions(n, prop, ex[0], None), False, ""))
+                q = self._question("limit", n, f"Is there a limit on {', '.join(term(d, p) for p in numeric)} before "
+                                   f"someone may {desc}? No limit is the default. (the action {n}; type `over N`, "
+                                   "`over N, only ROLE`, or `<fact> over N, only ROLE`)",
+                                   [f"actions.{n}.preconditions"], 2, choices)
+                if q is not None:
+                    out.append(q)
+        return out
+
+    def own_decisions(self, n: str, a: Any, cr: tuple[str, str | None, list[tuple[str, int, str]]]) -> list[dict[str, Any]]:
+        """"Not whoever made it": fail closed when who made it is not recorded, and compare the
+        person with the person (`actor.principal.id` on both sides)."""
+        from ..decl.words import term
+        d, obj = self.d, a.target
+        desc = a.description.rstrip(".")
+        desc = desc[:1].lower() + desc[1:]
+        prop, maker, align = cr
+        own: list[dict[str, Any]] = []
+        actions = self.doc.get("actions") or {}
+        if maker is not None:
+            if prop not in d.objects[obj].properties:
+                own.append({"path": f"objects.{obj}.properties.{prop}", "value": {"type": "string", "optional": True}})
+            effects = list((actions.get(maker) or {}).get("effects") or [])
+            own.append({"path": f"actions.{maker}.effects",
+                        "value": effects + [{"set": {f"new.{prop}": "actor.principal.id"}}]})
+        for act in sorted({x for x, _, _ in align}):
+            effects = [dict(e) for e in (actions.get(act) or {}).get("effects") or []]
+            for x, i, key in align:
+                if x == act:
+                    effects[i] = {**effects[i], "set": {**effects[i]["set"], key: "actor.principal.id"}}
+            own.append({"path": f"actions.{act}.effects", "value": effects})
+        own.append({"path": f"actions.{n}.preconditions.not-the-creator", "value": {
+            "check": f"exists(target.{prop}) and target.{prop} != actor.principal.id",
+            "reason": f"Whoever made the {term(d, obj)}, or had their agent make it, cannot {desc}; and while who "
+                      f"made it is not recorded, nobody can."}})
+        return own
+
+    def limit_decisions(self, n: str, prop: str, v: float, role: str | None) -> list[dict[str, Any]]:
+        """A limit on a number before an action: over `v`, only `role` may take it (added to who may,
+        if need be), or nobody may."""
+        from ..decl.words import term
+        from .ruling import fmt
+        d = self.d
+        a = d.actions[n]
+        desc = a.description.rstrip(".")
+        desc = desc[:1].lower() + desc[1:]
+        pt = term(d, prop)
+        if role is None:
+            return [{"path": f"actions.{n}.preconditions.limit-{prop}", "value": {
+                "check": f"target.{prop} <= {fmt(v)}", "reason": f"Over {fmt(v)} {pt}, nobody may {desc}."}}]
+        out = [{"path": f"actions.{n}.preconditions.limit-{prop}", "value": {
+            "check": f"target.{prop} <= {fmt(v)} or '{role}' in actor.roles",
+            "reason": f"Over {fmt(v)} {pt}, only the {term(d, role)} may {desc}."}}]
+        actor = list(((self.doc.get("actions") or {}).get(n) or {}).get("actor") or [])
+        if role not in {r if isinstance(r, str) else r.get("role") for r in actor}:
+            out.append({"path": f"actions.{n}.actor", "value": actor + [role]})
         return out
 
     def undecided(self) -> list[str]:
@@ -454,13 +503,13 @@ class Plan:
                 hp = next((p for p in said if mentions(p, HUMAN_CUES)), None)
                 rec = hp is not None and not picked
                 picked |= rec
-                choices.append((f"only a person may bring {_a(ot)} to {s}", [{"path": f"rules.{rid}-needs-a-person", "value": {
+                choices.append((f"only a person may bring {_a(ot)} to {s}", [{"path": f"rules.{obj}-{rid}-needs-a-person", "value": {
                     "on": f"{obj}.{s}", "requires": "human", "reason": f"Only a person brings {_a(ot)} to {s}."}}],
                     rec, f"your words say “{hp.text}” ({hp.ref})" if hp else ""))
                 roles = sorted({r if isinstance(r, str) else r.role for n in by for r in d.actions[n].actor})
                 for r in roles:
                     choices.append((f"only the {term(d, r)} may bring {_a(ot)} to {s}", [{
-                        "path": f"rules.{rid}-needs-{r}", "value": {
+                        "path": f"rules.{obj}-{rid}-needs-{r}", "value": {
                             "on": f"{obj}.{s}", "requires": {"roles": [r]},
                             "reason": f"Only the {term(d, r)} brings {_a(ot)} to {s}."}}], False, ""))
             choices.append(("no outcome rule", [], not picked,
