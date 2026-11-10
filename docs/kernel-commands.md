@@ -260,6 +260,18 @@ A person or an agent from tokens.yaml, with the story steps they act in.
 | `--identity` `IDENTITY` | the identity file your git email is looked up in (default `toprope.identity.yaml`) |
 | `--ship` | also deliver, preview, deploy, probe and verify the commit the request approves; a commit not recorded low risk stops after its preview |
 
+## `toprope-interview`
+
+`toprope-interview`: the interview, in your terminal, on your own domain (ADR-0053 §2).
+
+The interview's route for a newcomer: docs/interview.md.
+
+| Argument | What |
+|---|---|
+| `DIR` | the domain's directory (default: here); it holds domain.yaml, or the interview starts one |
+| `--answers` `ANSWERS` | read the answers from this file, one per line, instead of the terminal |
+| `--share` | print ADR-0053's choice measure from the interview log and stop |
+
 ## `toprope-server`
 
 `toprope-server`: serve a declaration over MCP (stdio or streamable HTTP).

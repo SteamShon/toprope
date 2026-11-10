@@ -41,11 +41,39 @@ This workflow is not in `examples/`, so it cannot be copied whole.
 
 Record one row per run in the table below, with the commit of `develop` the run used.
 
+### The choice measure (ADR-0053 §2)
+
+Measured on the same run, through the interview entry point the docs give
+([`docs/interview.md`](../interview.md)), with no extra step for the operator:
+
+1. When the run is done (or stopped), the observer runs `toprope-interview <the operator's domain
+   directory> --share`. It reads the interview log only.
+2. It prints `questions` (those whose answer became an enforced element or could have: an
+   action's actor, `requires` or precondition, an outcome rule, an invariant, a matrix cell,
+   including those answered "none"; plus every refused or abandoned attempt at one), `offered`
+   (those that offered choices with a recommended one), `share` (= offered ÷ questions), the
+   declined, refused and abandoned counts, and the questions answered in open text (`open`).
+3. The share does not show that the operator's rules hold. The observer also checks each of the
+   task's rules is enforced: `toprope-harness` on the operator's declaration passes, and a
+   command that breaks the rule is refused with its reason (`toprope-run` with the operator's
+   tokens, or `toprope-try` on a story that tries it). A rule the operator stated that is not
+   enforced is recorded under *stuck points*, with the question where it was lost.
+4. Record `share`, and whether each rule is enforced (`1 ✓ 2 ✓`), in the *Choices* column below.
+   The target is 0.8 or more, with every stated rule enforced. Questions about purpose and
+   wording, and the question that names the actions, are not counted.
+
+If the path goes through a template (`toprope-init --template`) and the operator never runs the
+interview, record `n/a (no interview)`: the measure is taken only where the docs send the operator
+to the interview. Dry runs on generic examples (leave requests; purchases with "over 2,500 needs a
+director", not this task's text) with the recommended answers give 8 of 8 and 10 of 10, with the
+stated limit enforced (`tests/test_interview_on_the_path.py`); they check the tool, they are not a
+measurement.
+
 ## Runs
 
-| Date | Run | `develop` at | Operator | Minutes | Touches | YAML lines | Done |
-|---|---|---|---|---|---|---|---|
-| | baseline | | | | | | |
+| Date | Run | `develop` at | Operator | Minutes | Touches | YAML lines | Choices | Done |
+|---|---|---|---|---|---|---|---|---|
+| | baseline | | | | | | | |
 
 ## The documented path today (not a run)
 
