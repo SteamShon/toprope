@@ -6,7 +6,7 @@ this page); plans live in [`roadmap.md`](roadmap.md) and the milestone and exper
 Every PR into `develop` or an `umbrella/*` branch fixes any line here it makes untrue, or says
 why not; each release trims it ([`AGENTS.md`](../AGENTS.md), "Progress").
 
-Updated: 2026-11-09 · Cleaned for release: `v0.1.0`
+Updated: 2026-11-10 · Cleaned for release: `v0.1.0`
 
 Legend: ✅ done · 🟡 in part · ⬜ not started
 
@@ -356,7 +356,9 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 
 1. The M1 recheck ([`M1-recheck.md`](experiments/M1-recheck.md)), in the order it gives; M1 closes
    when its three exit criteria hold.
-2. M2's spec, from the draft (`docs/experiments/M2-design.md`): the researcher decides each point,
+2. M2's spec, from the draft (`docs/experiments/M2-design.md`), and M2's grader, from its draft
+   (`docs/experiments/M2-grader.md`: options to bring the grader's noise under a preregistered
+   limit before M2 runs): the researcher decides each point,
    freezes the verdict rules, and finds the domain expert who is not the builder; the expert
    writes the change list, seeds it and keeps the key.
 3. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
