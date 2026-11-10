@@ -674,6 +674,32 @@ class Workspace:
                         "main": main.id if main else None})
         return out
 
+    def decisions(self) -> list[dict[str, str]]:
+        """What confirming and approving the draft decides, in the domain's words (ADR-0049, D2).
+        Against the approved `main`, since approving merges into it: a branch's own earlier,
+        unapproved commits are part of what this approval decides. Empty when the draft does not
+        parse."""
+        from ..check.decisions import decisions
+        doc = self.draft()
+        try:
+            new = Domain.model_validate(doc)
+        except ValidationError:
+            return []
+        d = doc.get("domain")
+        main = self.commits.main(d) if isinstance(d, str) and d and self.commits.log(d) else None
+        return decisions(new, self.commits.domain(d, main.id) if main else None)
+
+    def _unenforced(self) -> int:
+        from ..check.decisions import unenforced
+        doc = self.draft()
+        try:
+            new = Domain.model_validate(doc)
+        except ValidationError:
+            return 0
+        d = doc.get("domain")
+        main = self.commits.main(d) if isinstance(d, str) and d and self.commits.log(d) else None
+        return unenforced(new, self.commits.domain(d, main.id) if main else None)
+
     def render_review(self) -> str:
         items = self.review()
         if not items:
@@ -692,7 +718,8 @@ class Workspace:
             for ln in _show(it["now"]).rstrip().splitlines():
                 lines.append(f"    + {ln}")
             lines.append("")
-        return "\n".join(lines)
+        from ..check.decisions import render
+        return "\n".join(lines) + "\n" + render(self.decisions(), self._unenforced())
 
     # -- interview questions (ADR-0014) ----------------------------------------------------
     def attempts_by_action(self) -> dict[str, int]:
