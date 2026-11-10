@@ -238,7 +238,8 @@ def test_no_answer_from_the_server_says_it_may_have_acted(payments, tmp_path):
     def silent(**kw):
         raise TimeoutError("no answer in 30 s")
     p = Proxy(payments, tmp_path)
-    p.up.call = lambda tool, args: silent()
+    real = p.up.call
+    p.up.call = lambda tool, args: silent() if tool == "refund_order" else real(tool, args)   # the refund call hangs
     [(status, text)] = p.run([("refund_order", {"order_id": "O-3", "amount": 5})])
     assert status == "error" and "did not answer (TimeoutError: no answer in 30 s)" in text
     assert "may or may not have acted" in text and p.ex.state("O-3")["status"] == "paid"
@@ -325,7 +326,7 @@ def test_an_object_the_server_describes_badly_is_refused_with_a_fix(payments, tm
     payments.ORDERS["O-50"] = {"total": 5.0, "status": "lost"}
     p = Proxy(payments, tmp_path)
     [(status, text)] = p.run([("refund_order", {"order_id": "O-50", "amount": 1})])
-    assert status == "error" and "no days_since_purchase" in text and "status='lost' is not one of" in text
+    assert status == "error" and "no days_since_purchase" in text and "status='lost' is not a valid value (one of ['paid', 'refunded'])" in text
     assert "Fix: make get_order return" in text and payments.REFUNDS == []
 
 
@@ -365,3 +366,61 @@ def test_the_proxy_refuses_a_store_it_cannot_share(store):
     from toprope.proxy import StoreLock
     with pytest.raises(SystemExit, match="cannot share its gate over the store .*Fix: use `--store sqlite:FILE`"):
         StoreLock(store)
+
+
+# Review of #235 (2026-11-10): a copy read once was never read again, a symlinked store got its
+# own lock, a memory store slipped through, and values were checked for enums but not types.
+
+def test_the_gate_decides_on_what_the_server_says_now(payments, tmp_path):
+    p = Proxy(payments, tmp_path)
+    [(s1, _)] = p.run([("refund_order", {"order_id": "O-21", "amount": 999})])          # the server refuses
+    assert s1 == "error" and p.ex.state("O-21")["days_since_purchase"] == 1
+    payments.ORDERS["O-21"]["days_since_purchase"] = 30                           # a month later
+    kernel.UPSTREAM_SERVICES.clear()
+    p2 = Proxy(payments, tmp_path, seed=False)
+    p2.ex = p.ex
+    p2.server = build_proxy(p.ex, p2.b, p2.up, lambda: "t-sam")
+    [(s2, text)] = p2.run([("refund_order", {"order_id": "O-21", "amount": 10})])
+    assert s2 == "error" and "within-window" in text and payments.REFUNDS == []
+    ev = p.ex.history("O-21")[-1]
+    assert ev.type == "OrderReadFromServer" and ev.payload["changes"] == {"days_since_purchase": 30}
+
+
+@pytest.mark.parametrize("bad", [True, "1", None, [1]])
+def test_a_value_of_the_wrong_type_is_refused_before_anything_is_recorded(payments, tmp_path, bad):
+    payments.ORDERS["O-60"] = {"total": 5.0, "status": "paid", "days_since_purchase": bad}
+    p = Proxy(payments, tmp_path)
+    [(status, text)] = p.run([("refund_order", {"order_id": "O-60", "amount": 1})])
+    assert status == "error" and "days_since_purchase" in text and "Fix: make get_order return" in text
+    assert p.ex.lookup("O-60") is None and payments.REFUNDS == []
+
+
+def test_a_read_that_fails_says_so(payments, tmp_path):
+    p = Proxy(payments, tmp_path)
+    [(status, text)] = p.run([("refund_order", {"order_id": "O-404", "amount": 1})])
+    assert status == "error" and "get_order could not read O-404" in text and "Fix: check that O-404 exists" in text
+
+
+@pytest.mark.parametrize("store", ["sqlite::memory:", "sqlite:", "sqlite:file:x.db?mode=memory", "jsonl:"])
+def test_a_store_that_only_looks_shareable_is_refused(store):
+    from toprope.proxy import StoreLock
+    with pytest.raises(SystemExit, match="cannot share its gate"):
+        StoreLock(store)
+
+
+def test_a_symlinked_store_shares_its_targets_lock(tmp_path):
+    from toprope.proxy import StoreLock
+    (tmp_path / "a.db").touch()
+    (tmp_path / "link.db").symlink_to(tmp_path / "a.db")
+    assert StoreLock(f"sqlite:{tmp_path / 'a.db'}").path == StoreLock(f"sqlite:{tmp_path / 'link.db'}").path
+
+
+def test_a_load_tool_must_take_the_target_and_a_creating_tool_loads_nothing(payments, tmp_path):
+    up = Upstream(payments.build())
+    try:
+        b = Binding.load(_binding(tmp_path, {"refund_order": {**REFUND, "target": "order_id", "load": "wipe_orders"},
+                                             "wipe_orders": {"read": True}}))
+        problems = register(b, up.tools(), load_domain(DOMAIN))
+    finally:
+        up.close()
+    assert any("loads with wipe_orders, which takes no `order_id` argument" in x for x in problems)

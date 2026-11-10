@@ -24,7 +24,9 @@ def build() -> MCPServer:
 
     @server.tool(description="Read an order.", annotations={"readOnlyHint": True})
     def get_order(order_id: str) -> dict:
-        return {"order_id": order_id, **ORDERS.get(order_id, {})}
+        if order_id not in ORDERS:
+            raise ToolError(f"no order {order_id}")
+        return {"order_id": order_id, **ORDERS[order_id]}
 
     @server.tool(description="Delete every order. Nothing binds this, so the proxy never offers it.")
     def wipe_orders() -> dict:

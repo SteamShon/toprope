@@ -31,6 +31,7 @@ What the agent sees:
 | the same call again | not sent again: the same caller, tool and arguments are one call (or pass `idempotency_key`) |
 | two refunds of O-3 at once, even from two proxies on one store | one at a time (a lock beside the store): the second sees O-3 `refunded` and is refused |
 | `refund_order(O-21, 10)`, an order only the server knows | read first with `get_order` (the binding's `load:`), recorded, then gated like any other |
+| any gated call on an order | read again first: facts that changed on the server (days since purchase) are recorded before the gate decides; the stage stays the gate's own, and a different stage on the server is logged as drift |
 | the server does not answer | reported as such: it may or may not have acted, so read the order before calling again with a new `idempotency_key` |
 
 How it works:

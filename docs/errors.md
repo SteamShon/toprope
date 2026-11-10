@@ -161,7 +161,7 @@ the error is raised.
 | the binding {…}: tool {…} is either `read: true` or an `action` | bind it to a declared action, or mark it read-only |
 | the binding {…}: tool {…} names exactly one of `target` or `new_id` | name the argument that identifies the object |
 | the upstream MCP server did not start: {…} | check the binding's `upstream` command or URL, and that the server runs on its own |
-| toprope-proxy cannot share its gate over the store {…} | use `--store sqlite:FILE` (or `jsonl:DIR`); a memory store forgets what was done, and several proxies on one database need a shared lock M0b brings |
+| toprope-proxy needs POSIX file locks, which this system lacks | run the proxy on Linux or macOS |
 
 ## `proxy/cli.py`
 
