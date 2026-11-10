@@ -45,6 +45,25 @@ through review, with a record of why.
 
 ## Try it
 
+Start a domain from a template and watch its rules refuse an agent, in two commands
+([`docs/tutorial.md`](docs/tutorial.md) takes you from here to a connected agent in 15 minutes):
+
+```bash
+uv run toprope-init my-access --template approval    # also: budget, refunds, release
+cd my-access && uv run --project .. toprope-try
+```
+```
+the agent       asks to approve it
+                -> denied: Only a person can approve_request.
+max (manager)   asks to approve it
+                -> denied: Access to prod is approved by security.
+```
+
+Change a rule without writing YAML (`toprope-set prod_approver=manager`), and you see what the
+change touches before anything ships.
+
+### A worked example
+
 An agent proposes ad budget changes; a person approves them
 ([`examples/paid-media/`](examples/paid-media/), runs locally with no keys):
 
@@ -115,7 +134,7 @@ In this example, approving updates Toprope's own record. Calling the ad platform
 
 ## How to adopt it
 
-1. Run an example (above).
+1. Start from a template and try it (`toprope-init`, `toprope-try`; [`docs/tutorial.md`](docs/tutorial.md)).
 2. Declare one workflow: let your agent interview you about it, and confirm what it drafts.
 3. Serve it over MCP to the agent that does the work.
 4. Put one write action behind it: the one that would hurt most if the agent got it wrong.
@@ -216,7 +235,7 @@ changes only in a PR that reports a preregistered experiment verdict.
 
 | To | Read |
 |---|---|
-| try it | [`examples/paid-media/`](examples/paid-media/), [`examples/refunds/`](examples/refunds/) |
+| try it | [`docs/tutorial.md`](docs/tutorial.md) (15 minutes), [`examples/paid-media/`](examples/paid-media/), [`examples/refunds/`](examples/refunds/) |
 | see how it works | [`docs/concepts.md`](docs/concepts.md) (every part, and how they work together), [`docs/how-it-works.md`](docs/how-it-works.md), [`docs/domain-model.md`](docs/domain-model.md), [`docs/commits.md`](docs/commits.md) |
 | the problem, at length | [`docs/problem.md`](docs/problem.md) |
 | the design and its claims | [`docs/charter.md`](docs/charter.md), [`docs/architecture.md`](docs/architecture.md) |

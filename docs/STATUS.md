@@ -355,6 +355,7 @@ theme 1 records those (D1), it is measured again before it is compared (ADR-0049
 | Theme 2, getting started (umbrella #213, stacked on #201; plan: [`U-theme2-start.md`](experiments/U-theme2-start.md)): A4 `init` and `try`, A3 templates, E1 docs, E2 a tutorial | 🟡 | |
 | … A3 + A4: templates (approval, budget, refunds, release), each with a story; `toprope-init <name> --template T` writes a working domain and its `toprope.yaml` (`domain`, `store`, `identity` keys); `toprope-try` plays the story with each refusal's reason and fails if a step ends otherwise; `--check` diffs the domain with its template; `--token` and `--identity` may follow the action unless it has a param of that name | ✅ | #214 |
 | … Settings: a template names the values its rules turn on (a refund window, a step limit, the role that approves prod); `toprope-set name=value` (or `toprope-init --set`) rewrites the rule and its reason, checks the value, shows the change check and which story steps now end differently; no YAML by hand | ✅ | #215 |
+| … E1 + E2: the README's *Try it* leads with `toprope-init` and `toprope-try`; [`tutorial.md`](tutorial.md) goes from a template to a connected agent in 15 minutes, and `tests/test_tutorial.py` runs every command on it | ✅ | #216 |
 | Theme 3, interview and feedback: B1 choice questions, B2 examples first, B3 a live map, D2 impact as decisions, D3 counterexamples as stories | ⬜ | |
 | Theme 4, import and wrap: A1 from `AGENTS.md`, skills, OpenAPI, enums, tickets; A2 an MCP proxy (its own ADR first) | ⬜ | |
 
