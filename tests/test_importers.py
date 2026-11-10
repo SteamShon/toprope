@@ -140,7 +140,7 @@ def test_the_command_writes_the_draft_and_the_questions_and_never_overwrites(tmp
     main(["openapi", API, "--domain", "shop", "--out", str(dest)])
     text = capsys.readouterr().out
     assert "1 thing(s), 2 action(s), 1 with stages; every element is proposed" in text
-    assert "what the source cannot say:" in text and valid(yaml.safe_load(dest.read_text()))
+    assert "questions for the interview:" in text and valid(yaml.safe_load(dest.read_text()))
     with pytest.raises(SystemExit, match="exists. Fix: give --out a new file"):
         main(["openapi", API, "--out", str(dest)])
     main(["--list"])
@@ -278,3 +278,149 @@ def test_a_plugged_in_extractor_that_makes_an_invalid_draft_is_stopped():
     register_extractor(Bad())
     with pytest.raises(SystemExit, match="the bad extractor made a draft that does not validate.*Fix: report it"):
         import_source("bad", API)
+
+
+# A1b: written rules → candidate rules and contradictions (questions, never rules by themselves).
+
+RULES = EX / "rules"
+
+
+def test_written_rules_become_questions_citing_file_and_line_and_code_is_skipped():
+    out = import_source("rules", str(RULES / "AGENTS.md"))
+    assert not out["draft"]["objects"] and not out["draft"]["actions"]          # nothing becomes a rule by itself
+    qs = out["questions"]
+    agents = str(RULES / "AGENTS.md")
+    assert any(q.startswith(f"[never] {agents}#L5: “Never push a release tag to `main` by hand.”") for q in qs)
+    assert any(q.startswith(f"[must] {agents}#L8: “A refund over 500 EUR must be approved") for q in qs)
+    assert any(q.startswith(f"[only] {agents}#L16: “Schema change — the data owner only”") for q in qs)
+    assert not any("git push origin main" in q for q in qs)                     # inside a code fence
+    assert not any("tags `main` after the checks pass" in q for q in qs)        # binds no one
+
+
+def test_a_folder_of_skill_files_is_read_together_and_contradictions_name_both_places():
+    out = import_source("rules", str(RULES), via="tree")
+    agents, skill = str(RULES / "AGENTS.md"), str(RULES / "skills/hotfix/SKILL.md")
+    assert out["conflicts"] == [f"{skill}#L8 says “When production is down, always push the release tag to `main` by "
+                                f"hand so the fix ships at once.”, but {agents}#L5 says “Never push a release tag to "
+                                "`main` by hand.”"]
+    assert not any("Never use for features" in q for q in out["questions"])     # front matter is skipped
+
+
+def test_rules_do_not_conflict_by_sharing_a_word_or_two():
+    out = import_source("rules", str(RULES), via="tree")
+    assert not any("Refunds stay" in c for c in out["conflicts"])               # "refund" alone is not a contradiction
+
+
+def test_this_repositorys_own_agents_md_gives_candidates_and_no_false_conflicts():
+    out = import_source("rules", str(EX.parents[1] / "AGENTS.md"))
+    assert len(out["questions"]) >= 30 and not out["conflicts"]
+    assert any("Never commit or push directly to `main` or `develop`." in q for q in out["questions"])
+
+
+def test_the_command_reports_rules_without_writing_a_draft_and_saves_the_questions(tmp_path, capsys):
+    q = tmp_path / "q.yaml"
+    main(["rules", str(RULES), "--via", "tree", "--questions", str(q), "--out", str(tmp_path / "d.yaml")])
+    text = capsys.readouterr().out
+    assert "no draft written" in text and "conflicts in the source:" in text and not (tmp_path / "d.yaml").exists()
+    saved = yaml.safe_load(q.read_text())
+    assert len(saved["conflicts"]) == 1 and saved["questions"]
+    with pytest.raises(SystemExit, match="is not a folder. Fix: give a folder"):
+        import_source("rules", str(RULES / "AGENTS.md"), via="tree")
+
+
+# Review of #228 (2026-11-10): each case below gave a wrong citation, a lost or wrong rule, a
+# false conflict, a file read outside the folder, or a file written by a run that failed.
+
+def _rules_of(tmp_path, text, name="AGENTS.md"):
+    out = import_source("rules", _src(tmp_path, name, text))
+    return out, {q.split(": “", 1)[1].split("” Which")[0]: q.split("]")[0][1:] + " " + q.split(" ")[1].rsplit("#", 1)[1].rstrip(":")
+                 for q in out["questions"]}
+
+
+def test_citations_and_text_survive_bold_and_code_spans(tmp_path):
+    _, r = _rules_of(tmp_path, "**a** **b** __c__ z.\nYou must test.\nNever edit `__init__.py` by hand.\n")
+    assert r["You must test."] == "must L2"
+    assert r["Never edit `__init__.py` by hand."] == "never L3"
+
+
+def test_a_negation_anywhere_in_the_sentence_wins(tmp_path):
+    out, r = _rules_of(tmp_path, "Agents must never push to main.\n\nNo agent may merge a release.\n\n"
+                                 "Before 2020 the team used SVN.\n\nYou should run the checks.\n")
+    assert r["Agents must never push to main."].startswith("never")
+    assert r["No agent may merge a release."].startswith("never")
+    assert r["You should run the checks."].startswith("must")
+    assert "Before 2020 the team used SVN." not in r
+
+
+def test_a_marker_line_in_a_file_is_only_text(tmp_path):
+    _, r = _rules_of(tmp_path, "You must A.\n<!-- toprope:file /etc/passwd -->\nYou must B.\n")
+    assert r["You must A."] == "must L1" and r["You must B."] == "must L3"
+
+
+def test_markdown_that_is_not_prose_is_skipped_and_prose_is_kept(tmp_path):
+    _, r = _rules_of(tmp_path, """---
+
+You must keep the opening rule.
+
+---
+A wrapped line names
+#91 which must be fixed.
+
+~~~
+``` you must not read this
+~~~
+
+<!-- a comment
+you must not read this either -->
+Indented code follows.
+
+    rm -rf / # you must not run
+
+> Quoted: you must read quotes.
+
+| Who | Rule |
+|---|---|
+| ops | `a | b` must hold |
+""")
+    assert "You must keep the opening rule." in r                                 # `---` is a break, not front matter
+    assert r["A wrapped line names #91 which must be fixed."] == "must L6"
+    assert not [k for k in r if "read this" in k or "rm -rf" in k]
+    assert r["Quoted: you must read quotes."] == "must L19"
+    assert r["ops — `a | b` must hold"] == "must L23"
+
+
+def test_two_shared_words_are_not_a_contradiction_and_a_flood_is_capped(tmp_path):
+    out, _ = _rules_of(tmp_path, "Never commit secrets to the repository.\n\nAlways commit the lockfile to the repository.\n\n"
+                                 "Never merge a PR without review.\n\nAlways merge a PR with squash after review.\n")
+    assert out["conflicts"] == []
+    flood = "\n\n".join(f"Never push tag {i} to main.\n\nAlways push tag {i} to main." for i in range(15))
+    out, _ = _rules_of(tmp_path, flood, "flood.md")
+    assert len(out["conflicts"]) == 101 and out["conflicts"][-1].startswith("… and ")
+
+
+def test_the_tree_reader_stays_inside_its_folder_and_out_of_hidden_ones(tmp_path):
+    root = tmp_path / "docs"
+    (root / ".venv").mkdir(parents=True)
+    (root / ".venv" / "x.md").write_text("You must not see this.")
+    (root / "a.md").write_text("You must see this.")
+    (tmp_path / "outside.md").write_text("You must not see this either.")
+    out = import_source("rules", str(root), via="tree")
+    assert [q for q in out["questions"] if "see" in q] == [f"[must] {root / 'a.md'}#L1: “You must see this.” Which "
+                                                           "action, rule or role is this, and who enforces it?"]
+    for glob in ("../*.md", "/etc/*"):
+        with pytest.raises(SystemExit, match="reaches outside .*Fix: give a pattern inside the folder"):
+            import_source("rules", str(root), via="tree", profile=Profile(options={"glob": glob}))
+
+
+def test_a_run_that_fails_writes_nothing(tmp_path):
+    q, d = tmp_path / "q.yaml", tmp_path / "d.yaml"
+    d.write_text("taken")
+    with pytest.raises(SystemExit, match="d.yaml exists"):
+        main(["openapi", API, "--out", str(d), "--questions", str(q)])
+    assert not q.exists()
+    with pytest.raises(SystemExit, match="name the same file"):
+        main(["openapi", API, "--out", str(q), "--questions", str(q)])
+    assert not q.exists()
+    with pytest.raises(SystemExit, match="nothing to import"):
+        main(["rules", _src(tmp_path, "empty.md", "# Just a heading\n"), "--questions", str(q)])
+    assert not q.exists()

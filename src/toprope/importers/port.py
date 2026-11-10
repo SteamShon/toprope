@@ -50,6 +50,7 @@ class Extraction:
 class Raw:
     data: bytes
     ref: str                                                  # e.g. the path or URL, for citations
+    parts: list[Raw] | None = None                            # several documents, each with its own ref
 
 
 @dataclass
