@@ -54,5 +54,42 @@ How it works:
 - An action only a person may take is refused for an agent, naming who may. Toprope has no
   waiting approval for a domain action yet (ADR-0052, decision 6).
 
+## Drafting the binding from the server's tools
+
+A person need not write the binding, the action's call or its reply by hand (ADR-0052 §7).
+`toprope-import mcp` lists the server's tools and drafts them:
+
+```bash
+uv run toprope-import mcp "python examples/proxy/payments_server.py" --domain payments \
+    --patch import.yaml --workspace toprope.payments.workspace.yaml \
+    --binding-out payments.binding.yaml --questions q.yaml
+```
+
+- `refund_order` becomes the proposed action `refund_order` on an `Order` (its `order_id`), with
+  `amount` typed from the input schema. Its effect is `call: mcp:refund_order`, passing every
+  argument on. The reply action `record_refund_order` (`external:kernel`) takes `ok` and the
+  fields of the tool's output schema, and refuses when the server did not do it.
+- `get_order` is read-only (`readOnlyHint`), so it becomes a read binding, and the `load:` of
+  `refund_order`. An `Order`'s facts come from its output schema, when it has one.
+- `wipe_orders` names no thing, so it is not drafted or bound: the proxy never offers it.
+- Every cell is `undecided`, and every actor is `unassigned`. The questions name what a person
+  decides: which thing, which stage moves, who may call.
+
+The declaration goes through the change loop (`toprope-change`; see
+[`examples/import/`](../import/)), and a person confirms it. The binding is marked
+`status: proposed`, with each guess commented. The proxy will not start on it until a person
+confirms it:
+
+```bash
+uv run toprope-proxy --check --domain payments.domain.yaml --binding payments.binding.yaml      # agree?
+TOPROPE_TOKEN=t-dana uv run toprope-proxy --confirm-binding --domain payments.domain.yaml \
+    --binding payments.binding.yaml --identity static:ids.yaml
+```
+
+`--confirm-binding` refuses an agent. It confirms only a binding the proxy would start with, and
+it records who confirmed it and when.
+
 `tests/test_proxy.py` runs all of this in process. It also runs the real command over stdio in
-front of the server as a separate process.
+front of the server as a separate process. `tests/test_import_loop.py` drafts the declaration
+and binding from this server, takes them through the change loop, and checks that the proxy
+would start.
