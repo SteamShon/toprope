@@ -13,7 +13,7 @@ TEMPLATES = sorted(templates())
 
 
 def test_there_are_templates_for_the_common_workflows():
-    assert {"approval", "budget", "refunds", "release"} <= set(TEMPLATES)
+    assert {"approval", "budget", "experiment", "refunds", "release"} <= set(TEMPLATES)
 
 
 @pytest.mark.parametrize("name", TEMPLATES)

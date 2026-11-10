@@ -1,4 +1,5 @@
 title: A refund window
+keywords: [refund, order, purchase, return, customer, support]   # toprope-init "<a sentence>" picks the template whose words it uses most
 about: Support may refund a paid order within 7 days of purchase.
 next: >
   Try a 30-day window with `toprope-set window_days=30`, and see what the change touches.
