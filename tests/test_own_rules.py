@@ -40,7 +40,7 @@ def test_a_threshold_rule_is_enforced_and_the_story_shows_it_refusing(access, ca
     ok, rows = play(access)
     assert ok
     shown = [r for r in rows if r["code"] == "amount-over-1000-needs-finance"]
-    assert shown and shown[0]["reason"] == "When amount > 1000, only finance may approve request."
+    assert shown and shown[0]["reason"].split(" Fix: ")[0] == "When amount > 1000, only finance may approve request."
     assert rows[-1]["result"] == "ok" and "finance" in rows[-1]["who"]          # and finance gets through
     try_main(["--dir", str(access)])                                            # exits 0: the story ends as told
     assert "denied: When amount > 1000, only finance may approve request." in capsys.readouterr().out
@@ -100,7 +100,7 @@ def test_person_only_refuses_an_agent(tmp_path, capsys):
     assert "added an agent" in capsys.readouterr().out          # the template had none to show it with
     assert load_domain(out / "domain.yaml").actions["refund_order"].requires == "human"
     ok, rows = play(out)
-    assert ok and rows[-1]["code"] == "actor" and rows[-1]["reason"] == "Only a person can refund_order."
+    assert ok and rows[-1]["code"] == "actor" and rows[-1]["reason"].split(" Fix: ")[0] == "Only a person can refund_order."
 
 
 def test_a_window_counts_days_from_an_action_or_a_field(access, tmp_path):
@@ -270,7 +270,7 @@ def test_a_missing_amount_is_refused_with_how_to_give_it_and_the_role_still_deci
     ex.seed("AccessRequest", {"id": "R-x", "person": "dana", "system": "wiki", "status": "submitted"})
     o = ex.submit("t-max", "approve_request", "R-x", {}, idempotency_key="a")
     assert (o.status, o.code) == ("denied", "amount-over-1000-needs-finance-known")
-    assert o.reason == ("This has no amount, so only finance may approve request it; give it when taking "
+    assert o.reason.split(" Fix: ")[0] == ("This has no amount, so only finance may approve request it; give it when taking "
                         "submit_request (--amount).")
     assert ex.submit("t-kim", "approve_request", "R-x", {}, idempotency_key="b").ok
 
