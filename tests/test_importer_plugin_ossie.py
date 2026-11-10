@@ -6,6 +6,7 @@ import tomllib
 from pathlib import Path
 
 import pytest
+import yaml
 
 from toprope.decl import Domain, validate_domain
 from toprope.decl.provenance import proposed_elements
@@ -81,3 +82,72 @@ def test_a_semantic_model_without_an_ontology_names_the_document_to_export(tmp_p
     f.write_text("version: 0.3.0.dev0\nname: m\ndatasets: []\n")
     with pytest.raises(SystemExit, match="no `ontology` list. Fix: give the Ossie ontology document"):
         import_source("ossie", str(f))
+
+
+# Review of #226 (2026-11-10): each case below gave a silently wrong draft or a traceback.
+
+def _read(tmp_path, ontology, profile=None):
+    f = tmp_path / "o.yaml"
+    f.write_text(yaml.safe_dump({"version": "0.3.0.dev0", "name": "t", "ontology": ontology}))
+    return import_source("ossie", str(f), profile=profile)
+
+
+def rel(name, concept=None, mult="ManyToOne", **kw):
+    return {"name": name, "roles": [{"concept": concept}] if concept else [], "verbalizes": ["x"],
+            **({"multiplicity": mult} if mult else {}), **kw}
+
+
+def test_limits_on_a_value_type_and_its_supertypes_all_hold(tmp_path):
+    out = _read(tmp_path, [
+        {"concept": "S", "type": "ValueType", "extends": ["String"], "requires": ["S == 'a' OR S == 'b' OR S == 'a'"]},
+        {"concept": "T", "type": "ValueType", "extends": ["S"], "requires": ["T == 'a'"]},
+        {"concept": "N", "type": "ValueType", "extends": ["Integer"], "requires": ["N >= 0", "N <= 100"]},
+        {"concept": "M", "type": "ValueType", "extends": ["N"], "requires": ["M >= 10"]},
+        {"concept": "Box", "type": "EntityType", "relationships": [rel("t", "T"), rel("s", "S"), rel("m", "M")]}])
+    p = valid(out["draft"]).objects["Box"].properties
+    assert p["t"].enum == ["a"] and p["s"].enum == ["a", "b"]
+    assert (p["m"].min, p["m"].max) == (10, 100)
+
+
+def test_names_that_collide_are_conflicts_and_nothing_is_dropped_silently(tmp_path):
+    out = _read(tmp_path, [
+        {"concept": "Order", "type": "EntityType", "requires": ["Order.nope"],
+         "relationships": [rel("placedAt", "DateTime"), rel("placed_at", "Date"), rel("line_x", "Order"),
+                           rel("owner", "Hidden"), rel("nicknames", "String", mult=None)]},
+        {"concept": "OrderLine", "type": "EntityType", "relationships": [rel("x", "Order")]},
+        {"concept": "order_line", "type": "EntityType"},
+        {"concept": "Hidden", "type": "EntityType"},
+        {"concept": "Staff", "type": "EntityType", "derived_by": ["EXISTS(Person.earns)"]}],
+        profile=Profile(ignore=["Hidden"]))
+    d = valid(out["draft"])
+    conflicts, questions = "\n".join(out["conflicts"]), "\n".join(out["questions"])
+    assert "Order.placed_at reads as `placed_at`, like another fact" in conflicts
+    assert "links.order_line_x is said twice" in conflicts and "objects.OrderLine is said twice" in conflicts
+    assert "has no relationship nope" in conflicts
+    assert "links to Hidden, which the profile ignores" in questions
+    assert "Can an Order have more than one nicknames?" in questions and "nicknames" not in d.objects["Order"].properties
+    assert "Staff is derived" in questions and "Staff" not in d.objects
+    assert "What happens to Order, OrderLine, and who" in questions
+
+
+def test_a_stage_field_is_found_by_its_source_name(tmp_path):
+    out = _read(tmp_path, [
+        {"concept": "St", "type": "ValueType", "extends": ["String"], "requires": ["St == 'new' OR St == 'done'"]},
+        {"concept": "Job", "type": "EntityType", "relationships": [rel("orderStatus", "St")]}],
+        profile=Profile(stage_fields=["orderStatus"]))
+    t = valid(out["draft"]).transitions["Job"]
+    assert t.field == "order_status" and set(t.matrix) == {"new", "done"}
+
+
+def test_a_role_that_is_not_a_mapping_is_refused_with_a_fix(tmp_path):
+    with pytest.raises(SystemExit, match="is not `\\{concept: Name\\}`. Fix: write each role"):
+        _read(tmp_path, [{"concept": "A", "type": "EntityType",
+                          "relationships": [{"name": "b", "roles": ["String"], "verbalizes": ["x"]}]}])
+
+
+def test_any_and_cycles_are_named_for_what_they_are(tmp_path):
+    out = _read(tmp_path, [
+        {"concept": "P", "type": "ValueType", "extends": ["Q"]}, {"concept": "Q", "type": "ValueType", "extends": ["P"]},
+        {"concept": "A", "type": "EntityType", "relationships": [rel("p", "P"), rel("thing", "Any")]}])
+    assert "in a cycle" in "\n".join(out["conflicts"])
+    assert "links to Any, which names no thing" in "\n".join(out["questions"])

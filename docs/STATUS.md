@@ -411,6 +411,10 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 Each item names the PR it came from and the review date. The PR that resolves an item deletes
 it; each release's cleanup PR handles items older than one release.
 
+- The Ossie extractor (#226, review 2026-11-10) takes a stage field's first enum value as `initial`
+  and keeps a stage field optional if the source does; the interview asks which stage comes first,
+  but the draft does not mark the guess. Auto Ontology's certification does not reach the draft
+  (its Ossie export drops it; a reader for its REST API could carry it).
 - The `human-request` workflow pushes its result with the workflow token, so no `pull_request`
   check runs on that head, and the ruleset does not accept the `status` run the workflow
   dispatches; the PR needs one more commit before it can merge. A push token that triggers

@@ -12,7 +12,7 @@ ossie = "toprope_ossie:OssieExtractor"
 
 ```bash
 uv pip install -e examples/plugins/toprope-ossie
-uv run toprope-import --list                  # extractors: ossie, openapi, sql, workflow
+uv run toprope-import --list                  # extractors: openapi, ossie, sql, workflow
 uv run toprope-import ossie examples/plugins/toprope-ossie/examples/orders.ossie.yaml --domain shop
 ```
 
@@ -32,8 +32,8 @@ Any tool that exports Ossie can provide one. For example:
 |---|---|
 | `EntityType` concept | a thing (`objects.<Concept>`) |
 | a relationship to a value type or a built-in | a fact, typed by the built-in it extends |
-| `X == 'a' OR X == 'b'` on a value type | an enum |
-| `X >= 0`, `X <= 9` on a value type | `min`, `max` |
+| `X == 'a' OR X == 'b'` on a string value type | an enum (every limit on the way to the built-in holds) |
+| `X >= 0`, `X <= 9` on a number value type | `min`, `max` (the tightest) |
 | a relationship with no other role | a boolean fact |
 | a relationship to an entity type | a link (`ManyToOne` → many-to-one, `OneToOne` → one-to-one) |
 | `identify_by`, `requires: [Concept.fact]` | a required fact (others are optional, as in Ossie) |
@@ -41,9 +41,14 @@ Any tool that exports Ossie can provide one. For example:
 
 Everything else is turned into a question for the interview:
 - what happens to the things, and who may do it (Ossie has no actions);
-- `derived_by` facts;
+- `derived_by` concepts and facts;
 - other `requires` constraints;
-- relationships with three or more roles.
+- relationships with three or more roles;
+- facts with no multiplicity, which may have many values;
+- links to ignored concepts or to `Any`.
+
+Two source names that read as one name (`placedAt`, `placed_at`) are listed as a conflict,
+naming both places. The first one is kept.
 
 Every element stays `proposed` until a person confirms it.
 
@@ -51,6 +56,6 @@ Auto Ontology's certification of terms does not survive its Ossie export. A read
 API could carry it into each element's ref; that is not built yet.
 
 `examples/flights.ontology.yaml` is Apache Ossie's own example, copied unchanged under its Apache
-License 2.0 header from apache/ossie at commit d700cdea. `examples/orders.ossie.yaml` was written
+License 2.0 header from apache/ossie at commit d700cdea; its NOTICE is in `NOTICE`. `examples/orders.ossie.yaml` was written
 for this example. `tests/test_importer_plugin_ossie.py` loads this package through the entry point
 above and reads both files.
