@@ -1,0 +1,5 @@
+t-bot: {id: bot, kind: agent, roles: [engineer],
+        on_behalf_of: {id: eli, roles: [engineer]},
+        grant: {id: g1, actions: [record_tests, ship_release]}}
+t-eli: {id: eli, roles: [engineer, release_manager]}
+t-ana: {id: ana, roles: [release_manager]}

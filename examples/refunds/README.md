@@ -1,5 +1,8 @@
 # Example: a refund window
 
+This is the `refunds` template (`toprope-init <name> --template refunds`); the template is the
+source of `refunds`'s declaration and tokens (`src/toprope/templates/README.md`).
+
 Link: none (an example for the README). A one-object domain: support may refund a paid order
 within 7 days of purchase. `tests/test_examples.py` checks that it gives the output below.
 

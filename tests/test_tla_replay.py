@@ -21,16 +21,16 @@ TRACE = '''Error: Invariant Inv_holdouts_never_change is violated.
 Error: The behavior up to this point is:
 State 1: <Initial predicate>
 /\\ last = <<"init">>
-/\\ obj = ("C-search" :> ("id" :> <<"s", "C-search">>))
+/\\ obj = ("C-holdout" :> [id |-> <<"s", "C-holdout">>, change |-> <<"s", "none">>, daily_budget |-> <<"i", 800>>, exception_approved |-> <<"n">>, holdout |-> <<"b", TRUE>>, name |-> <<"s", "Search, holdout">>, proposed_budget |-> <<"n">>, proposed_by |-> <<"n">>])
 
-State 2: <Step_propose_budget_change_analyst line 60, col 1 to line 66, col 9 of module Toprope_paid_media>
+State 2: <Step_propose_budget_change_analyst line 68, col 39 to line 77, col 120 of module Toprope_paid_media>
 /\\ last = << "propose_budget_change",
    "analyst",
    "C-holdout",
-   <<<<"daily_budget", <<"i", 0>>>>, <<"reason", <<"s", "x">>>>>> >>
-/\\ obj = ("C-search" :> ("id" :> <<"s", "C-search">>))
+   <<<<"daily_budget", <<"i", 1>>>>, <<"reason", <<"s", "x">>>>>> >>
+/\\ obj = ("C-holdout" :> [id |-> <<"s", "C-holdout">>, change |-> <<"s", "proposed">>, daily_budget |-> <<"i", 800>>, exception_approved |-> <<"n">>, holdout |-> <<"b", TRUE>>, name |-> <<"s", "Search, holdout">>, proposed_budget |-> <<"i", 1>>, proposed_by |-> <<"s", "analyst-1">>])
 
-105 states generated, 37 distinct states found, 0 states left on queue.
+34 states generated, 34 distinct states found, 31 states left on queue.
 '''
 
 
@@ -41,7 +41,7 @@ def test_tlc_values_and_the_trace_are_read():
         parse_value("[x |-> 1]")                                       # records are not in `last`
     inv, steps = parse_trace(TRACE)
     assert inv == "Inv_holdouts_never_change"
-    assert steps == [Step("propose_budget_change", "analyst", "C-holdout", {"daily_budget": 0, "reason": "x"})]
+    assert steps == [Step("propose_budget_change", "analyst", "C-holdout", {"daily_budget": 1, "reason": "x"})]
     assert parse_value('<<"s", "u:' + "é".encode().hex() + '">>') and \
         parse_trace(TRACE.replace('<<"s", "x">>', '<<"s", "u:' + "é".encode().hex() + '">>'))[1][0].params["reason"] == "é"
 

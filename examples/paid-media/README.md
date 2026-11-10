@@ -1,5 +1,8 @@
 # Example: an agent proposes ad budget changes
 
+This is the `budget` template (`toprope-init <name> --template budget`); the template is the
+source of `paid-media`'s declaration and tokens (`src/toprope/templates/README.md`).
+
 Link: none (an example for the README). An agent analyses campaigns and proposes budget
 changes; a person approves them. The rules are the team's: holdout campaigns are never
 touched unless a media lead grants a one-time exception, a budget rises by at most 500 a day at
@@ -93,6 +96,6 @@ invariants exercised: 1/1
 with the current rules before anything ships:
 
 ```
-changes 1 precondition(s); affects 4 cell test(s), 14 param test(s), 2 precondition test(s), exploration; replays past propose_budget_change
+changes 1 precondition(s); affects 4 cell test(s), 14 param test(s), 3 precondition test(s), exploration; replays past propose_budget_change
 passes; 0 error(s), 0 warning(s)
 ```
