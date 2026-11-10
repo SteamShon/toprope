@@ -9,6 +9,10 @@ A person approves on these sentences, so nothing enforced may go unsaid (#221's 
 changed element that has no sentence of its own gets a plain one with its before and after, and
 only the glossary, examples, scenarios and purpose, which nothing enforces, are left out, and
 counted.
+
+Sentences use the domain's words (#225's review): a thing or a role by its glossary term where the
+glossary has one, an action by its description. On a domain's first commit every rule is listed,
+in the same words, so the first approval is no less informed than a later one.
 """
 from __future__ import annotations
 
@@ -17,6 +21,7 @@ from typing import Any
 
 from ..decl.interface import review_contents
 from ..decl.models import Domain
+from ..decl.words import doing, term
 
 NOT_ENFORCED = ("term", "fixture", "scenario", "purpose")   # wording and evidence: counted, not decided
 
@@ -52,35 +57,43 @@ def _cell(c: Any) -> str:
     return f"moves it to {v}"
 
 
-def _actor(x: Any) -> str:
+def _actor(d: Domain, x: Any) -> str:
     if isinstance(x, str):
-        return x
+        return term(d, x)
     if isinstance(x, dict):
-        return " where ".join(str(v) for v in (x.get("role"), x.get("where")) if v) or _short(x)
+        return " where ".join(str(v) for v in (term(d, x["role"]) if x.get("role") else None, x.get("where"))
+                              if v) or _short(x)
     return str(x)
 
 
-def _who(a: dict[str, Any]) -> str:
-    who = ", ".join(_actor(x) for x in a.get("actor") or []) or "nobody"
+def _who(d: Domain, a: dict[str, Any]) -> str:
+    who = ", ".join(_actor(d, x) for x in a.get("actor") or []) or "nobody"
     return who + (" (a person only)" if a.get("requires") == "human" else "")
 
 
-def _requires(r: Any) -> str:
+def _requires(d: Domain, r: Any) -> str:
     if r == "human":
         return "a person"
     if isinstance(r, dict) and r.get("roles"):
-        return "role " + ", ".join(r["roles"])
+        return "role " + ", ".join(term(d, x) for x in r["roles"])
     if isinstance(r, dict) and r.get("check"):
         return f"`{r['check']}`"
     return _short(r)
 
 
+STRUCTURE = ("object", "property", "link", "role")       # on a first commit: counted in its first line
+
+
 def decisions(new: Domain, old: Domain | None) -> list[dict[str, str]]:
-    """What approving the change from `old` to `new` decides, one sentence per change."""
+    """What approving the change from `old` to `new` decides, one sentence per change. With no
+    `old` (a domain's first commit), every rule it enforces, after a first line that counts it."""
     if old is None:
-        return [{"where": "domain", "decide": f"{new.domain} starts with {len(new.actions)} action(s) and "
-                 f"{len(new.objects)} kind(s) of thing"}]
+        first = [{"where": "domain", "decide": f"{new.domain} starts with {len(new.actions)} action(s) and "
+                  f"{len(new.objects)} kind(s) of thing"}]
+        empty = Domain.model_validate({"domain": new.domain, "version": new.version})
+        return first + [x for x in decisions(new, empty) if x["where"].partition(":")[0] not in STRUCTURE]
     before, after = review_contents(old), review_contents(new)
+    d = new
     out: list[dict[str, str]] = []
 
     def say(where: str, text: str) -> None:
@@ -95,7 +108,8 @@ def decisions(new: Domain, old: Domain | None) -> list[dict[str, str]]:
         if kind in NOT_ENFORCED:
             continue
         if kind == "precondition":
-            action = name.split(".")[0]
+            action = doing(d, name.split(".")[0]) if name.split(".")[0] in d.actions else \
+                doing(old, name.split(".")[0])
             if b is None:
                 say(key, f"{action} gets a new rule: {_q(a.get('reason'))} (checks `{a.get('check')}`)")
             elif a is None:
@@ -108,6 +122,8 @@ def decisions(new: Domain, old: Domain | None) -> list[dict[str, str]]:
                              f"(was `{b.get('check')}`)")
         elif kind == "cell":
             obj, state, action = name.split(".", 2)
+            action = doing(d if action in d.actions else old, action)
+            obj = term(d, obj)
             if b is None:
                 say(key, f"When {_a(obj)} is {state}, {action} {_cell(a)}")
             elif a is None:
@@ -116,19 +132,19 @@ def decisions(new: Domain, old: Domain | None) -> list[dict[str, str]]:
                 say(key, f"When {_a(obj)} is {state}, {action} {_cell(b)}; it will be: {_cell(a)}")
         elif kind == "action":
             if b is None:
-                say(key, f"New action {name}: {a.get('description', '')} Who may take it: {_who(a)}")
+                say(key, f"New action {doing(d, name)}: who may take it: {_who(d, a)}")
             elif a is None:
-                say(key, f"The action {name} goes away: nobody can "
-                         + str(b.get("description") or name).rstrip(".").lower())
+                say(key, f"The action {doing(old, name)} goes away: nobody can take it")
             else:
-                if _who(b) != _who(a):
-                    say(key, f"{name}: who may take it changes from {_who(b)} to {_who(a)}")
-                for field in sorted((set(b) | set(a)) - {"actor", "requires", "description"}):
+                if _who(old, b) != _who(d, a):
+                    say(key, f"{doing(d, name)}: who may take it changes from {_who(old, b)} to {_who(d, a)}")
+                for field in sorted((set(b) | set(a)) - {"actor", "requires", "description", "source", "status"}):
                     if b.get(field) != a.get(field):
-                        say(key, f"{name}: its {field.replace('_', ' ')} changes from {_short(b.get(field))} "
+                        say(key, f"{doing(d, name)}: its {field.replace('_', ' ')} changes from {_short(b.get(field))} "
                                  f"to {_short(a.get(field))}")
         elif kind == "param":
             action, _, param = name.partition(".")
+            action = doing(d if action in d.actions else old, action)
             if b is None:
                 say(key, f"{action} takes a new input, {param} ({_short(a)})")
             elif a is None:
@@ -148,6 +164,11 @@ def decisions(new: Domain, old: Domain | None) -> list[dict[str, str]]:
         elif kind == "stages":
             if b is not None and a is not None:
                 say(key, f"{name}'s stages: {_short(b)} becomes {_short(a)}")
+            elif b is None and a is not None:
+                states = list(d.transitions[name].matrix) if name in d.transitions else []
+                say(key, f"{_a(term(d, name))[:1].upper()}{_a(term(d, name))[1:]} goes through the stages "
+                         f"{', '.join(states)} (its {term(d, a.get('field') or 'stage')})"
+                         + (f", starting {a['initial']}" if a.get("initial") else ""))
         if len(out) == n and b is not None and a is not None and kind in ("object", "action") and \
                 {k: v for k, v in b.items() if k != "description"} == {k: v for k, v in a.items() if k != "description"}:
             continue                                          # only its wording changed
@@ -168,13 +189,13 @@ def decisions(new: Domain, old: Domain | None) -> list[dict[str, str]]:
         if o == n_:
             continue
         if o is None:
-            say(f"rule:{rid}", f"New outcome rule: {_q(n_.get('reason'))}: only {_requires(n_.get('requires'))} "
+            say(f"rule:{rid}", f"New outcome rule: {_q(n_.get('reason'))}: only {_requires(new, n_.get('requires'))} "
                                f"may bring about {n_.get('on')}")
         elif n_ is None:
             say(f"rule:{rid}", f"Outcome rule removed: {_q(o.get('reason'))} (on {o.get('on')})")
         else:
-            parts = [f"{f} {_requires(o.get(f)) if f == 'requires' else _short(o.get(f))} becomes "
-                     f"{_requires(n_.get(f)) if f == 'requires' else _short(n_.get(f))}"
+            parts = [f"{f} {_requires(old, o.get(f)) if f == 'requires' else _short(o.get(f))} becomes "
+                     f"{_requires(new, n_.get(f)) if f == 'requires' else _short(n_.get(f))}"
                      for f in ("on", "requires", "reason") if o.get(f) != n_.get(f)]
             say(f"rule:{rid}", f"Outcome rule {_q(o.get('reason'))}: " + "; ".join(parts))
     return out

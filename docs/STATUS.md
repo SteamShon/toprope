@@ -6,7 +6,7 @@ this page); plans live in [`roadmap.md`](roadmap.md) and the milestone and exper
 Every PR into `develop` or an `umbrella/*` branch fixes any line here it makes untrue, or says
 why not; each release trims it ([`AGENTS.md`](../AGENTS.md), "Progress").
 
-Updated: 2026-11-09 · Cleaned for release: `v0.1.0`
+Updated: 2026-11-10 · Cleaned for release: `v0.1.0`
 
 Legend: ✅ done · 🟡 in part · ⬜ not started
 
@@ -353,13 +353,13 @@ theme 1 records those (D1), it is measured again before it is compared (ADR-0049
 | … C1: `toprope-change "<intent>" --patch FILE` proposes the patch's elements, checks the working copy on a scratch copy of the commit store (no commit is added), prints the diff to confirm and writes one human request whose one approval confirms, commits, checks and approves; a failing check stops it before any request | ✅ | #208 |
 | … C2: ADR-0050 (accepted): one approval covers a low-risk change from confirm to verify (verify on the condition that the probes pass), two for a high-risk one; risk computed by `check_commit`; any change to who may take a person-only step is high. `check_commit` records `risk` with its reasons; `toprope-change` writes the one-approval request for low risk; a request's delivery steps run only on a commit checked low risk inside it | ✅ | #209, #210 |
 | Theme 2, getting started: A4 `init` and `try`, A3 templates, E1 docs, E2 a tutorial | ⬜ | |
-| Theme 3, interview and feedback (umbrella #218, stacked on #201; plan: [`U-theme3-interview.md`](experiments/U-theme3-interview.md)): B1 choice questions, B2 examples first, B3 a live map, D2 impact as decisions, D3 counterexamples as stories | ✅ (code); the 80% target measured in F2's interview; Authoring's kernel replies widened after M1 | #218 |
+| Theme 3, interview and feedback (umbrella #218, stacked on #201; plan: [`U-theme3-interview.md`](experiments/U-theme3-interview.md)): B1 choice questions, B2 examples first, B3 a live map, D2 impact as decisions, D3 counterexamples as stories; then the interview on a newcomer's path (ADR-0053 §2) | ✅ (code); the 80% target measured in F2's run (generic dry runs give 8 of 8 and 10 of 10, the stated limit enforced); Authoring's kernel replies widened after M1 | #218 |
 | … B1: transition questions offer choices with their decisions, one recommended with its reason (a plain move only where every other state moves it the same way for every role, else refused: fail-closed; never n/a, which a person would not confirm); a choice id names what it decides, so a changed choice is refused; optional stages offer to skip; answering by `choice:<id>` applies them, citing the owner's words, also through the kernel's `record_answer`; `choice_share` measures the target | ✅ | #219 |
 | … B2: examples first: right after the cast, the actions stage first asks for one real case of each thing with facts (made-up personal data), before any rule; an answered example (`world.fixtures` with one object) must fit the draft (its object, facts, enum values, no personal data or secret) and joins the others, replacing one with the same id, and the answer log keeps it; transition questions repeat only its numbers and choices (`like O-7: total 42`) | ✅ | #220 |
 | … D2: the change check also states its impact as decisions in the domain's words (a rule's reason and its check before and after, who may take an action, its inputs and effects, what a state now does, outcome and approval rules; any other enforced change is stated plainly; only the glossary, examples, scenarios and purpose are left out, and counted): `ChangeReport.decisions`, and the end of the review a person confirms from | ✅ | #221 |
 | … D3: the harness tells its minimal flow, its cases the last-resort guard stopped (grouped) and its inductive breaks as stories in the domain's words (each thing and its stage as the flow reaches it, who asks to do what in the action's own words or by name, refused or failed or let through, missing facts first, the reason of the rule that would no longer hold): `Report.stories`, printed as `in your words:` | ✅ | #222 |
-| … D3: the harness tells its minimal flow and its inductive breaks as stories in the domain's words (the thing and its stage, who asks to do what in the action's own description, what the rules did, the rule's reason that would no longer hold): `Report.stories`, printed as `in your words:` | ✅ | #222 |
 | … B3: a live map while answering: `Workspace.live_map()` shows every stage and every action of each thing: where it leads, refused, n/a, still open (`?`, also a missing cell or stage row) or only proposed (`*`; n/a carries no mark in schema v1), each role of a per-role cell; the world map's state diagrams on request; every reply of `questions()` and every answer carries it. Through the kernel, Authoring's `stage_questions` still replies with question texts only: showing choices and the map there means widening Authoring's own declaration, after M1's recheck | ✅ | #223 |
+| … The interview on a newcomer's path (the integrated review of 2026-11-10; ADR-0053 §2): `toprope-interview [DIR]` runs on any directory with a `domain.yaml` (and a `sources/` folder), in the terminal (numbered choices, Enter = recommended) or from `--answers`; writes only `proposed` and confirms only on a typed `yes` ([`interview.md`](interview.md)). Choices where rules are decided: an action named in open words waits for its actor, chosen among the roles (recommended from the glossary's description of each role and the action's); for actions that let a thing go ahead, who must not (only a person, not whoever made it) and a limit on each number (a number the sources state, else the example's value, refused above it); a column moves to the stage named after the action; cells the stop rule skips are asked as one choice; an outcome rule per thing. Each recommendation cites the passage, answer or example, or says nothing points to one. The map shows roles → things → actions from the cast on. Decisions and stories use glossary terms and action descriptions; a first commit lists every rule. The column question no longer says "not applicable" while recommending refusal. Outcome rules carry provenance (a person confirms them). `toprope-interview --share` measures the target from the log. After review (#242): numbers read as written (`1,000`), a passage naming the thing or the action counts, a limit is recommended only where the owner's words state one (else "no limit", the default), the person may type `over N, only ROLE` or `from A to B`, a refused answer is asked again, columns start from the step before the decision (`paid` is `pay`'s), "not whoever made it" fails closed and compares person with person, the guard is asked once, rule ids carry the thing, and the measure counts declined, refused and abandoned questions | ✅ | #242 |
 | Theme 4, import and wrap: A1 from `AGENTS.md`, skills, OpenAPI, enums, tickets; A2 an MCP proxy (its own ADR first) | ⬜ | |
 
 ## M0b, M2 to M5
@@ -429,10 +429,19 @@ it; each release's cleanup PR handles items older than one release.
   status` lists the superseded `*.stale-1` folders too (#166, #170, 2026-11-08)
 
 - Outcome rules (#179): the `check`-expression form of `requires`, an agent actor in the harness
-  world (a `human` rule is tested at the interpreter for now), rules in the generated guide, and the
-  interview stage that asks for them (ADR-0048 §4) are not done yet (#179, 2026-11-09)
+  world (a `human` rule is tested at the interpreter for now), and rules in the generated guide are
+  not done yet; the interview asks for them since #242 (#179, 2026-11-09)
 
 - Examples (`world.fixtures`) carry no provenance in schema v1, so an example an agent adds from an answer is never confirmed by a person; the answer log keeps it. A schema change (provenance on fixtures, and the review listing them) needs an ADR (#220, 2026-11-10)
+
+- Merging `umbrella/m1-recheck` (its invariants stage is "Invariants and rules", done once
+  `d.invariants or d.rules`, with an open `rules` question) with this umbrella's outcome-rule
+  question in the transitions stage (#242): keep one outcome-rule question, this umbrella's (the
+  choice one, `kind: rule`, in transitions); drop m1-recheck's open `q("rules", …)`; make the
+  invariants stage done when `d.invariants or d.rules`, or when it is skipped, or when every
+  `rule` question was answered (the `Plan.answered` set: a "no outcome rule" answer counts), so a
+  declined outcome rule does not leave the stage open; skipping invariants must not drop a `rule`
+  question still open (it lives in transitions, which comes first) (#242, 2026-11-10)
 
 ## Open questions
 

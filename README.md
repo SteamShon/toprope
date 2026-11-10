@@ -116,7 +116,9 @@ In this example, approving updates Toprope's own record. Calling the ad platform
 ## How to adopt it
 
 1. Run an example (above).
-2. Declare one workflow: let your agent interview you about it, and confirm what it drafts.
+2. Declare one workflow: run `toprope-interview` on its directory and answer its questions (where
+   the answer is a rule it offers choices, one recommended with why), then confirm what it drafted
+   ([`docs/interview.md`](docs/interview.md)). Your agent can draft the same through the Authoring tools.
 3. Serve it over MCP to the agent that does the work.
 4. Put one write action behind it: the one that would hurt most if the agent got it wrong.
 5. Connect it to the system that action changes (adapters: *planned*, M0b).
@@ -220,6 +222,7 @@ changes only in a PR that reports a preregistered experiment verdict.
 | see how it works | [`docs/concepts.md`](docs/concepts.md) (every part, and how they work together), [`docs/how-it-works.md`](docs/how-it-works.md), [`docs/domain-model.md`](docs/domain-model.md), [`docs/commits.md`](docs/commits.md) |
 | the problem, at length | [`docs/problem.md`](docs/problem.md) |
 | the design and its claims | [`docs/charter.md`](docs/charter.md), [`docs/architecture.md`](docs/architecture.md) |
+| declare your own workflow | [`docs/interview.md`](docs/interview.md): `toprope-interview` |
 | use it | [`docs/workflow.md`](docs/workflow.md), [`docs/kernel-commands.md`](docs/kernel-commands.md), [`docs/server.md`](docs/server.md) |
 | write a declaration | [`docs/domain-schema.md`](docs/domain-schema.md), [`docs/semantics.md`](docs/semantics.md) |
 | follow the project | [`docs/STATUS.md`](docs/STATUS.md), [`docs/roadmap.md`](docs/roadmap.md), [`docs/adr/`](docs/adr/) |
