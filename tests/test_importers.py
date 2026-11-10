@@ -140,7 +140,7 @@ def test_the_command_writes_the_draft_and_the_questions_and_never_overwrites(tmp
     main(["openapi", API, "--domain", "shop", "--out", str(dest)])
     text = capsys.readouterr().out
     assert "1 thing(s), 2 action(s), 1 with stages; every element is proposed" in text
-    assert "what the source cannot say:" in text and valid(yaml.safe_load(dest.read_text()))
+    assert "questions for the interview:" in text and valid(yaml.safe_load(dest.read_text()))
     with pytest.raises(SystemExit, match="exists. Fix: give --out a new file"):
         main(["openapi", API, "--out", str(dest)])
     main(["--list"])
@@ -278,3 +278,51 @@ def test_a_plugged_in_extractor_that_makes_an_invalid_draft_is_stopped():
     register_extractor(Bad())
     with pytest.raises(SystemExit, match="the bad extractor made a draft that does not validate.*Fix: report it"):
         import_source("bad", API)
+
+
+# A1b: written rules → candidate rules and contradictions (questions, never rules by themselves).
+
+RULES = EX / "rules"
+
+
+def test_written_rules_become_questions_citing_file_and_line_and_code_is_skipped():
+    out = import_source("rules", str(RULES / "AGENTS.md"))
+    assert not out["draft"]["objects"] and not out["draft"]["actions"]          # nothing becomes a rule by itself
+    qs = out["questions"]
+    agents = str(RULES / "AGENTS.md")
+    assert any(q.startswith(f"[never] {agents}#L5: “Never push a release tag to `main` by hand.”") for q in qs)
+    assert any(q.startswith(f"[must] {agents}#L8: “A refund over 500 EUR must be approved") for q in qs)
+    assert any(q.startswith(f"[only] {agents}#L16: “Schema change — the data owner only”") for q in qs)
+    assert not any("git push origin main" in q for q in qs)                     # inside a code fence
+    assert not any("tags `main` after the checks pass" in q for q in qs)        # binds no one
+
+
+def test_a_folder_of_skill_files_is_read_together_and_contradictions_name_both_places():
+    out = import_source("rules", str(RULES), via="tree")
+    agents, skill = str(RULES / "AGENTS.md"), str(RULES / "skills/hotfix/SKILL.md")
+    assert out["conflicts"] == [f"{skill}#L8 says “When production is down, always push the release tag to `main` by "
+                                f"hand so the fix ships at once.”, but {agents}#L5 says “Never push a release tag to "
+                                "`main` by hand.”"]
+    assert not any("Never use for features" in q for q in out["questions"])     # front matter is skipped
+
+
+def test_rules_do_not_conflict_by_sharing_a_word_or_two():
+    out = import_source("rules", str(RULES), via="tree")
+    assert not any("Refunds stay" in c for c in out["conflicts"])               # "refund" alone is not a contradiction
+
+
+def test_this_repositorys_own_agents_md_gives_candidates_and_no_false_conflicts():
+    out = import_source("rules", str(EX.parents[1] / "AGENTS.md"))
+    assert len(out["questions"]) >= 30 and not out["conflicts"]
+    assert any("Never commit or push directly to `main` or `develop`." in q for q in out["questions"])
+
+
+def test_the_command_reports_rules_without_writing_a_draft_and_saves_the_questions(tmp_path, capsys):
+    q = tmp_path / "q.yaml"
+    main(["rules", str(RULES), "--via", "tree", "--questions", str(q), "--out", str(tmp_path / "d.yaml")])
+    text = capsys.readouterr().out
+    assert "no draft written" in text and "conflicts in the source:" in text and not (tmp_path / "d.yaml").exists()
+    saved = yaml.safe_load(q.read_text())
+    assert len(saved["conflicts"]) == 1 and saved["questions"]
+    with pytest.raises(SystemExit, match="is not a folder. Fix: give a folder"):
+        import_source("rules", str(RULES / "AGENTS.md"), via="tree")

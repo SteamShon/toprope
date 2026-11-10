@@ -96,8 +96,9 @@ the error is raised.
 | Error | Fix |
 |---|---|
 | no source given | give `toprope-import <extractor> <source>` |
-| nothing to import from {…} | check that it is {…}: no things, enums or statuses were found |
+| nothing to import from {…} | check that it is {…}: no things, enums, statuses or rules were found |
 | {…} does not read as {…}: {…} | give the export as it was written, or another extractor |
+| {…} exists | give --questions a new file |
 | {…} exists | give --out a new file; to add to a draft, propose the elements there |
 
 ## `importers/port.py`
@@ -118,7 +119,9 @@ the error is raised.
 |---|---|
 | cannot fetch {…}: {…} | check the URL and that the network allows it |
 | cannot read {…}: {…} | give the path of the file to import |
+| no file under {…} matches {…} | set `options: {glob: ...}` in the profile |
 | {…} is not a URL | give an http(s) URL, or use the file reader |
+| {…} is not a folder | give a folder, or use the file reader for one file |
 
 ## `kernel/services.py`
 
