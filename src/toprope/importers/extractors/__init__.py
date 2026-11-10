@@ -63,10 +63,11 @@ def stages(out: Extraction, obj: str, field: str, states: list[str], ref: str) -
 
 
 from .openapi import OpenAPIExtractor
+from .rules import RulesExtractor
 from .sql import SQLExtractor
 from .workflow import WorkflowExtractor
 
-BUILTIN = [OpenAPIExtractor(), SQLExtractor(), WorkflowExtractor()]
+BUILTIN = [OpenAPIExtractor(), RulesExtractor(), SQLExtractor(), WorkflowExtractor()]
 
 __all__ = ["BUILTIN", "TYPES", "Any", "Candidate", "Extraction", "Profile", "a_", "ignored", "mapping", "pascal", "put",
            "singular", "snake", "stages"]
