@@ -130,6 +130,17 @@ def _owners(key: str) -> set[str]:
     return {f"{dom}/{parts[0]}"}
 
 
+# A check whose findings sit on the edited element by construction: the capability diff reports
+# who can now reach what through the very action the change edited, and an info finding is a
+# summary, not a problem. Matching their `where` to the binding says nothing, so the grader labels
+# them like any other flag (found in the M1 recheck: 67 such flags matched every time).
+NOT_SCRIPTED_CHECKS = {"capability"}
+
+
+def scriptable(finding: dict[str, Any]) -> bool:
+    return finding.get("check") not in NOT_SCRIPTED_CHECKS and finding.get("severity") != "info"
+
+
 def binding_match(finding: dict[str, Any], bound: list[str]) -> bool:
     """A Toprope finding touches the elements the change is bound to: the same element, or one
     of the same action or object."""
@@ -219,7 +230,7 @@ def grade_change(backend: Any, seq: int, req: dict[str, Any], recs: dict[str, di
             for i, f in enumerate(r.get("findings") or []):
                 fid = f"{letter}.{r['run']}.{i}"
                 lines.append(f"{fid}. {json.dumps(f, ensure_ascii=False)}")
-                script = "seeded" if arm == "toprope" and binding_match(f, bound) else None
+                script = "seeded" if arm == "toprope" and scriptable(f) and binding_match(f, bound) else None
                 flags.append({"id": fid, "run": r["run"], "index": i, "flag": f, "script_label": script})
         blocks.append("\n".join(lines))
     user = f"{_sealed_context(seq, req, key, binding)}\n\n" + "\n\n".join(blocks)
@@ -571,19 +582,47 @@ def score(run: Path, instruments: Path) -> dict[str, Any]:
     disagree = [(c["seq"], f["id"]) for c in graded["changes"] for f in c["flags"]
                 if f.get("script_label") and f.get("label") != f["script_label"]]
     result = {"partial": graded.get("partial", False), "metrics": m, "verdicts": verdicts(m, rules),
-              "noise_floor": noise_floor(m), "probe_gate": gate, "script_and_researcher_disagree": disagree,
+              "noise_floor": noise_floor(m), "probe_gate": gate, "by_sitting": by_sitting(run, key, binding),
+              "script_and_researcher_disagree": disagree,
               "unbindable": sorted(s for s, b in binding.items() if b.get("unbindable"))}
     (run / "scoring/metrics.json").write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n")
     return result
 
 
-def grader_recall(run: Path, scoring: str, key: dict[int, Any], binding: dict[int, Any]) -> dict[str, float | None]:
-    """Each arm's mean recall from one sitting's proposed labels, before the researcher decides
-    anything: the grader's own reading (a flag with no label counts as not seeded)."""
+def sitting_metrics(run: Path, scoring: str, key: dict[int, Any], binding: dict[int, Any]) -> dict[str, Any]:
+    """Each arm's mean recall and precision from one sitting's proposed labels, as the grader read
+    them (a flag with no label counts as not seeded and not real)."""
     graded = yaml.safe_load((run / scoring / "proposed.yaml").read_text())
     labels = {int(s): v for s, v in yaml.safe_load((run / scoring / "blind-labels.yaml").read_text())["labels"].items()}
     by_arm = _by_arm(graded, labels)
-    return {arm: arm_metrics(arm, by_arm[arm], [], records(run, arm), key, binding)["recall"] for arm in ARMS}
+    out = {}
+    for arm in ARMS:
+        m = arm_metrics(arm, by_arm[arm], [], records(run, arm), key, binding)
+        out[arm] = {"recall": m["recall"], "precision": m["precision"],
+                    "precision_grouped": m["precision_grouped_spread"]["mean"]}
+    return out
+
+
+def grader_recall(run: Path, scoring: str, key: dict[int, Any], binding: dict[int, Any]) -> dict[str, float | None]:
+    return {arm: v["recall"] for arm, v in sitting_metrics(run, scoring, key, binding).items()}
+
+
+def by_sitting(run: Path, key: dict[int, Any], binding: dict[int, Any], first: str = "scoring",
+               second: str = "scoring-2") -> dict[str, Any] | None:
+    """Each arm's recall and precision from each sitting, with their range (M1-recheck.md,
+    criterion 3): the reference numbers when one grader's reading is not steady. None without a
+    second sitting."""
+    if not (run / second / "proposed.yaml").exists():
+        return None
+    a, b = sitting_metrics(run, first, key, binding), sitting_metrics(run, second, key, binding)
+    out: dict[str, Any] = {}
+    for arm in ARMS:
+        out[arm] = {}
+        for m in ("recall", "precision", "precision_grouped"):
+            xs = [v for v in (a[arm][m], b[arm][m]) if v is not None]
+            out[arm][m] = {"first": a[arm][m], "second": b[arm][m],
+                           "range": [min(xs), max(xs)] if xs else None}
+    return out
 
 
 def compare_gradings(run: Path, instruments: Path, first: str = "scoring", second: str = "scoring-2",
@@ -600,10 +639,73 @@ def compare_gradings(run: Path, instruments: Path, first: str = "scoring", secon
     return out
 
 
+def rescript(run: Path, scoring: str = "scoring") -> dict[str, Any]:
+    """Take back a script label from a flag `scriptable` now excludes, in a sitting graded before:
+    its label becomes the grader's. Needs no key; the sitting's file is rewritten in place."""
+    path = run / scoring / "proposed.yaml"
+    graded = yaml.safe_load(path.read_text())
+    n = 0
+    same: dict[tuple, str] = {}                          # the grader's label of a finding, by change and text
+    for c in graded["changes"]:
+        for f in c["flags"]:
+            fl = f.get("flag") or {}
+            if f.get("grader_label"):
+                same.setdefault((c["seq"], f["id"].split(".")[0], fl.get("check"), fl.get("where"), fl.get("problem")),
+                                f["grader_label"])
+    for c in graded["changes"]:
+        for f in c["flags"]:
+            fl = f.get("flag") or {}
+            if f.get("script_label") and not scriptable(fl):
+                # A grader that left it unlabelled gave the same finding of the same label elsewhere
+                # in this change (the compiler repeats it in every run): that label, else none.
+                label = f.get("grader_label") or same.get(
+                    (c["seq"], f["id"].split(".")[0], fl.get("check"), fl.get("where"), fl.get("problem")))
+                f["script_label"], f["label"], f["script_cleared"] = None, label, True
+                n += 1
+    head = "".join(line + "\n" for line in path.read_text().splitlines() if line.startswith("#"))
+    path.write_text(head + yaml.safe_dump(graded, sort_keys=False, allow_unicode=True, width=110))
+    left = sum(1 for c in graded["changes"] for f in c["flags"] if f.get("label") not in LABELS)
+    return {"file": str(path), "script_labels_cleared": n, "flags_without_label": left}
+
+
+def regrade_missing(run: Path, instruments: Path, backend: Any, scoring: str = "scoring",
+                    redo: list[tuple[str, int]] | None = None) -> dict[str, Any]:
+    """Grade again, once, each probe run of a sitting the grader left without a pass or fail
+    (no JSON even after the retry), so every grade comes from the grader (M1-recheck.md,
+    criterion 2). A run that did not complete stays for the researcher."""
+    path = run / scoring / "proposed.yaml"
+    graded = yaml.safe_load(path.read_text())
+    probes = {p["id"]: p for p in yaml.safe_load((instruments / "probe-suite.yaml").read_text())["probes"]}
+    tr = run / scoring / "transcripts"
+    done, left = 0, 0
+    again = set(redo or [])
+    for arm, rows in graded["probes"].items():
+        for row in rows:
+            if (arm, row["seq"]) in again:                 # its probes ran again: the old grade is moot
+                row.update(passed=None, why="", error=None)
+            if isinstance(row.get("passed"), bool) or row.get("error"):
+                continue
+            rec = records(run, arm).get(row["seq"], {})
+            pr = next((x for x in probe_runs(rec) if x["run"] == row.get("run", 1)), None)
+            res = next((x for x in (pr or {}).get("results", []) if x["probe"] == row["probe"]), None)
+            if pr is None or res is None:
+                left += 1
+                continue
+            g = grade_probe(backend, probes[row["probe"]], run / arm / f"seq-{row['seq']:02d}" / pr["dir"], res,
+                            tr / f"{arm}-seq-{row['seq']:02d}-run-{row.get('run', 1)}-{row['probe']}-regrade.jsonl")
+            row.update({k: g.get(k) for k in ("passed", "why", "error")}, regraded=True)
+            done += 1
+            left += not isinstance(g["passed"], bool)
+    head = "".join(line + "\n" for line in path.read_text().splitlines() if line.startswith("#"))
+    path.write_text(head + yaml.safe_dump(graded, sort_keys=False, allow_unicode=True, width=110))
+    return {"file": str(path), "regraded": done, "still_without_a_grade": left}
+
+
 def to_decide(run: Path) -> dict[str, Any]:
     """What the researcher must decide in the grades (ADR-0047 §3): flags where the script and the
     grader disagree, flags with no label, edits with no judgment, and probe runs with no result.
-    The rest is accepted as proposed. Reads `confirmed.yaml` if it exists, else `proposed.yaml`."""
+    The rest is accepted as proposed. Reads `confirmed.yaml` if it exists, else `proposed.yaml`.
+    A disagreement the researcher settled in `confirmed.yaml` carries `decided: true`."""
     path = run / "scoring/confirmed.yaml"
     if not path.exists():
         path = run / "scoring/proposed.yaml"
@@ -612,7 +714,8 @@ def to_decide(run: Path) -> dict[str, Any]:
     for c in g["changes"]:
         for f in c["flags"]:
             if f.get("label") not in LABELS or (f.get("script_label") and f.get("grader_label")
-                                                and f["script_label"] != f["grader_label"]):
+                                                and f["script_label"] != f["grader_label"]
+                                                and not f.get("decided")):
                 flags.append({"seq": c["seq"], "id": f["id"], "label": f.get("label"),
                               "script_label": f.get("script_label"), "grader_label": f.get("grader_label"),
                               "flag": f.get("flag"), "why": f.get("why")})
@@ -621,201 +724,3 @@ def to_decide(run: Path) -> dict[str, Any]:
               for a, ps in g["probes"].items() for p in ps if not isinstance(p.get("passed"), bool)]
     return {"file": str(path), "flags": flags, "edits": edits, "probes": probes,
             "count": len(flags) + len(edits) + len(probes)}
-
-
-# -- the two sittings' disagreements, grouped for the researcher (M1-recheck.md, criterion 3) --------
-
-def _norm(text: Any) -> str:
-    return " ".join(re.sub(r"[^\w.`-]+", " ", str(text or "").lower()).split())
-
-
-def _sitting(run: Path, scoring: str) -> dict[tuple[int, str, int, int], dict[str, Any]]:
-    """One sitting's flags under (seq, arm, run, index): the same finding in both sittings, whatever
-    blind letter each gave it. Opened here only, inside the harness (ADR-0040 §8)."""
-    graded = yaml.safe_load((run / scoring / "proposed.yaml").read_text())
-    labels = {int(s): v for s, v in yaml.safe_load((run / scoring / "blind-labels.yaml").read_text())["labels"].items()}
-    out = {}
-    for c in graded["changes"]:
-        for f in c["flags"]:
-            letter = f["id"].split(".")[0]
-            out[(c["seq"], labels[c["seq"]][letter], f["run"], f["index"])] = f
-    return out
-
-
-def group_disagreements(run: Path, first: str = "scoring", second: str = "scoring-2") -> dict[str, Any]:
-    """The flags the two sittings labelled differently, grouped so that one decision covers the
-    same finding however often it recurs: a compiler flag by (change, check, where, problem); a
-    review flag by (change, arm, where). Writes `disagreements.yaml` for the researcher, blind: a
-    group shows no arm, and its members are named by the first sitting's ids. A group is
-    `recall: true` when either sitting called a member seeded; those need the researcher's label."""
-    a, b = _sitting(run, first), _sitting(run, second)
-    groups: dict[tuple, dict[str, Any]] = {}
-    for key, fa in sorted(a.items()):
-        fb = b.get(key)
-        if fb is None or fa.get("label") == fb.get("label"):
-            continue
-        seq, arm, _, _ = key
-        flag = fa.get("flag") or {}
-        gk = (seq, "compiler", flag.get("check"), _norm(flag.get("where")), _norm(flag.get("problem"))) \
-            if "check" in flag else (seq, arm, _norm(flag.get("where")))
-        g = groups.setdefault(gk, {"seq": seq, "where": flag.get("where"), "check": flag.get("check"),
-                                   "problems": [], "members": [], "first": {}, "second": {},
-                                   "why_first": fa.get("why", ""), "why_second": fb.get("why", "")})
-        if _norm(flag.get("problem")) not in {_norm(p) for p in g["problems"]}:
-            g["problems"].append(flag.get("problem"))
-        g["members"].append(fa["id"])
-        g["first"][fa.get("label")] = g["first"].get(fa.get("label"), 0) + 1
-        g["second"][fb.get("label")] = g["second"].get(fb.get("label"), 0) + 1
-    rows = sorted(groups.values(), key=lambda g: (not ("seeded" in g["first"] or "seeded" in g["second"]), g["seq"]))
-    out = []
-    for i, g in enumerate(rows, 1):
-        recall = "seeded" in g["first"] or "seeded" in g["second"]
-        out.append({"group": f"G{i:03d}", "seq": g["seq"], "recall": recall,
-                    **({"check": g["check"]} if g["check"] else {}), "where": g["where"],
-                    "problems": g["problems"], "members": g["members"],
-                    "first": g["first"], "second": g["second"],
-                    "why_first": g["why_first"], "why_second": g["why_second"],
-                    "researcher_label": None, "member_labels": {}})
-    summary = {"flags": sum(len(g["members"]) for g in out), "groups": len(out),
-               "recall_groups": sum(g["recall"] for g in out),
-               "recall_flags": sum(len(g["members"]) for g in out if g["recall"])}
-    doc = {"summary": summary, "groups": out}
-    (run / "disagreements.yaml").write_text(
-        "# The flags the two sittings labelled differently, grouped (M1-recheck.md, criterion 3).\n"
-        "# Set `researcher_label` (seeded, other-real or false-alarm) on every group with `recall: true`;\n"
-        "# where one group mixes findings, set `member_labels: {<member id>: <label>}` instead.\n"
-        "# Groups left unset keep the first sitting's label. Then `apply-disagreements`.\n"
-        + yaml.safe_dump(doc, sort_keys=False, allow_unicode=True, width=110))
-    return summary
-
-
-def apply_disagreements(run: Path, first: str = "scoring") -> dict[str, Any]:
-    """The researcher's labels from `disagreements.yaml` onto the first sitting's grades, written as
-    `scoring/confirmed.yaml` with `status: proposed`: `to-decide` then lists what is left, and the
-    researcher sets `status: confirmed`. A recall group with no label is refused."""
-    doc = yaml.safe_load((run / "disagreements.yaml").read_text())
-    chosen: dict[str, str] = {}
-    missing = []
-    for g in doc["groups"]:
-        per = {str(k): v for k, v in (g.get("member_labels") or {}).items()}
-        for m in g["members"]:
-            label = per.get(m) or g.get("researcher_label")
-            if label is None:
-                if g["recall"]:
-                    missing.append(g["group"])
-                continue
-            if label not in LABELS:
-                raise SystemExit(f"{g['group']}: {label!r} is not one of {LABELS}")
-            chosen[m] = label
-    if missing:
-        raise SystemExit(f"{len(set(missing))} recall group(s) have no researcher_label: {sorted(set(missing))[:10]}")
-    target = run / first / "confirmed.yaml"
-    if target.exists():
-        raise SystemExit(f"{target} exists: apply onto a fresh copy only")
-    graded = yaml.safe_load((run / first / "proposed.yaml").read_text())
-    applied = 0
-    for c in graded["changes"]:
-        for f in c["flags"]:
-            if f["id"] in chosen:
-                f["label"], f["label_source"] = chosen[f["id"]], "researcher (two sittings disagreed)"
-                applied += 1
-    graded["status"] = "proposed"
-    target.write_text("# The first sitting's grades with the researcher's labels where the two sittings disagreed\n"
-                      "# (apply-disagreements). Finish `to-decide`, then set `status: confirmed`.\n"
-                      + yaml.safe_dump(graded, sort_keys=False, allow_unicode=True, width=110))
-    return {"applied": applied, "written": str(target)}
-
-
-# -- only the disagreements that can change recall (M1-recheck.md, criterion 3 as amended) -------------
-
-QUESTIONS = "recall-questions.yaml"
-
-
-def recall_questions(run: Path, instruments: Path, first: str = "scoring",
-                     second: str = "scoring-2") -> dict[str, Any]:
-    """The questions whose answer can change recall, and nothing else. A run of an arm catches a
-    change's seeded problem when one of its flags is labelled seeded (`arm_metrics`), so:
-    - a change with no seeded problem is not asked about;
-    - a run where both sittings already call one flag seeded has caught it, whatever else differs;
-    - otherwise, a run where the sittings disagree on whether a flag is seeded is one question:
-      "does any of these findings catch the seeded problem?" (yes or no).
-    Answering every question gives the recall that labelling every disagreement would. Writes
-    QUESTIONS for the researcher (the key's entry, the disputed findings and both sittings'
-    reasons; no arm named) and returns counts only: the key is opened here, inside the harness."""
-    key, binding = load_sealed(instruments)
-    a, b = _sitting(run, first), _sitting(run, second)
-    seeded = set(_seeded(key, binding))
-    reqs = {}
-    try:
-        reqs = {r["seq"]: r for r in yaml.safe_load((instruments / "change-requests.yaml").read_text())["requests"]}
-    except (OSError, KeyError, TypeError):
-        pass
-    cells = sorted({k[:3] for k in a})
-    questions, untouched = [], 0
-    for (seq, arm, r) in cells:
-        if seq not in seeded:
-            continue
-        keys = [k for k in a if k[:3] == (seq, arm, r) and k in b]
-        if any(a[k].get("label") == "seeded" and b[k].get("label") == "seeded" for k in keys):
-            untouched += 1
-            continue
-        disputed = [k for k in keys if (a[k].get("label") == "seeded") != (b[k].get("label") == "seeded")]
-        if not disputed:
-            continue
-        k_ = key.get(seq, {})
-        questions.append({
-            "seq": seq, "run": r,
-            "change": (reqs.get(seq) or {}).get("intent"),
-            "seeded_problem": {x: k_.get(x) for x in ("problem", "type", "against")},
-            "findings": [{"member": a[k]["id"], "problem": (a[k].get("flag") or {}).get("problem"),
-                          "where": (a[k].get("flag") or {}).get("where"),
-                          **({"check": a[k]["flag"]["check"]} if "check" in (a[k].get("flag") or {}) else {}),
-                          "first": a[k].get("label"), "second": b[k].get("label"),
-                          "why_first": a[k].get("why", ""), "why_second": b[k].get("why", "")}
-                         for k in disputed],
-            "answer": None})
-    for n, q in enumerate(questions, 1):
-        q["question"] = f"Q{n:03d}"
-    doc = {"summary": {"questions": len(questions),
-                       "disputed_flags": sum(len(q["findings"]) for q in questions)},
-           "questions": [{"question": q.pop("question"), **q} for q in questions]}
-    (run / QUESTIONS).write_text(
-        "# Holds the answer key's entries: for the researcher only (never an agent session).\n"
-        "# For each question: does ANY of these findings catch the seeded problem? answer: yes | no.\n"
-        "# Only runs whose recall depends on the answer are asked (M1-recheck.md, criterion 3).\n"
-        + yaml.safe_dump(doc, sort_keys=False, allow_unicode=True, width=110))
-    return {**doc["summary"], "runs_already_caught": untouched}
-
-
-def apply_recall_answers(run: Path, first: str = "scoring") -> dict[str, Any]:
-    """The researcher's answers onto the first sitting, as `scoring/confirmed.yaml` with
-    `status: proposed`. Yes: the disputed findings either sitting called seeded become seeded. No:
-    none is seeded; each keeps the first sitting's label, or `other-real` where that was seeded.
-    Every other flag keeps the first sitting's label. An unanswered question is refused."""
-    doc = yaml.safe_load((run / QUESTIONS).read_text())
-    open_ = [q["question"] for q in doc["questions"] if q.get("answer") not in ("yes", "no", True, False)]
-    if open_:
-        raise SystemExit(f"{len(open_)} question(s) have no yes/no answer: {open_[:10]}")
-    target = run / first / "confirmed.yaml"
-    if target.exists():
-        raise SystemExit(f"{target} exists: apply onto a fresh copy only")
-    chosen: dict[str, str] = {}
-    for q in doc["questions"]:
-        yes = q["answer"] in ("yes", True)
-        for f in q["findings"]:
-            if yes and "seeded" in (f["first"], f["second"]):
-                chosen[f["member"]] = "seeded"
-            elif not yes:
-                chosen[f["member"]] = f["first"] if f["first"] != "seeded" else "other-real"
-    graded = yaml.safe_load((run / first / "proposed.yaml").read_text())
-    applied = 0
-    for c in graded["changes"]:
-        for f in c["flags"]:
-            if f["id"] in chosen and f.get("label") != chosen[f["id"]]:
-                f["label"], f["label_source"] = chosen[f["id"]], "researcher (recall question)"
-                applied += 1
-    graded["status"] = "proposed"
-    target.write_text("# The first sitting's grades with the researcher's answers to the recall questions\n"
-                      "# (apply-recall-answers). Finish `to-decide`, then set `status: confirmed`.\n"
-                      + yaml.safe_dump(graded, sort_keys=False, allow_unicode=True, width=110))
-    return {"answered": len(doc["questions"]), "labels_changed": applied, "written": str(target)}

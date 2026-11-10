@@ -138,7 +138,8 @@ record their decision.
 Then:
 1. Copy `proposed.yaml` to `confirmed.yaml`.
 2. Set each decided `label`, edit `fidelity` and probe `passed` as the researcher said. Leave
-   `script_label` and `grader_label` as they are.
+   `script_label` and `grader_label` as they are; on a flag where they differ, add
+   `decided: true` once the researcher has decided it.
 3. Set `status: confirmed`.
 
 Run `to-decide` again: it must report `count: 0`.
@@ -181,17 +182,51 @@ with these differences:
   uv run python -m phase_b grade --model MODEL --out runs/phase-b-recheck-combined --into scoring-2
   uv run python -m phase_b compare-gradings --out runs/phase-b-recheck-combined
   ```
-  Report `grader-noise.json`. **STOP** if `within_limit` is false: the researcher decides the
-  disagreements that can change recall (M1-recheck.md, criterion 3 as amended):
+  Report `grader-noise.json`. If `within_limit` is false, that is the measurement criterion 3
+  asks for (M1-recheck.md, amended 2026-11-10): report it and go on. Nobody adjudicates the
+  grades. If an earlier session left `recall-questions.yaml` (it holds the key's entries) or
+  `disagreements.yaml` in the run directory, delete both without opening them, and never commit
+  them:
   ```bash
-  uv run python -m phase_b recall-questions --out runs/phase-b-recheck-combined
+  rm -f runs/phase-b-recheck-combined/recall-questions.yaml runs/phase-b-recheck-combined/disagreements.yaml
   ```
-  Report only the counts it prints. **Do not open `recall-questions.yaml`**: it holds the answer
-  key's entries. The researcher answers each question (`answer: yes` or `no`) in that file, then:
+- **Script labels from before #233.** Both sittings were graded when the script still matched
+  capability and info findings to the binding (their `where` is the edited element by
+  construction). Take those back, then measure the noise again:
   ```bash
-  uv run python -m phase_b apply-recall-answers --out runs/phase-b-recheck-combined
+  uv run python -m phase_b rescript --out runs/phase-b-recheck-combined --scoring scoring
+  uv run python -m phase_b rescript --out runs/phase-b-recheck-combined --scoring scoring-2
+  uv run python -m phase_b regrade-missing --model MODEL --out runs/phase-b-recheck-combined --scoring scoring
+  uv run python -m phase_b regrade-missing --model MODEL --out runs/phase-b-recheck-combined --scoring scoring-2
+  uv run python -m phase_b compare-gradings --out runs/phase-b-recheck-combined
   ```
-  It writes `scoring/confirmed.yaml` with `status: proposed`; continue with `to-decide`.
+  `rescript` must report `flags_without_label: 0`, and `regrade-missing` `still_without_a_grade: 0`;
+  if not, stop and report. `to-decide` should then list nothing; anything it lists goes to the
+  researcher as in step 5.
+- **The Toprope arm's probes before any change, run again (#234).** In the recheck every Toprope
+  probe ran without its domain servers' tools (they did not connect) and nothing stopped it; a
+  conversation now stops when they are missing. First check they connect here, then run only the
+  probes before any change again, copy them into the combined run, and grade them again:
+  ```bash
+  uv run python -m phase_b check-probe-tools --model MODEL --out runs/phase-b-recheck \
+    --toolchain runs/phase-b-recheck/toprope/seq-00/probes/run-1/deployed-toolchain
+  ```
+  It must print `"connected": true`. If not, stop and report its `mcp_servers`, `error` and
+  `server_stderr` (each domain server's own stderr). A redo whose servers do not connect stops
+  each probe with the same, and the servers' stderr is kept beside each probe's transcript
+  (`P0N-servers/`). Then:
+  ```bash
+  uv run python -m phase_b arm toprope --model MODEL --out runs/phase-b-recheck --redo-baseline-probes
+  rm -rf runs/phase-b-recheck-combined/toprope/seq-00
+  cp -R runs/phase-b-recheck/toprope/seq-00 runs/phase-b-recheck-combined/toprope/seq-00
+  uv run python -m phase_b regrade-missing --model MODEL --out runs/phase-b-recheck-combined --scoring scoring --redo toprope:0
+  uv run python -m phase_b regrade-missing --model MODEL --out runs/phase-b-recheck-combined --scoring scoring-2 --redo toprope:0
+  ```
+  Each must report `still_without_a_grade: 0`. The Toprope arm's probes after each change
+  (`seq` 1 to 20) are not run again: its "found after deploy" is reported as not measured.
 - Then step 5's `to-decide` and confirmation, and step 6's `score`, on
-  `runs/phase-b-recheck-combined` (its `scoring/`). Report `metrics.json` with its `probe_gate`
+  `runs/phase-b-recheck-combined` (its `scoring/`, the first sitting). `metrics.json` holds, under
+  `by_sitting`, each arm's recall and precision from both sittings with their range: report those
+  as the reference numbers. Commit `scoring/` and `scoring-2/` (with their transcripts) and
+  `grader-noise.json`. Report `metrics.json` with its `probe_gate`
   (exit criterion 1): the probes that fail the gate, and the grader's reason for each failing run.

@@ -132,6 +132,9 @@ class CliBackend(Backend):
                     "command": sys.executable, "args": ["-m", "phase_b.toolserver", tools.dumps()],
                     "env": {"PYTHONPATH": str(Path(__file__).resolve().parents[1])}}, **extra_servers(tools)}}))
             env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}   # the subscription
+            # The domain servers start cold, several at once: give them longer than Claude Code's
+            # default to connect (a run's own setting wins).
+            env.setdefault("MCP_TIMEOUT", "120000")
             transcript.write("start", system=system, user=user, tools=tools.kind if tools else None,
                              backend="claude-cli")
             try:
@@ -161,12 +164,31 @@ class CliBackend(Backend):
                 kind = ev.get("type")
                 if kind == "system" and ev.get("subtype") == "init":
                     got = set(ev.get("tools") or [])
+                    status = ev.get("mcp_servers")
                     other = {n for n in got - allowed if not (prefixes and n.startswith(prefixes))}
                     if other:
                         p.kill()
                         transcript.write("refused", tools=sorted(got))
                         raise BackendError(f"the conversation got tools it must not have: {sorted(other)}")
-                    transcript.write("init", tools=sorted(got), model=ev.get("model"))
+                    # A server the role needs that gave no tool (it failed to start or to connect):
+                    # the role would run without its tools, and fail for the harness's reason. Stop
+                    # it instead (found in the M1 recheck: every Toprope probe ran without them).
+                    missing = [s for s in (prefixes or ()) if not any(n.startswith(s) for n in got)]
+                    if missing:
+                        p.kill()
+                        p.wait()
+                        errfile.seek(0)
+                        tail = errfile.read()[-1500:]
+                        names = [m[5:-2] for m in missing]
+                        logs = json.loads(tools.context or "{}").get("server_logs") or {}
+                        server_err = {n: Path(logs[n]).read_text()[-1500:] for n in names
+                                      if n in logs and Path(logs[n]).exists()}
+                        transcript.write("refused", tools=sorted(got), mcp_servers=status, stderr=tail,
+                                         server_stderr=server_err)
+                        raise BackendError(f"the tools of {names} did not connect (servers: {json.dumps(status)}); "
+                                           f"server stderr: {json.dumps({n: e[-600:] for n, e in server_err.items()})}"
+                                           f"; claude stderr: {tail[-300:]}")
+                    transcript.write("init", tools=sorted(got), model=ev.get("model"), mcp_servers=status)
                 elif kind == "assistant":
                     turns += 1
                     msg = ev.get("message") or {}

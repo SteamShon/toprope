@@ -390,18 +390,35 @@ def _user(p: dict[str, Any], situation: dict[str, Any]) -> str:
             f"Task: {p['task']}")
 
 
-def servers(root: Path) -> dict[str, Any]:
-    """The generated MCP servers of the deployed domains, over a probe world, as the agent."""
+def server_logs(logs: Path) -> dict[str, str]:
+    """Where each domain server's stderr goes (`serverwrap.py`), beside the probe's transcript."""
+    return {m: str(logs.resolve() / f"{m}-server.stderr") for m in DOMAINS}
+
+
+def servers(root: Path, logs: Path | None = None) -> dict[str, Any]:
+    """The generated MCP servers of the deployed domains, over a probe world, as the agent. With
+    `logs`, each runs through `serverwrap.py`, which keeps its stderr in `server_logs(logs)`."""
     exe = Path(sys.executable).parent / "toprope-server"
     if not exe.exists():
         raise RuntimeError(f"toprope-server is not installed next to this Python ({sys.executable})")
     exe = str(exe)
-    return {m: {"command": exe, "args": ["--composition", str(root / COMPOSITION), "--working-copy", "--member", m,
-                                         "--kernel-root",
-                                         str(root), "--workspace", str(root / "toprope.library.workspace.yaml"),
-                                         "--env", str(root / ".toprope/env-library"), "--identity",
-                                         f"static:{root / 'ids.yaml'}"],
-                "env": {"TOPROPE_TOKEN": TOKENS["agent"]}} for m in DOMAINS}
+    # Claude Code starts the servers in its own working directory: every path must be absolute
+    # (the M1 recheck's `--out runs/...` gave relative ones, and every Toprope probe's servers died).
+    root = root.resolve()
+    logs = logs.resolve() if logs is not None else None
+    out = {}
+    for m in DOMAINS:
+        args = ["--composition", str(root / COMPOSITION), "--working-copy", "--member", m, "--kernel-root",
+                str(root), "--workspace", str(root / "toprope.library.workspace.yaml"),
+                "--env", str(root / ".toprope/env-library"), "--identity", f"static:{root / 'ids.yaml'}"]
+        if logs is None:
+            out[m] = {"command": exe, "args": args, "env": {"TOPROPE_TOKEN": TOKENS["agent"]}}
+        else:
+            logs.mkdir(parents=True, exist_ok=True)
+            out[m] = {"command": sys.executable,
+                      "args": [str(Path(__file__).with_name("serverwrap.py")), server_logs(logs)[m], exe, *args],
+                      "env": {"TOPROPE_TOKEN": TOKENS["agent"]}}
+    return out
 
 
 def run_probe(backend: Any, worlds: Path, p: dict[str, Any], out: Path, how: str, materials: str,
@@ -417,7 +434,8 @@ def run_probe(backend: Any, worlds: Path, p: dict[str, Any], out: Path, how: str
     if toolchain is not None:
         for d in DOMAINS:
             shutil.copy(toolchain / d / f"{d}.domain.yaml", root / "toolchain" / d / f"{d}.domain.yaml")
-        ctx["servers"] = servers(root)
+        logs = out / f"{p['id']}-servers"
+        ctx["servers"], ctx["server_logs"] = servers(root, logs), server_logs(logs)
     t = Transcript(out / f"{p['id']}.jsonl")
     result: dict[str, Any] = {"probe": p["id"]}
     from .blind import check
