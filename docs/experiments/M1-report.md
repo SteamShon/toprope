@@ -192,10 +192,9 @@ and the change list is the same (ADR-0048 §6). They are a reference, not a resu
 | Criterion | Outcome |
 |---|---|
 | 1. Probe gate | **Met by its own rule.** Two probes pass the gate in every arm: P03 and P05. P01, P02, P04, P06, P07 and P08 fail it in at least one arm. As the criterion says, they are dropped from "found after deploy" with their causes recorded (below), and go to M2's probe design as they are. None is amended a second time. The one failure the harness caused (the Toprope probes without their tools) was fixed and those probes were run again. |
-| 2. A clean pipeline | **Met, with the faults found on the way fixed and recorded** (below). Every grade comes from the grader. One probe run gave no JSON even after the retry; it was graded once more (`regrade-missing`). The one item left in *Left from reviews* (#96) is a repository setting for the maintainer, not part of M1's harness. |
+| 2. A clean pipeline | **Met, with the faults found on the way fixed and recorded** (below). Every grade comes from the grader. One probe run gave no JSON even after the retry; it was graded once more (`regrade-missing`). The one item left in *Left from reviews* (#96, a push token for the human-request workflow) is dropped: the researcher will not put a token into this public repository (2026-11-10), so a PR that a human request pushed to still needs one more commit before it merges. |
 | 3. The grader's noise | **Met by measuring it** (amended 2026-11-10). Two sittings differ by **0.18 of recall** for the NL and structured arms, and by 0.06 for Toprope. That is over the 0.1 limit, and is reported as such. Nobody adjudicated the grades. M2's grader is redesigned so that this does not recur ([`M2-grader.md`](M2-grader.md)). |
 
-Criterion 2 treats #96 as outside M1's harness; that reading is the researcher's to confirm.
 
 ### Reference numbers (both sittings)
 
