@@ -203,7 +203,7 @@ with these differences:
   `rescript` must report `flags_without_label: 0`, and `regrade-missing` `still_without_a_grade: 0`;
   if not, stop and report. `to-decide` should then list nothing; anything it lists goes to the
   researcher as in step 5.
-- **The Toprope arm's probes before any change, run again (#235).** In the recheck every Toprope
+- **The Toprope arm's probes before any change, run again (#234).** In the recheck every Toprope
   probe ran without its domain servers' tools (they did not connect) and nothing stopped it; a
   conversation now stops when they are missing. First check they connect here, then run only the
   probes before any change again, copy them into the combined run, and grade them again:
