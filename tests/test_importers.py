@@ -473,6 +473,53 @@ def test_a_second_source_joins_a_draft_and_a_disagreement_is_a_conflict_not_an_o
     assert d.transitions["Order"].matrix.keys() == {"paid", "shipped", "refunded"}
 
 
+def _tools(*tools):
+    return Raw(json.dumps({"server": {"command": ["python", "server.py"]}, "tools": list(tools)}).encode(), "srv")
+
+
+ORDER_OUT = {"type": "object", "required": ["status", "total"], "properties": {
+    "order_id": {"type": "string"}, "status": {"enum": ["paid", "refunded"], "type": "string"},
+    "total": {"type": "number"}, "refund_id": {"anyOf": [{"type": "string"}, {"type": "null"}]}}}
+REFUND = {"name": "refund_order", "description": "Refund an order.",
+          "inputSchema": {"type": "object", "required": ["order_id", "amount"], "properties": {
+              "order_id": {"type": "string"}, "amount": {"type": "number"},
+              "note": {"anyOf": [{"type": "string"}, {"type": "null"}]}, "lines": {"type": "array"}}},
+          "outputSchema": {"type": "object", "properties": {"refund_id": {"type": "string"}}}}
+GET = {"name": "get_order", "inputSchema": {"type": "object", "properties": {"order_id": {"type": "string"}}},
+       "outputSchema": ORDER_OUT, "annotations": {"readOnlyHint": True}}
+WIPE = {"name": "wipe_orders", "inputSchema": {"type": "object", "properties": {}}}
+
+
+def test_a_servers_tools_become_proposed_actions_with_their_call_and_reply_and_a_draft_binding():
+    from toprope.importers.draft import build
+    from toprope.importers.extractors.mcp import McpExtractor, render_binding
+    ext = McpExtractor().extract(_tools(REFUND, GET, WIPE), Profile())
+    d = valid(build("payments", ext))
+    a = d.actions["refund_order"]
+    assert a.target == "Order" and a.actor == ["unassigned"] and a.status == "proposed"
+    assert a.params["amount"].type == "number" and a.params["note"].optional and "lines" not in a.params
+    (e,) = a.effects
+    assert e.call == "mcp:refund_order" and e.reply == "record_refund_order"
+    assert e.with_ == {"order_id": "target.id", "amount": "params.amount", "note": "params.note"}
+    r = d.actions["record_refund_order"]
+    assert r.actor == ["external:kernel"] and set(r.params) == {"ok", "refund_id"}
+    assert r.preconditions[0].check == "params.ok == true"
+    assert r.effects[0].set == {"target.refund_id": "params.refund_id"}           # a fact the thing keeps
+    assert set(d.objects["Order"].properties) == {"status", "total", "refund_id"}  # from get_order's output schema
+    m = d.transitions["Order"].matrix
+    assert m["paid"]["refund_order"] == "undecided" and m["refunded"]["record_refund_order"] == "undecided"
+    assert "wipe_orders" not in d.actions
+    b = yaml.safe_load(render_binding(ext.binding, "payments"))
+    assert b["status"] == "proposed" and b["upstream"] == {"command": ["python", "server.py"]}
+    assert b["tools"] == {"refund_order": {"action": "refund_order", "target": "order_id",
+                                           "result": {"refund_id": "string"}, "load": "get_order"},
+                          "get_order": {"read": True}}
+    kinds_asked = {n.kind: n for n in ext.question_records()}
+    assert {"actor", "target", "param", "cell", "stage"} <= set(kinds_asked)
+    assert kinds_asked["target"].decides == ["actions.wipe_orders"] and kinds_asked["target"].places == ["srv#/tools/2"]
+    assert "transitions.Order.matrix.paid.record_refund_order" in kinds_asked["cell"].decides
+
+
 def test_openapi_asks_how_a_thing_is_created_and_drafts_a_call_only_when_it_is_named(tmp_path):
     api = yaml.safe_load(Path(API).read_text())
     del api["paths"]["/orders"], api["components"]["schemas"]["NewOrder"]

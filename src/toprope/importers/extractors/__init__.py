@@ -1,4 +1,5 @@
-"""Built-in extractors (ADR-0051): OpenAPI, SQL DDL, a workflow export, written rules. Others plug in through
+"""Built-in extractors (ADR-0051): OpenAPI, SQL DDL, a workflow export, written rules, an MCP
+server's tool list. Others plug in through
 `toprope.extractors`. Each turns one format into candidates citing their exact place."""
 from __future__ import annotations
 
@@ -63,12 +64,13 @@ def stages(out: Extraction, obj: str, field: str, states: list[str], ref: str) -
                                                            "matrix": {s: {} for s in states}}, ref))
 
 
+from .mcp import McpExtractor
 from .openapi import OpenAPIExtractor
 from .rules import RulesExtractor
 from .sql import SQLExtractor
 from .workflow import WorkflowExtractor
 
-BUILTIN = [OpenAPIExtractor(), RulesExtractor(), SQLExtractor(), WorkflowExtractor()]
+BUILTIN = [McpExtractor(), OpenAPIExtractor(), RulesExtractor(), SQLExtractor(), WorkflowExtractor()]
 
 __all__ = ["BUILTIN", "TYPES", "Any", "Candidate", "Extraction", "Profile", "a_", "ignored", "mapping", "pascal", "put",
            "singular", "snake", "stages"]

@@ -57,6 +57,7 @@ class ToolBinding:
 class Binding:
     upstream: dict[str, Any]
     tools: dict[str, ToolBinding]
+    status: str = "confirmed"          # `proposed`: drafted by `toprope-import mcp`, until a person confirms it
 
     @classmethod
     def load(cls, path: str | Path) -> Binding:
@@ -88,7 +89,12 @@ class Binding:
                 raise SystemExit(fixed(f"the binding {path}: tool {name} names exactly one of `target` or `new_id`",
                                        "name the argument that identifies the object"))
             tools[str(name)] = tb
-        return cls(up, tools)
+        status = str(data.get("status") or "confirmed")
+        if status not in ("proposed", "confirmed"):
+            raise SystemExit(fixed(f"the binding {path}: `status: {status}`",
+                                   "leave `status: proposed` for a person to confirm with `toprope-proxy "
+                                   "--confirm-binding`"))
+        return cls(up, tools, status)
 
 
 class Upstream:
@@ -297,6 +303,10 @@ def check(d: Any, binding: Binding) -> list[str]:
     from ..kernel import UPSTREAM_SERVICES
     problems = [fixed(f"{i.code} at {i.where}: {i.message}", "correct the declaration")
                 for i in validate_domain(d) if i.severity == "error"]
+    if binding.status == "proposed":   # a drafted binding is enforced only once a person confirmed it (ADR-0052 §7)
+        problems.append(fixed("the binding is a draft no person has confirmed (`status: proposed`)",
+                              "read it, then confirm it as the person: `toprope-proxy --confirm-binding` with the "
+                              "same --domain, --binding and --identity"))
     unconfirmed = proposed_elements(d.model_dump(mode="json", by_alias=True, exclude_none=True))
     if unconfirmed:                    # agents propose; only what a person confirmed is enforced (ADR-0041)
         problems.append(fixed(f"the declaration has {len(unconfirmed)} element(s) no person has confirmed "

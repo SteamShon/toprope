@@ -95,12 +95,30 @@ the error is raised.
 
 | Error | Fix |
 |---|---|
-| --questions and --out name the same file | give each its own file |
+| --into and --out both name where the draft goes | give one |
+| --patch joins the workspace's draft, so it takes no --into or --out | give --patch alone (the loop proposes into the workspace's draft), or --into/--out to write a file |
+| --workspace and --source-id go with --patch | add --patch FILE, or leave them out |
+| cannot read the draft {…}: {…} | give --into an existing draft, or --out for a new one |
 | no source given | give `toprope-import <extractor> <source>` |
 | nothing to import from {…} | check that it is {…}: no things, enums, statuses or rules were found |
+| nothing to propose from {…}: it names no element | work from its questions (--questions); an agent proposes elements from the answers |
+| nothing to propose from {…}: the draft already says all of it | nothing to do; any conflict with the draft is for the interview (--questions) |
+| the {…} extractor drafts no binding | --binding-out goes with `mcp`, which reads a server's tools |
+| two options name the same file | give each its own file |
 | {…} does not read as {…}: {…} | give the export as it was written, or another extractor |
-| {…} exists | give --out a new file; to add to a draft, propose the elements there |
-| {…} exists | give --questions a new file |
+| {…} exists | give {…} a new file |
+| {…} exists | give --out a new file, or --into it to join this source to the draft |
+| {…} is not a declaration | give --into a `*.domain.yaml` draft |
+
+## `importers/loop.py`
+
+| Error | Fix |
+|---|---|
+| could not add the source to {…}: its `sources:` is not a list this can extend | add `- {…}` under `sources:` yourself, then import again |
+| no workspace to register the source in | give --workspace (a `*.workspace.yaml` file; a new one is made), or set `workspace:` in toprope.yaml |
+| the source {…} has no text the workspace can read | import a text source (the workspace skips binary files and files over 512 KiB) |
+| the workspace {…} already has a source {…}, at {…} | give --source-id a new id for this source |
+| {…} is not a workspace file | name it `<something>.workspace.yaml` |
 
 ## `importers/port.py`
 
@@ -119,8 +137,10 @@ the error is raised.
 | Error | Fix |
 |---|---|
 | cannot fetch {…}: {…} | check the URL and that the network allows it |
+| cannot read the server command {…}: {…} | quote the command as one argument, e.g. "python server.py" |
 | cannot read {…}: {…} | give the path of the file to import |
 | no file under {…} matches {…} | set `options: {glob: ...}` in the profile |
+| no server command given | give the command that starts the server, or its URL |
 | the glob {…} does not work: {…} | give a pattern like `**/*.md` |
 | the glob {…} reaches outside {…} | give a pattern inside the folder, e.g. `**/*.md` |
 | {…} is not a URL | give an http(s) URL, or use the file reader |
@@ -156,6 +176,7 @@ the error is raised.
 | cannot read the binding {…}: {…} | give the binding's YAML file |
 | no kernel services in this proxy for {…} | call only `mcp:` tools from a declaration served by toprope-proxy |
 | the binding {…} needs `upstream:` and `tools:` mappings | see `toprope-proxy --help` for the binding's shape |
+| the binding {…}: `status: {…}` | leave `status: proposed` for a person to confirm with `toprope-proxy --confirm-binding` |
 | the binding {…}: `upstream` has exactly one of `command` or `url` | give `command: [program, args…]` for stdio, or `url:` for streamable HTTP |
 | the binding {…}: tool {…} has unknown key(s) {…} | use only the keys {…} |
 | the binding {…}: tool {…} is either `read: true` or an `action` | bind it to a declared action, or mark it read-only |
@@ -167,7 +188,13 @@ the error is raised.
 
 | Error | Fix |
 |---|---|
+| --confirm-binding needs --identity | give the identity that says who you are |
+| TOPROPE_TOKEN is missing or does not resolve to a caller | set TOPROPE_TOKEN to your token in the identity file |
 | TOPROPE_TOKEN is missing or does not resolve to a caller | set TOPROPE_TOKEN to a token in the identity file |
+| the proxy needs --store and --identity to serve | give both, or --check to only check the binding |
+| {…} is an agent; only a person confirms a binding (ADR-0041) | ask the person the agent acts for to run it |
+| {…} says `status: proposed` in a form this cannot rewrite | write `status: proposed` on its own line, then confirm again |
+| {…} would not start, so it was not confirmed | fix what is listed, then confirm it again |
 
 ## `workspace/__init__.py`
 
