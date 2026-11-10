@@ -4,7 +4,8 @@ name: human-request
 # .toprope/requests/<id>.yaml on a work branch. `plan` validates the request and shows it on
 # this run's page; `act` waits until the researcher approves the run (environment
 # `researcher`, required reviewer), then runs the steps as the approver and pushes the
-# result to the branch.
+# result to the branch. If a step fails, the work of the steps before it is still pushed, the
+# request keeps the steps that are left, and the run ends red.
 on:
   push:
     branches-ignore: [main, develop]
@@ -87,30 +88,47 @@ jobs:
           if [ -z "$login" ] || [ "$login" = "null" ]; then echo "no approval found"; exit 1; fi
           echo "login=$login" >> "$GITHUB_OUTPUT"
       - name: Take the steps as the approver
+        id: take
         env:
           REQUEST: ${{ needs.plan.outputs.request }}
           APPROVER: ${{ steps.who.outputs.login }}
         run: |
           uv sync --quiet
+          # `run` writes how far it got even when a step fails, then exits non-zero (the job ends red)
           uv run python tools/human_request.py run "$REQUEST" --approver "$APPROVER" > "$RUNNER_TEMP/done.json"
           cat "$RUNNER_TEMP/done.json"
+      # Also after a failed step: the steps before it are kept (ADR-0050, 2), and the request is
+      # rewritten to the steps that are left. Nothing is pushed if no step ran.
       - name: Commit and push
+        id: push
+        if: ${{ !cancelled() && (steps.take.outcome == 'success' || steps.take.outcome == 'failure') }}
         env:
           REQUEST: ${{ needs.plan.outputs.request }}
           APPROVER: ${{ steps.who.outputs.login }}
           BRANCH: ${{ github.ref_name }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          DONE: ${{ runner.temp }}/done.json
         run: |
+          if [ ! -s "$DONE" ]; then echo "no step ran: nothing to push"; exit 0; fi
+          person=$(jq -r '.as' "$DONE")
+          ran=$(jq -r '.steps' "$DONE")
+          failed=$(jq -r '.failed.step // 0' "$DONE")
+          if [ "$ran" -eq 0 ]; then echo "step 1 failed: nothing ran, nothing to push"; exit 0; fi
           summary=$(uv run python -c "import sys,yaml; print(yaml.safe_load(open(sys.argv[1]))['summary'])" "$REQUEST")
-          person=$(uv run python -c "import json,sys; print(json.load(open(sys.argv[1]))['as'])" "$RUNNER_TEMP/done.json")
-          uv run python tools/human_request.py record "$REQUEST" --approver "$APPROVER" --as "$person" --run-url "$RUN_URL"
-          git rm --quiet "$REQUEST"
+          uv run python tools/human_request.py record "$REQUEST" --approver "$APPROVER" --as "$person" --run-url "$RUN_URL" --done "$DONE"
+          if [ "$failed" -eq 0 ]; then
+            git rm --quiet "$REQUEST"
+          else
+            summary="$summary (steps 1-$ran; step $failed failed, the rest is left in the request)"
+          fi
           git add -A
           git -c user.name="toprope-human-request" -c user.email="actions@users.noreply.github.com" \
             commit --quiet --author "$person" -m "$summary" \
             -m "Approved-by: $APPROVER (GitHub environment review)" -m "Approval: $RUN_URL"
           git push origin "HEAD:refs/heads/$BRANCH"     # a fast-forward of the approved commit, or nothing
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
       - name: Run the status check on the new head
+        if: ${{ !cancelled() && steps.push.outputs.pushed == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           BRANCH: ${{ github.ref_name }}

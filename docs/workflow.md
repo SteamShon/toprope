@@ -42,7 +42,11 @@ change takes one request: `python tools/human_request.py change .toprope/request
 --draft <draft>` writes confirm, commit, check and approve, where the last two name `$commit`,
 the commit the request's own commit step makes. So nobody predicts the commit's id. The run
 is also appended to `.toprope/approval-runs.jsonl`, so a commit can cite it as evidence
-(`cite_evidence --kind approval-run`) after any merge. The
+(`cite_evidence --kind approval-run`) after any merge. A step that fails stops the run, and
+the steps before it are kept: the workflow still pushes their work, notes the failed step in the
+run's entry, leaves the steps from the failed one on in the request, and ends red. So a failed
+preview leaves the commit approved (ADR-0050). Fix the cause and push a change to that request;
+its run takes only the steps that did not run. The
 format is in `tools/human_request.py`. One-time setup (maintainer): Repository settings →
 Environments → `researcher` → Required reviewers: you ("Prevent self-review" off); Actions →
 Workflow permissions: read and write.

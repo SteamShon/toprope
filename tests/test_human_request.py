@@ -288,3 +288,95 @@ def test_a_second_request_ships_an_approved_commit(tmp_path):
     assert hr.check(req) == []
     assert [s["run"]["action"] for s in req["steps"]] == ["deliver", "preview", "deploy", "run_probes", "verify"]
     assert "One approval ships" not in hr.render(req)       # it approves nothing: the person read the preview
+
+
+def nine_steps():
+    """A low-risk change on one approval (ADR-0050, 2): confirm to approve, then deliver to verify."""
+    req = hr.change("authoring")
+    req["steps"] += hr.ship(hr.MADE, "authoring")["steps"]
+    assert len(req["steps"]) == 9 and hr.check(req) == []
+    return req
+
+
+def fake_run(cmds, fails=None):
+    def run(cmd, **kw):
+        cmds.append(cmd)
+        if cmd[-2] == fails or (fails in cmd and cmd[-1] != fails):
+            return subprocess.CompletedProcess(cmd, 1, "", "the preview environment is down")
+        then = [{"kernel": "commit", "reply": "record_commit", "status": "ok", "object": "7-c0ffee"}] \
+            if cmd[-2] == "commit_draft" else []
+        return subprocess.CompletedProcess(cmd, 0, json.dumps({"status": "ok", "then": then}), "")
+    return run
+
+
+def test_a_failed_step_keeps_the_work_before_it_and_leaves_the_rest(tmp_path, monkeypatch, capsys):
+    """ADR-0050, 2: a late failure leaves the commit approved. The run says how far it got, exits
+    non-zero, and the request becomes the steps that are left, so running it again takes no step twice."""
+    (tmp_path / "ids.yaml").write_text(yaml.safe_dump(IDS))
+    monkeypatch.setenv(hr.TLC_ENV, "tla2tools.jar")
+    low_risk(tmp_path, "7-c0ffee")
+    cmds = []
+    monkeypatch.setattr(hr.subprocess, "run", fake_run(cmds, fails="deliver"))
+    req = nine_steps()
+    with pytest.raises(SystemExit) as stopped:
+        hr.run(req, "ana-gh", identity="ids.yaml", cwd=tmp_path)
+    msg = str(stopped.value.code)
+    assert msg.startswith("step 5 of 9 failed; steps 1-4 ran and their work is kept") and "Fix: " in msg
+    assert "the preview environment is down" in msg
+    assert [c[-2] for c in cmds][:5] == ["confirm_all_proposed", "commit_draft", "check_commit", "approve_commit",
+                                         "--environment"] and len(cmds) == 5   # stopped at deliver
+    out = json.loads(capsys.readouterr().out)
+    assert (out["as"], out["steps"], out["of"], out["commit"]) == ("ana <ana@example.com>", 4, 9, "7-c0ffee")
+    assert out["failed"]["step"] == 5 and "the preview environment is down" in out["failed"]["error"]
+    rest = out["rest"]
+    assert hr.check(rest) == [] and "(the rest, from step 5 of 9)" in rest["summary"]
+    assert [(s["run"]["action"], s["run"]["target"]) for s in rest["steps"]] == [
+        ("deliver", "7-c0ffee"), ("preview", "authoring:7-c0ffee:local"), ("deploy", "authoring:7-c0ffee:local"),
+        ("run_probes", "authoring:7-c0ffee:local"), ("verify", "authoring:7-c0ffee:local")]
+
+    request = tmp_path / ".toprope/requests/r.yaml"            # what the workflow does next
+    request.parent.mkdir(parents=True)
+    request.write_text(yaml.safe_dump(req))
+    url = "https://github.com/o/r/actions/runs/8"
+    row = hr.record(req, "Ana-GH", out["as"], url, cwd=tmp_path, outcome=out, request=".toprope/requests/r.yaml")
+    assert (row["ran"], row["failed"]["step"], row["steps"]) == (4, 5, req["steps"])
+    assert hr.load(request) == rest
+
+    cmds.clear()                                                # fixed, pushed, approved again
+    monkeypatch.setattr(hr.subprocess, "run", fake_run(cmds))
+    done = hr.run(hr.load(request), "ana-gh", identity="ids.yaml", cwd=tmp_path)
+    assert len(done) == 5 and [c[c.index("--identity") + 2] for c in cmds] == [
+        "deliver", "preview", "deploy", "run_probes", "verify"]   # nothing before them taken twice
+
+
+def test_the_rest_of_a_failed_approval_checks_the_commit_again():
+    """Approval needs TLC's check in the same run (ADR-0043), so the rest keeps it."""
+    rest = hr.rest(nine_steps(), 4, "7-c0ffee")
+    assert [(s["run"]["action"], s["run"]["target"]) for s in rest["steps"][:3]] == [
+        ("check_commit", "7-c0ffee"), ("approve_commit", "7-c0ffee"), ("deliver", "7-c0ffee")]
+    assert hr.check(rest) == []
+    before_commit = hr.rest(nine_steps(), 2, None)               # no commit yet: $commit stays
+    assert before_commit["steps"][0]["run"]["action"] == "commit_draft" and hr.check(before_commit) == []
+
+
+def test_a_request_that_fails_before_any_step_prints_nothing_to_push(tmp_path, monkeypatch, capsys):
+    (tmp_path / "ids.yaml").write_text(yaml.safe_dump(IDS))
+    monkeypatch.setenv(hr.TLC_ENV, "tla2tools.jar")
+    cmds = []
+    monkeypatch.setattr(hr.subprocess, "run", fake_run(cmds, fails="confirm_all_proposed"))
+    with pytest.raises(SystemExit, match="^step 1 of 9 failed: "):
+        hr.run(nine_steps(), "ana-gh", identity="ids.yaml", cwd=tmp_path)
+    assert json.loads(capsys.readouterr().out)["steps"] == 0      # the workflow pushes nothing
+
+
+def test_the_workflow_pushes_the_work_of_a_run_that_failed():
+    """Before: `Commit and push` ran only on success, so a late failure lost the approval."""
+    workflow = yaml.safe_load((ROOT / ".github/workflows/human-request.yml").read_text())
+    steps = {s.get("name"): s for s in workflow["jobs"]["act"]["steps"]}
+    take, push, status = steps["Take the steps as the approver"], steps["Commit and push"], steps[
+        "Run the status check on the new head"]
+    assert "failure" in push["if"] and "!cancelled()" in push["if"] and take["id"] in push["if"]
+    assert "--done" in push["run"] and "nothing to push" in push["run"]
+    assert push["run"].index("record") < push["run"].index("git rm")      # recorded, then committed
+    assert "if" not in take and "continue-on-error" not in take        # a failed step still ends the job red
+    assert "pushed" in status["if"] and push["id"] in status["if"]

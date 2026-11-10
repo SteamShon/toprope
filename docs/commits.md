@@ -117,7 +117,8 @@ pointer is refused. Each kind has a strength, which says how far the evidence go
 | `approval-run` | a GitHub Actions run URL | a human request approved in that run (ADR-0039), recorded in `.toprope/approval-runs.jsonl` | approved |
 
 The `human-request` workflow appends each approved run to `.toprope/approval-runs.jsonl` with
-the result it pushes, so the record outlives the branch and a squash merge.
+the result it pushes, so the record outlives the branch and a squash merge. A run whose step
+failed is recorded too, with `ran` (how many steps ran) and `failed` (which step, and why).
 Citations are appended to `evidence.jsonl` next to the commit log, with who cited and when,
 and are never rewritten. `toprope-commits evidence DOMAIN COMMIT` lists them. Nothing requires
 evidence yet. In the Authoring domain, the owner or their agent cites with the action

@@ -40,6 +40,12 @@ it waits for the approval, and `run` after it.
 
 `record` appends the approved run to `.toprope/approval-runs.jsonl`, committed with the result,
 so a commit can cite the run as evidence (`cite_evidence --kind approval-run`) after any merge.
+
+A step that fails stops the run, and the work of the steps before it is kept: `run` prints how
+far it got and exits non-zero, `record --done` notes the failed step in the run's entry and
+rewrites the request to the steps that are left, and the workflow commits and pushes that, then
+ends red. So a failed preview leaves the commit approved, as ADR-0050 says. To go on, fix the
+cause and push a change to the request (the rest): its run takes only the steps that did not run.
 """
 
 from __future__ import annotations
@@ -246,9 +252,43 @@ def recorded_risk(commit: str, cwd: str | Path = ".") -> str | None:
     return level
 
 
+def rest(req: dict, failed: int, made: str | None) -> dict:
+    """The request that is left when step `failed` (1-based) failed: that step and the ones after
+    it, with `$commit` put in where a commit_draft step that already ran made it. A step that ran
+    is not in it, so running it does not take a step twice (`toprope-run` gives each command a new
+    idempotency key, so a step run again is a new command). An `approve_commit` keeps the
+    `check_commit` before it, since approval needs TLC's check in the same run (ADR-0043)."""
+    steps, checked, own_commit = [], set(), False
+    for st in req["steps"][failed - 1:]:
+        (kind, arg), = st.items()
+        if kind == "run":
+            arg = dict(arg)
+            if arg["action"] == "commit_draft":
+                own_commit = True               # from here on, $commit is the commit this one makes
+            if made and not own_commit:
+                arg["target"] = arg["target"].replace(MADE, made)
+            key = (arg["member"], arg["target"])
+            if arg["action"] == "check_commit":
+                checked.add(key)
+            elif arg["action"] == "approve_commit" and key not in checked:
+                steps.append({"run": {**{k: v for k, v in arg.items() if k != "params"}, "action": "check_commit"}})
+                checked.add(key)
+            st = {"run": arg}
+        steps.append(st)
+    first = req["summary"].split(" (the rest, from step ")[0]
+    return {"summary": f"{first} (the rest, from step {failed} of {len(req['steps'])})", "steps": steps}
+
+
 def run(req: dict, approver: str, identity: str = "toprope.identity.yaml", cwd: str | Path = ".") -> list[dict]:
-    """Run every step as the approver; stop at the first that fails."""
+    """Run every step as the approver; stop at the first that fails.
+
+    It prints what happened as JSON on stdout, also when a step fails: `as`, `steps` (how many
+    ran), `of`, `commit`, and on failure `failed` (the step and why) and `rest` (the request that
+    is left, see `rest`). Then a failure exits non-zero, after the work of the steps before it is
+    on disk, so the workflow commits that work (ADR-0050, 2: the commit stays approved) and the
+    run still ends red. A failure before any step ran (no such person, no TLC) prints nothing."""
     sys.path.insert(0, str(ROOT / "src"))
+    from toprope.errors import fixed
     from toprope.identity.github import ENV, github_logins
     person = github_logins(Path(cwd) / identity).get(approver.lower())
     if person is None:
@@ -258,40 +298,60 @@ def run(req: dict, approver: str, identity: str = "toprope.identity.yaml", cwd: 
             and not env.get(TLC_ENV):
         raise SystemExit(f"approve_commit needs TLC: set {TLC_ENV} to a TLC jar (the workflow does)")
     done, made, approved = [], None, set()
-    for st in req["steps"]:
+
+    def report(**more) -> None:
+        print(json.dumps({"approver": approver, "as": person.actor.id, "steps": len(done), "of": len(req["steps"]),
+                          **({"commit": made} if made else {}), **more}, indent=2))
+
+    def stop(i: int, message: str, fix: str, attempt: dict | None = None) -> None:
+        print(json.dumps(done + ([attempt] if attempt else []), indent=2), file=sys.stderr)
+        report(failed={"step": i, "error": message}, rest=rest(req, i, made))
+        kept = "" if i == 1 else f"; {'step 1' if i == 2 else f'steps 1-{i - 1}'} ran and their work is kept"
+        raise SystemExit(fixed(f"step {i} of {len(req['steps'])} failed{kept}: {message}", fix))
+
+    for i, st in enumerate(req["steps"], 1):
         arg = st.get("run") or {}
         if MADE in str(arg.get("target")) and made is None:
-            raise SystemExit(f"step {len(done) + 1}: {MADE}, but no commit_draft step before it made a commit")
+            raise SystemExit(f"step {i}: {MADE}, but no commit_draft step before it made a commit")
         if arg.get("action") == "approve_commit":
             approved.add(made if arg["target"] == MADE else arg["target"])
         ships = shipped_commit(arg, made) if arg.get("action") in SHIPS else None
         if ships and ships in approved and recorded_risk(ships, cwd) != "low":
             # ADR-0050: one approval ships only a low-risk change, as checked inside this request
-            print(json.dumps(done, indent=2), file=sys.stderr)
-            raise SystemExit(f"step {len(done) + 1}: {ships} is not low risk ({recorded_risk(ships, cwd)}), so this "
-                             "approval does not ship it. Fix: read the preview, then approve a second request "
-                             "with the delivery steps")
+            stop(i, f"{ships} is not low risk ({recorded_risk(ships, cwd)}), so this approval does not ship it",
+                 "read the preview, then approve a second request with the delivery steps (the workflow leaves "
+                 "them in the request)")
         cmd = command(st, made)
         r = subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True, check=False)
-        done.append({"step": st, "returncode": r.returncode, "stdout": r.stdout[-4000:], "stderr": r.stderr[-4000:]})
+        attempt = {"step": st, "returncode": r.returncode, "stdout": r.stdout[-4000:], "stderr": r.stderr[-4000:]}
         unmet = _unmet(r.stdout) if r.returncode == 0 and "run" in st else []
-        if r.returncode != 0 or unmet:
-            print(json.dumps(done, indent=2), file=sys.stderr)
-            why = "; ".join(unmet) or r.stderr[-2000:]
-            raise SystemExit(f"step {len(done)} failed: {' '.join(cmd[:6])} ...\n{why}")
+        if r.returncode != 0 or unmet:          # it did not run to the end: it is in the rest
+            why = "; ".join(unmet) or r.stderr[-2000:].strip()
+            stop(i, f"{' '.join(cmd[:6])} ...\n{why}",
+                 "fix the cause, then push a change to the request (the workflow leaves the steps from this one "
+                 "on in it), and approve that run", attempt)
+        done.append(attempt)
         if arg.get("action") == "commit_draft" and (c := _made(r.stdout)):
             made = c
             done[-1]["commit"] = c
-    print(json.dumps({"approver": approver, "as": person.actor.id, "steps": len(done),
-                      **({"commit": made} if made else {})}, indent=2))
+    report()
     return done
 
 
-def record(req: dict, approver: str, person: str, run_url: str, cwd: str | Path = ".") -> dict:
-    """Append the approved run, its approver and its steps to the approval-run log."""
+def record(req: dict, approver: str, person: str, run_url: str, cwd: str | Path = ".",
+           outcome: dict | None = None, request: str | Path | None = None) -> dict:
+    """Append the approved run, its approver and its steps to the approval-run log.
+
+    `outcome` is what `run` printed. If a step failed, the entry says how many steps ran and which
+    failed, and `request` is rewritten to the rest (`rest`), so the steps that ran are not taken
+    again; otherwise the workflow removes the request."""
     from datetime import datetime, timezone
     entry = {"run": run_url, "approver": approver, "as": person, "summary": req["summary"],
              "steps": req["steps"], "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+    if outcome and outcome.get("failed"):
+        entry |= {"ran": outcome["steps"], "failed": outcome["failed"]}
+        if request is not None:
+            Path(cwd, request).write_text(yaml.safe_dump(outcome["rest"], sort_keys=False, allow_unicode=True))
     path = Path(cwd) / APPROVAL_RUNS
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a") as f:
@@ -307,6 +367,8 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--identity", default="toprope.identity.yaml")
     ap.add_argument("--as", dest="person", help="the person the approver acted as (for record)")
     ap.add_argument("--run-url", help="the approved workflow run (for record)")
+    ap.add_argument("--done", help="(for record) the JSON `run` printed; after a failed step, the request "
+                                   "is rewritten to the steps that are left")
     ap.add_argument("--draft", help="the draft whose change to take through (for change)")
     ap.add_argument("--member", default="authoring", help="(for change)")
     ap.add_argument("--workspace", help="(for change) the draft's workspace, if not the member's")
@@ -341,7 +403,8 @@ def main(argv: list[str] | None = None) -> None:
     elif args.cmd == "record":
         if not (args.approver and args.person and args.run_url):
             raise SystemExit("record needs --approver, --as and --run-url")
-        record(req, args.approver, args.person, args.run_url)
+        outcome = json.loads(Path(args.done).read_text()) if args.done else None
+        record(req, args.approver, args.person, args.run_url, outcome=outcome, request=args.request)
     else:
         if not args.approver:
             raise SystemExit("run needs --approver")
