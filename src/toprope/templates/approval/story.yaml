@@ -3,8 +3,7 @@ about: >
   An agent files access requests for the team. A manager approves them, prod access needs
   security, and nobody approves a request they (or their agent) made.
 next: >
-  Try changing who approves prod access: edit `prod-needs-security` in domain.yaml, then run
-  `toprope-try` again.
+  Try `toprope-set prod_approver=manager` to let managers approve prod access, and see what the change touches; set it back with `toprope-set prod_approver=security`.
 settings:
   prod_approver:
     says: The role that approves access to prod.

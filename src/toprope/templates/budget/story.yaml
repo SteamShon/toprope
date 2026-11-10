@@ -3,8 +3,7 @@ about: >
   Holdout campaigns keep their budget, a budget rises by at most 500 at a time, and whoever
   proposed a change cannot approve it.
 next: >
-  Try a step limit of 1000: change `<= 500` in domain.yaml, and see what the change check says
-  with `toprope-try --check`.
+  Try a step limit of 1000 with `toprope-set step_limit=1000`, and see what the change touches.
 settings:
   step_limit:
     says: The most a daily budget may rise in one change.

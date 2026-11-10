@@ -49,10 +49,12 @@ Start a domain from a template and watch its rules refuse an agent, in two comma
 ([`docs/tutorial.md`](docs/tutorial.md) takes you from here to a connected agent in 15 minutes):
 
 ```bash
-uv run toprope-init my-access --template approval    # also: budget, refunds, release
-cd my-access && uv run --project .. toprope-try
+export TOPROPE="$(pwd)"                              # this repository
+uv run toprope-init my-access --template approval --dir /tmp    # also: budget, refunds, release
+cd /tmp/my-access && uv run --project "$TOPROPE" toprope-try
 ```
 ```
+...
 the agent       asks to approve it
                 -> denied: Only a person can approve_request.
 max (manager)   asks to approve it

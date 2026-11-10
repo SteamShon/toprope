@@ -226,11 +226,17 @@ def build_parser(d: Domain) -> argparse.ArgumentParser:
             p.add_argument("--token", default=argparse.SUPPRESS, help="your credential, as before the action")
         if "identity" not in a.params:
             p.add_argument("--identity", default=argparse.SUPPRESS, help="as before the action")
+    reads = []
     for cmd, what in (("get", "an object's current state"), ("history", "an object's events"),
                       ("allowed", "the actions you may take on an object now")):
-        sub.add_parser(cmd, help=what).add_argument("target")
-    sub.add_parser("whoami", help="who you are here, and your roles")
-    sub.add_parser("guide", help="the domain guide: how this domain works and who does what")
+        r = sub.add_parser(cmd, help=what)
+        r.add_argument("target")
+        reads.append(r)
+    reads.append(sub.add_parser("whoami", help="who you are here, and your roles"))
+    reads.append(sub.add_parser("guide", help="the domain guide: how this domain works and who does what"))
+    for r in reads:                              # who you are may follow a read too (ADR-0049, A4)
+        r.add_argument("--token", default=argparse.SUPPRESS, help="your credential, as before the command")
+        r.add_argument("--identity", default=argparse.SUPPRESS, help="as before the command")
     if "review" not in d.actions:            # a domain's own action named `review` keeps its name
         sub.add_parser("review", help="the proposed elements of the authoring workspace, as one diff to "
                        "confirm from (needs --workspace)")
