@@ -108,6 +108,7 @@ the error is raised.
 | no kernel service {…} | use a service the kernel's catalog lists (src/toprope/kernel/__init__.py) |
 | no source {…} | use a source id listed in the workspace file's `sources:` |
 | nothing to confirm: no paths given, or nothing is proposed | propose elements first, or name the paths to confirm |
+| the human request run {…} failed at step {…}, at or before its approve_commit step, so it approved nothing | cite the run of the request that approved the commit (the rest of this one, once it ran) |
 | {…} has no passing TLC check ({…}) | run `check_commit` here, where TLC is configured (TOPROPE_TLC_JAR), then approve |
 | {…} is not deployed here: no events to cite | deploy it here first, or cite another kind of evidence |
 | {…} is outside the kernel's root | give a path inside the repository the kernel runs on (`--kernel-root`) |

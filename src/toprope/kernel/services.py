@@ -227,9 +227,15 @@ class LocalKernel(KernelServices):
         record survives a squash merge."""
         import json
         log = self.root / APPROVAL_RUNS
-        runs = {json.loads(x).get("run") for x in log.read_text().splitlines() if x.strip()} if log.exists() else set()
-        if url not in runs:
+        runs = [json.loads(x) for x in log.read_text().splitlines() if x.strip()] if log.exists() else []
+        entries = [r for r in runs if r.get("run") == url]
+        if not entries:
             raise ValueError(fixed(f"no approved human request ran as {url!r} ({APPROVAL_RUNS})", "cite the run URL of an approved human request, as `.toprope/approval-runs.jsonl` lists it"))
+        for r in entries:   # a run that failed at or before an approval step did not approve
+            failed = (r.get("failed") or {}).get("step")
+            if failed and any((st.get("run") or {}).get("action") == "approve_commit"
+                              for st in (r.get("steps") or [])[failed - 1:]):
+                raise ValueError(fixed(f"the human request run {url!r} failed at step {failed}, at or before its approve_commit step, so it approved nothing", "cite the run of the request that approved the commit (the rest of this one, once it ran)"))
 
     def run(self, service, inputs):
         if service == "diff":   # `from` is a Python keyword
