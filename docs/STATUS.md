@@ -379,9 +379,11 @@ M2 runs, with no person adjudicating grades after the results.
 
 | Item | Status | PR |
 |---|---|---|
-| The checklist grader: `grade --grader checklist`, four yes/no items per distinct flag (rule B in item `outcome`), each answered k=3 times and decided by majority, the label by a fixed rule; `compare-gradings --first --second --limit` | ✅ | |
+| The checklist grader: `grade --grader checklist`, four yes/no items per distinct flag (rule B in item `outcome`), each answered k=3 times and decided by majority, the label by a fixed rule; `compare-gradings --first --second --limit` | ✅ | #248 |
 | The validation run on M1's combined run: two checklist sittings, noise within 0.05 (local session) | ⬜ | |
-| The invented examples for rule B reviewed by the researcher; the grader frozen with M2's instruments | ⬜ | |
+| Rule B's invented examples reviewed and accepted by the researcher (2026-11-10) | ✅ | |
+| The grader frozen with M2's instruments, after the validation run | ⬜ | |
+| Validity, not only consistency: the grader's agreement with the domain expert's own labels on a sample of M2's pilot flags, and which model grades (proposed in `M2-grader.md`; the researcher decides before M2 runs) | ⬜ | |
 
 ## M0b, M2 to M5
 

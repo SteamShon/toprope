@@ -123,8 +123,9 @@ compares the arms.
 2. **Noise limit: 0.05 of recall per arm**; at most **2** revisions of the grader before it is frozen.
 3. **k = 3** for the majority.
 4. The checklist's items (a), (b), (c) and the formula `seeded = (a) and ((b) or (c))`, as above;
-   rule B's wording as option 4 gives it. The invented examples are drafted with the
-   implementation, and the researcher reviews them before the grader is frozen.
+   rule B's wording as option 4 gives it. The invented examples are in
+   `phase_b/prompts/grade_checklist.md`; the researcher reviewed and accepted them (2026-11-10:
+   "기준 B 예시 2개 확인했어. 이대로 하면 될 것 같아").
 5. **Calibration:** M1's combined run, graded twice, for options 2 to 4 (consistency only); M2's
    pilot for option 1 and for the final check.
 
@@ -135,6 +136,20 @@ compares the arms.
 2. The harness grades with it, by majority, grouping identical flags.
 3. A test shows that one judgement graded k times takes the majority.
 4. The grader is validated on M1's run as above, then frozen with M2's instruments.
+
+## Validity, not only consistency (proposed; the researcher decides)
+
+The grader is still an LLM judging free text. The checklist, the majority and the noise gate make
+it **steady**. They do not show that it is **right**: two sittings can agree on the same mistake.
+Two additions would close that gap before M2's main run:
+
+- **Agreement with a person on a sample.** In M2's pilot, the domain expert, who writes the key,
+  labels a random sample of flags blind, with the same checklist. The grader's agreement with
+  those labels is reported per item. A minimum agreement is set in the preregistration, and below
+  it the grader is revised within the same cap. The sample comes from the pilot, never from M1.
+- **The grader's model.** The arms and the grader use the same model today. A grader of the same
+  family may favour the reviews written in its own style. Grading with another model, or with two
+  models that must agree, removes that doubt, at a cost.
 
 ## The validation run (on M1's combined run, consistency only)
 
