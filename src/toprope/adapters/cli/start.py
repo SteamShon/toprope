@@ -4,6 +4,8 @@
     toprope-init my-approvals --template approval        # writes ./my-approvals/
     cd my-approvals && toprope-try                       # the template's story, step by step
     toprope-try --check                                  # after editing domain.yaml: what changed
+    toprope-set --list                                   # the template's settings and their values
+    toprope-set window_days=30                           # change a rule without editing YAML
 
 `toprope-init` writes a working domain: `domain.yaml` (the template's declaration, renamed),
 `tokens.yaml` (the people and the agent of its story), `story.yaml`, and a `toprope.yaml` so
@@ -169,6 +171,122 @@ def render(story: dict[str, Any], rows: list[dict[str, Any]]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def settings_of(where: Path) -> dict[str, dict[str, Any]]:
+    story = yaml.safe_load((where / "story.yaml").read_text()) or {}
+    return story.get("settings") or {}
+
+
+ROLE = re.compile(r"[A-Za-z_][A-Za-z0-9_-]{0,40}")
+
+
+def _pattern(template_text: str) -> re.Pattern:
+    """The template's text with `{value}` as the one thing that may vary."""
+    head, _, tail = template_text.partition("{value}")
+    return re.compile(re.escape(head) + r"(.+?)" + re.escape(tail) + r"\Z")
+
+
+def _find(raw: dict[str, Any], spec: dict[str, Any], name: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    segs = spec["at"].split(".")                       # actions.<action>.preconditions.<id>
+    action = (raw.get("actions") or {}).get(segs[1])
+    pre = next((p for p in (action or {}).get("preconditions") or [] if p.get("id") == segs[3]), None)
+    if action is None or pre is None:
+        raise SystemExit(fixed(f"{name} names {spec['at']}, which domain.yaml no longer has",
+                               "put that precondition back, or edit domain.yaml by hand"))
+    return action, pre
+
+
+def current_values(where: Path) -> dict[str, str]:
+    """Each setting's value, read from the rule in domain.yaml itself, so a hand edit shows."""
+    from ...decl import load_yaml
+    raw = load_yaml((where / "domain.yaml").read_text())
+    out = {}
+    for name, spec in settings_of(where).items():
+        try:
+            _, pre = _find(raw, spec, name)
+        except SystemExit:
+            out[name] = "(its rule is gone)"
+            continue
+        m = _pattern(spec["check"]).match(str(pre.get("check", "")))
+        out[name] = m.group(1) if m else "(edited by hand)"
+    return out
+
+
+def _value(name: str, spec: dict[str, Any], raw: str, action: dict[str, Any]) -> Any:
+    kind = spec.get("type", "string")
+    if kind == "integer":
+        try:
+            v = int(raw)
+        except ValueError:
+            raise SystemExit(fixed(f"{name} is a whole number, not {raw!r}", f"give e.g. {name}={spec.get('default')}")) from None
+        if v <= 0:
+            raise SystemExit(fixed(f"{name} must be positive, not {v}", f"give e.g. {name}={spec.get('default')}"))
+        return v
+    if kind == "role":
+        may = [r for r in action.get("actor") or [] if isinstance(r, str)]
+        if not ROLE.fullmatch(raw):          # it goes inside quotes in a check (#215's review)
+            raise SystemExit(fixed(f"{raw!r} is not a role name", "use letters, digits, `_` and `-`"))
+        if raw not in may:
+            raise SystemExit(fixed(f"{raw!r} may not take this action, so nobody could pass the rule",
+                                   f"use one of {', '.join(may)}"))
+        return raw
+    if not re.fullmatch(r"[\w .:-]{1,80}", raw):
+        raise SystemExit(fixed(f"{name}: {raw!r} has characters a setting may not hold", "use letters, digits and spaces"))
+    return raw
+
+
+def _replace_line(lines: list[str], start: int, key: str, value: str) -> None:
+    """Set `key:` in the list item that starts at `start`, keeping its indentation and every
+    other line of the file as it was (comments, quoting, layout)."""
+    item = len(lines[start]) - len(lines[start].lstrip())
+    for i in range(start, len(lines)):
+        body = lines[i].lstrip()
+        if i > start and (body.startswith("- ") and len(lines[i]) - len(body) <= item
+                          or body and len(lines[i]) - len(body) < item):
+            break
+        m = re.match(rf"^(\s*(?:- )?){re.escape(key)}:\s", lines[i])
+        if m:
+            lines[i] = f"{m.group(1)}{key}: {json.dumps(value, ensure_ascii=False)}"
+            return
+    raise SystemExit(fixed(f"no `{key}:` line found for the setting's rule",
+                           "write the rule's check and reason on their own lines, as the template does"))
+
+
+def apply_settings(where: Path, assignments: list[str]) -> list[str]:
+    """Set the template's settings in domain.yaml: each names one precondition and fills in its
+    check and reason. Only those two lines change; the rest of the file stays as it was. Returns
+    what changed, in words. Nothing is written if any value is wrong."""
+    from ...decl import load_yaml                       # YAML 1.1 would read the key `on:` as true
+    specs = settings_of(where)
+    decl_file = where / "domain.yaml"
+    text = decl_file.read_text()
+    raw = load_yaml(text)
+    before = current_values(where)
+    lines, said = text.split("\n"), []
+    for a in assignments:
+        name, eq, given = a.partition("=")
+        if not eq or name not in specs:
+            raise SystemExit(fixed(f"no setting {name!r}" if eq else f"{a!r} is not name=value",
+                                   f"use one of {', '.join(specs) or '(this template has none)'}, as name=value"))
+        spec = specs[name]
+        action, pre = _find(raw, spec, name)
+        value = _value(name, spec, given.strip(), action)
+        check_text, reason = spec["check"].format(value=value), spec["reason"].format(value=value)
+        at = next((i for i, ln in enumerate(lines) if re.match(rf"^\s*- id: {re.escape(pre['id'])}\s*$", ln)), None)
+        if at is None:
+            raise SystemExit(fixed(f"no `- id: {pre['id']}` line in domain.yaml",
+                                   "write the precondition's id on its own line, as the template does"))
+        _replace_line(lines, at, "check", check_text)
+        _replace_line(lines, at, "reason", reason)
+        pre["check"], pre["reason"] = check_text, reason
+        said.append(f"{name}: {before.get(name)} -> {value} ({reason})")
+    out = "\n".join(lines)
+    if load_yaml(out) != raw:                           # the edit changed exactly what it meant to
+        raise SystemExit(fixed("the edited domain.yaml would not read back as intended",
+                               "edit the rule by hand; the file's layout is not one toprope-set can edit"))
+    decl_file.write_text(out)
+    return said
+
+
 def check(where: Path) -> str:
     from ...check import change_check
     from ...decl import Domain, load_yaml
@@ -192,6 +310,17 @@ def init_parser() -> argparse.ArgumentParser:
     ap.add_argument("--template", help="the template to start from (see --list)")
     ap.add_argument("--dir", default=".", help="where to write the domain's directory (default: here)")
     ap.add_argument("--list", action="store_true", help="list the templates")
+    ap.add_argument("--set", action="append", default=[], metavar="NAME=VALUE",
+                    help="a template setting (see `toprope-set --list` in the new directory)")
+    return ap
+
+
+def set_parser() -> argparse.ArgumentParser:
+    ap = argparse.ArgumentParser(prog="toprope-set", description=__doc__, allow_abbrev=False,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("assignments", nargs="*", metavar="NAME=VALUE", help="settings to change")
+    ap.add_argument("--dir", default=".", help="the domain's directory (default: here)")
+    ap.add_argument("--list", action="store_true", help="the settings, what each means, and its value")
     return ap
 
 
@@ -215,8 +344,45 @@ def init_main(argv: list[str] | None = None) -> None:
     if not a.template:
         raise SystemExit(fixed("no --template", f"choose one of {', '.join(templates())}"))
     out = init(a.name, a.template, Path(a.dir))
+    if a.set:
+        try:
+            for line in apply_settings(out, a.set):
+                print(line)
+        except SystemExit:
+            shutil.rmtree(out, ignore_errors=True)
+            raise
     print(f"wrote {out}/: domain.yaml, tokens.yaml, story.yaml, toprope.yaml\n\n"
           f"next:\n  cd {out}\n  toprope-try")
+
+
+def set_main(argv: list[str] | None = None) -> None:
+    a = set_parser().parse_args(argv)
+    where = Path(a.dir)
+    if not (where / "story.yaml").is_file():
+        raise SystemExit(fixed(f"no story.yaml in {where}", "run toprope-set in a directory toprope-init wrote"))
+    specs, current = settings_of(where), current_values(where)
+    if a.list or not a.assignments:
+        if not specs:
+            print("this template has no settings; edit domain.yaml, then `toprope-try --check`")
+        for name, spec in specs.items():
+            print(f"{name} = {current.get(name)}    {spec.get('says', '')}")
+        return
+    before = (where / "domain.yaml").read_text()
+    try:
+        for line in apply_settings(where, a.assignments):
+            print(line)
+        load(where / "domain.yaml")
+    except SystemExit:
+        (where / "domain.yaml").write_text(before)
+        raise
+    print(check(where), end="")
+    ok, rows = play(where)
+    changed = [r for r in rows if not r["as_told"]]
+    for r in changed:
+        print(f"the story now ends differently: {r['who']} asks to {r['asks']} -> {r['result']}"
+              + (f" ({r['reason']})" if r["reason"] else ""))
+    if not changed:
+        print("the story still ends as told")
 
 
 def try_main(argv: list[str] | None = None) -> None:
@@ -233,4 +399,4 @@ def try_main(argv: list[str] | None = None) -> None:
                                "update the step's `expect` in story.yaml; otherwise undo the change"))
 
 
-__all__ = ["check", "init", "init_main", "init_parser", "play", "templates", "try_main", "try_parser"]
+__all__ = ["apply_settings", "check", "init", "set_main", "set_parser", "settings_of", "init_main", "init_parser", "play", "templates", "try_main", "try_parser"]

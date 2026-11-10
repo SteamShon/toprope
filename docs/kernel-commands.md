@@ -39,6 +39,7 @@ Start a domain from a template and see its rules work (ADR-0049, A3 and A4).
 | `--template` `TEMPLATE` | the template to start from (see --list) |
 | `--dir` `DIR` | where to write the domain's directory (default: here) (default `.`) |
 | `--list` | list the templates |
+| `--set` `NAME=VALUE` | a template setting (see `toprope-set --list` in the new directory) (default `[]`) |
 
 ## `toprope-try`
 
@@ -49,6 +50,16 @@ Start a domain from a template and see its rules work (ADR-0049, A3 and A4).
 | `--dir` `DIR` | the domain's directory (default: here) (default `.`) |
 | `--check` | compare domain.yaml with its template |
 | `--json` | the steps as JSON |
+
+## `toprope-set`
+
+Start a domain from a template and see its rules work (ADR-0049, A3 and A4).
+
+| Argument | What |
+|---|---|
+| `NAME=VALUE` | settings to change |
+| `--dir` `DIR` | the domain's directory (default: here) (default `.`) |
+| `--list` | the settings, what each means, and its value |
 
 ## `toprope-change`
 

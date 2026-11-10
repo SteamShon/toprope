@@ -5,6 +5,14 @@ about: >
 next: >
   Try changing who approves prod access: edit `prod-needs-security` in domain.yaml, then run
   `toprope-try` again.
+settings:
+  prod_approver:
+    says: The role that approves access to prod.
+    type: role
+    default: security
+    at: actions.approve_request.preconditions.prod-needs-security
+    check: "target.system != 'prod' or '{value}' in actor.roles"
+    reason: "Access to prod is approved by {value}."
 steps:
   - {who: t-bot, as: the agent, action: submit_request, target: R-prod, says: "ask for prod access for dana", expect: ok}
   - {who: t-bot, as: the agent, action: approve_request, target: R-prod, says: "approve it", expect: denied, code: actor}
