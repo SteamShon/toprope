@@ -244,6 +244,20 @@ def test_a_cli_conversation_with_other_tools_stops_the_run(tmp_path, monkeypatch
         CliBackend("m").converse("r", "m", None, Transcript(tmp_path / "t.jsonl"))
 
 
+def test_a_conversation_whose_domain_servers_did_not_connect_stops(tmp_path, monkeypatch, fake_claude):
+    """The M1 recheck's Toprope probes all ran with only the harness's own tools: the domain
+    servers failed to connect, and nothing stopped them. Now the conversation stops, as an error."""
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    spec = ToolSpec("files", str(ws), json.dumps({"servers": {"authoring": {"command": "x", "args": []}}}))
+    monkeypatch.setenv("FAKE_CLAUDE_TOOLS", "mcp__phase_b__read_file")
+    with pytest.raises(BackendError, match="authoring.*did not connect"):
+        CliBackend("m").converse("r", "m", spec, Transcript(tmp_path / "t.jsonl"))
+    assert json.loads((tmp_path / "t.jsonl").read_text().splitlines()[-1])["kind"] == "refused"
+    monkeypatch.setenv("FAKE_CLAUDE_TOOLS", "mcp__phase_b__read_file,mcp__authoring__get_object")
+    assert CliBackend("m").converse("r", "m", spec, Transcript(tmp_path / "t2.jsonl")) == "the answer"
+
+
 @pytest.mark.parametrize("mode", ["limit-stderr", "limit-result"])
 def test_the_usage_limit_is_recognised(tmp_path, monkeypatch, fake_claude, mode):
     monkeypatch.setenv("FAKE_CLAUDE_MODE", mode)
