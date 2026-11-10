@@ -20,6 +20,17 @@ TOPROPE_TOKEN=t-sam uv run toprope-proxy --domain examples/proxy/shop.domain.yam
 and `order_id` names the order it acts on. `get_order` is read-only. `wipe_orders` is not in the
 binding, so the agent is never offered it.
 
+A person confirmed the binding as it is: its `confirmed:` record names dana, when, and the hash
+of its `upstream` and `tools`. The proxy serves only a binding whose record matches what it binds
+now. A binding with no record, or one changed after it was confirmed (another target, `load:`,
+`result:` or server command), is refused until a person confirms it again. The record was written
+by a command, never by hand:
+
+```bash
+TOPROPE_TOKEN=t-dana uv run toprope-proxy --confirm-binding --domain examples/proxy/shop.domain.yaml \
+    --binding examples/proxy/binding.yaml --identity static:examples/proxy/tokens.yaml
+```
+
 What the agent sees:
 
 | Call | What happens |
@@ -65,20 +76,23 @@ uv run toprope-import mcp "python examples/proxy/payments_server.py" --domain pa
     --binding-out payments.binding.yaml --questions q.yaml
 ```
 
-- `refund_order` becomes the proposed action `refund_order` on an `Order` (its `order_id`), with
-  `amount` typed from the input schema. Its effect is `call: mcp:refund_order`, passing every
+- `refund_order` becomes the proposed action `refund_order` on an `Order` (its `order_id`, a
+  whole word of the tool's name; `orderId` works too), with `amount` typed from the input schema.
+  An argument written in camelCase becomes a snake_case param, mapped in the binding's `params:`.
+  An enum of numbers stays a number, with a question. Its effect is `call: mcp:refund_order`, passing every
   argument on. The reply action `record_refund_order` (`external:kernel`) takes `ok` and the
   fields of the tool's output schema, and refuses when the server did not do it.
 - `get_order` is read-only (`readOnlyHint`), so it becomes a read binding, and the `load:` of
   `refund_order`. An `Order`'s facts come from its output schema, when it has one.
-- `wipe_orders` names no thing, so it is not drafted or bound: the proxy never offers it.
+- `wipe_orders` names no thing, so it is not drafted or bound: the proxy never offers it. Nor is
+  a tool that creates a thing whose id the server assigns (`create_order(customer, total)`); a
+  question asks which argument names it.
 - Every cell is `undecided`, and every actor is `unassigned`. The questions name what a person
   decides: which thing, which stage moves, who may call.
 
 The declaration goes through the change loop (`toprope-change`; see
-[`examples/import/`](../import/)), and a person confirms it. The binding is marked
-`status: proposed`, with each guess commented. The proxy will not start on it until a person
-confirms it:
+[`examples/import/`](../import/)), and a person confirms it. The binding comes with each guess
+commented and no confirmation. The proxy will not start on it until a person confirms it:
 
 ```bash
 uv run toprope-proxy --check --domain payments.domain.yaml --binding payments.binding.yaml      # agree?
@@ -87,7 +101,9 @@ TOPROPE_TOKEN=t-dana uv run toprope-proxy --confirm-binding --domain payments.do
 ```
 
 `--confirm-binding` refuses an agent. It confirms only a binding the proxy would start with, and
-it records who confirmed it and when.
+records who confirmed it, when, and the hash of what it binds. A record anyone writes by hand
+holds only while the binding is what it hashed; Toprope cannot tell who wrote the file, so keep
+the binding where agents cannot write (as for the declaration's `status: confirmed`).
 
 `tests/test_proxy.py` runs all of this in process. It also runs the real command over stdio in
 front of the server as a separate process. `tests/test_import_loop.py` drafts the declaration

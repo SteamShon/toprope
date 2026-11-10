@@ -37,7 +37,8 @@ after 100 conflicts the rest are counted.
 
 `--into` joins another source to a draft. What the draft lacks is added, proposed and citing its
 place. What it already says the same is left alone. What it says differently is a conflict that
-names both places, and the draft's own is kept: nothing is overwritten.
+names both places, and the draft's own is kept: nothing is overwritten. An actor the draft left
+`unassigned` is filled from a source that names one, like an `undecided` cell.
 
 ```bash
 uv run toprope-import openapi examples/import/orders.openapi.yaml --domain shop --out /tmp/shop.domain.yaml
@@ -50,7 +51,8 @@ uv run toprope-import sql examples/import/orders.sql --into /tmp/shop.domain.yam
 becomes a source of the workspace, so every element's citation resolves. A file inside the
 workspace is registered where it is; anything else is kept as a snapshot under
 `.toprope/imports/<id>/`. The elements, joined to the workspace's draft, become a patch for
-`toprope-change`. A new workspace file is made when `--workspace` names none.
+`toprope-change`. A new workspace file is made when `--workspace` names none. A source id that
+already holds a different snapshot (the source changed) is refused: give `--source-id` a new id.
 
 ```bash
 uv run toprope-import openapi api.yaml --domain shop --patch import.yaml --workspace toprope.shop.workspace.yaml
