@@ -88,6 +88,13 @@ def test_a_check_rule_is_evaluated_on_the_actor():
     assert decide(d, Command(Actor("eve", "person", ("eng",)), "approve_quickly", "E1", {})).status == "ok"
 
 
+def test_a_check_rule_refusal_names_the_check_not_a_role():
+    # merge of the refusal fixes (ADR-0053 §5) with the check form (#189): a check rule has no roles
+    out = decide(with_bypass(NOT_ELI), Command(Actor("eli", "person", ("eng",)), "approve_quickly", "E1", {}))
+    assert out.reason.startswith("Eli does not approve experiments.")
+    assert 'actor.id != "eli"' in out.reason and "no role yet" not in out.reason
+
+
 def test_the_validator_reads_a_check_rule():
     bad = {**NOT_ELI, "requires": {"check": "nobody.id == 1"}}
     assert ("unknown-root", f"rules.{RULE}.requires.check") in {(i.code, i.where) for i in validate_domain(with_bypass(bad))}

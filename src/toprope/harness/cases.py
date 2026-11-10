@@ -199,7 +199,7 @@ class Planner:
                 insts = [i for i in self.w.in_state(obj, state) if self.first_failing(a, i.data, role) is None]
                 if not insts or not self.actor_ok(name, a, role, insts[0]):
                     continue
-                expect = cell_expectation(raw_cell(self.d, obj, state, name, role), state)
+                expect = cell_expectation(self.d, obj, state, name, role, raw_cell(self.d, obj, state, name, role))
                 if expect["status"] != "ok":
                     continue
                 if a.requires == "human":

@@ -108,9 +108,10 @@ def suggest_rules(d: Domain) -> dict[str, dict[str, Any]]:
         art = "an" if obj[:1].lower() in "aeiou" else "a"
         what = (f"brings {art} {obj} to {part}" if tr is not None and part in tr.matrix
                 else f"sets the {part} of {art} {obj}")
-        out[rid] = {"on": outcome, "requires": "human",
-                    "reason": f"Only a person {what}: every action that does so today requires a person "
-                              f"({acts}).",
+        # A declared rule's reason: the domain's words, which the refusal follows with its fix
+        # (refusals.rule_unmet), not a message shown on its own.
+        declared = f"Only a person {what}: every action that does so today requires a person ({acts})."
+        out[rid] = {"on": outcome, "requires": "human", "reason": declared,
                     "source": {"kind": "system", "ref": f"promoted from requires: human on {acts}"},
                     "status": "proposed"}
     return out
