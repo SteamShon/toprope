@@ -116,4 +116,23 @@ CATALOG: dict[str, Service] = {s.name: s for s in (
             {"passed": "boolean", "summary": "string"}),
 )}
 
-__all__ = ["CATALOG", "KERNEL", "Service"]
+UPSTREAM = "mcp:"                           # a tool of an existing MCP server (ADR-0052)
+
+# Tools of an upstream MCP server, as services a declaration may call (ADR-0052). Only
+# `toprope-proxy` registers them, from its binding and the server's tool list; they never shadow
+# a kernel service, and a declaration names them with the `mcp:` prefix.
+UPSTREAM_SERVICES: dict[str, Service] = {}
+
+
+def service(name: str) -> Service | None:
+    """A kernel service, or an upstream tool the proxy registered."""
+    return CATALOG.get(name) or UPSTREAM_SERVICES.get(name)
+
+
+def register_upstream(svc: Service) -> None:
+    if not svc.name.startswith(UPSTREAM):
+        raise ValueError(f"an upstream tool's service is named `{UPSTREAM}<tool>`, not {svc.name!r}")
+    UPSTREAM_SERVICES[svc.name] = svc
+
+
+__all__ = ["CATALOG", "KERNEL", "UPSTREAM", "UPSTREAM_SERVICES", "Service", "register_upstream", "service"]

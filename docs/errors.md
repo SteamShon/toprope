@@ -143,6 +143,25 @@ the error is raised.
 | {…} is {…}: not a {…} | cite it with `--kind {…}` |
 | {…} records a person's decision: the calling person must be the approver | the person named as approver takes the action themselves |
 
+## `proxy/__init__.py`
+
+| Error | Fix |
+|---|---|
+| cannot read the binding {…}: {…} | give the binding's YAML file |
+| no kernel services in this proxy for {…} | call only `mcp:` tools from a declaration served by toprope-proxy |
+| the binding {…} needs `upstream:` and `tools:` mappings | see `toprope-proxy --help` for the binding's shape |
+| the binding {…}: `upstream` has exactly one of `command` or `url` | give `command: [program, args…]` for stdio, or `url:` for streamable HTTP |
+| the binding {…}: tool {…} has unknown key(s) {…} | use only the keys {…} |
+| the binding {…}: tool {…} is either `read: true` or an `action` | bind it to a declared action, or mark it read-only |
+| the binding {…}: tool {…} names exactly one of `target` or `new_id` | name the argument that identifies the object |
+| the upstream MCP session did not start within a minute | check the binding's `upstream` command or URL, and that the server runs on its own |
+
+## `proxy/cli.py`
+
+| Error | Fix |
+|---|---|
+| TOPROPE_TOKEN is missing or does not resolve to a caller | set TOPROPE_TOKEN to a token in the identity file |
+
 ## `workspace/__init__.py`
 
 | Error | Fix |

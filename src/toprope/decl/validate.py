@@ -349,10 +349,14 @@ def _unset_on_create(d: Domain, name: str, a: Any, where: str) -> list[Issue]:
 
 def _check_call(d: Domain, name: str, a, k: int, e) -> list[Issue]:
     """A kernel-service call (ADR-0028): the service, its inputs, and the reply action."""
-    from ..kernel import CATALOG, KERNEL
+    from ..kernel import CATALOG, KERNEL, UPSTREAM, service
     out: list[Issue] = []
     where = f"actions.{name}.effects[{k}]"
-    svc = CATALOG.get(e.call)
+    svc = service(e.call)
+    if svc is None and e.call.startswith(UPSTREAM):
+        # An upstream tool (ADR-0052): checked in full when toprope-proxy starts with its binding.
+        return [Issue("upstream-service", where, f"'{e.call}' is a tool of an upstream MCP server; toprope-proxy "
+                      "checks its inputs and reply against the server when it starts", severity="warning")]
     if svc is None:
         return [Issue("unknown-service", where, f"no kernel service '{e.call}' (one of {sorted(CATALOG)})")]
     for i in svc.required():
