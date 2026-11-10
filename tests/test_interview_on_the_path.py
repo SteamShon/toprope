@@ -234,7 +234,40 @@ def test_an_outcome_rule_is_offered_once_the_cells_are_settled_and_needs_confirm
     ws.answer(rule["id"], "Yes.", f"choice:{r['id']}")
     assert ws.draft()["rules"]["LeaveRequest-approved-needs-a-person"]["status"] == "proposed"
     assert "rules.LeaveRequest-approved-needs-a-person" in ws._proposed(ws.draft())  # a person confirms it
-    assert ws.progress()["current"] == "invariants"
+    assert ws.progress()["current"] == "world"            # a rule fills "Invariants and rules" (m1-recheck)
+
+
+def settled(tmp_path):
+    ws = leave(tmp_path)
+    to_transitions(ws)
+    for q in qs(ws, "default"):
+        ws.answer(q["id"], "Yes.", f"choice:{rec(q)['id']}")
+    return ws
+
+
+def every_question(ws):
+    return [q for s in ("transitions", "invariants") for q in ws.questions(stage=s, limit=50)["questions"]]
+
+
+def test_no_outcome_rule_completes_the_invariants_stage_and_asks_no_open_rules_question(tmp_path):
+    # merging m1-recheck's "Invariants and rules" stage with the transitions stage's choice (#242)
+    ws = settled(tmp_path)
+    (rule,) = qs(ws, "rule")
+    (none,) = [c for c in rule["choices"] if c["label"] == "no outcome rule"]
+    ws.answer(rule["id"], "No.", f"choice:{none['id']}")
+    assert "rules" not in ws.draft() and "invariants" not in ws.draft()
+    assert ws.progress()["current"] == "world"
+    assert not [q for q in every_question(ws) if q["kind"] in ("rules", "rule")]
+
+
+def test_skipping_invariants_leaves_the_outcome_rule_question_and_its_decision(tmp_path):
+    ws = settled(tmp_path)
+    ws.skip_stage("invariants", "Nothing beyond the stages.")
+    assert ws.progress()["current"] == "transitions"                   # the rule question is still open
+    (rule,) = qs(ws, "rule")
+    ws.answer(rule["id"], "Yes.", f"choice:{rec(rule)['id']}")
+    assert ws.draft()["rules"]["LeaveRequest-approved-needs-a-person"]["requires"] == "human"
+    assert ws.progress()["current"] == "world"
 
 
 def test_cells_the_stop_rule_skips_are_asked_as_one_choice(ws):  # noqa: F811

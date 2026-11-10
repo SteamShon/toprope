@@ -266,12 +266,13 @@ def test_the_kernel_serves_stages_and_skips_an_optional_one(ws):
 
 
 
-def test_the_invariants_stage_asks_for_outcome_rules_and_a_rule_fills_it(ws):
+def test_the_invariants_stage_asks_no_open_rules_question_and_a_rule_fills_it(ws):
+    # one outcome-rule question, the transitions stage's choice (`kind: rule`, #242); the open
+    # `rules` question m1-recheck asked here is dropped in the merge of the two
     put(ws, upto("invariants"))
     b = ws.questions(limit=50)
     assert b["stage"] == "invariants"
-    assert any(q["kind"] == "rules" and q["decides"] == ["rules"] and "whatever the action" in q["text"]
-               for q in b["questions"])
+    assert not any(q["kind"] in ("rules", "rule") for q in b["questions"])
     doc = upto("invariants")
     doc["rules"] = {"only-clerks-ship": {"on": "Order.shipped", "requires": {"roles": ["clerk"]},
                                          "reason": "Only a clerk ships.", "status": "proposed"}}

@@ -125,8 +125,10 @@ class Plan:
             if st.get("why") != BUDGET and self.rest_question() is not None:
                 return False                 # cells the stop rule skipped are still asked, as one choice
             return not self.outcome_questions()
-        if n == "invariants":
-            return bool(d.invariants or d.rules)
+        if n == "invariants":     # done by an invariant or a rule, a skip (above), or every outcome-rule
+            if d.invariants or d.rules:   # question answered, "no outcome rule" included: those are asked
+                return True               # in transitions (`outcome_questions`), not here
+            return any(_qid("rule", o) in self.answered for o in d.transitions) and not self.outcome_questions()
         if n == "world":
             return bool(d.world.fixtures and d.scenarios)
         if n == "handoffs":
