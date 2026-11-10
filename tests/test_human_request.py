@@ -483,3 +483,37 @@ def test_a_red_run_is_not_run_again():
     assert names.index("The branch is still at this run's commit") < names.index("Take the steps as the approver")
     assert "ls-remote" in guard["run"] and "GITHUB_SHA" in guard["run"] and "Fix: " in guard["run"]
     assert "do not re-run" in (ROOT / "docs/workflow.md").read_text()
+
+
+def test_a_failed_step_s_record_of_its_attempt_survives_the_restore(tmp_path, monkeypatch, capsys):
+    """F1 counts failures before the gate and refused commands: those records stay, while the rest
+    of what the failed step wrote is undone."""
+    (tmp_path / "ids.yaml").write_text(yaml.safe_dump(IDS))
+    monkeypatch.setenv(hr.TLC_ENV, "tla2tools.jar")
+    ev = tmp_path / "domains/delivery/events"
+    ev.mkdir(parents=True)
+    for name in ("events.jsonl", "idempotency.jsonl", "attempts.jsonl"):
+        (ev / name).write_text('{"before": true}\n')
+    for c in (["init", "-q"], ["add", "-A"], ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "base"]):
+        assert hr._git(tmp_path, *c)[0] == 0
+
+    def run(cmd, **kw):
+        action = cmd[cmd.index("--identity") + 2]
+        if action == "deliver":
+            for name in ("events.jsonl", "idempotency.jsonl", "attempts.jsonl"):
+                with (ev / name).open("a") as f:
+                    f.write(f'{{"{name}": "deliver"}}\n')
+            (tmp_path / ".toprope/failures").mkdir(parents=True)
+            (tmp_path / ".toprope/failures/deliver-1.json").write_text('{"command": "deliver"}')
+            (tmp_path / "half-written.json").write_text("{")
+            return subprocess.CompletedProcess(cmd, 1, "", "refused")
+        then = [{"kernel": "commit", "status": "ok", "object": "7-c0ffee"}] if action == "commit_draft" else []
+        return subprocess.CompletedProcess(cmd, 0, json.dumps({"status": "ok", "then": then}), "")
+    monkeypatch.setattr(hr.subprocess, "run", run)
+    low_risk(tmp_path, "7-c0ffee")
+    with pytest.raises(SystemExit, match="^step 5 of 9 failed"):
+        hr.run(nine_steps(), "ana-gh", identity="ids.yaml", cwd=tmp_path)
+    assert (tmp_path / ".toprope/failures/deliver-1.json").read_text() == '{"command": "deliver"}'
+    assert "deliver" in (ev / "idempotency.jsonl").read_text() and "deliver" in (ev / "attempts.jsonl").read_text()
+    assert (ev / "events.jsonl").read_text() == '{"before": true}\n'          # undone
+    assert not (tmp_path / "half-written.json").exists()

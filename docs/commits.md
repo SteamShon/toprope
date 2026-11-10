@@ -118,7 +118,9 @@ pointer is refused. Each kind has a strength, which says how far the evidence go
 
 The `human-request` workflow appends each approved run to `.toprope/approval-runs.jsonl` with
 the result it pushes, so the record outlives the branch and a squash merge. A run whose step
-failed is recorded too, with `ran` (how many steps ran) and `failed` (which step, and why). It is
+failed is recorded too, with `ran` (the first `ran` of its `steps` ran, a step whose action was taken
+but whose follow-up failed among them) and `failed` (`step`, its position in those `steps`; `number`,
+its number in the first request when this one is the rest of another; and why). It is
 approval evidence only if it failed after its `approve_commit` steps; one that failed at or before
 one approved nothing, and citing it is refused.
 Citations are appended to `evidence.jsonl` next to the commit log, with who cited and when,

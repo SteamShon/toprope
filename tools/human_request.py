@@ -334,19 +334,32 @@ def snapshot(cwd: str | Path) -> str | None:
     return tree if code == 0 else None
 
 
+# What a failed step wrote as a record of its attempt, which F1 counts (tools/usability_baseline.py):
+# a failure before the gate (D1b), and a refused or denied command's outcome and attempt. Kept as
+# they are when the rest of the tree is put back: the attempt happened.
+ATTEMPT_RECORDS = (".toprope/failures/**/*", "domains/*/events/idempotency.jsonl", "domains/*/events/attempts.jsonl")
+
+
 def restore(cwd: str | Path, tree: str | None) -> None:
-    """Put the working tree back to `tree`: what a failed step half wrote is not pushed."""
+    """Put the working tree back to `tree`, so what a failed step half wrote is not pushed, but
+    keep the records of its attempt (`ATTEMPT_RECORDS`)."""
     if tree:
+        keep = {f: f.read_bytes() for pattern in ATTEMPT_RECORDS for f in Path(cwd).glob(pattern) if f.is_file()}
         _git(cwd, "add", "-A")
         _git(cwd, "read-tree", "-u", "--reset", tree)
+        for f, data in keep.items():
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_bytes(data)
 
 
 def run(req: dict, approver: str, identity: str = "toprope.identity.yaml", cwd: str | Path = ".") -> list[dict]:
     """Run every step as the approver; stop at the first that fails.
 
     It prints what happened as JSON on stdout, also when a step fails: `as`, `steps` (how many
-    ran), `of`, `commit`, and on failure `failed` (the step in this request, why, and `accepted`
-    when its action was taken but what it set off failed), `label` (what happened, in the first
+    ran: the first `steps` of this request), `of`, `commit`, and on failure `failed` (`step`: its
+    position in this request; `number`: its number in the first request, as `label` gives it; why;
+    and `accepted` when its action was taken but what it set off failed, so it is one of the
+    `steps` that ran), `label` (what happened, in the first
     request's step numbers) and `rest` (the request that is left, see `rest`; null if none). Then
     a failure exits non-zero, after the work of the steps before it is on disk, so the workflow
     commits that work (ADR-0050, 2: the commit stays approved) and the run still ends red.
@@ -384,7 +397,7 @@ def run(req: dict, approver: str, identity: str = "toprope.identity.yaml", cwd: 
         ran = nums[:len(done)]
         if ran:
             what += f"; {_spans(ran)} ran and {'its' if len(ran) == 1 else 'their'} work is kept"
-        report(failed={"step": i, "error": message, **({"accepted": True} if accepted else {})},
+        report(failed={"step": i, "number": nums[i - 1], "error": message, **({"accepted": True} if accepted else {})},
                label=what, rest=rest(req, i + 1 if accepted else i, made))
         raise SystemExit(fixed(f"{what}: {message}", fix))
 
