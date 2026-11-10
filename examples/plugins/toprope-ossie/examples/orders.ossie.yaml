@@ -1,0 +1,51 @@
+# An Ossie ontology for a small shop, written for this example (Ossie 0.3.0.dev0).
+version: 0.3.0.dev0
+name: Shop
+requires:
+  - COUNT[Order] >= 0
+ontology:
+- concept: OrderStatus
+  type: ValueType
+  extends: [ String ]
+  requires: [ OrderStatus == 'paid' OR OrderStatus == 'shipped' OR OrderStatus == 'refunded' ]
+- concept: Money
+  type: ValueType
+  extends: [ Decimal ]
+  requires: [ Money >= 0 ]
+- concept: Customer
+  type: EntityType
+  description: "Someone who buys."
+  identify_by: [ email ]
+  relationships:
+  - name: email
+    roles: [ { concept: String } ]
+    verbalizes: [ '{Customer} is identified by {String}' ]
+    multiplicity: OneToOne
+- concept: Order
+  type: EntityType
+  description: "What a customer bought, from payment to delivery."
+  identify_by: [ id ]
+  requires: [ Order.status, Order.customer ]
+  relationships:
+  - name: id
+    roles: [ { concept: Integer } ]
+    verbalizes: [ '{Order} is identified by {Integer}' ]
+    multiplicity: OneToOne
+  - name: status
+    roles: [ { concept: OrderStatus } ]
+    verbalizes: [ '{Order} is in {OrderStatus}' ]
+    multiplicity: ManyToOne
+  - name: total
+    roles: [ { concept: Money } ]
+    verbalizes: [ '{Order} costs {Money}' ]
+    multiplicity: ManyToOne
+  - name: placedAt
+    roles: [ { concept: DateTime } ]
+    verbalizes: [ '{Order} was placed at {DateTime}' ]
+    multiplicity: ManyToOne
+  - name: gift
+    verbalizes: [ '{Order} is a gift' ]
+  - name: customer
+    roles: [ { concept: Customer } ]
+    verbalizes: [ '{Order} is placed by {Customer}' ]
+    multiplicity: ManyToOne

@@ -8,6 +8,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from ..errors import fixed
 from ..expr import ParseError, Path, parse, paths_read
 from .models import (
     RESERVED_ACTORS,
@@ -18,6 +19,7 @@ from .models import (
     RuleCheck,
     RuleRoles,
     Target,
+    UNASSIGNED,
 )
 
 RESERVED_CELLS = {"n/a", "undecided"}
@@ -155,6 +157,11 @@ def validate_domain(d: Domain) -> list[Issue]:
         for p in a.preconditions:
             issues += _check_expr(d, p.check, f"{where}.preconditions.{p.id}", a.object_type, set(a.params))
         roles_named = {r.role if isinstance(r, ActorRule) else r for r in a.actor}
+        if roles_named and roles_named <= {UNASSIGNED}:
+            add(Issue("unassigned-actor", f"{where}.actor", fixed(
+                f"no one may take {name} yet: its actor is `{UNASSIGNED}`, the role an import names until a person "
+                "says who acts, so the draft is not ready", "answer who may take it in the interview, and propose "
+                "those roles as its actor"), severity="warning"))
         if "external:kernel" in roles_named and roles_named - {"external:kernel"}:
             add(Issue("mixed-external", f"{where}.actor",
                       "an action is either for `external:kernel` or for others: declare two actions"))
@@ -362,10 +369,14 @@ def _unset_on_create(d: Domain, name: str, a: Any, where: str) -> list[Issue]:
 
 def _check_call(d: Domain, name: str, a, k: int, e) -> list[Issue]:
     """A kernel-service call (ADR-0028): the service, its inputs, and the reply action."""
-    from ..kernel import CATALOG, KERNEL
+    from ..kernel import CATALOG, KERNEL, UPSTREAM, service
     out: list[Issue] = []
     where = f"actions.{name}.effects[{k}]"
-    svc = CATALOG.get(e.call)
+    svc = service(e.call)
+    if svc is None and e.call.startswith(UPSTREAM):
+        # An upstream tool (ADR-0052): checked in full when toprope-proxy starts with its binding.
+        return [Issue("upstream-service", where, f"'{e.call}' is a tool of an upstream MCP server; toprope-proxy "
+                      "checks its inputs and reply against the server when it starts", severity="warning")]
     if svc is None:
         return [Issue("unknown-service", where, f"no kernel service '{e.call}' (one of {sorted(CATALOG)})")]
     for i in svc.required():

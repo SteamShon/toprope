@@ -272,6 +272,26 @@ The interview's route for a newcomer: docs/interview.md.
 | `--answers` `ANSWERS` | read the answers from this file, one per line, instead of the terminal |
 | `--share` | print ADR-0053's choice measure from the interview log and stop |
 
+## `toprope-import`
+
+`toprope-import`: a proposed draft from a source a team already has (ADR-0049 A1, ADR-0051).
+
+| Argument | What |
+|---|---|
+| `KIND` | the source's format: an extractor (see --list) |
+| `SOURCE` | where the source is, as the reader takes it (a path, a URL, a command) |
+| `--via` `VIA` | the reader that reaches the source (default: mcp for mcp, else file) |
+| `--profile` `PROFILE` | a YAML file of the team's conventions |
+| `--domain` `DOMAIN` | the new domain's name (default `imported`) |
+| `--out` `OUT` | where to write a new draft (default: <domain>.domain.yaml here) |
+| `--into` `INTO` | an existing draft to join this source to; its elements are never overwritten |
+| `--patch` `PATCH` | write the elements as a patch for `toprope-change --patch`, and register the source in the workspace, instead of writing a draft |
+| `--workspace` `WORKSPACE` | with --patch: the workspace file (default: `workspace:` in toprope.yaml); a new one is made for --domain |
+| `--source-id` `SOURCE_ID` | with --patch: the source's id in the workspace (default: <domain>-<kind>) |
+| `--binding-out` `BINDING_OUT` | write the draft binding a server's tools give (mcp), for toprope-proxy |
+| `--questions` `QUESTIONS` | also write the conflicts and questions as YAML records, for an agent to work from |
+| `--list` | the readers and extractors installed |
+
 ## `toprope-server`
 
 `toprope-server`: serve a declaration over MCP (stdio or streamable HTTP).
@@ -294,6 +314,21 @@ The interview's route for a newcomer: docs/interview.md.
 | `--no-seed` | do not load the declaration's example fixtures (never loaded into a composition member's own event log) |
 | `--harness-report` `HARNESS_REPORT` | harness report JSON (toprope-harness --json) shown in the world map |
 | `--working-copy` | with --composition and --kernel-root: run each member from its working-copy file, not from its deployed commit (ADR-0045) |
+
+## `toprope-proxy`
+
+`toprope-proxy`: a declaration's rules in front of an existing MCP server (ADR-0052).
+
+| Argument | What |
+|---|---|
+| `--domain` `DOMAIN` | the declaration whose rules gate the calls (required) |
+| `--binding` `BINDING` | the binding: the upstream server and which tool is which action (required) |
+| `--identity` `IDENTITY` | static:FILE (token -> caller), jwt or git, as for toprope-server |
+| `--store` `STORE` | sqlite:FILE or jsonl:DIR: the gate's record, shared with a lock by every proxy on it |
+| `--audit` `AUDIT` | append every call, gated or read, to this JSONL file |
+| `--no-seed` | do not load the declaration's example fixtures |
+| `--check` | check that the binding, the server's tools and the declaration agree, as at start, and exit |
+| `--confirm-binding` | as a person: check the binding as at start, then record that you confirmed it as it is (who, when, its hash) |
 
 ## `toprope-harness`
 

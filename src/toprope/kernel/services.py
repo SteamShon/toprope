@@ -13,8 +13,9 @@ from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
 
-from . import CATALOG, Service
 from ..errors import fixed
+from . import Service
+from . import service as lookup
 
 
 def complete(svc: Service, result: dict[str, Any]) -> dict[str, Any]:
@@ -40,13 +41,13 @@ class KernelServices(ABC):
         """`caller` is the actor whose action made the call (`{id, kind}`), from the outbox
         event. Services that record a person's decision check it, so no declaration can make
         an agent, the system or the kernel approve or deploy (the fixed floor)."""
-        svc = CATALOG.get(service)
+        svc = lookup(service)
         if svc is None:
             raise KeyError(fixed(f"no kernel service {service!r}", "use a service the kernel's catalog lists (src/toprope/kernel/__init__.py)"))
         missing = [i for i in svc.required() if i not in inputs]
         if missing:
             return svc.failure(fixed(f"missing inputs {missing}", "map them in the effect's `inputs` in the declaration"))
-        if "approver" in svc.inputs:
+        if "approver" in svc.inputs and not service.startswith("mcp:"):   # an upstream tool's own argument
             if not caller or caller.get("kind") != "person" or caller.get("id") != inputs["approver"]:
                 return svc.failure(fixed(f"{service} records a person's decision: the calling person must be the approver",
                                          "the person named as approver takes the action themselves"))
@@ -70,7 +71,7 @@ class RecordingKernel(KernelServices):
     def run(self, service, inputs):
         self.calls.append((service, dict(inputs)))
         out = dict(self.results.get(service, {"ok": True}))
-        if "id" in CATALOG[service].result and "id" not in out:
+        if "id" in lookup(service).result and "id" not in out:
             out["id"] = f"{service}-{len(self.calls)}"     # a creating reply needs an id
         return out
 

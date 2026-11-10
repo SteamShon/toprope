@@ -1,0 +1,95 @@
+"""Built-in extractors (ADR-0051): OpenAPI, SQL DDL, a workflow export, written rules, an MCP
+server's tool list. Others plug in through
+`toprope.extractors`. Each turns one format into candidates citing their exact place."""
+from __future__ import annotations
+
+import re
+from typing import Any
+
+from ...errors import fixed
+from ..port import Candidate, Extraction, Profile
+
+TYPES = {"string": "string", "integer": "integer", "number": "number", "boolean": "boolean"}
+
+
+def snake(name: str) -> str:
+    s = re.sub(r"[^A-Za-z0-9]+", "_", re.sub(r"(?<=[a-z0-9])([A-Z])", r"_\1", name)).strip("_").lower()
+    return s if s and s[0].isalpha() else f"x_{s}"
+
+
+def pascal(name: str) -> str:
+    s = "".join(w[:1].upper() + w[1:] for w in re.split(r"[^A-Za-z0-9]+", name) if w)
+    return s if s and s[0].isalpha() else f"X{s}"
+
+
+def a_(w: str) -> str:
+    return f"{'an' if w[:1].lower() in 'aeiou' else 'a'} {w}"
+
+
+def singular(name: str) -> str:
+    """`orders` → `order`, `statuses` → `status`, `categories` → `category`."""
+    low = name.lower()
+    if low.endswith("ies") and len(name) > 3:
+        return name[:-3] + "y"
+    if low.endswith(("sses", "shes", "ches", "xes", "uses")):
+        return name[:-2]
+    if low.endswith("s") and not low.endswith(("ss", "us", "is")):
+        return name[:-1]
+    return name
+
+
+def enum_fact(values: list[Any], optional: bool) -> dict[str, Any] | None:
+    """An enum as a declaration can hold it. Names stay an enum; numbers or booleans keep their
+    type (a declared enum holds names only, so `[1, 2, 3]` becomes an integer, never `["1", "2",
+    "3"]`, which the server's own values would never match); a mix is not a fact (None)."""
+    vals = [v for v in values if v is not None]
+    optional = optional or len(vals) < len(values)
+    if not vals:
+        return None
+    if all(isinstance(v, str) for v in vals):
+        return {"enum": list(dict.fromkeys(vals)), "optional": optional}
+    if all(isinstance(v, bool) for v in vals):
+        return {"type": "boolean", "optional": optional}
+    if all(isinstance(v, int) and not isinstance(v, bool) for v in vals):
+        return {"type": "integer", "optional": optional}
+    if all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in vals):
+        return {"type": "number", "optional": optional}
+    return None
+
+
+def ignored(profile: Profile, *names: str) -> bool:
+    """By the source's name or ours (ADR-0051: a profile may name either)."""
+    return any(n in profile.ignore for n in names)
+
+
+def put(facts: dict[str, Any], key: str, value: Any, out: Extraction, where: str, path: str = "") -> None:
+    """Two source names that read as one fact are a conflict, not a silent overwrite. `path` is
+    the element the facts belong to (`objects.Order.properties`)."""
+    if key in facts:
+        out.conflict(f"{where}: two facts read as `{key}`; kept the first", [f"{path}.{key}" if path else key], [where])
+    else:
+        facts[key] = value
+
+
+def mapping(doc: Any, ref: str, kind: str) -> dict[str, Any]:
+    if not isinstance(doc, dict):
+        raise SystemExit(fixed(f"{ref} is not {kind}: its top level is a {type(doc).__name__}, not a mapping",
+                               f"give the {kind} document itself"))
+    return doc
+
+
+def stages(out: Extraction, obj: str, field: str, states: list[str], ref: str) -> None:
+    out.candidates.append(Candidate(f"transitions.{obj}", {"field": field, "initial": states[0],
+                                                           "matrix": {s: {} for s in states}}, ref))
+
+
+from .mcp import McpExtractor
+from .openapi import OpenAPIExtractor
+from .rules import RulesExtractor
+from .sql import SQLExtractor
+from .workflow import WorkflowExtractor
+
+BUILTIN = [McpExtractor(), OpenAPIExtractor(), RulesExtractor(), SQLExtractor(), WorkflowExtractor()]
+
+__all__ = ["BUILTIN", "TYPES", "Any", "Candidate", "Extraction", "Profile", "a_", "enum_fact", "ignored", "mapping", "pascal", "put",
+           "singular", "snake", "stages"]

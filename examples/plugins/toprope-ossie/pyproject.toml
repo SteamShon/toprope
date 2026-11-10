@@ -1,0 +1,17 @@
+[project]
+name = "toprope-ossie"
+version = "0.1.0"
+description = "Read Apache Ossie ontologies into a proposed Toprope draft (an extractor plugin, ADR-0051)"
+requires-python = ">=3.11"
+dependencies = ["toprope", "pyyaml"]
+
+# This line is the whole integration: Toprope finds the extractor by this entry point.
+[project.entry-points."toprope.extractors"]
+ossie = "toprope_ossie:OssieExtractor"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/toprope_ossie"]

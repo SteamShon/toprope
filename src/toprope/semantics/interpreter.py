@@ -18,7 +18,7 @@ from typing import Any
 from ..decl.models import Action, ActorRule, Deny, Domain, Invariant
 from ..expr import Env, EvalError, evaluate, parse, paths_read
 from ..errors import fixed
-from ..kernel import CATALOG
+from ..kernel import service as kernel_service
 from . import refusals
 from .types import Actor, Command, Event, Grant, Outcome
 
@@ -371,7 +371,7 @@ class Interpreter:
             try:
                 env = self._env(view, cmd.actor, cmd.params, principal=self._principal(cmd))
                 payload["inputs"] = {i: evaluate(self._expr(src), env) for i, src in eff.with_.items()}
-                svc = CATALOG.get(eff.call)
+                svc = kernel_service(eff.call)
                 for i, v in payload["inputs"].items():
                     want = svc.inputs.get(i) if svc else None
                     if v is None and svc and i in svc.optional:

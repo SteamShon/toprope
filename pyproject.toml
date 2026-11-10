@@ -33,6 +33,8 @@ toprope-remove = "toprope.adapters.cli.rule:remove_main"
 toprope-change = "toprope.adapters.cli.change:main"
 toprope-apply = "toprope.adapters.cli.apply:main"
 toprope-interview = "toprope.adapters.cli.interview:main"
+toprope-import = "toprope.importers.cli:main"
+toprope-proxy = "toprope.proxy.cli:main"
 
 [dependency-groups]
 dev = [
