@@ -176,12 +176,42 @@ def settings_of(where: Path) -> dict[str, dict[str, Any]]:
     return story.get("settings") or {}
 
 
-def _current(where: Path) -> dict[str, Any]:
-    f = where / ".settings.yaml"
-    return yaml.safe_load(f.read_text()) or {} if f.is_file() else {}
+ROLE = re.compile(r"[A-Za-z_][A-Za-z0-9_-]{0,40}")
 
 
-def _value(name: str, spec: dict[str, Any], raw: str, roles: list[str]) -> Any:
+def _pattern(template_text: str) -> re.Pattern:
+    """The template's text with `{value}` as the one thing that may vary."""
+    head, _, tail = template_text.partition("{value}")
+    return re.compile(re.escape(head) + r"(.+?)" + re.escape(tail) + r"\Z")
+
+
+def _find(raw: dict[str, Any], spec: dict[str, Any], name: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    segs = spec["at"].split(".")                       # actions.<action>.preconditions.<id>
+    action = (raw.get("actions") or {}).get(segs[1])
+    pre = next((p for p in (action or {}).get("preconditions") or [] if p.get("id") == segs[3]), None)
+    if action is None or pre is None:
+        raise SystemExit(fixed(f"{name} names {spec['at']}, which domain.yaml no longer has",
+                               "put that precondition back, or edit domain.yaml by hand"))
+    return action, pre
+
+
+def current_values(where: Path) -> dict[str, str]:
+    """Each setting's value, read from the rule in domain.yaml itself, so a hand edit shows."""
+    from ...decl import load_yaml
+    raw = load_yaml((where / "domain.yaml").read_text())
+    out = {}
+    for name, spec in settings_of(where).items():
+        try:
+            _, pre = _find(raw, spec, name)
+        except SystemExit:
+            out[name] = "(its rule is gone)"
+            continue
+        m = _pattern(spec["check"]).match(str(pre.get("check", "")))
+        out[name] = m.group(1) if m else "(edited by hand)"
+    return out
+
+
+def _value(name: str, spec: dict[str, Any], raw: str, action: dict[str, Any]) -> Any:
     kind = spec.get("type", "string")
     if kind == "integer":
         try:
@@ -192,42 +222,68 @@ def _value(name: str, spec: dict[str, Any], raw: str, roles: list[str]) -> Any:
             raise SystemExit(fixed(f"{name} must be positive, not {v}", f"give e.g. {name}={spec.get('default')}"))
         return v
     if kind == "role":
-        if raw not in roles:
-            raise SystemExit(fixed(f"{raw!r} is not a role of this domain", f"use one of {', '.join(roles)}"))
+        may = [r for r in action.get("actor") or [] if isinstance(r, str)]
+        if not ROLE.fullmatch(raw):          # it goes inside quotes in a check (#215's review)
+            raise SystemExit(fixed(f"{raw!r} is not a role name", "use letters, digits, `_` and `-`"))
+        if raw not in may:
+            raise SystemExit(fixed(f"{raw!r} may not take this action, so nobody could pass the rule",
+                                   f"use one of {', '.join(may)}"))
         return raw
     if not re.fullmatch(r"[\w .:-]{1,80}", raw):
         raise SystemExit(fixed(f"{name}: {raw!r} has characters a setting may not hold", "use letters, digits and spaces"))
     return raw
 
 
+def _replace_line(lines: list[str], start: int, key: str, value: str) -> None:
+    """Set `key:` in the list item that starts at `start`, keeping its indentation and every
+    other line of the file as it was (comments, quoting, layout)."""
+    item = len(lines[start]) - len(lines[start].lstrip())
+    for i in range(start, len(lines)):
+        body = lines[i].lstrip()
+        if i > start and (body.startswith("- ") and len(lines[i]) - len(body) <= item
+                          or body and len(lines[i]) - len(body) < item):
+            break
+        m = re.match(rf"^(\s*(?:- )?){re.escape(key)}:\s", lines[i])
+        if m:
+            lines[i] = f"{m.group(1)}{key}: {json.dumps(value, ensure_ascii=False)}"
+            return
+    raise SystemExit(fixed(f"no `{key}:` line found for the setting's rule",
+                           "write the rule's check and reason on their own lines, as the template does"))
+
+
 def apply_settings(where: Path, assignments: list[str]) -> list[str]:
     """Set the template's settings in domain.yaml: each names one precondition and fills in its
-    check and reason. Returns what changed, in words. Nothing is written if any value is wrong."""
+    check and reason. Only those two lines change; the rest of the file stays as it was. Returns
+    what changed, in words. Nothing is written if any value is wrong."""
+    from ...decl import load_yaml                       # YAML 1.1 would read the key `on:` as true
     specs = settings_of(where)
     decl_file = where / "domain.yaml"
-    from ...decl import load_yaml                       # YAML 1.1 would read the key `on:` as true
-    raw = load_yaml(decl_file.read_text())
-    roles = list(raw.get("roles") or [])
-    current, said = _current(where), []
+    text = decl_file.read_text()
+    raw = load_yaml(text)
+    before = current_values(where)
+    lines, said = text.split("\n"), []
     for a in assignments:
-        name, eq, text = a.partition("=")
+        name, eq, given = a.partition("=")
         if not eq or name not in specs:
             raise SystemExit(fixed(f"no setting {name!r}" if eq else f"{a!r} is not name=value",
                                    f"use one of {', '.join(specs) or '(this template has none)'}, as name=value"))
         spec = specs[name]
-        value = _value(name, spec, text.strip(), roles)
-        segs = spec["at"].split(".")                 # actions.<action>.preconditions.<id>
-        action = raw["actions"][segs[1]]
-        pre = next((p for p in action.get("preconditions") or [] if p.get("id") == segs[3]), None)
-        if pre is None:
-            raise SystemExit(fixed(f"{name} names {spec['at']}, which domain.yaml no longer has",
-                                   "put that precondition back, or edit domain.yaml by hand"))
-        pre["check"] = spec["check"].format(value=value)
-        pre["reason"] = spec["reason"].format(value=value)
-        said.append(f"{name}: {current.get(name, spec.get('default'))} -> {value} ({pre['reason']})")
-        current[name] = value
-    decl_file.write_text(yaml.safe_dump(raw, sort_keys=False, allow_unicode=True, width=100))
-    (where / ".settings.yaml").write_text(yaml.safe_dump(current, sort_keys=False))
+        action, pre = _find(raw, spec, name)
+        value = _value(name, spec, given.strip(), action)
+        check_text, reason = spec["check"].format(value=value), spec["reason"].format(value=value)
+        at = next((i for i, ln in enumerate(lines) if re.match(rf"^\s*- id: {re.escape(pre['id'])}\s*$", ln)), None)
+        if at is None:
+            raise SystemExit(fixed(f"no `- id: {pre['id']}` line in domain.yaml",
+                                   "write the precondition's id on its own line, as the template does"))
+        _replace_line(lines, at, "check", check_text)
+        _replace_line(lines, at, "reason", reason)
+        pre["check"], pre["reason"] = check_text, reason
+        said.append(f"{name}: {before.get(name)} -> {value} ({reason})")
+    out = "\n".join(lines)
+    if load_yaml(out) != raw:                           # the edit changed exactly what it meant to
+        raise SystemExit(fixed("the edited domain.yaml would not read back as intended",
+                               "edit the rule by hand; the file's layout is not one toprope-set can edit"))
+    decl_file.write_text(out)
     return said
 
 
@@ -304,12 +360,12 @@ def set_main(argv: list[str] | None = None) -> None:
     where = Path(a.dir)
     if not (where / "story.yaml").is_file():
         raise SystemExit(fixed(f"no story.yaml in {where}", "run toprope-set in a directory toprope-init wrote"))
-    specs, current = settings_of(where), _current(where)
+    specs, current = settings_of(where), current_values(where)
     if a.list or not a.assignments:
         if not specs:
             print("this template has no settings; edit domain.yaml, then `toprope-try --check`")
         for name, spec in specs.items():
-            print(f"{name} = {current.get(name, spec.get('default'))}    {spec.get('says', '')}")
+            print(f"{name} = {current.get(name)}    {spec.get('says', '')}")
         return
     before = (where / "domain.yaml").read_text()
     try:

@@ -51,7 +51,57 @@ def test_a_wrong_value_is_refused_with_its_fix_and_nothing_is_written(tmp_path, 
     assert (out / "domain.yaml").read_text() == before
 
 
-def test_a_role_setting_takes_only_a_declared_role(tmp_path):
-    with pytest.raises(SystemExit, match="'ceo' is not a role of this domain. Fix: use one of member, manager, security"):
+def test_a_role_setting_takes_only_a_role_that_may_take_the_action(tmp_path):
+    with pytest.raises(SystemExit, match="'ceo' may not take this action.*Fix: use one of manager, security"):
         init_main(["acc", "--template", "approval", "--dir", str(tmp_path), "--set", "prod_approver=ceo"])
     assert not (tmp_path / "acc").exists()
+
+
+def test_a_role_that_could_not_approve_is_refused(tmp_path):
+    out = init("acc", "approval", tmp_path)
+    with pytest.raises(SystemExit, match="'member' may not take this action, so nobody could pass the rule"):
+        set_main(["--dir", str(out), "prod_approver=member"])
+
+
+def test_a_role_name_cannot_break_out_of_its_quotes(tmp_path):
+    out = init("acc", "approval", tmp_path)
+    decl = out / "domain.yaml"
+    decl.write_text(decl.read_text().replace("roles: [member, manager, security]",
+                                             "roles: [member, manager, security, \"x' or true or 'y\"]"))
+    with pytest.raises(SystemExit, match="is not a role name"):
+        set_main(["--dir", str(out), "prod_approver=x' or true or 'y"])
+
+
+def test_only_the_rule_changes_and_the_rest_of_the_file_stays_as_written(tmp_path):
+    out = init("shop", "refunds", tmp_path)
+    decl = out / "domain.yaml"
+    text = "# our refund policy\n" + decl.read_text().replace(
+        "description: A paid order.", "description: '1e3'  # a code, kept as text")
+    decl.write_text(text)
+    set_main(["--dir", str(out), "window_days=30"])
+    after = decl.read_text()
+    assert after.startswith("# our refund policy\n") and "description: '1e3'  # a code, kept as text" in after
+    changed = [(a, b) for a, b in zip(text.splitlines(), after.splitlines()) if a != b]
+    assert len(changed) == 2 and all(("check:" in b or "reason:" in b) for _, b in changed)
+
+
+def test_the_value_shown_is_the_one_in_the_rule_even_after_a_hand_edit(tmp_path, capsys):
+    out = init("shop", "refunds", tmp_path)
+    decl = out / "domain.yaml"
+    decl.write_text(decl.read_text().replace("<= 7", "<= 14"))
+    set_main(["--dir", str(out), "--list"])
+    assert "window_days = 14" in capsys.readouterr().out
+    set_main(["--dir", str(out), "window_days=30"])
+    assert "window_days: 14 -> 30" in capsys.readouterr().out
+    decl.write_text(decl.read_text().replace("<= 30", "< 30 and true"))
+    set_main(["--dir", str(out), "--list"])
+    assert "window_days = (edited by hand)" in capsys.readouterr().out
+
+
+def test_a_setting_whose_action_is_gone_names_its_fix(tmp_path):
+    out = init("shop", "refunds", tmp_path)
+    decl = out / "domain.yaml"
+    decl.write_text(decl.read_text().replace("refund_order", "give_back"))
+    with pytest.raises(SystemExit, match="names actions.refund_order.preconditions.within-window, which domain.yaml "
+                                         "no longer has. Fix:"):
+        set_main(["--dir", str(out), "window_days=30"])
