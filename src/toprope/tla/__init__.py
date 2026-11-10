@@ -41,7 +41,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from ..decl.models import ActorRule, ByRole, Deny, Domain, Target
+from ..decl.models import ActorRule, ByRole, Deny, Domain, RuleCheck, Target
+from ..decl.rules import covering
 from ..expr import parse
 from ..expr.ast import Arith, Call, Compare, ListLit, Literal, Logical, Neg, Not, Path
 from ..harness.world import world_actors
@@ -400,10 +401,13 @@ def _action(d: Domain, name: str, a: Any, tr: Any, actors: dict[str, Any], ids: 
     required = {p: s for p, s in a.params.items() if not s.optional}
     pvars = {p: f"p_{ident(p)}" for p in required}
     cands = {}
+    unread = _unread_params(d, a)
     for p, s in required.items():
         vals = _candidates(d, s, ids)
         if not vals:
             raise Unsupported(f"the param {p} with no candidate value")
+        if p in unread:            # only copied into fields nothing reads: one value stands for all
+            vals = vals[:1]
         cands[p] = [[v] if s.many else v for v in vals]
     out = []
     for role, actor in sorted(actors.items()):
@@ -418,7 +422,7 @@ def _action(d: Domain, name: str, a: Any, tr: Any, actors: dict[str, Any], ids: 
         else:
             who = " \\/ ".join(f"Pass({ex(r.where)})" for r in rules)
         moves = []
-        from ..decl.rules import covering, meets
+        from ..decl.rules import meets
         for state, cells in tr.matrix.items():
             to = _resolve(cells.get(name, "undecided"), actor.roles)
             if to is not None and all(meets(r, actor.kind, actor.roles) for _, r in covering(d, name, state)):
@@ -426,6 +430,12 @@ def _action(d: Domain, name: str, a: Any, tr: Any, actors: dict[str, Any], ids: 
         if not moves:
             continue
         pre = [f"Pass({ex(p.check)})" for p in a.preconditions]
+        for rid, rule in sorted(d.rules.items()):       # a `check` rule guards the moves it covers
+            if isinstance(rule.requires, RuleCheck):
+                held = sorted(st for st in tr.matrix if any(r == rid for r, _ in covering(d, name, st)))
+                if held:
+                    pre.append(f"(mv[1] \\notin {{{', '.join(tla_str(st) for st in held)}}} \\/ "
+                               f"Pass({ex(rule.requires.check)}))")
         sets = {}
         for e in a.effects:
             for key, v in (e.set or {}).items():
@@ -476,7 +486,7 @@ def _create(d: Domain, name: str, a: Any, actors: dict[str, Any], ids: list[str]
     if tr is not None and tr.initial:
         base[tr.field] = value(tr.initial)
     out = []
-    from ..decl.rules import covering, meets
+    from ..decl.rules import meets
     for role, actor in sorted(actors.items()):
         if a.requires == "human" and actor.kind != "person":
             continue
@@ -489,6 +499,7 @@ def _create(d: Domain, name: str, a: Any, actors: dict[str, Any], ids: list[str]
         who = "TRUE" if any(isinstance(r, str) or not r.where for r in rules) else \
             " \\/ ".join(f"Pass({ex(r.where)})" for r in rules)
         pre = [f"Pass({ex(p.check)})" for p in a.preconditions]
+        pre += [f"Pass({ex(r.requires.check)})" for _, r in covering(d, name, None) if isinstance(r.requires, RuleCheck)]
         sets = {}
         for e in a.effects:
             for key, v in (e.set or {}).items():
@@ -507,6 +518,45 @@ def _create(d: Domain, name: str, a: Any, actors: dict[str, Any], ids: list[str]
                 f"\n    /\\ last' = <<{tla_str(name)}, {tla_str(role)}, {tla_str(new_id)}, {params_rec}>>")
         out.append((op, body))
     return out
+
+
+def _unread_params(d: Domain, action: Any) -> set[str]:
+    """The params of an action on an existing object that only an effect copies into a field
+    (`target.f: params.p`), where no other expression of the action reads `params.p` and no
+    expression of the domain reads a field `f` (a precondition, an actor rule, an effect, a call's
+    inputs, an invariant, a rule or a handoff). Their values cannot change any step or check, so
+    TLC tries one (as `_reads` does for creation); otherwise each stored string multiplies the
+    states."""
+    copies: dict[str, set[str]] = {}
+    own: list[str] = [p.check for p in action.preconditions]
+    own += [r.where for r in action.actor if isinstance(r, ActorRule) and r.where]
+    for e in action.effects:
+        own += [v for v in (e.with_ or {}).values() if isinstance(v, str)]
+        for key, v in (e.set or {}).items():
+            m = re.fullmatch(r"params\.([A-Za-z_][A-Za-z0-9_]*)", v.strip()) if isinstance(v, str) else None
+            if m and key.startswith("target."):
+                copies.setdefault(m.group(1), set()).add(key.split(".", 1)[1])
+            elif isinstance(v, str):
+                own.append(v)
+    if not copies:
+        return set()
+    texts = list(own)
+    for a in d.actions.values():
+        if a is action:
+            continue
+        texts += [p.check for p in a.preconditions]
+        texts += [r.where for r in a.actor if isinstance(r, ActorRule) and r.where]
+        for e in a.effects:
+            texts += [v for v in (e.set or {}).values() if isinstance(v, str)]
+            texts += [v for v in (e.with_ or {}).values() if isinstance(v, str)]
+    texts += [i.check for i in d.invariants]
+    texts += [r.requires.check for r in d.rules.values() if isinstance(r.requires, RuleCheck)]
+    for h in d.handoffs.values():
+        texts += [h.target, *h.params.values()]
+    blob = " ".join(texts)
+    return {p for p, fields in copies.items()
+            if not re.search(rf"\bparams\.{p}\b", " ".join(own))
+            and not any(re.search(rf"\.{f}\b", blob) for f in fields)}
 
 
 def _reads(d: Domain, obj: str, creating: Any) -> set[str]:

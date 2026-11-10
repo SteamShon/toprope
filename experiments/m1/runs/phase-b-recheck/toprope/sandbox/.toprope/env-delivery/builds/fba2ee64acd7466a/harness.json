@@ -1,0 +1,152 @@
+{
+  "ok": true,
+  "levels": [
+    "model",
+    "execution"
+  ],
+  "findings": [],
+  "coverage": {
+    "edges": {
+      "DeliveryRequest.(new).request_delivery": "verified",
+      "DeliveryRequest.built.deploy": "verified",
+      "DeliveryRequest.built.preview": "verified",
+      "DeliveryRequest.built.record_build": "verified",
+      "DeliveryRequest.built.record_deployment": "verified",
+      "DeliveryRequest.built.record_probes": "verified",
+      "DeliveryRequest.built.run_probes": "verified",
+      "DeliveryRequest.built.verify": "verified",
+      "DeliveryRequest.deploying.deploy": "verified",
+      "DeliveryRequest.deploying.preview": "verified",
+      "DeliveryRequest.deploying.record_build": "verified",
+      "DeliveryRequest.deploying.record_deployment": "verified",
+      "DeliveryRequest.deploying.record_probes": "verified",
+      "DeliveryRequest.deploying.run_probes": "verified",
+      "DeliveryRequest.deploying.verify": "verified",
+      "DeliveryRequest.done.deploy": "verified",
+      "DeliveryRequest.done.preview": "verified",
+      "DeliveryRequest.done.record_build": "verified",
+      "DeliveryRequest.done.record_deployment": "verified",
+      "DeliveryRequest.done.record_probes": "verified",
+      "DeliveryRequest.done.run_probes": "verified",
+      "DeliveryRequest.done.verify": "verified",
+      "DeliveryRequest.previewing.deploy": "verified",
+      "DeliveryRequest.previewing.preview": "verified",
+      "DeliveryRequest.previewing.record_build": "verified",
+      "DeliveryRequest.previewing.record_deployment": "verified",
+      "DeliveryRequest.previewing.record_probes": "verified",
+      "DeliveryRequest.previewing.run_probes": "verified",
+      "DeliveryRequest.previewing.verify": "verified",
+      "DeliveryRequest.requested.deploy": "verified",
+      "DeliveryRequest.requested.preview": "verified",
+      "DeliveryRequest.requested.record_build": "verified",
+      "DeliveryRequest.requested.record_deployment": "verified",
+      "DeliveryRequest.requested.record_probes": "verified",
+      "DeliveryRequest.requested.run_probes": "verified",
+      "DeliveryRequest.requested.verify": "verified",
+      "DeliveryRequest.verified.deploy": "verified",
+      "DeliveryRequest.verified.preview": "verified",
+      "DeliveryRequest.verified.record_build": "verified",
+      "DeliveryRequest.verified.record_deployment": "verified",
+      "DeliveryRequest.verified.record_probes": "verified",
+      "DeliveryRequest.verified.run_probes": "verified",
+      "DeliveryRequest.verified.verify": "verified"
+    },
+    "cells": {
+      "decided": 84,
+      "covered": {
+        "model": 84,
+        "execution": 84
+      },
+      "undecided": [],
+      "gaps": []
+    },
+    "preconditions": {
+      "cases": 5,
+      "gaps": []
+    },
+    "creates": 2,
+    "invariants": {
+      "total": 5,
+      "exercised": 5
+    },
+    "flows": {
+      "total": 4,
+      "passed": {
+        "model": 4,
+        "execution": 4
+      }
+    },
+    "races": 0,
+    "unreachable": {},
+    "mechanical": {
+      "cells": 84,
+      "samples": 222,
+      "no_sample": [
+        "DeliveryRequest.verified.preview.external:kernel",
+        "DeliveryRequest.verified.deploy.approver",
+        "DeliveryRequest.verified.deploy.external:kernel",
+        "DeliveryRequest.verified.record_deployment.external:kernel",
+        "DeliveryRequest.verified.record_probes.approver",
+        "DeliveryRequest.verified.record_probes.external:kernel"
+      ],
+      "unreachable_from_creation": {}
+    }
+  },
+  "minimal_flows": [],
+  "warnings": [
+    {
+      "kind": "no-sample",
+      "level": "model",
+      "case": "mechanical:DeliveryRequest.verified.preview.external:kernel",
+      "detail": {
+        "reason": "no generated object satisfies the invariants in this stage",
+        "why": "the cell is not tested mechanically; give an example in this stage"
+      }
+    },
+    {
+      "kind": "no-sample",
+      "level": "model",
+      "case": "mechanical:DeliveryRequest.verified.deploy.approver",
+      "detail": {
+        "reason": "no generated object satisfies the invariants in this stage",
+        "why": "the cell is not tested mechanically; give an example in this stage"
+      }
+    },
+    {
+      "kind": "no-sample",
+      "level": "model",
+      "case": "mechanical:DeliveryRequest.verified.deploy.external:kernel",
+      "detail": {
+        "reason": "no generated object satisfies the invariants in this stage",
+        "why": "the cell is not tested mechanically; give an example in this stage"
+      }
+    },
+    {
+      "kind": "no-sample",
+      "level": "model",
+      "case": "mechanical:DeliveryRequest.verified.record_deployment.external:kernel",
+      "detail": {
+        "reason": "no generated object satisfies the invariants in this stage",
+        "why": "the cell is not tested mechanically; give an example in this stage"
+      }
+    },
+    {
+      "kind": "no-sample",
+      "level": "model",
+      "case": "mechanical:DeliveryRequest.verified.record_probes.approver",
+      "detail": {
+        "reason": "no generated object satisfies the invariants in this stage",
+        "why": "the cell is not tested mechanically; give an example in this stage"
+      }
+    },
+    {
+      "kind": "no-sample",
+      "level": "model",
+      "case": "mechanical:DeliveryRequest.verified.record_probes.external:kernel",
+      "detail": {
+        "reason": "no generated object satisfies the invariants in this stage",
+        "why": "the cell is not tested mechanically; give an example in this stage"
+      }
+    }
+  ]
+}

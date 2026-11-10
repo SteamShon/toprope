@@ -1,0 +1,112 @@
+{
+  "ok": true,
+  "levels": [
+    "model",
+    "execution"
+  ],
+  "findings": [],
+  "coverage": {
+    "edges": {
+      "Answer.(new).answer_question": "verified",
+      "Answer.recorded.record_answer_ref": "verified",
+      "Commit.(new).record_commit": "verified",
+      "Commit.recorded.approve_commit": "verified",
+      "Commit.recorded.check_commit": "verified",
+      "Commit.recorded.cite_evidence": "verified",
+      "Commit.recorded.deliver": "verified",
+      "Commit.recorded.record_approval": "verified",
+      "Commit.recorded.record_check": "verified",
+      "Commit.recorded.record_evidence": "verified",
+      "DecisionRequest.(new).request_decision": "verified",
+      "DecisionRequest.decided.decide": "verified",
+      "DecisionRequest.open.decide": "verified",
+      "Draft.(new).open_draft": "verified",
+      "Draft.open.checkout_commit": "verified",
+      "Draft.open.commit_draft": "verified",
+      "Draft.open.confirm_all_proposed": "verified",
+      "Draft.open.merge_main": "verified",
+      "Draft.open.next_questions": "verified",
+      "Draft.open.record_checkout": "verified",
+      "Draft.open.record_confirm_all": "verified",
+      "Draft.open.record_merge": "verified",
+      "Draft.open.record_questions": "verified",
+      "Draft.open.record_search": "verified",
+      "Draft.open.record_skip": "verified",
+      "Draft.open.search": "verified",
+      "Draft.open.skip_stage": "verified",
+      "Element.(new).propose_element": "verified",
+      "Element.confirmed.confirm_element": "verified",
+      "Element.confirmed.confirm_wording_fix": "verified",
+      "Element.confirmed.mark_unknown": "verified",
+      "Element.confirmed.record_confirmation": "verified",
+      "Element.confirmed.record_proposal": "verified",
+      "Element.confirmed.second_confirm_element": "verified",
+      "Element.confirmed.withdraw_element": "verified",
+      "Element.proposed.confirm_element": "verified",
+      "Element.proposed.confirm_wording_fix": "verified",
+      "Element.proposed.mark_unknown": "verified",
+      "Element.proposed.record_confirmation": "verified",
+      "Element.proposed.record_proposal": "verified",
+      "Element.proposed.second_confirm_element": "verified",
+      "Element.proposed.withdraw_element": "verified",
+      "Element.unknown.confirm_element": "verified",
+      "Element.unknown.confirm_wording_fix": "verified",
+      "Element.unknown.mark_unknown": "verified",
+      "Element.unknown.record_confirmation": "verified",
+      "Element.unknown.record_proposal": "verified",
+      "Element.unknown.second_confirm_element": "verified",
+      "Element.unknown.withdraw_element": "verified",
+      "Element.withdrawn.confirm_element": "verified",
+      "Element.withdrawn.confirm_wording_fix": "verified",
+      "Element.withdrawn.mark_unknown": "verified",
+      "Element.withdrawn.record_confirmation": "verified",
+      "Element.withdrawn.record_proposal": "verified",
+      "Element.withdrawn.second_confirm_element": "verified",
+      "Element.withdrawn.withdraw_element": "verified",
+      "Question.(new).ask_question": "verified",
+      "Source.(new).add_source": "verified",
+      "Source.added.fetch_source": "verified",
+      "Source.added.record_fetch": "verified",
+      "Source.fetched.fetch_source": "verified",
+      "Source.fetched.record_fetch": "verified"
+    },
+    "cells": {
+      "decided": 165,
+      "covered": {
+        "model": 165,
+        "execution": 165
+      },
+      "undecided": [],
+      "gaps": []
+    },
+    "preconditions": {
+      "cases": 9,
+      "gaps": [
+        "precondition:skip_stage.reason-written",
+        "precondition:confirm_wording_fix.not-permission"
+      ]
+    },
+    "creates": 21,
+    "invariants": {
+      "total": 4,
+      "exercised": 4
+    },
+    "flows": {
+      "total": 4,
+      "passed": {
+        "model": 4,
+        "execution": 4
+      }
+    },
+    "races": 0,
+    "unreachable": {},
+    "mechanical": {
+      "cells": 165,
+      "samples": 494,
+      "no_sample": [],
+      "unreachable_from_creation": {}
+    }
+  },
+  "minimal_flows": [],
+  "warnings": []
+}

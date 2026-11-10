@@ -52,7 +52,7 @@ jobs:
   act:
     needs: plan
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 120        # uncached checks of two changed declarations can take tens of minutes
     environment: researcher
     permissions:
       contents: write
@@ -73,9 +73,14 @@ jobs:
           TLC_VERSION: v1.8.0
           TLC_SHA256: e1f11b75c4b5bc4478ba0ac5cb6ae28e40a01b0016bc33e0aa97da22dfdbcd7f
         run: |
-          curl -sSLo "$RUNNER_TEMP/tla2tools.jar" \
-            "https://github.com/tlaplus/tlaplus/releases/download/$TLC_VERSION/tla2tools.jar"
-          echo "$TLC_SHA256  $RUNNER_TEMP/tla2tools.jar" | sha256sum -c -
+          # The download sometimes returns a partial or wrong file: retry until the hash matches.
+          for i in 1 2 3 4 5; do
+            curl -fsSL --retry 3 --retry-all-errors -o "$RUNNER_TEMP/tla2tools.jar" \
+              "https://github.com/tlaplus/tlaplus/releases/download/$TLC_VERSION/tla2tools.jar" \
+              && echo "$TLC_SHA256  $RUNNER_TEMP/tla2tools.jar" | sha256sum -c - && break
+            if [ "$i" = 5 ]; then exit 1; fi
+            sleep $((i * 10))
+          done
           echo "TOPROPE_TLC_JAR=$RUNNER_TEMP/tla2tools.jar" >> "$GITHUB_ENV"
       - name: Who approved
         id: who

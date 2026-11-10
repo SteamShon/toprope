@@ -336,6 +336,19 @@ def test_a_commit_with_a_proposed_element_is_not_approved(store):
     assert st.approve("example", c2.id, "ana") == c2
 
 
+def test_a_commit_with_a_proposed_outcome_rule_is_not_approved_and_confirm_all_finds_it(store, tmp_path):
+    """Found when the M1 recheck's approval confirmed everything proposed but the rules (ADR-0048)."""
+    from toprope.decl.provenance import proposed_elements
+    st, wc = store
+    raw = schema_doc_domain()
+    raw["rules"] = {"only-approvers": {"on": "Experiment.approved", "requires": {"roles": ["approver"]},
+                                       "reason": "r", "status": "proposed"}}
+    assert proposed_elements(raw) == ["rules.only-approvers"]
+    c, _ = st.commit(write(wc, raw))
+    with pytest.raises(CommitError, match=r"1 proposed element\(s\): rules.only-approvers"):
+        st.approve("example", c.id, "ana")
+
+
 def test_a_merge_that_brings_in_a_proposed_element_is_not_approved(store, tmp_path):
     st, wc = store
     raw = schema_doc_domain()
@@ -469,3 +482,12 @@ def test_by_default_one_owner_commits_and_approves(tmp_path):
     st = CommitStore(tmp_path / "commits")
     c, _ = st.commit(write(tmp_path / "d.domain.yaml", schema_doc_domain()), author="ana")
     assert st.approve("example", c.id, "ana").id == c.id                # M1: one owner (ADR-0032)
+
+
+def test_a_changed_outcome_rule_is_reviewed_again():
+    from toprope.decl.interface import review_diff, review_elements
+    raw = schema_doc_domain()
+    raw["rules"] = {"only-approvers": {"on": "Experiment.approved", "requires": {"roles": ["approver"]}, "reason": "r"}}
+    old = review_elements(Domain.model_validate(raw))
+    raw["rules"]["only-approvers"]["requires"] = "human"
+    assert review_diff(old, review_elements(Domain.model_validate(raw))).changed == ["rule:only-approvers"]

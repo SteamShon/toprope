@@ -1,0 +1,9 @@
+{
+  "id": "3ec5a16fd05bf9af",
+  "domain": "authoring",
+  "version": 21,
+  "declaration_sha256": "3ec5a16fd05bf9af76e5e89e7432b315fc6941e9d4dfe8248b05016434d380c5",
+  "toolchain": "45dcf59bceae89ec388152ff75a63cf206f20fa3691e317920b7ef01a913ed51",
+  "harness_ok": true,
+  "created_at": "2026-11-09T16:55:11+00:00"
+}

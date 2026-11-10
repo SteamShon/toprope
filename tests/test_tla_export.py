@@ -144,3 +144,21 @@ def test_time_is_the_harness_clock_frozen():
     assert '("2025-11-02T00:00:00+00:00" :> 60)' in e.module             # Days: 60 days before the clock
     assert 'DaysSince(Attr(R(o), "started_at"))' in e.module
     assert '("started_at" :> Store(T(0)))' in e.module
+
+
+def test_a_param_only_copied_into_a_field_nothing_reads_takes_one_value():
+    """A string the declaration stores but never reads cannot change a step or a check; trying
+    every candidate multiplied Authoring's states until TLC took hours (the M1 recheck)."""
+    from toprope.tla import _unread_params
+    raw = schema_doc_domain()
+    raw["objects"]["Experiment"]["properties"]["memo"] = {"type": "string", "optional": True}
+    raw["actions"]["approve_experiment"]["params"]["memo"] = {"type": "string"}
+    raw["actions"]["approve_experiment"]["effects"].append({"set": {"target.memo": "params.memo"}})
+    d = Domain.model_validate(raw)
+    assert _unread_params(d, d.actions["approve_experiment"]) == {"memo"}
+    step = export(d).module.split("Step_approve_experiment_approver ==")[1].split("\n\n")[0]
+    assert step.count("p_memo \\in {") == 1 and step.split("p_memo \\in {")[1].split("}")[0].count(",") == 0
+    raw["invariants"].append({"id": "memo-short", "on": "Experiment", "check": "count(target.memo) < 99",
+                              "reason": "r"})
+    read = Domain.model_validate(raw)
+    assert _unread_params(read, read.actions["approve_experiment"]) == set()       # read: every value
