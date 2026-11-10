@@ -19,6 +19,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..decl.models import Domain
+from ..errors import fixed
+from ..semantics import refusals
 
 KNOWN, GAP, MISMATCH = "known", "harness gap", "model mismatch"
 
@@ -43,7 +45,8 @@ def parse_value(text: str) -> Any:
         nonlocal pos
         m = _TOKEN.match(text, pos)
         if not m:
-            raise ValueError(f"cannot read TLC value at {text[pos:pos + 40]!r}")
+            raise ValueError(fixed(f"cannot read TLC value at {text[pos:pos + 40]!r}",
+                                   "give the trace as TLC prints it, one state per value"))
         pos = m.end()
         return m.group(1)
 
@@ -65,7 +68,8 @@ def parse_value(text: str) -> Any:
 
     out.append(value(token()))
     if text[pos:].strip():
-        raise ValueError(f"trailing text after a TLC value: {text[pos:pos + 40]!r}")
+        raise ValueError(fixed(f"trailing text after a TLC value: {text[pos:pos + 40]!r}",
+                               "give the trace as TLC prints it, one state per value"))
     return out[0]
 
 
@@ -80,7 +84,8 @@ def _untag(v: Any) -> Any:
         return v[1]
     if tag == "l":
         return [_untag(x) for x in v[1]]
-    raise ValueError(f"a param value TLC cannot hold: {v!r}")
+    raise ValueError(fixed(f"a param value TLC cannot hold: {v!r}",
+                           "replay only traces of Toprope's own TLA export, whose params it can hold"))
 
 
 def parse_trace(tlc_output: str) -> tuple[str | None, list[Step]]:
@@ -131,7 +136,7 @@ def judge(d: Domain, invariant_op: str | None, steps: list[Step], harness_broken
     outcomes = replay(d, steps)
     *before, last = outcomes
     reproduced = (all(o["status"] == "ok" for o in before) and last["code"] == "invariant-guard"
-                  and last["reason"] == inv.reason)
+                  and last["reason"] == refusals.invariant(inv.reason, inv.check, d))
     if not reproduced:
         bad = next((o for o in outcomes if o["status"] != "ok"), last)
         return {"verdict": MISMATCH, "invariant": inv.id, "steps": outcomes,
@@ -149,7 +154,8 @@ def harness_broken(d: Domain) -> set[str]:
         if f.kind == "invariant":
             det = f.detail
             inv = det.get("invariant") or ((det.get("observed") or {}).get("reason"))
-            out.add(next((i.id for i in d.invariants if inv in (i.id, i.reason)), inv))
+            out.add(next((i.id for i in d.invariants
+                          if inv in (i.id, i.reason, refusals.invariant(i.reason, i.check, d))), inv))
         elif f.kind == "exploration":
             out.add(f.detail.get("invariant"))
     return out

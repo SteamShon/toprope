@@ -19,6 +19,7 @@ import json
 from typing import Any
 
 from . import CommitError, CommitStore
+from ..errors import fixed
 
 
 DOMAIN = "the domain's name, as its declaration's `domain:` says"
@@ -59,7 +60,8 @@ def run(args: argparse.Namespace) -> Any:
         return {"current": env.current(), "history": env.history()[-10:], "server_args": serve}
     st = CommitStore(args.commits)
     if not st.log(args.domain):
-        raise CommitError(f"no commits for domain {args.domain!r} in {args.commits}")
+        raise CommitError(fixed(f"no commits for domain {args.domain!r} in {args.commits}",
+                                "check --domain and --commits, or commit the draft first (`commit_draft`)"))
     if args.cmd in ("checks", "evidence"):
         st.get(args.domain, args.commit)                 # an unknown commit is an error, not {}
     if args.cmd == "branches":
@@ -68,7 +70,7 @@ def run(args: argparse.Namespace) -> Any:
         return st.element_log(args.domain, args.element, args.at)
     if args.cmd == "diff":
         if len(args.ids) > 2:
-            raise CommitError("diff takes [FROM] TO")
+            raise CommitError(fixed("diff takes [FROM] TO", "give one commit (diffed with its parent) or two"))
         frm, to = (None, args.ids[0]) if len(args.ids) == 1 else args.ids
         return st.diff(args.domain, frm, to)
     if args.cmd == "evidence":

@@ -28,6 +28,7 @@ from typing import Any
 import yaml
 
 from ..decl.models import Domain
+from ..errors import fixed
 
 ENV = "TOPROPE_NL_COMMAND"
 
@@ -83,7 +84,8 @@ def parse(text: str) -> list[tuple[str, str]]:
             continue
         if isinstance(data, dict) and isinstance(data.get("conflicts"), list):
             return [(str(c.get("where", "")), str(c.get("problem", ""))) for c in data["conflicts"] if isinstance(c, dict)]
-    raise ValueError("the checker did not answer with the JSON asked for")
+    raise ValueError(fixed("the checker did not answer with the JSON asked for",
+                           "run the check again; if it repeats, check the checker command's prompt handling"))
 
 
 class CommandChecker:
@@ -99,7 +101,9 @@ class CommandChecker:
         r = subprocess.run(self.command, input=build_prompt(old, new, changed), capture_output=True, text=True,
                            timeout=self.timeout, check=False)
         if r.returncode != 0:
-            raise RuntimeError(f"the checker exited {r.returncode}: {r.stderr.strip()[-500:]}")
+            raise RuntimeError(fixed(f"the checker exited {r.returncode}: {r.stderr.strip()[-500:]}",
+                                     "fix the checker command (its error is above), or run the check without the "
+                                     "language check"))
         return parse(r.stdout)
 
 

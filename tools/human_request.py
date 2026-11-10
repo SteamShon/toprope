@@ -62,6 +62,7 @@ import sys
 from pathlib import Path
 
 import yaml
+from toprope.errors import fixed
 
 ROOT = Path(__file__).resolve().parents[1]
 REQUESTS = ".toprope/requests"
@@ -69,6 +70,8 @@ APPROVAL_RUNS = ".toprope/approval-runs.jsonl"
 INSTRUMENT_STEPS = ("freeze", "freeze-binding", "freeze-protocol", "amend")
 COMPOSITION = "domains/toprope-self.composition.yaml"
 MADE = "$commit"                     # the commit an earlier commit_draft step of the request made
+AGAIN = ("fix the cause, then push a change to the request (the workflow leaves the steps that did not run in it), "
+         "and approve that run; do not re-run this run")   # the fix of a step that failed
 TLC_ENV = "TOPROPE_TLC_JAR"         # the kernel model-checks with it; approval needs it (ADR-0043)
 
 
@@ -76,7 +79,8 @@ def load(path: str | Path) -> dict:
     req = yaml.safe_load(Path(path).read_text())
     errors = check(req)
     if errors:
-        raise ValueError("; ".join(errors))
+        raise ValueError(fixed("; ".join(errors), "edit the request into the format at the top of "
+                               "tools/human_request.py, then push it again"))
     return req
 
 
@@ -374,16 +378,18 @@ def run(req: dict, approver: str, identity: str = "toprope.identity.yaml", cwd: 
     from toprope.identity.github import ENV, github_logins
     person = github_logins(Path(cwd) / identity).get(approver.lower())
     if person is None:
-        raise SystemExit(f"GitHub user {approver} approved, but is not a person with `github:` in {identity}")
+        raise SystemExit(fixed(f"GitHub user {approver} approved, but is not a person with `github:` in {identity}",
+                               "add `github: <login>` to the approver's entry under `people` in the identity file, "
+                               "or have a listed person approve"))
     env = {**os.environ, ENV: approver}
     if any((st.get("run") or {}).get("action") == "approve_commit" for st in req["steps"]) \
             and not env.get(TLC_ENV):
-        raise SystemExit(f"approve_commit needs TLC: set {TLC_ENV} to a TLC jar (the workflow does)")
+        raise SystemExit(fixed(f"approve_commit needs TLC: set {TLC_ENV} to a TLC jar (the workflow does)",
+                               "run the request through the `human-request` workflow, or set the variable to a TLC "
+                               "jar"))
     _, nums, total = numbering(req)
     done, made, approved = [], None, set()
     tree = snapshot(cwd)
-    again = "fix the cause, then push a change to the request (the workflow leaves the steps that did not run " \
-            "in it), and approve that run; do not re-run this run"
 
     def report(**more) -> None:
         print(json.dumps({"approver": approver, "as": person.actor.id, "steps": len(done), "of": len(req["steps"]),
@@ -420,10 +426,10 @@ def run(req: dict, approver: str, identity: str = "toprope.identity.yaml", cwd: 
         except SystemExit:
             raise
         except Exception as e:                  # noqa: BLE001 - reported like any failed step
-            stop(i, f"{type(e).__name__}: {e}", again)
+            stop(i, f"{type(e).__name__}: {e}", AGAIN)
         attempt = {"step": st, "returncode": r.returncode, "stdout": r.stdout[-4000:], "stderr": r.stderr[-4000:]}
         if r.returncode != 0:                   # refused or broken: undone, and in the rest
-            stop(i, f"{' '.join(cmd[:6])} ...\n{r.stderr[-2000:].strip()}", again, attempt)
+            stop(i, f"{' '.join(cmd[:6])} ...\n{r.stderr[-2000:].strip()}", AGAIN, attempt)
         done.append(attempt)
         if arg.get("action") == "commit_draft" and (c := _made(r.stdout)):
             made = c
@@ -480,7 +486,8 @@ def main(argv: list[str] | None = None) -> None:
     args = ap.parse_args(argv)
     if args.cmd == "ship":
         if not args.commit:
-            raise SystemExit("ship needs --commit, the approved commit")
+            raise SystemExit(fixed("ship needs --commit, the approved commit",
+                                   "give --commit with the approved commit's id"))
         Path(args.request).parent.mkdir(parents=True, exist_ok=True)
         Path(args.request).write_text(yaml.safe_dump(ship(args.commit, args.domain, args.summary),
                                                      sort_keys=False, allow_unicode=True))
@@ -488,7 +495,8 @@ def main(argv: list[str] | None = None) -> None:
         return
     if args.cmd == "change":
         if not args.draft:
-            raise SystemExit("change needs --draft")
+            raise SystemExit(fixed("change needs --draft",
+                                   "give --draft with the draft whose change to take through"))
         req = change(args.draft, args.member, args.workspace, args.summary)
         Path(args.request).parent.mkdir(parents=True, exist_ok=True)
         Path(args.request).write_text(yaml.safe_dump(req, sort_keys=False, allow_unicode=True))
@@ -504,12 +512,14 @@ def main(argv: list[str] | None = None) -> None:
         print(render(req), end="")
     elif args.cmd == "record":
         if not (args.approver and args.person and args.run_url):
-            raise SystemExit("record needs --approver, --as and --run-url")
+            raise SystemExit(fixed("record needs --approver, --as and --run-url",
+                                   "give --approver, --as and --run-url (the workflow does)"))
         outcome = json.loads(Path(args.done).read_text()) if args.done else None
         record(req, args.approver, args.person, args.run_url, outcome=outcome, request=args.request)
     else:
         if not args.approver:
-            raise SystemExit("run needs --approver")
+            raise SystemExit(fixed("run needs --approver",
+                                   "give --approver with the GitHub login that approved the run (the workflow does)"))
         run(req, args.approver, args.identity)
 
 

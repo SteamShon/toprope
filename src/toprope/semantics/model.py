@@ -12,7 +12,8 @@ from typing import Any
 
 from ..decl.models import Domain
 from ..store import ConcurrencyError, EventStore, MemoryEventStore
-from .interpreter import Interpreter
+from ..errors import fixed
+from .interpreter import UNKNOWN_ACTOR, Interpreter
 from .types import Actor, Command, Event, Grant, Outcome
 
 SYSTEM = Actor("system", "system", ("system",))
@@ -49,7 +50,8 @@ class ReferenceModel:
         oid = data["id"]
         from .interpreter import RESERVED_ID_PREFIXES
         if str(oid).startswith(RESERVED_ID_PREFIXES):
-            raise ValueError(f"object ids may not start with {RESERVED_ID_PREFIXES}: {oid}")
+            raise ValueError(fixed(f"object ids may not start with {RESERVED_ID_PREFIXES}: {oid}",
+                                   "give the fixture an id without that prefix"))
         ev = Event(f"{obj}Created", oid, obj, at=self.clock(), actor=SYSTEM.ref(),
                    payload={"changes": copy.deepcopy(data), "params": {}, "action": None, "fixture": True},
                    domain_version=self.d.version)
@@ -76,13 +78,15 @@ class ReferenceModel:
     # -- commands (docs/semantics.md §2) -------------------------------------------------
     def execute(self, cmd: Command) -> Outcome:
         if cmd.actor is None:                                                  # step 1
-            return Outcome("rejected", "unauthenticated", "Unknown actor.")
+            return Outcome("rejected", "unauthenticated", UNKNOWN_ACTOR)
         key = None
         if cmd.idempotency_key:                                                # step 2
             key = (cmd.actor.id, cmd.action, cmd.target, cmd.idempotency_key)
             prev = self.store.claim(key)
             if prev == "pending":
-                return Outcome("rejected", "in-progress", "The same command is already being processed.")
+                return Outcome("rejected", "in-progress", fixed("The same command is already being processed.",
+                                                                "wait for its outcome, then send it again with the "
+                                                                "same idempotency key to read it"))
             if prev is not None:
                 return prev
         try:
@@ -122,7 +126,9 @@ class ReferenceModel:
             # that folding the stored events rebuilds exactly this state.
             return Outcome(dec.outcome.status, dec.outcome.code, dec.outcome.reason,
                            dec.outcome.state, tuple(written))
-        return Outcome("rejected", "conflict", f"{cmd.target} kept changing; gave up after {MAX_RETRIES} retries.")
+        return Outcome("rejected", "conflict", fixed(
+            f"{cmd.target} kept changing; gave up after {MAX_RETRIES} retries.",
+            "send the command again; it is safe with the same key"))
 
     def allowed_actions(self, oid: str, actor: Actor, on_behalf_of: Actor | None = None,
                         grant: Grant | None = None) -> list[str]:
