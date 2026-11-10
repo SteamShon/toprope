@@ -45,8 +45,12 @@ is also appended to `.toprope/approval-runs.jsonl`, so a commit can cite it as e
 (`cite_evidence --kind approval-run`) after any merge. A step that fails stops the run, and
 the steps before it are kept: the workflow still pushes their work, notes the failed step in the
 run's entry, leaves the steps from the failed one on in the request, and ends red. So a failed
-preview leaves the commit approved (ADR-0050). Fix the cause and push a change to that request;
-its run takes only the steps that did not run. The
+preview leaves the commit approved (ADR-0050). What the failed step itself half wrote is undone
+first; a step whose action was taken but whose follow-up failed counts as run and is not sent
+again. Fix the cause and push a change to that request; its run takes only the steps that did
+not run, numbered as in the first request. If a run ends red, do not re-run it (**Re-run jobs**); push a change to
+the rest. A re-run would take the first request's steps again, so the workflow refuses it once the
+branch has moved on. The
 format is in `tools/human_request.py`. One-time setup (maintainer): Repository settings →
 Environments → `researcher` → Required reviewers: you ("Prevent self-review" off); Actions →
 Workflow permissions: read and write.

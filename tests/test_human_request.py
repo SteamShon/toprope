@@ -329,7 +329,7 @@ def test_a_failed_step_keeps_the_work_before_it_and_leaves_the_rest(tmp_path, mo
     assert (out["as"], out["steps"], out["of"], out["commit"]) == ("ana <ana@example.com>", 4, 9, "7-c0ffee")
     assert out["failed"]["step"] == 5 and "the preview environment is down" in out["failed"]["error"]
     rest = out["rest"]
-    assert hr.check(rest) == [] and "(the rest, from step 5 of 9)" in rest["summary"]
+    assert hr.check(rest) == [] and rest["summary"].endswith(" (the rest: steps 5-9 of 9)")
     assert [(s["run"]["action"], s["run"]["target"]) for s in rest["steps"]] == [
         ("deliver", "7-c0ffee"), ("preview", "authoring:7-c0ffee:local"), ("deploy", "authoring:7-c0ffee:local"),
         ("run_probes", "authoring:7-c0ffee:local"), ("verify", "authoring:7-c0ffee:local")]
@@ -380,3 +380,106 @@ def test_the_workflow_pushes_the_work_of_a_run_that_failed():
     assert push["run"].index("record") < push["run"].index("git rm")      # recorded, then committed
     assert "if" not in take and "continue-on-error" not in take        # a failed step still ends the job red
     assert "pushed" in status["if"] and push["id"] in status["if"]
+
+
+def test_a_step_whose_action_was_taken_is_not_sent_again(tmp_path, monkeypatch, capsys):
+    """The commit was made, but a handoff it set off failed: the rest starts after commit_draft and
+    names the commit, so no second commit is made and the first is not orphaned."""
+    (tmp_path / "ids.yaml").write_text(yaml.safe_dump(IDS))
+    monkeypatch.setenv(hr.TLC_ENV, "tla2tools.jar")
+    cmds = []
+
+    def run(cmd, **kw):
+        cmds.append(cmd)
+        then = [{"kernel": "commit", "reply": "record_commit", "status": "ok", "object": "7-c0ffee"},
+                {"to": "delivery.notify", "status": "failed", "error": "delivery is down"}] \
+            if cmd[-2] == "commit_draft" else []
+        return subprocess.CompletedProcess(cmd, 0, json.dumps({"status": "ok", "then": then}), "")
+    monkeypatch.setattr(hr.subprocess, "run", run)
+    with pytest.raises(SystemExit, match="(?s)^step 2 of 9 was taken, but what it set off failed; steps 1-2 ran and "
+                                         "their work is kept: .*delivery is down.*Fix: "):
+        hr.run(nine_steps(), "ana-gh", identity="ids.yaml", cwd=tmp_path)
+    out = json.loads(capsys.readouterr().out)
+    assert (out["steps"], out["commit"], out["failed"]["step"], out["failed"]["accepted"]) == (2, "7-c0ffee", 2, True)
+    assert [(s["run"]["action"], s["run"]["target"]) for s in out["rest"]["steps"][:2]] == [
+        ("check_commit", "7-c0ffee"), ("approve_commit", "7-c0ffee")]
+    assert out["rest"]["summary"].endswith("(the rest: steps 3-9 of 9)") and hr.check(out["rest"]) == []
+    assert len(cmds) == 2
+
+
+def test_a_failed_step_s_own_writes_are_not_pushed(tmp_path, monkeypatch, capsys):
+    """The workflow commits the whole tree, so what a failed step half wrote is undone first."""
+    (tmp_path / "ids.yaml").write_text(yaml.safe_dump(IDS))
+    monkeypatch.setenv(hr.TLC_ENV, "tla2tools.jar")
+    for c in (["init", "-q"], ["add", "-A"], ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "base"]):
+        assert hr._git(tmp_path, *c)[0] == 0
+    log = tmp_path / "events.jsonl"
+
+    def run(cmd, **kw):
+        action = cmd[cmd.index("--identity") + 2]
+        with log.open("a") as f:
+            f.write(action + "\n")
+        if action == "deliver":
+            (tmp_path / "half-written.json").write_text("{")
+            return subprocess.CompletedProcess(cmd, 1, "", "delivery crashed half way")
+        then = [{"kernel": "commit", "status": "ok", "object": "7-c0ffee"}] if action == "commit_draft" else []
+        return subprocess.CompletedProcess(cmd, 0, json.dumps({"status": "ok", "then": then}), "")
+    monkeypatch.setattr(hr.subprocess, "run", run)
+    low_risk(tmp_path, "7-c0ffee")
+    with pytest.raises(SystemExit, match="^step 5 of 9 failed"):
+        hr.run(nine_steps(), "ana-gh", identity="ids.yaml", cwd=tmp_path)
+    assert log.read_text().split() == ["confirm_all_proposed", "commit_draft", "check_commit", "approve_commit"]
+    assert not (tmp_path / "half-written.json").exists()
+
+
+def test_every_failure_after_a_step_ran_reports_how_far_it_got(tmp_path, monkeypatch, capsys):
+    (tmp_path / "ids.yaml").write_text(yaml.safe_dump(IDS))
+    monkeypatch.setenv(hr.TLC_ENV, "tla2tools.jar")
+    ok = subprocess.CompletedProcess([], 0, json.dumps({"status": "ok", "then": []}), "")
+    monkeypatch.setattr(hr.subprocess, "run", lambda cmd, **kw: ok)          # commit_draft made no commit
+    with pytest.raises(SystemExit, match=r"^step 3 of 9 failed; steps 1-2 ran and their work is kept: \$commit, but"):
+        hr.run(nine_steps(), "ana-gh", identity="ids.yaml", cwd=tmp_path)
+    assert json.loads(capsys.readouterr().out)["steps"] == 2
+
+    cmds = []
+    monkeypatch.setattr(hr.subprocess, "run", fake_run(cmds))
+    (tmp_path / ".toprope/commits/authoring").mkdir(parents=True)
+    (tmp_path / ".toprope/commits/authoring/checks.jsonl").write_text("{not json\n")
+    with pytest.raises(SystemExit, match="^step 5 of 9 failed; steps 1-4 ran .*JSONDecodeError"):
+        hr.run(nine_steps(), "ana-gh", identity="ids.yaml", cwd=tmp_path)
+    assert json.loads(capsys.readouterr().out)["rest"]["steps"][0]["run"]["action"] == "deliver"
+
+
+def test_the_rest_of_a_rest_keeps_the_first_request_s_numbers(tmp_path, monkeypatch, capsys):
+    (tmp_path / "ids.yaml").write_text(yaml.safe_dump(IDS))
+    monkeypatch.setenv(hr.TLC_ENV, "tla2tools.jar")
+    first = hr.rest(nine_steps(), 5, "7-c0ffee")
+    assert hr.numbering(first)[1:] == ([5, 6, 7, 8, 9], 9)
+    cmds = []
+    monkeypatch.setattr(hr.subprocess, "run", fake_run(cmds, fails="preview"))
+    with pytest.raises(SystemExit, match="^step 6 of 9 failed; step 5 ran and its work is kept: "):
+        hr.run(first, "ana-gh", identity="ids.yaml", cwd=tmp_path)
+    out = json.loads(capsys.readouterr().out)
+    assert out["rest"]["summary"] == "Confirm, commit, check and approve the change in draft authoring " \
+                                     "(the rest: steps 6-9 of 9)"
+    assert out["label"] == "step 6 of 9 failed; step 5 ran and its work is kept"
+    assert hr.rest(nine_steps(), 4, "7-c0ffee")["summary"].endswith("(the rest: steps 3-9 of 9)")  # its check
+
+
+def test_a_taken_last_step_leaves_no_request(tmp_path):
+    req = {"summary": "x", "steps": [{"run": {"member": "authoring", "action": "check_commit", "target": "5-ab"}}]}
+    (tmp_path / "r.yaml").write_text(yaml.safe_dump(req))
+    out = {"steps": 1, "failed": {"step": 1, "error": "e", "accepted": True}, "rest": None}
+    hr.record(req, "Ana-GH", "ana", "https://github.com/o/r/actions/runs/9", cwd=tmp_path, outcome=out,
+              request="r.yaml")
+    assert not (tmp_path / "r.yaml").exists()
+
+
+def test_a_red_run_is_not_run_again():
+    """"Re-run jobs" would take the first request's steps again on a branch that has moved on."""
+    workflow = yaml.safe_load((ROOT / ".github/workflows/human-request.yml").read_text())
+    names = [s.get("name") for s in workflow["jobs"]["act"]["steps"]]
+    guard = workflow["jobs"]["act"]["steps"][names.index("The branch is still at this run's commit")]
+    assert names.index("The branch is still at this run's commit") < names.index("Take the steps as the approver")
+    assert "ls-remote" in guard["run"] and "GITHUB_SHA" in guard["run"] and "Fix: " in guard["run"]
+    assert "do not re-run" in (ROOT / "docs/workflow.md").read_text()

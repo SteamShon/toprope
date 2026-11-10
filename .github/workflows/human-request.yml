@@ -87,6 +87,16 @@ jobs:
             --jq '[.[] | select(.state == "approved")] | last | .user.login')
           if [ -z "$login" ] || [ "$login" = "null" ]; then echo "no approval found"; exit 1; fi
           echo "login=$login" >> "$GITHUB_OUTPUT"
+      - name: The branch is still at this run's commit
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          # A re-run of a red run would take the request's steps again, from the old state
+          head=$(git ls-remote origin "refs/heads/$BRANCH" | cut -f1)
+          if [ "$head" != "$GITHUB_SHA" ]; then
+            echo "::error::$BRANCH is at ${head:-nothing}, no longer at this run's commit $GITHUB_SHA (a re-run, or a later push). Fix: do not re-run this run; push a change to the request (the rest an earlier run left in it) and approve that run"
+            exit 1
+          fi
       - name: Take the steps as the approver
         id: take
         env:
@@ -119,7 +129,7 @@ jobs:
           if [ "$failed" -eq 0 ]; then
             git rm --quiet "$REQUEST"
           else
-            summary="$summary (steps 1-$ran; step $failed failed, the rest is left in the request)"
+            summary="$summary ($(jq -r '.label + (if .rest then "; what is left stays in the request" else "" end)' "$DONE"))"
           fi
           git add -A
           git -c user.name="toprope-human-request" -c user.email="actions@users.noreply.github.com" \

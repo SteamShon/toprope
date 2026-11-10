@@ -44,8 +44,11 @@ so a commit can cite the run as evidence (`cite_evidence --kind approval-run`) a
 A step that fails stops the run, and the work of the steps before it is kept: `run` prints how
 far it got and exits non-zero, `record --done` notes the failed step in the run's entry and
 rewrites the request to the steps that are left, and the workflow commits and pushes that, then
-ends red. So a failed preview leaves the commit approved, as ADR-0050 says. To go on, fix the
-cause and push a change to the request (the rest): its run takes only the steps that did not run.
+ends red. So a failed preview leaves the commit approved, as ADR-0050 says. What the failed step
+half wrote is undone first; a step whose action was taken but whose follow-up failed counts as run.
+To go on, fix the cause and push a change to the request (the rest): its run takes only the steps
+that did not run, numbered as in the first request. Never re-run a red run: the workflow refuses
+it once the branch has moved on.
 """
 
 from __future__ import annotations
@@ -53,6 +56,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -252,14 +256,47 @@ def recorded_risk(commit: str, cwd: str | Path = ".") -> str | None:
     return level
 
 
-def rest(req: dict, failed: int, made: str | None) -> dict:
-    """The request that is left when step `failed` (1-based) failed: that step and the ones after
-    it, with `$commit` put in where a commit_draft step that already ran made it. A step that ran
-    is not in it, so running it does not take a step twice (`toprope-run` gives each command a new
+REST = re.compile(r" \(the rest: steps? ([0-9, -]+) of (\d+)\)$")
+
+
+def _spans(nums: list[int]) -> str:
+    """`step 5`, `steps 1-4`, `steps 3, 5-9`."""
+    parts, start = [], None
+    for k, n in enumerate(nums):
+        start = n if start is None else start
+        if k + 1 == len(nums) or nums[k + 1] != n + 1:
+            parts.append(str(n) if start == n else f"{start}-{n}")
+            start = None
+    return ("step " if len(nums) == 1 else "steps ") + ", ".join(parts)
+
+
+def numbering(req: dict) -> tuple[str, list[int], int]:
+    """The request's summary without its numbering, each step's number in the request it came
+    from, and that request's length. A rest keeps the numbers of the request it is the rest of."""
+    n = len(req["steps"])
+    if m := REST.search(req["summary"]):
+        nums = []
+        for part in m.group(1).split(","):
+            lo, _, hi = part.strip().partition("-")
+            nums += range(int(lo), int(hi or lo) + 1)
+        if len(nums) == n:
+            return req["summary"][:m.start()], nums, int(m.group(2))
+    return req["summary"], list(range(1, n + 1)), n
+
+
+def rest(req: dict, start: int, made: str | None) -> dict | None:
+    """The request that is left from step `start` (1-based) on, or None if nothing is left, with
+    `$commit` put in where a commit_draft step that already ran made it. A step that ran is not in
+    it, so running it does not take a step twice (`toprope-run` gives each command a new
     idempotency key, so a step run again is a new command). An `approve_commit` keeps the
-    `check_commit` before it, since approval needs TLC's check in the same run (ADR-0043)."""
-    steps, checked, own_commit = [], set(), False
-    for st in req["steps"][failed - 1:]:
+    `check_commit` before it, since approval needs TLC's check in the same run (ADR-0043). Its
+    summary keeps the numbers the steps had in the first request."""
+    if start > len(req["steps"]):
+        return None
+    base, nums, total = numbering(req)
+    steps, numbers, checked, own_commit = [], [], set(), False
+    before = [(k, st["run"]) for k, st in enumerate(req["steps"][:start - 1]) if "run" in st]
+    for k, st in enumerate(req["steps"][start - 1:], start - 1):
         (kind, arg), = st.items()
         if kind == "run":
             arg = dict(arg)
@@ -271,22 +308,54 @@ def rest(req: dict, failed: int, made: str | None) -> dict:
             if arg["action"] == "check_commit":
                 checked.add(key)
             elif arg["action"] == "approve_commit" and key not in checked:
-                steps.append({"run": {**{k: v for k, v in arg.items() if k != "params"}, "action": "check_commit"}})
+                steps.append({"run": {**{x: v for x, v in arg.items() if x != "params"}, "action": "check_commit"}})
+                numbers.append(next((nums[j] for j, a in reversed(before) if a["action"] == "check_commit"
+                                     and a["member"] == arg["member"]
+                                     and a["target"].replace(MADE, made or MADE) == arg["target"]), nums[k]))
                 checked.add(key)
             st = {"run": arg}
         steps.append(st)
-    first = req["summary"].split(" (the rest, from step ")[0]
-    return {"summary": f"{first} (the rest, from step {failed} of {len(req['steps'])})", "steps": steps}
+        numbers.append(nums[k])
+    return {"summary": f"{base} (the rest: {_spans(numbers)} of {total})", "steps": steps}
+
+
+def _git(cwd: str | Path, *args: str) -> tuple[int, str]:
+    # Popen, not subprocess.run: the steps' runner is replaced in the tests, git is not
+    p = subprocess.Popen(["git", *args], cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    out, _ = p.communicate()
+    return p.returncode, out.strip()
+
+
+def snapshot(cwd: str | Path) -> str | None:
+    """The working tree as a git tree (it stages everything), or None outside a git work tree."""
+    if _git(cwd, "rev-parse", "--is-inside-work-tree")[0] or _git(cwd, "add", "-A")[0]:
+        return None
+    code, tree = _git(cwd, "write-tree")
+    return tree if code == 0 else None
+
+
+def restore(cwd: str | Path, tree: str | None) -> None:
+    """Put the working tree back to `tree`: what a failed step half wrote is not pushed."""
+    if tree:
+        _git(cwd, "add", "-A")
+        _git(cwd, "read-tree", "-u", "--reset", tree)
 
 
 def run(req: dict, approver: str, identity: str = "toprope.identity.yaml", cwd: str | Path = ".") -> list[dict]:
     """Run every step as the approver; stop at the first that fails.
 
     It prints what happened as JSON on stdout, also when a step fails: `as`, `steps` (how many
-    ran), `of`, `commit`, and on failure `failed` (the step and why) and `rest` (the request that
-    is left, see `rest`). Then a failure exits non-zero, after the work of the steps before it is
-    on disk, so the workflow commits that work (ADR-0050, 2: the commit stays approved) and the
-    run still ends red. A failure before any step ran (no such person, no TLC) prints nothing."""
+    ran), `of`, `commit`, and on failure `failed` (the step in this request, why, and `accepted`
+    when its action was taken but what it set off failed), `label` (what happened, in the first
+    request's step numbers) and `rest` (the request that is left, see `rest`; null if none). Then
+    a failure exits non-zero, after the work of the steps before it is on disk, so the workflow
+    commits that work (ADR-0050, 2: the commit stays approved) and the run still ends red.
+
+    A step that failed is undone in the working tree (it is restored to the snapshot taken after
+    the last step that ran, in a git work tree), so only the work of the steps that ran is pushed,
+    and the step is in the rest. A step whose action was taken, but whose follow-up (a kernel call
+    or a handoff) failed, has run: its work is kept and the rest starts after it, so it is not sent
+    twice. A failure before any step ran (no such person, no TLC) prints nothing."""
     sys.path.insert(0, str(ROOT / "src"))
     from toprope.errors import fixed
     from toprope.identity.github import ENV, github_logins
@@ -297,43 +366,61 @@ def run(req: dict, approver: str, identity: str = "toprope.identity.yaml", cwd: 
     if any((st.get("run") or {}).get("action") == "approve_commit" for st in req["steps"]) \
             and not env.get(TLC_ENV):
         raise SystemExit(f"approve_commit needs TLC: set {TLC_ENV} to a TLC jar (the workflow does)")
+    _, nums, total = numbering(req)
     done, made, approved = [], None, set()
+    tree = snapshot(cwd)
+    again = "fix the cause, then push a change to the request (the workflow leaves the steps that did not run " \
+            "in it), and approve that run; do not re-run this run"
 
     def report(**more) -> None:
         print(json.dumps({"approver": approver, "as": person.actor.id, "steps": len(done), "of": len(req["steps"]),
                           **({"commit": made} if made else {}), **more}, indent=2))
 
-    def stop(i: int, message: str, fix: str, attempt: dict | None = None) -> None:
-        print(json.dumps(done + ([attempt] if attempt else []), indent=2), file=sys.stderr)
-        report(failed={"step": i, "error": message}, rest=rest(req, i, made))
-        kept = "" if i == 1 else f"; {'step 1' if i == 2 else f'steps 1-{i - 1}'} ran and their work is kept"
-        raise SystemExit(fixed(f"step {i} of {len(req['steps'])} failed{kept}: {message}", fix))
+    def stop(i: int, message: str, fix: str, attempt: dict | None = None, accepted: bool = False) -> None:
+        print(json.dumps(done + ([attempt] if attempt and not accepted else []), indent=2), file=sys.stderr)
+        if not accepted:
+            restore(cwd, tree)
+        what = f"step {nums[i - 1]} of {total} " + ("was taken, but what it set off failed" if accepted else "failed")
+        ran = nums[:len(done)]
+        if ran:
+            what += f"; {_spans(ran)} ran and {'its' if len(ran) == 1 else 'their'} work is kept"
+        report(failed={"step": i, "error": message, **({"accepted": True} if accepted else {})},
+               label=what, rest=rest(req, i + 1 if accepted else i, made))
+        raise SystemExit(fixed(f"{what}: {message}", fix))
 
     for i, st in enumerate(req["steps"], 1):
         arg = st.get("run") or {}
-        if MADE in str(arg.get("target")) and made is None:
-            raise SystemExit(f"step {i}: {MADE}, but no commit_draft step before it made a commit")
-        if arg.get("action") == "approve_commit":
-            approved.add(made if arg["target"] == MADE else arg["target"])
-        ships = shipped_commit(arg, made) if arg.get("action") in SHIPS else None
-        if ships and ships in approved and recorded_risk(ships, cwd) != "low":
-            # ADR-0050: one approval ships only a low-risk change, as checked inside this request
-            stop(i, f"{ships} is not low risk ({recorded_risk(ships, cwd)}), so this approval does not ship it",
-                 "read the preview, then approve a second request with the delivery steps (the workflow leaves "
-                 "them in the request)")
-        cmd = command(st, made)
-        r = subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True, check=False)
+        try:
+            if MADE in str(arg.get("target")) and made is None:
+                stop(i, f"{MADE}, but no commit_draft step before it made a commit",
+                     "put a commit_draft step before it, or name the commit")
+            if arg.get("action") == "approve_commit":
+                approved.add(made if arg["target"] == MADE else arg["target"])
+            ships = shipped_commit(arg, made) if arg.get("action") in SHIPS else None
+            if ships and ships in approved and (risk := recorded_risk(ships, cwd)) != "low":
+                # ADR-0050: one approval ships only a low-risk change, as checked inside this request
+                stop(i, f"{ships} is not low risk ({risk}), so this approval does not ship it",
+                     "read the preview, then approve a second request with the delivery steps (the workflow "
+                     "leaves them in the request); do not re-run this run")
+            cmd = command(st, made)
+            r = subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True, check=False)
+        except SystemExit:
+            raise
+        except Exception as e:                  # noqa: BLE001 - reported like any failed step
+            stop(i, f"{type(e).__name__}: {e}", again)
         attempt = {"step": st, "returncode": r.returncode, "stdout": r.stdout[-4000:], "stderr": r.stderr[-4000:]}
-        unmet = _unmet(r.stdout) if r.returncode == 0 and "run" in st else []
-        if r.returncode != 0 or unmet:          # it did not run to the end: it is in the rest
-            why = "; ".join(unmet) or r.stderr[-2000:].strip()
-            stop(i, f"{' '.join(cmd[:6])} ...\n{why}",
-                 "fix the cause, then push a change to the request (the workflow leaves the steps from this one "
-                 "on in it), and approve that run", attempt)
+        if r.returncode != 0:                   # refused or broken: undone, and in the rest
+            stop(i, f"{' '.join(cmd[:6])} ...\n{r.stderr[-2000:].strip()}", again, attempt)
         done.append(attempt)
         if arg.get("action") == "commit_draft" and (c := _made(r.stdout)):
             made = c
             done[-1]["commit"] = c
+        if unmet := (_unmet(r.stdout) if "run" in st else []):
+            stop(i, f"{' '.join(cmd[:6])} ...\n" + "; ".join(unmet),
+                 "the step's action was taken, so the rest does not send it again: fix the cause and, if the "
+                 "step must be taken again (e.g. an approval was refused), add it to the rest; push the rest "
+                 "and approve that run; do not re-run this run", attempt, accepted=True)
+        tree = snapshot(cwd)
     report()
     return done
 
@@ -350,8 +437,10 @@ def record(req: dict, approver: str, person: str, run_url: str, cwd: str | Path 
              "steps": req["steps"], "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
     if outcome and outcome.get("failed"):
         entry |= {"ran": outcome["steps"], "failed": outcome["failed"]}
-        if request is not None:
+        if request is not None and outcome.get("rest"):
             Path(cwd, request).write_text(yaml.safe_dump(outcome["rest"], sort_keys=False, allow_unicode=True))
+        elif request is not None:               # the failed step was the last, and it was taken
+            Path(cwd, request).unlink(missing_ok=True)
     path = Path(cwd) / APPROVAL_RUNS
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a") as f:
