@@ -20,6 +20,7 @@ the error is raised.
 | {…} reads one member | give --member, one of {…} |
 | {…} requires a person | run it yourself on a terminal, or through a human request (tools/human_request.py) |
 | {…}: `{…}` must be a single value | give one value, such as a path |
+| {…}: both `domain` and `composition` | keep one: `domain` for one declaration, `composition` for several |
 | {…}: cannot read it ({…}) | give --config FILE, or --no-config |
 | {…}: expected a mapping such as `composition: x.composition.yaml` | fix the file, or give --no-config |
 | {…}: no member of {…} has this action | check the spelling; `toprope-run --member <member> --help` lists the actions |
@@ -42,6 +43,23 @@ the error is raised.
 | {…} exists | name a new request file, or leave --request out |
 | {…} names no origin | give it `origin:` (a Source object's id), or --origin for every element |
 | {…}{…} | fix that element and run the change again with the elements not yet proposed, or restore the draft with `git checkout -- <declaration>` |
+
+## `adapters/cli/start.py`
+
+| Error | Fix |
+|---|---|
+| a step did not end as the story says | if you changed domain.yaml on purpose, update the step's `expect` in story.yaml; otherwise undo the change |
+| a step of story.yaml expects a refusal without saying which ({…} {…}) | give the step the `code` of the refusal it expects, so any other refusal (a wrong token, a missing grant) does not pass for it |
+| no --template | choose one of {…} |
+| no template recorded in {…} | run --check in a directory toprope-init wrote |
+| no template {…} | use one of {…} (`toprope-init --list` describes them) |
+| no {…} in {…} | run toprope-try in a directory toprope-init wrote, or give --dir |
+| the story names {…}, which domain.yaml does not declare | rename the step's action in story.yaml, or put the action back |
+| {…} cannot be read: {…} | fix the YAML at the line named |
+| {…} exists | choose another name, or remove that directory |
+| {…} is not a domain name | use lowercase letters, digits and dashes, starting with a letter |
+| {…}: {…} | fix those elements; docs/domain-schema.md describes them |
+| {…}: {…}: {…}{…} | fix that line; docs/domain-schema.md describes every field |
 
 ## `adapters/mcp/cli.py`
 

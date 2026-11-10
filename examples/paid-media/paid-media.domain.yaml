@@ -28,6 +28,9 @@ actions:
       - id: not-a-holdout
         check: target.holdout == false or target.exception_approved == true
         reason: Holdout campaigns keep their budget; changing it would break the test. A media lead can grant a one-time exception.
+      - id: positive-budget
+        check: params.daily_budget > 0
+        reason: A daily budget is a positive amount.
       - id: step-limit
         check: params.daily_budget - target.daily_budget <= 500
         reason: Raise a daily budget by at most 500 at a time.
@@ -58,6 +61,8 @@ actions:
     actor: [media_lead]
     target: Campaign
     requires: human
+    effects:
+      - set: {target.exception_approved: false}
     records_decision: true
 
 transitions:

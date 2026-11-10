@@ -49,7 +49,8 @@ READS = ("get", "history", "allowed", "whoami", "guide", "review")
 CONFIRMS = ("confirm_all_proposed", "confirm_element")   # a person confirms from one diff (B5)
 CONFIG = "toprope.yaml"
 # The keys `toprope.yaml` may set, and the option each one stands for.
-CONFIG_KEYS = {"composition": "--composition", "member": "--member", "kernel_root": "--kernel-root",
+CONFIG_KEYS = {"domain": "--domain", "store": "--store",
+               "composition": "--composition", "member": "--member", "kernel_root": "--kernel-root",
                "workspace": "--workspace", "env": "--env", "store_dir": "--store-dir",
                "identity": "--identity", "failures": "--failures"}
 
@@ -108,6 +109,9 @@ def read_config(path: Path) -> dict[str, str]:
     if not isinstance(data, dict):
         raise SystemExit(fixed(f"{path}: expected a mapping such as `composition: x.composition.yaml`",
                                "fix the file, or give --no-config"))
+    if data.get("domain") and data.get("composition"):
+        raise SystemExit(fixed(f"{path}: both `domain` and `composition`",
+                               "keep one: `domain` for one declaration, `composition` for several"))
     unknown = sorted(set(data) - set(CONFIG_KEYS))
     if unknown:
         raise SystemExit(fixed(f"{path}: unknown key(s) {', '.join(unknown)}",
@@ -119,7 +123,11 @@ def read_config(path: Path) -> dict[str, str]:
             raise SystemExit(fixed(f"{path}: `{key}` must be a single value", "give one value, such as a path"))
         value = str(value)
         # A path in the file is relative to the file, so the file works from anywhere.
-        if key in ("composition", "kernel_root", "workspace", "env", "store_dir", "failures"):
+        if key == "store" and value.split(":", 1)[0] in ("sqlite", "jsonl") and ":" in value:
+            kind, _, where = value.partition(":")
+            if not where.startswith(":"):                  # `sqlite::memory:` is no path
+                value = f"{kind}:{where if Path(where).is_absolute() else base / where}"
+        elif key in ("domain", "composition", "kernel_root", "workspace", "env", "store_dir", "failures"):
             value = str((base / value)) if not Path(value).is_absolute() else value
         elif key == "identity" and value.split(":", 1)[0] in ("git", "github", "static"):
             kind, _, file = value.partition(":")
@@ -212,6 +220,12 @@ def build_parser(d: Domain) -> argparse.ArgumentParser:
         p.add_argument("target", help=target)
         for pname, spec in a.params.items():
             _param_option(p, pname, spec)
+        # Who you are may also follow the action (`act T --token t-mia`), unless the action has a
+        # param of that name (ADR-0049, A4). SUPPRESS keeps the value given before the action.
+        if "token" not in a.params:
+            p.add_argument("--token", default=argparse.SUPPRESS, help="your credential, as before the action")
+        if "identity" not in a.params:
+            p.add_argument("--identity", default=argparse.SUPPRESS, help="as before the action")
     for cmd, what in (("get", "an object's current state"), ("history", "an object's events"),
                       ("allowed", "the actions you may take on an object now")):
         sub.add_parser(cmd, help=what).add_argument("target")

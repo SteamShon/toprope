@@ -23,6 +23,7 @@ MARK = "Fix: "
 COVERED = (
     "adapters/cli/__init__.py",
     "adapters/cli/change.py",
+    "adapters/cli/start.py",
     "adapters/mcp/cli.py",
     "commits/__init__.py",
     "identity/git.py",

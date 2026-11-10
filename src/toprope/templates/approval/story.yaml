@@ -1,0 +1,14 @@
+title: An agent asks for access; people decide
+about: >
+  An agent files access requests for the team. A manager approves them, prod access needs
+  security, and nobody approves a request they (or their agent) made.
+next: >
+  Try changing who approves prod access: edit `prod-needs-security` in domain.yaml, then run
+  `toprope-try` again.
+steps:
+  - {who: t-bot, as: the agent, action: submit_request, target: R-prod, says: "ask for prod access for dana", expect: ok}
+  - {who: t-bot, as: the agent, action: approve_request, target: R-prod, says: "approve it", expect: denied, code: actor}
+  - {who: t-max, as: max (manager), action: approve_request, target: R-prod, says: "approve it", expect: denied, code: prod-needs-security}
+  - {who: t-sec, as: sec (security), action: approve_request, target: R-prod, says: "approve it", expect: ok}
+  - {who: t-max, as: max (manager), action: submit_request, target: R-wiki, says: "ask for wiki access for dana", expect: ok}
+  - {who: t-max, as: max (manager), action: approve_request, target: R-wiki, says: "approve his own request", expect: denied, code: not-the-requester}
