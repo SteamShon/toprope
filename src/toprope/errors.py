@@ -44,6 +44,9 @@ SHOWN_AT = {"DeployRefused": 1}
 # A reply's keys that hold a message shown to its caller (`{"error": "…"}`, `{"reason": "…"}`).
 REPLY_KEYS = ("error", "reason")
 TYPE_NAMES = {"string", "strings", "boolean", "integer", "number", "datetime"}   # a schema's dict, not a reply
+# A dict with one of these keys declares an element (a precondition, invariant or outcome rule): its
+# `reason` is the domain's words, which the refusal follows with its fix (`semantics/refusals.py`).
+DECLARES = {"check", "requires"}
 # A command's refusal: the call, and the position of its reason. `Outcome` counts only when its
 # status is "denied" or "rejected".
 REFUSALS = {"Outcome": 2, "deny": 1, "_attempt": 3}
@@ -151,6 +154,7 @@ def _replies(tree: ast.AST) -> list[tuple[ast.Dict, ast.AST]]:
     return [(n, v) for n in ast.walk(tree) if isinstance(n, ast.Dict)
             and not all(isinstance(x, ast.Constant) and x.value in TYPE_NAMES
                         for k, x in zip(n.keys, n.values) if k is not None)
+            and not any(isinstance(k, ast.Constant) and k.value in DECLARES for k in n.keys)
             for k, v in zip(n.keys, n.values)
             if isinstance(k, ast.Constant) and k.value in REPLY_KEYS]
 

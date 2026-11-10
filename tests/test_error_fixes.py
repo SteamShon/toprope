@@ -130,6 +130,16 @@ def test_the_scan_finds_a_deploy_refusal_and_a_reply_without_a_fix(tmp_path):
         ("DeployRefused", "commit {…} has no approval", None), ("reply", "No object {…}.", None)]
 
 
+def test_a_declared_elements_reason_is_not_a_reply(tmp_path):
+    # a precondition or rule a command writes into a domain: the refusal adds the fix (refusals.py)
+    r = scan_text(tmp_path, (
+        'def f(n):\n'
+        '    pre = {"id": "p", "check": "exists(target.x)", "reason": f"This has no {n}."}\n'
+        '    rule = {"on": "A.done", "requires": "human", "reason": f"Only a person {n}."}\n'
+        '    return {"status": "denied", "reason": f"No {n}."}\n'))
+    assert [(r0.exception, r0.message, r0.fix) for r0 in r] == [("reply", "No {…}.", None)]
+
+
 def test_the_scan_reads_a_fix_a_caller_passes_to_a_function_that_raises(tmp_path):
     r = scan_text(tmp_path, ('def run(x):\n'
                              '    def stop(i, message, fix):\n'
