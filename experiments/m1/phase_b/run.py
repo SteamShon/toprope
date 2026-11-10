@@ -538,6 +538,9 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     g.add_argument("--instruments", type=Path, default=INSTRUMENTS)
     g.add_argument("--partial", action="store_true", help="grade an incomplete run (tests; never for the report)")
     g.add_argument("--into", default="scoring", help="the scoring directory: `scoring-2` for the second sitting")
+    g.add_argument("--grader", choices=["single", "checklist"], default="single",
+                   help="single: one pass, one label per flag (M1); checklist: M2's grader (M2-grader.md)")
+    g.add_argument("--k", type=int, default=3, help="answers per checklist item, decided by majority (M2: 3)")
     rs = sub.add_parser("rescript", help="take back script labels the current rule no longer gives (a sitting "
                         "graded before the fix); the label becomes the grader's")
     rs.add_argument("--out", type=Path, default=DEFAULT_OUT)
@@ -558,6 +561,9 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     cg = sub.add_parser("compare-gradings", help="the grader's noise: each arm's recall from two sittings")
     cg.add_argument("--out", type=Path, default=DEFAULT_OUT)
     cg.add_argument("--instruments", type=Path, default=INSTRUMENTS)
+    cg.add_argument("--first", default="scoring")
+    cg.add_argument("--second", default="scoring-2")
+    cg.add_argument("--limit", type=float, default=0.1, help="the noise limit (M1: 0.1; M2's grader: 0.05)")
     sc = sub.add_parser("score", help="the metrics and pilot verdicts, from scoring/confirmed.yaml")
     sc.add_argument("--out", type=Path, default=DEFAULT_OUT)
     sc.add_argument("--instruments", type=Path, default=INSTRUMENTS)
@@ -575,7 +581,7 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
         return
     if args.cmd == "compare-gradings":
         from .score import compare_gradings
-        print(json.dumps(compare_gradings(args.out, args.instruments), indent=2))
+        print(json.dumps(compare_gradings(args.out, args.instruments, args.first, args.second, args.limit), indent=2))
         return
     if args.cmd == "recheck-toprope":
         print(json.dumps(recheck_toprope(args.out), indent=2))
@@ -622,7 +628,7 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
         if errs:
             raise SystemExit("the instruments do not verify; nothing is graded:\n" + "\n".join(errs))
         path = grade_run(args.out, args.instruments, backend, change_requests(args.instruments), args.partial,
-                         into=args.into)
+                         into=args.into, grader=args.grader, k=args.k)
         print(json.dumps({"proposed": str(path), "usage": backend.report()}))
         return
     if args.cmd == "render":

@@ -372,6 +372,17 @@ theme 1 records those (D1), it is measured again before it is compared (ADR-0049
 | Theme 3, interview and feedback: B1 choice questions, B2 examples first, B3 a live map, D2 impact as decisions, D3 counterexamples as stories | ⬜ | |
 | Theme 4, import and wrap: A1 from `AGENTS.md`, skills, OpenAPI, enums, tickets; A2 an MCP proxy (its own ADR first) | ⬜ | |
 
+## M2's grader (umbrella `umbrella/m2-grader`, link: ① ②)
+
+As decided in [`M2-grader.md`](experiments/M2-grader.md) (2026-11-10): the grader steady enough before
+M2 runs, with no person adjudicating grades after the results.
+
+| Item | Status | PR |
+|---|---|---|
+| The checklist grader: `grade --grader checklist`, four yes/no items per distinct flag (rule B in item `outcome`), each answered k=3 times and decided by majority, the label by a fixed rule; `compare-gradings --first --second --limit` | ✅ | |
+| The validation run on M1's combined run: two checklist sittings, noise within 0.05 (local session) | ⬜ | |
+| The invented examples for rule B reviewed by the researcher; the grader frozen with M2's instruments | ⬜ | |
+
 ## M0b, M2 to M5
 
 Not started. Plans: [`roadmap.md`](roadmap.md).

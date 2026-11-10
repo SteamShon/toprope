@@ -135,3 +135,21 @@ compares the arms.
 2. The harness grades with it, by majority, grouping identical flags.
 3. A test shows that one judgement graded k times takes the majority.
 4. The grader is validated on M1's run as above, then frozen with M2's instruments.
+
+## The validation run (on M1's combined run, consistency only)
+
+The checklist grader is `grade --grader checklist` (k = 3 by default). From `experiments/m1`, two
+sittings into their own directories, then their noise against M2's limit:
+
+```bash
+uv run python -m phase_b grade --model MODEL --out runs/phase-b-recheck-combined --grader checklist --into scoring-checklist-1
+uv run python -m phase_b grade --model MODEL --out runs/phase-b-recheck-combined --grader checklist --into scoring-checklist-2
+uv run python -m phase_b compare-gradings --out runs/phase-b-recheck-combined \
+  --first scoring-checklist-1 --second scoring-checklist-2 --limit 0.05
+```
+
+Only `grader-noise.scoring-checklist-1.scoring-checklist-2.json` is reported: each arm's recall in
+the two sittings, the largest difference and whether it is within 0.05. M1's own grades
+(`scoring/`, `scoring-2/`) are not touched, and no number is compared with them. Over the limit,
+the grader is revised and checked again, at most twice; each revision is its own PR.
+

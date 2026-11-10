@@ -251,6 +251,83 @@ def grade_change(backend: Any, seq: int, req: dict[str, Any], recs: dict[str, di
             "grader_error": None if data else "the grader did not answer with JSON"}
 
 
+CHECKLIST = ("names", "conflict", "outcome", "real")
+
+
+def checklist_label(answers: dict[str, bool | None], seeded_problem: bool) -> str | None:
+    """M2-grader.md, options 2 and 4: `seeded` when the flag names what the key's problem is
+    against and either says it conflicts with it or describes an outcome that breaks it (rule B);
+    otherwise `other-real` or `false-alarm` by `real`. None when an answer is missing."""
+    if any(answers.get(q) is None for q in CHECKLIST):
+        return None
+    if seeded_problem and answers["names"] and (answers["conflict"] or answers["outcome"]):
+        return "seeded"
+    return "other-real" if answers["real"] else "false-alarm"
+
+
+def majority(votes: list[Any]) -> Any:
+    """The answer most votes give (option 3); None when no answer has a strict majority of the
+    votes cast, or none was cast."""
+    cast = [v for v in votes if v is not None]
+    for v in set(map(json.dumps, cast)):
+        if cast.count(json.loads(v)) * 2 > len(cast):
+            return json.loads(v)
+    return None
+
+
+def grade_change_checklist(backend: Any, seq: int, req: dict[str, Any], recs: dict[str, dict[str, Any]],
+                           labels: dict[str, str], key, binding, out: Path, k: int = 3) -> dict[str, Any]:
+    """One change graded with the checklist (M2-grader.md, decided 2026-11-10): each distinct flag
+    once (a flag repeated across runs, as the compiler's are, is one item), every item answered
+    k times by the grader, each answer decided by majority, the label by `checklist_label`. The
+    script's element match stays as in `grade_change`."""
+    bound = (binding.get(seq) or {}).get("elements", [])
+    seeded_problem = (key.get(seq) or {}).get("problem") not in (None, "none")
+    flags, blocks, items = [], [], {}
+    for letter, arm in labels.items():
+        rec = recs.get(arm) or {}
+        lines = [f"=== {letter} ===", f"The edit: {(rec.get('edit') or {}).get('diff') or '(no change)'}"]
+        seen: dict[str, str] = {}
+        for r in check_runs(rec):
+            for i, f in enumerate(r.get("findings") or []):
+                text = json.dumps(f, ensure_ascii=False, sort_keys=True)
+                if text not in seen:
+                    seen[text] = f"{letter}.u{len(seen)}"
+                    items[seen[text]] = []
+                    lines.append(f"{seen[text]}. {json.dumps(f, ensure_ascii=False)}")
+                script = "seeded" if arm == "toprope" and scriptable(f) and binding_match(f, bound) else None
+                flags.append({"id": f"{letter}.{r['run']}.{i}", "item": seen[text], "run": r["run"], "index": i,
+                              "flag": f, "script_label": script})
+        blocks.append("\n".join(lines))
+    user = f"{_sealed_context(seq, req, key, binding)}\n\n" + "\n\n".join(blocks)
+    answers: dict[str, list[dict[str, Any]]] = {i: [] for i in items}
+    fidelity: dict[str, list[str | None]] = {letter: [] for letter in labels}
+    whys: dict[str, str] = {}
+    errors = 0
+    for n in range(1, k + 1):
+        data = _ask_json(backend, prompt("grade_checklist"), user, out / f"seq-{seq:02d}-vote-{n}.jsonl") or {}
+        errors += not data
+        got = {str(x.get("id")): x for x in data.get("flags", []) if isinstance(x, dict)}
+        for i in items:
+            g = got.get(i, {})
+            answers[i].append({q: g.get(q) if isinstance(g.get(q), bool) else None for q in CHECKLIST})
+            whys.setdefault(i, g.get("why", ""))
+        ed = {str(x.get("label")): x for x in data.get("edits", []) if isinstance(x, dict)}
+        for letter in labels:
+            f_ = (ed.get(letter) or {}).get("fidelity")
+            fidelity[letter].append(f_ if f_ in FIDELITY else None)
+    decided = {i: {q: majority([a[q] for a in votes]) for q in CHECKLIST} for i, votes in answers.items()}
+    for f in flags:
+        f["answers"] = decided[f["item"]]
+        f["votes"] = answers[f["item"]]
+        f["grader_label"] = checklist_label(decided[f["item"]], seeded_problem)
+        f["why"] = whys.get(f["item"], "")
+        f["label"] = f["script_label"] or f["grader_label"]
+    return {"seq": seq, "flags": flags, "grader": {"kind": "checklist", "k": k},
+            "edits": {letter: {"fidelity": majority(v), "why": ""} for letter, v in fidelity.items()},
+            "grader_error": f"{errors} of {k} answers were not JSON" if errors else None}
+
+
 def _probe_text(run_dir: Path, result: dict[str, Any]) -> str:
     """What the probe agent did, from its transcript: tool calls, their results, messages, answer."""
     lines = []
@@ -292,7 +369,7 @@ def grade_probe(backend: Any, probe: dict[str, Any], run_dir: Path, result: dict
 
 
 def grade(run: Path, instruments: Path, backend: Any, requests: list[dict[str, Any]], partial: bool = False,
-          seed: int | None = None, into: str = "scoring") -> Path:
+          seed: int | None = None, into: str = "scoring", grader: str = "single", k: int = 3) -> Path:
     """`into`: the scoring directory; a second sitting writes `scoring-2` (M1-recheck.md, criterion 3)."""
     seqs = [r["seq"] for r in requests]
     missing = complete(run, seqs)
@@ -311,8 +388,10 @@ def grade(run: Path, instruments: Path, backend: Any, requests: list[dict[str, A
         "# Which arm each label stands for, per change. Do not open it while grading.\n"
         + yaml.safe_dump({"seed": seed, "labels": labels}, sort_keys=False))
     reqs = {r["seq"]: r for r in requests}
-    changes = [grade_change(backend, s, reqs[s], {a: recs[a].get(s, {}) for a in ARMS}, labels[s], key, binding, tr)
-               for s in seqs if any(s in recs[a] for a in ARMS)]
+    def one(s: int) -> dict[str, Any]:
+        args = (backend, s, reqs[s], {a: recs[a].get(s, {}) for a in ARMS}, labels[s], key, binding, tr)
+        return grade_change_checklist(*args, k=k) if grader == "checklist" else grade_change(*args)
+    changes = [one(s) for s in seqs if any(s in recs[a] for a in ARMS)]
     probe_rows: dict[str, list[dict[str, Any]]] = {}
     for arm in ARMS:
         rows = probe_rows.setdefault(arm, [])
@@ -635,7 +714,8 @@ def compare_gradings(run: Path, instruments: Path, first: str = "scoring", secon
     worst = max((d for d in diff.values() if d is not None), default=None)
     out = {"first": a, "second": b, "difference": diff, "largest": worst, "limit": limit,
            "within_limit": worst is not None and worst <= limit}
-    (run / "grader-noise.json").write_text(json.dumps(out, indent=2) + "\n")
+    name = "grader-noise.json" if (first, second) == ("scoring", "scoring-2") else f"grader-noise.{first}.{second}.json"
+    (run / name).write_text(json.dumps(out, indent=2) + "\n")
     return out
 
 
