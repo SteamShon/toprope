@@ -71,11 +71,24 @@ class Profile:
             data = yaml.safe_load(Path(path).read_text()) or {}
         except (OSError, yaml.YAMLError) as e:
             raise SystemExit(fixed(f"cannot read the profile {path}: {e}", "give a YAML file of profile keys")) from None
+        if not isinstance(data, dict):
+            raise SystemExit(fixed(f"the profile {path} is a {type(data).__name__}, not a mapping of keys",
+                                   "write `key: value` lines, e.g. `stage_fields: [status]`"))
         known = set(cls.__dataclass_fields__)
-        unknown = sorted(set(data) - known)
+        unknown = sorted(set(map(str, data)) - known)
         if unknown:
             raise SystemExit(fixed(f"the profile {path} has unknown key(s) {', '.join(unknown)}",
                                    f"use {', '.join(sorted(known))}; put an extractor's own settings under `options`"))
+        shapes = {"stage_fields": list, "roles": list, "ignore": list, "rename": dict, "options": dict,
+                  "object": str, "roles_from": (str, type(None))}
+        for key, shape in shapes.items():
+            v = data.get(key)
+            if key in data and not isinstance(v, shape):
+                example = {list: f"`{key}: [a, b]`", dict: f"`{key}: {{a: b}}`"}.get(shape, f"`{key}: name`")
+                raise SystemExit(fixed(f"the profile {path}: `{key}` is a {type(v).__name__}", f"write it as {example}"))
+            if isinstance(v, list) and not all(isinstance(x, str) for x in v):
+                raise SystemExit(fixed(f"the profile {path}: `{key}` holds something other than names",
+                                       f"write `{key}` as a list of names"))
         return cls(**data)
 
     def name(self, source_name: str) -> str:
@@ -108,26 +121,27 @@ def register_extractor(extractor: Any) -> None:
 
 
 def _discover() -> None:
-    """Built-ins, then whatever installed packages plug in through entry points."""
+    """Registered in code wins over an installed package's entry point, which wins over a built-in."""
     global _discovered
     if _discovered:
         return
     _discovered = True
+    import sys
     from importlib.metadata import entry_points
 
     from . import extractors, readers
-    for r in readers.BUILTIN:
-        _READERS.setdefault(r.kind, r)                     # a plugin registered in code keeps its kind
-    for x in extractors.BUILTIN:
-        _EXTRACTORS.setdefault(x.kind, x)
-    for group, register in ((READERS_GROUP, register_reader), (EXTRACTORS_GROUP, register_extractor)):
+    for group, table in ((READERS_GROUP, _READERS), (EXTRACTORS_GROUP, _EXTRACTORS)):
         for ep in entry_points(group=group):
             try:
                 cls = ep.load()
-                register(cls() if isinstance(cls, type) else cls)
-            except Exception as e:                            # noqa: BLE001 - one bad plugin is reported
-                import sys
+                plugin = cls() if isinstance(cls, type) else cls
+                table.setdefault(plugin.kind, plugin)
+            except (Exception, SystemExit) as e:  # noqa: BLE001 - one bad plugin is reported, not fatal
                 print(f"warning: the {group} plugin {ep.name} did not load: {e}", file=sys.stderr)
+    for r in readers.BUILTIN:
+        _READERS.setdefault(r.kind, r)
+    for x in extractors.BUILTIN:
+        _EXTRACTORS.setdefault(x.kind, x)
 
 
 def reader(kind: str) -> Any:

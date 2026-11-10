@@ -108,6 +108,9 @@ the error is raised.
 | no extractor {…} | use one of {…}, or install a package that plugs one into `{…}` |
 | no reader {…} | use one of {…}, or install a package that plugs one into `{…}` |
 | the profile {…} has unknown key(s) {…} | use {…}; put an extractor's own settings under `options` |
+| the profile {…} is a {…}, not a mapping of keys | write `key: value` lines, e.g. `stage_fields: [status]` |
+| the profile {…}: `{…}` holds something other than names | write `{…}` as a list of names |
+| the profile {…}: `{…}` is a {…} | write it as {…} |
 
 ## `importers/readers.py`
 

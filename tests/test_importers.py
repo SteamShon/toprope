@@ -1,4 +1,5 @@
 """A proposed draft from a source a team already has, through ports (ADR-0049 A1, ADR-0051)."""
+import json
 from pathlib import Path
 
 import pytest
@@ -160,3 +161,120 @@ def test_the_built_ins_come_back_when_the_registry_starts_over(monkeypatch):
     monkeypatch.setattr(port, "_READERS", {})
     monkeypatch.setattr(port, "_EXTRACTORS", {})
     assert {"file", "http"} <= set(kinds()["readers"]) and {"openapi", "sql", "workflow"} <= set(kinds()["extractors"])
+
+
+# Review of #225 (2026-11-10): each case below gave an invalid draft, a lost element or a traceback.
+
+def _src(tmp_path, name, text):
+    f = tmp_path / name
+    f.write_text(text)
+    return str(f)
+
+
+SHOP = """
+openapi: 3.1.0
+paths:
+  /orders: {post: {operationId: createOrder}}
+  /orders/{id}/refund: {post: {operationId: refundOrder}}
+  /auth/login: {post: {operationId: login}}
+components:
+  schemas:
+    Order:
+      type: object
+      required: [status]
+      properties:
+        status: {type: string, enum: [paid, shipped, null, paid]}
+        note: {type: [string, "null"]}
+        customer: {$ref: "#/components/schemas/Customer"}
+    Customer: {type: object, properties: {email: {type: string}}}
+"""
+
+
+def test_an_operation_on_nothing_the_source_describes_is_asked_about_not_written_invalid(tmp_path):
+    out = import_source("openapi", _src(tmp_path, "a.yaml", SHOP), domain="shop")
+    d = valid(out["draft"])
+    assert "login" not in d.actions and any("Which thing does login" in q for q in out["questions"])
+    props = d.objects["Order"].properties
+    assert props["status"].enum == ["paid", "shipped"] and props["status"].optional       # null: optional, once
+    assert props["note"].type == "string" and props["note"].optional                      # 3.1 nullable
+    assert d.links["order_customer"].to == "Customer"
+
+
+def test_a_profile_renaming_or_ignoring_a_schema_keeps_the_actions_consistent(tmp_path):
+    f = _src(tmp_path, "a.yaml", SHOP)
+    d = valid(import_source("openapi", f, profile=Profile(rename={"Order": "Purchase"}))["draft"])
+    assert d.actions["refund_order"].target == "Purchase" and d.actions["create_order"].creates == "Purchase"
+    for ignore in (["Order"], ["Purchase"]):
+        out = import_source("openapi", f, profile=Profile(rename={"Order": "Purchase"}, ignore=ignore))
+        assert "Purchase" not in valid(out["draft"]).objects and "refund_order" not in out["draft"]["actions"]
+
+
+def test_two_source_names_for_one_element_are_a_conflict_naming_both_places(tmp_path):
+    f = _src(tmp_path, "a.yaml", """
+paths:
+  /orders: {delete: {}}
+  /orders/{id}: {delete: {}}
+components:
+  schemas:
+    Order: {type: object, properties: {status: {type: string, enum: [a, b]}, firstName: {type: string}, first-name: {type: integer}}}
+    order: {type: object, properties: {total: {type: number}}}
+""")
+    out = import_source("openapi", f)
+    d = valid(out["draft"])
+    assert "status" in d.objects["Order"].properties and d.objects["Order"].properties["first_name"].type == "string"
+    joined = "\n".join(out["conflicts"])
+    assert "objects.Order is said twice" in joined and "actions.delete_orders is said twice" in joined
+    assert "two facts read as `first_name`" in joined
+
+
+def test_transitions_sharing_a_name_keep_every_move_and_an_unknown_target_is_asked(tmp_path):
+    f = _src(tmp_path, "w.json", json.dumps({"statuses": ["Open", "In Progress", "Done"], "transitions": [
+        {"name": "Close", "from": "Open", "to": "Done"}, {"name": "Close", "from": "In Progress", "to": "Done"},
+        {"name": "Archive", "from": "Done", "to": "Archived"}]}))
+    out = import_source("workflow", f)
+    m = valid(out["draft"]).transitions["Ticket"].matrix
+    assert m["open"]["close"].to == "done" and m["in_progress"]["close"].to == "done"
+    assert any("'Archived', which is not among the statuses" in q for q in out["questions"])
+
+
+def test_sql_reads_real_dialects_without_mixing_tables(tmp_path):
+    f = _src(tmp_path, "s.sql", """
+/* CREATE TABLE ghost (state text CHECK (state IN ('x'))); */
+CREATE TABLE `orders` (
+  status ENUM('paid','it''s','b,c') NOT NULL,
+  id int
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+CREATE TYPE public.prio AS ENUM ('low', 'high');
+CREATE TABLE public."Line Items" (prio public.prio);
+create table statuses (state text check (state in ('on', 'off')));
+""")
+    d = valid(import_source("sql", f)["draft"])
+    assert set(d.objects) == {"Order", "LineItem", "Status"}                          # no Ghost, no Statuse
+    assert d.objects["Order"].properties["status"].enum == ["paid", "it's", "b,c"]
+    assert set(d.objects["Order"].properties) == {"status"}
+    assert d.objects["LineItem"].properties["prio"].enum == ["low", "high"]
+    assert d.objects["Status"].source.ref == f"{f}#L9"                               # its CREATE line
+
+
+@pytest.mark.parametrize("kind,text", [("openapi", "- a\n- b\n"), ("workflow", '"just text"')])
+def test_a_document_that_is_not_a_mapping_is_refused_with_a_fix(tmp_path, kind, text):
+    with pytest.raises(SystemExit, match="not a mapping. Fix: give the"):
+        import_source(kind, _src(tmp_path, "x", text))
+
+
+@pytest.mark.parametrize("text,msg", [("roles: admin\n", "`roles` is a str. Fix: write it as `roles: \\[a, b\\]`"),
+                                      ("- stage_fields\n", "is a list, not a mapping")])
+def test_a_profile_value_of_the_wrong_shape_is_refused(tmp_path, text, msg):
+    with pytest.raises(SystemExit, match=msg):
+        Profile.load(_src(tmp_path, "p.yaml", text))
+
+
+def test_a_plugged_in_extractor_that_makes_an_invalid_draft_is_stopped():
+    class Bad:
+        kind = "bad"
+
+        def extract(self, raw, profile):
+            return Extraction([Candidate("actions.go", {"description": "Go.", "actor": ["x"]}, "here")])
+    register_extractor(Bad())
+    with pytest.raises(SystemExit, match="the bad extractor made a draft that does not validate.*Fix: report it"):
+        import_source("bad", API)

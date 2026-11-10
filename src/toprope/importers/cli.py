@@ -45,7 +45,7 @@ def main(argv: list[str] | None = None) -> None:
         return
     try:
         out = import_source(a.kind, a.source, domain=a.domain, profile=Profile.load(a.profile), via=a.via)
-    except (yaml.YAMLError, ValueError) as e:
+    except (yaml.YAMLError, ValueError, UnicodeDecodeError) as e:
         raise SystemExit(fixed(f"{a.source} does not read as {a.kind}: {e}",
                                "give the export as it was written, or another extractor")) from None
     draft = out["draft"]
