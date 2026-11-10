@@ -1,7 +1,8 @@
 # ADR-0052: Rules in front of an existing MCP server
 
 - Link: ③ works as built (the rules hold on the tools agents already call), ⑥ · Status:
-  **proposed**, 2026-11-10, for the researcher (drafted by the assistant; ADR-0049, A2)
+  **accepted**, 2026-11-10, decided by SteamShon ("추천대로": the recommendation on each open
+  point; drafted by the assistant; ADR-0049, A2)
 - Builds on: ADR-0011 (adapters at the edge), ADR-0016 (actors and principals), ADR-0024 (the
   outbox), ADR-0028 (kernel services as declared effects), ADR-0041 (one way across), ADR-0050
   (approvals by risk), ADR-0051 (external sources through ports)
@@ -19,7 +20,7 @@ result in a reply action, at most once, keyed by the effect id (ADR-0028, ADR-00
 after someone moved the object changes nothing (#148). Approvals by risk say which actions wait
 for a person (ADR-0050). The import ports can read a server's tool list (ADR-0051).
 
-## Decision (proposed)
+## Decision
 1. **`toprope-proxy` is an MCP server that stands where the upstream server stood.** An agent
    connects to the proxy; the proxy is a client of the upstream server. The agent sees the tools
    it is bound to (decision 2), with the same names and input schemas, so its prompts and code do
@@ -63,15 +64,13 @@ for a person (ADR-0050). The import ports can read a server's tool list (ADR-005
   the binding file, the gate through `Execution`. Identity providers, timers and a hosted proxy
   come with M0b's adapters.
 
-## Open, for the researcher
-1. Unbound tools: hidden (recommended: fail-closed, and the import drafts a binding for every
-   tool), or passed through with a warning?
-2. Read-only tools: pass through recorded but not gated (recommended), or gate them too, through
-   read visibility (`read`, M0b)?
-3. An action that waits for approval: refuse and let the agent ask again (recommended: MCP has no
-   callback, and a held call would time out), or hold the call open until a person decides?
-4. Where the gate's state comes from: Toprope's log, with drift found by the Sources domain
-   (recommended), or a read from upstream before every call (fresher, but one more call, and a
-   rule then depends on a server Toprope does not control)?
-5. Build the minimal proxy in this umbrella (recommended: it is the theme's last item and needs
-   no M0b part), or wait for M0b?
+## Decided on the open points (2026-11-10)
+1. **Unbound tools are hidden** (fail-closed). The import drafts a binding for every tool, so
+   leaving one out is a choice a person makes.
+2. **Read-only tools pass through**, recorded but not gated. Gating reads waits for read
+   visibility (`read`, M0b).
+3. **An action that waits for approval is refused**, naming the approval; the agent asks again
+   once a person decides. MCP has no callback, and a held call would time out.
+4. **The gate's state is Toprope's log.** Drift from upstream is found by the Sources domain
+   (ADR-0051, decision 4), not by a read before every call.
+5. **The minimal proxy is built in this umbrella** (theme 4's last item). It needs no M0b part.
