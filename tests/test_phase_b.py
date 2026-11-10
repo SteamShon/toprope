@@ -258,6 +258,27 @@ def test_a_conversation_whose_domain_servers_did_not_connect_stops(tmp_path, mon
     assert CliBackend("m").converse("r", "m", spec, Transcript(tmp_path / "t2.jsonl")) == "the answer"
 
 
+def test_a_server_that_dies_at_start_leaves_its_stderr_on_record(tmp_path, monkeypatch, fake_claude):
+    """The recheck's redo: the servers failed under Claude Code with nothing on record but
+    "failed". serverwrap keeps a server's stderr in a file, and the stopped conversation says it."""
+    import subprocess
+    dying = tmp_path / "dying-server"
+    dying.write_text(f"#!{sys.executable}\nimport sys\nsys.stderr.write('no such table: events\\n')\nsys.exit(1)\n")
+    dying.chmod(0o755)
+    log = tmp_path / "logs" / "authoring-server.stderr"
+    log.parent.mkdir()
+    wrap = ROOT / "experiments/m1/phase_b/serverwrap.py"
+    assert subprocess.run([sys.executable, str(wrap), str(log), str(dying), "--x"]).returncode == 1
+    assert log.read_text() == "no such table: events\n"
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    spec = ToolSpec("files", str(ws), json.dumps({"servers": {"authoring": {"command": "x", "args": []}},
+                                                 "server_logs": {"authoring": str(log)}}))
+    monkeypatch.setenv("FAKE_CLAUDE_TOOLS", "mcp__phase_b__read_file")
+    with pytest.raises(BackendError, match="no such table: events"):
+        CliBackend("m").converse("r", "m", spec, Transcript(tmp_path / "t.jsonl"))
+
+
 @pytest.mark.parametrize("mode", ["limit-stderr", "limit-result"])
 def test_the_usage_limit_is_recognised(tmp_path, monkeypatch, fake_claude, mode):
     monkeypatch.setenv("FAKE_CLAUDE_MODE", mode)
