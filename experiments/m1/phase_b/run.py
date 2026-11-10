@@ -14,6 +14,7 @@ opens the key, the binding or the blind labels, and never takes a role:
   uv run python -m phase_b grade --model M --into scoring-2       the second sitting (the M1 recheck)
   uv run python -m phase_b compare-gradings                       the grader's noise between the two
   uv run python -m phase_b rescript --scoring S                   take back script labels the rule no longer gives
+  uv run python -m phase_b check-probe-tools --model M            do a Toprope probe's domain servers connect?
   uv run python -m phase_b to-decide                              what the researcher must decide
   uv run python -m phase_b score                                  the metrics, from confirmed.yaml
 
@@ -181,7 +182,7 @@ def probe_runs(arm: Any, req: dict[str, Any], d: Path, worlds: Path, probes: lis
 def run_arm(arm: Any, out: Path, requests: list[dict[str, Any]], backend: Backend, model_id: str,
             instruments: Path = INSTRUMENTS, extra: dict[str, Any] | None = None,
             total: int | None = None, worlds: Path | None = None, jobs: int = 1,
-            runs_of_probes: int = 3) -> dict[str, Any]:
+            runs_of_probes: int = 3, redo_baseline_probes: bool = False) -> dict[str, Any]:
     """Every request in order: edit, check, deploy (flagged or not), then the probes (with
     `worlds`, their starting states). Finished changes are skipped;
     a stop (the usage limit, the cost cap, Ctrl-C, an error) keeps them, and is recorded."""
@@ -207,6 +208,14 @@ def run_arm(arm: Any, out: Path, requests: list[dict[str, Any]], backend: Backen
     log = RunLog(log_path(out.parent))
     log.append(arm.name, "", "", "session-start", mpath, f"harness {session['harness_commit']}; model {model_id}")
     try:
+        if redo_baseline_probes and manifest.get("baseline_probes"):
+            from .toprope_arm import _aside
+            if (out / "seq-00").exists():
+                aside = _aside(out / "seq-00", "redone")
+                (out / "seq-00").rename(aside)
+                log.append(arm.name, 0, "", "superseded", aside, "the probes before any change run again")
+            manifest["baseline_probes"] = False
+            write()
         if worlds is not None and not manifest.get("baseline_probes"):
             # The probes before any change: a probe that passes here and fails after a change
             # points at that change (the scorer's "found after deploy").
@@ -372,6 +381,29 @@ def probe_worlds(out: Path) -> Path:
     return worlds
 
 
+def check_probe_tools(backend: Backend, worlds: Path) -> dict[str, Any]:
+    """One conversation with a Toprope probe's servers, on a copy of P07's starting state: which
+    tools it got, each server's status, and the error if the domain servers did not connect."""
+    from .agent import Transcript
+    from .probes import servers
+    from .toolserver import ToolSpec
+    with tempfile.TemporaryDirectory(prefix="probe-tools-") as tmp:
+        root = Path(tmp) / "P07"
+        shutil.copytree(worlds / "P07", root)
+        t = Transcript(Path(tmp) / "t.jsonl")
+        spec = ToolSpec("probe", str(root), json.dumps({"objects": False, "servers": servers(root)}))
+        try:
+            backend.converse("You check which tools you have.", "Name three of your tools, then stop.", spec, t,
+                             max_turns=2)
+            error = None
+        except Exception as e:                        # what the run would have recorded
+            error = f"{type(e).__name__}: {e}"
+        rows = [json.loads(x) for x in t.path.read_text().splitlines()]
+    init = next((r for r in rows if r["kind"] in ("init", "refused")), {})
+    return {"connected": error is None, "error": error, "tools": len(init.get("tools") or []),
+            "mcp_servers": init.get("mcp_servers"), "stderr": init.get("stderr")}
+
+
 def baseline() -> dict[str, str]:
     """The self-domain commits everything starts from (ADR-0040 §3), whatever the repository's
     self domains are now: `baseline.BASELINE`, checked at `baseline.BASELINE_REVS`."""
@@ -464,6 +496,9 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     a.add_argument("--reviews", type=int, default=5,
                    help="reviews per change in the NL and structured arms (run protocol §3: 5)")
     a.add_argument("--probe-runs", type=int, default=3, help="runs of the probes after each change (§3: 3)")
+    a.add_argument("--redo-baseline-probes", action="store_true",
+                   help="run the probes before any change again (their seq-00 moved aside): a harness fault "
+                        "spoilt them (the M1 recheck's Toprope probes ran without their domain tools)")
     a.add_argument("--timed", type=int, default=5, help="timed repeats of the Toprope checks per change (§3: 5)")
     a.add_argument("--no-probes", action="store_true",
                    help="skip the probes (not for a real run: ADR-0040 §6 runs all of them after every change)")
@@ -501,6 +536,11 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     rg.add_argument("--out", type=Path, default=DEFAULT_OUT)
     rg.add_argument("--instruments", type=Path, default=INSTRUMENTS)
     rg.add_argument("--scoring", default="scoring")
+    rg.add_argument("--redo", action="append", default=[], metavar="ARM:SEQ",
+                    help="grade these probe runs again too, e.g. toprope:0 after --redo-baseline-probes")
+    cp = sub.add_parser("check-probe-tools", parents=[common], help="start one Toprope probe's conversation as a run "
+                        "does and report whether its domain servers connected (no probe is graded)")
+    cp.add_argument("--out", type=Path, default=DEFAULT_OUT)
     cg = sub.add_parser("compare-gradings", help="the grader's noise: each arm's recall from two sittings")
     cg.add_argument("--out", type=Path, default=DEFAULT_OUT)
     cg.add_argument("--instruments", type=Path, default=INSTRUMENTS)
@@ -550,9 +590,13 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
         from .combined import combine
         print(json.dumps({**combine(args.out, args.to, backend), "usage": backend.report()}))
         return
+    if args.cmd == "check-probe-tools":
+        print(json.dumps(check_probe_tools(backend, probe_worlds(args.out)), indent=2))
+        return
     if args.cmd == "regrade-missing":
         from .score import regrade_missing
-        print(json.dumps({**regrade_missing(args.out, args.instruments, backend, args.scoring),
+        redo = [(x.split(":")[0], int(x.split(":")[1])) for x in args.redo]
+        print(json.dumps({**regrade_missing(args.out, args.instruments, backend, args.scoring, redo),
                           "usage": backend.report()}, indent=2))
         return
     if args.cmd == "grade":
@@ -600,7 +644,7 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
                      "timed": args.timed if args.arm == "toprope" else None}
     m = run_arm(arm, work, [r for r in reqs if r["seq"] in chosen], backend, args.model or "unnamed",
                 args.instruments, extra, total=len(reqs), worlds=worlds, jobs=max(1, args.jobs),
-                runs_of_probes=args.probe_runs)
+                runs_of_probes=args.probe_runs, redo_baseline_probes=args.redo_baseline_probes)
     stopped = m["sessions"][-1]["stopped"]
     print(json.dumps({"arm": args.arm, "done": m["done"], "stopped": stopped, "usage": backend.report(),
                       "seconds": round(time.monotonic() - t, 1)}))

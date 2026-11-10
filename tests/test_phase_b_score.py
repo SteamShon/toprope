@@ -595,3 +595,15 @@ def test_the_recheck_closes_end_to_end_from_two_sittings_graded_before_the_fixes
     out = score.score(run, inst)
     assert out["metrics"]["toprope"]["recall"] == 0.0                        # no longer the script's tautology
     assert out["by_sitting"]["nl"]["recall"]["range"] == [0.5, 0.5]
+
+
+def test_probes_run_again_are_graded_again(tmp_path):
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    three_arms(run)
+    runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m"],
+                backend=ApiBackend(FakeModel(grader(LABELS, run)[0])))
+    out = score.regrade_missing(run, inst, ApiBackend(FakeModel(grader(LABELS, run)[0])), redo=[("toprope", 0)])
+    assert (out["regraded"], out["still_without_a_grade"]) == (8, 0)       # the eight probes before any change
+    rows = yaml.safe_load((run / "scoring/proposed.yaml").read_text())["probes"]
+    assert all(r.get("regraded") for r in rows["toprope"] if r["seq"] == 0)
+    assert not any(r.get("regraded") for r in rows["nl"])
