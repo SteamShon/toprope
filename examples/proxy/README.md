@@ -29,7 +29,9 @@ What the agent sees:
 | `refund_order(O-3, 500)` | allowed, and sent; the server refuses (more than the total); O-3 stays `paid` |
 | `refund_order(O-3, 50)` | allowed, and sent once; the answer (`R-1`) comes back through `record_refund`, and O-3 is `refunded` |
 | the same call again | not sent again: the same caller, tool and arguments are one call (or pass `idempotency_key`) |
-| two refunds of O-3 at once | one at a time: the second sees O-3 `refunded` and is refused |
+| two refunds of O-3 at once, even from two proxies on one store | one at a time (a lock beside the store): the second sees O-3 `refunded` and is refused |
+| `refund_order(O-21, 10)`, an order only the server knows | read first with `get_order` (the binding's `load:`), recorded, then gated like any other |
+| any gated call on an order | read again first: facts that changed on the server (days since purchase) are recorded before the gate decides; the stage stays the gate's own, and a different stage on the server is logged as drift |
 | the server does not answer | reported as such: it may or may not have acted, so read the order before calling again with a new `idempotency_key` |
 
 How it works:
@@ -42,6 +44,10 @@ How it works:
 - A call that goes straight to the payments server, past the proxy, is not governed. Take that
   access away from the agent.
 - `read: true` is accepted only for a tool the server itself marks read-only (`readOnlyHint`).
+- The proxy enforces only what a person confirmed: it will not start while the declaration has a
+  `proposed` element (ADR-0041).
+- `--store` is a SQLite file or a JSONL folder, never memory: the gate's record must outlive the
+  process, and every proxy on the store takes turns through a lock file beside it.
 - Every argument the agent may send is either checked by the gate and passed on by the effect's
   `with`, or not offered. An optional argument outside both is left to the server's default. A
   required one stops the start.

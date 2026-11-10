@@ -5,7 +5,9 @@ from __future__ import annotations
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
-ORDERS = {"O-3": {"total": 80.0}, "O-8": {"total": 120.0}}
+ORDERS = {"O-3": {"total": 80.0, "status": "paid", "days_since_purchase": 3},
+          "O-8": {"total": 120.0, "status": "paid", "days_since_purchase": 8},
+          "O-21": {"total": 40.0, "status": "paid", "days_since_purchase": 1}}   # not among the declaration's fixtures
 REFUNDS: list[dict] = []
 
 
@@ -22,7 +24,9 @@ def build() -> MCPServer:
 
     @server.tool(description="Read an order.", annotations={"readOnlyHint": True})
     def get_order(order_id: str) -> dict:
-        return {"order_id": order_id, **ORDERS.get(order_id, {})}
+        if order_id not in ORDERS:
+            raise ToolError(f"no order {order_id}")
+        return {"order_id": order_id, **ORDERS[order_id]}
 
     @server.tool(description="Delete every order. Nothing binds this, so the proxy never offers it.")
     def wipe_orders() -> dict:

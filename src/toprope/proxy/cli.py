@@ -25,7 +25,8 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--domain", required=True, help="the declaration whose rules gate the calls")
     ap.add_argument("--binding", required=True, help="the binding: the upstream server and which tool is which action")
     ap.add_argument("--identity", required=True, help="static:FILE (token -> caller) or jwt, as for toprope-server")
-    ap.add_argument("--store", default="memory", help="memory (default), sqlite:FILE, postgres:DSN or jsonl:DIR")
+    ap.add_argument("--store", required=True, help="sqlite:FILE or jsonl:DIR: the gate's record, shared with a lock by "
+                                                  "every proxy on it")
     ap.add_argument("--audit", help="append every call, gated or read, to this JSONL file")
     ap.add_argument("--no-seed", action="store_true", help="do not load the declaration's example fixtures")
     return ap
@@ -35,9 +36,18 @@ def main(argv: list[str] | None = None) -> None:
     from ..adapters.mcp.cli import open_identity, open_store
     from ..decl import load_domain
     from ..exec import Execution
-    from . import Binding, Upstream, UpstreamServices, build_proxy, check, register
+    from . import (
+        Binding,
+        StoreLock,
+        Upstream,
+        UpstreamServices,
+        build_proxy,
+        check,
+        register,
+    )
 
     a = build_parser().parse_args(argv)
+    lock = StoreLock(a.store)                      # before anything starts: a store it cannot share is refused
     binding = Binding.load(a.binding)
     domain = load_domain(a.domain)
     identity = open_identity(a.identity)
@@ -57,7 +67,7 @@ def main(argv: list[str] | None = None) -> None:
     if not a.no_seed:
         ex.seed_world()
     try:
-        build_proxy(ex, binding, upstream, lambda: token, audit=a.audit).run("stdio")
+        build_proxy(ex, binding, upstream, lambda: token, audit=a.audit, lock=lock).run("stdio")
     finally:
         upstream.close()
 

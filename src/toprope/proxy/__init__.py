@@ -19,6 +19,7 @@ The binding (YAML):
         target: order_id                             # the argument naming the object (or `new_id:`)
         params: {amount: amount}                     # action param: tool argument (default: same names)
         result: {refund_id: string}                  # fields of the answer the reply may take
+        load: get_order                              # an order the gate has not seen: read it here
       get_order: {read: true}
 """
 from __future__ import annotations
@@ -49,6 +50,7 @@ class ToolBinding:
     params: dict[str, str] = field(default_factory=dict)   # action param -> tool argument
     result: dict[str, str] = field(default_factory=dict)   # answer field -> service type
     hidden: set[str] = field(default_factory=set)          # optional arguments the gate never sees: not offered
+    load: str | None = None            # a read tool that returns an object the gate has not seen yet
 
 
 @dataclass
@@ -71,7 +73,7 @@ class Binding:
             raise SystemExit(fixed(f"the binding {path}: `upstream` has exactly one of `command` or `url`",
                                    "give `command: [program, args…]` for stdio, or `url:` for streamable HTTP"))
         tools = {}
-        known = {"read", "action", "target", "new_id", "params", "result"}   # `hidden` is computed, not written
+        known = {"read", "action", "target", "new_id", "params", "result", "load"}   # `hidden` is computed
         for name, spec in data["tools"].items():
             spec = spec or {}
             bad = sorted(set(spec) - known) if isinstance(spec, dict) else ["(not a mapping)"]
@@ -187,6 +189,43 @@ class UpstreamServices(KernelServices):
         return {"ok": True, **data}
 
 
+class StoreLock:
+    """One gated call at a time across every proxy on the same store: a file lock beside a SQLite
+    file or a JSONL folder, held around the gate's decision, the call and its reply."""
+
+    def __init__(self, store: str):
+        kind, _, where = store.partition(":")
+        refuse = fixed(f"toprope-proxy cannot share its gate over the store {store!r}",
+                       "use `--store sqlite:FILE` (or `jsonl:DIR`) with a real path; a memory store forgets what "
+                       "was done, and several proxies on one database need a shared lock M0b brings")
+        if kind not in ("sqlite", "jsonl") or not where.strip() or where.startswith((":memory:", "file:")):
+            raise SystemExit(refuse)
+        try:
+            import fcntl  # noqa: F401  (POSIX file locks; checked at start, not at the first call)
+        except ImportError:
+            raise SystemExit(fixed("toprope-proxy needs POSIX file locks, which this system lacks",
+                                   "run the proxy on Linux or macOS")) from None
+        real = Path(where).resolve()                    # a symlinked store shares its target's lock
+        path = real.with_name(real.name + ".proxy.lock") if kind == "sqlite" else real / ".proxy.lock"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self.path, self._local = path, threading.Lock()
+
+    def __enter__(self) -> StoreLock:
+        import fcntl
+        self._local.acquire()
+        self._f = open(self.path, "a")
+        fcntl.flock(self._f, fcntl.LOCK_EX)
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        import fcntl
+        try:
+            fcntl.flock(self._f, fcntl.LOCK_UN)
+            self._f.close()
+        finally:
+            self._local.release()
+
+
 def key(tool: str, inputs: dict[str, Any]) -> str:
     return json.dumps([tool, inputs], sort_keys=True, default=str)
 
@@ -219,6 +258,9 @@ def register(binding: Binding, tools: dict[str, Any], d: Any) -> list[str]:
                 problems.append(fixed(f"the binding marks {name} read-only, but the server does not (readOnlyHint)",
                                       f"bind {name} to a declared action, or leave it out"))
             continue
+        if tb.load and tb.load in tools and tb.target not in ((tools[tb.load].input_schema or {}).get("properties") or {}):
+            problems.append(fixed(f"tool {name} loads with {tb.load}, which takes no `{tb.target}` argument",
+                                  f"name a read tool that takes `{tb.target}`, or drop `load:`"))
         a = d.actions.get(tb.action)
         call = next((e for e in (a.effects if a else []) if e.call == f"{UPSTREAM}{name}"), None)
         if a is None or call is None:
@@ -251,9 +293,16 @@ def register(binding: Binding, tools: dict[str, Any], d: Any) -> list[str]:
 def check(d: Any, binding: Binding) -> list[str]:
     """What must hold between the declaration and the binding before anything is served."""
     from ..decl import validate_domain
+    from ..decl.provenance import proposed_elements
     from ..kernel import UPSTREAM_SERVICES
     problems = [fixed(f"{i.code} at {i.where}: {i.message}", "correct the declaration")
                 for i in validate_domain(d) if i.severity == "error"]
+    unconfirmed = proposed_elements(d.model_dump(mode="json", by_alias=True, exclude_none=True))
+    if unconfirmed:                    # agents propose; only what a person confirmed is enforced (ADR-0041)
+        problems.append(fixed(f"the declaration has {len(unconfirmed)} element(s) no person has confirmed "
+                              f"({', '.join(unconfirmed[:5])}{', …' if len(unconfirmed) > 5 else ''})",
+                              "a person confirms them (set `status: confirmed`, or confirm through the authoring "
+                              "loop) before the proxy enforces them"))
     for an, a in d.actions.items():
         for e in a.effects:
             if e.call and e.call.startswith(UPSTREAM) and e.call not in UPSTREAM_SERVICES:
@@ -270,6 +319,12 @@ def check(d: Any, binding: Binding) -> list[str]:
         if not any(e.call == f"{UPSTREAM}{name}" for e in a.effects):
             problems.append(fixed(f"action {tb.action} does not call {UPSTREAM}{name}",
                                   f"add the effect `call: {UPSTREAM}{name}` with its inputs and a `reply` action"))
+        if tb.load and tb.new_id:
+            problems.append(fixed(f"tool {name} creates an object, so there is nothing to load",
+                                  "drop `load:` from a creating tool"))
+        if tb.load and not (tb.load in binding.tools and binding.tools[tb.load].read):
+            problems.append(fixed(f"tool {name} loads objects with {tb.load}, which the binding does not mark "
+                                  "`read: true`", f"bind {tb.load} as a read-only tool, or drop `load:`"))
         if bool(a.creates) != bool(tb.new_id):
             problems.append(fixed(f"tool {name}: action {tb.action} {'creates' if a.creates else 'targets'} an object",
                                   f"name its argument with `{'new_id' if a.creates else 'target'}:`"))
@@ -277,8 +332,10 @@ def check(d: Any, binding: Binding) -> list[str]:
 
 
 def build_proxy(ex: Any, binding: Binding, upstream: Upstream, credentials: Any, *,
-                audit: str | Path | None = None, **server_kwargs: Any) -> Any:
-    """The MCP server an agent connects to. `ex` runs with `UpstreamServices` over `upstream`."""
+                audit: str | Path | None = None, lock: Any = None, **server_kwargs: Any) -> Any:
+    """The MCP server an agent connects to. `ex` runs with `UpstreamServices` over `upstream`.
+    `lock` serialises gated calls; give every proxy on one store the same one (`StoreLock`), or
+    two of them can both see an object before either call has moved it."""
     from mcp.server.mcpserver import MCPServer
     from mcp.server.mcpserver.exceptions import ToolError
     from mcp.server.mcpserver.tools import Tool
@@ -289,12 +346,67 @@ def build_proxy(ex: Any, binding: Binding, upstream: Upstream, credentials: Any,
 
     offered = upstream.tools()
     services: UpstreamServices = ex.services
-    gate = threading.Lock()          # one gated call at a time: the next sees what the last one did
+    gate = lock or threading.Lock()  # one gated call at a time: the next sees what the last one did
 
     def log(entry: dict[str, Any]) -> None:
         if audit:
             with open(audit, "a") as f:
                 f.write(json.dumps({"at": datetime.now(UTC).isoformat(), **entry}) + "\n")
+
+    def fits(spec: Any, v: Any) -> bool:
+        if spec.enum:
+            return v in spec.enum
+        ok = {"string": isinstance(v, str), "datetime": isinstance(v, str), "boolean": isinstance(v, bool),
+              "integer": isinstance(v, int) and not isinstance(v, bool),
+              "number": isinstance(v, (int, float)) and not isinstance(v, bool)}.get(spec.type, False)
+        return ok and (spec.min is None or v >= spec.min) and (spec.max is None or v <= spec.max)
+
+    def load(name: str, tb: ToolBinding, target: str, who: str) -> None:
+        """Read the object from the server before every gated call, so the gate decides on what
+        the server says now: a new object is recorded as the server's (a system fixture); for one
+        it has, the facts that changed are recorded as read from the server. The stage stays the
+        gate's own (ADR-0052 §4): a different stage on the server is drift, for the person."""
+        from ..semantics.model import SYSTEM
+        from ..semantics.types import Event
+        a = ex.d.actions[tb.action]
+        obj = ex.d.objects[a.object_type]
+        field = ex.d.transitions[a.object_type].field if a.object_type in ex.d.transitions else None
+        try:
+            res = upstream.call(tb.load, {tb.target: target})
+        except Exception as e:                                    # noqa: BLE001 - no answer: refuse, fail closed
+            raise ToolError(fixed(f"{name}: could not read {target} with {tb.load} ({type(e).__name__}: {e})",
+                                  "ask again when the server answers; nothing was sent")) from None
+        if getattr(res, "is_error", False):
+            raise ToolError(fixed(f"{name}: {tb.load} could not read {target}: {answer(res).get('result')}",
+                                  f"check that {target} exists on the server; nothing was sent"))
+        data = {k: v for k, v in answer(res).items() if k in obj.properties}
+        found = ex.lookup(target)
+        have = found[1] if found else {}
+        new = {k: v for k, v in data.items() if not (k == field and found)}   # the stage is the gate's
+        merged = {**have, **new}
+        missing = [k for k, s in obj.properties.items() if not s.optional and merged.get(k) is None]
+        bad = [k for k, v in new.items() if v is not None and not fits(obj.properties[k], v)]
+        if missing or bad:
+            raise ToolError(fixed(f"{target} from {tb.load} cannot be checked: " + "; ".join(
+                [*(f"no {k}" for k in missing), *(f"{k}={new[k]!r} is not a valid {obj.properties[k].type or 'value'}"
+                                                  + (f" (one of {obj.properties[k].enum})" if obj.properties[k].enum else "")
+                                                  for k in bad)]),
+                f"make {tb.load} return {', '.join(sorted(k for k, s in obj.properties.items() if not s.optional))} "
+                "with their declared types; nothing was sent"))
+        if not found:
+            ex.seed(a.object_type, {"id": target, **new})
+            log({"tool": tb.load, "caller": who, "loaded": target, "for": name})
+        else:
+            changed = {k: v for k, v in new.items() if have.get(k) != v}
+            if changed:
+                ex.store.append(target, ex.store.version(target), [Event(
+                    f"{a.object_type}ReadFromServer", target, a.object_type, at=datetime.now(UTC), actor=SYSTEM.ref(),
+                    payload={"changes": changed, "params": {}, "action": None, "source": tb.load},
+                    domain_version=ex.d.version)])
+                log({"tool": tb.load, "caller": who, "refreshed": target, "changed": sorted(changed), "for": name})
+            if field and field in data and data[field] != have.get(field):
+                log({"tool": tb.load, "caller": who, "drift": target, field: {"gate": have.get(field),
+                                                                             "server": data[field]}})
 
     def make(name: str, tb: ToolBinding) -> Tool:
         up = offered[name]
@@ -326,6 +438,8 @@ def build_proxy(ex: Any, binding: Binding, upstream: Upstream, credentials: Any,
             params = {p: args[arg] for p in action.params
                       if (arg := tb.params.get(p, p)) in args and args[arg] is not None}
             with gate:
+                if tb.load:
+                    load(name, tb, str(target), caller.actor.id)
                 out = ex.submit(token, tb.action, str(target), params, f"proxy:{ikey}")
                 log({"tool": name, "caller": caller.actor.id, "args": args, "gated": True, "action": tb.action,
                      "status": out.status, "code": out.code})
@@ -379,4 +493,5 @@ def build_proxy(ex: Any, binding: Binding, upstream: Upstream, credentials: Any,
                      tools=[make(n, tb) for n, tb in binding.tools.items() if n in offered], **server_kwargs)
 
 
-__all__ = ["Binding", "ToolBinding", "Upstream", "UpstreamServices", "answer", "build_proxy", "check", "register"]
+__all__ = ["Binding", "StoreLock", "ToolBinding", "Upstream", "UpstreamServices", "answer", "build_proxy", "check",
+           "register"]

@@ -6,5 +6,6 @@ tools:
     action: refund
     target: order_id
     result: {refund_id: string}
+    load: get_order          # an order the proxy has not seen yet is read from the server first
   get_order:
     read: true

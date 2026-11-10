@@ -359,7 +359,7 @@ theme 1 records those (D1), it is measured again before it is compared (ADR-0049
 | … the first outside extractor, [`examples/plugins/toprope-ossie`](../examples/plugins/toprope-ossie/): reads an Apache Ossie ontology (what NVIDIA Auto Ontology and the Ossie converters export) into proposed things, facts, enums, links and stages, and asks what Ossie cannot say (actions, who acts, derived facts, constraints); found through its own entry point, no change to Toprope | ✅ | #226 |
 | … A1b: `toprope-import rules` reads `AGENTS.md`, skill files or any Markdown (a folder through the `tree` reader): each sentence that binds someone becomes a question citing its file and line, and two that say opposite things about the same thing are a conflict naming both places; nothing becomes a rule by itself. `--questions` saves them as YAML for an agent to work from. On this repository's `AGENTS.md`: about fifty candidates, no false conflict | ✅ | #228 |
 | … ADR-0052 (accepted, "추천대로"): rules in front of an existing MCP server (A2): a binding maps each tool to a declared action, unbound tools are hidden, read-only tools pass through recorded, the gate decides before the call from Toprope's log, the call is the action's declared effect, an action that needs a person is refused until approved; the minimal proxy is built in this umbrella | ✅ | #229 |
-| … A2: `toprope-proxy` (ADR-0052): an MCP server in front of an existing one; a binding maps each tool to a declared action, unbound tools are hidden, read-only tools pass through to an audit log, the kernel decides before the call, the call is the action's `call: mcp:<tool>` effect sent once, and the reply records the answer; gated calls run one at a time; it will not start when binding, server and declaration disagree, and offers no argument the gate does not check ([`examples/proxy/`](../examples/proxy/)). It serves over stdio; drafting a binding from a server's tool list is next | ✅ | #230 |
+| … A2: `toprope-proxy` (ADR-0052): an MCP server in front of an existing one; a binding maps each tool to a declared action, unbound tools are hidden, read-only tools pass through to an audit log, the kernel decides before the call, the call is the action's `call: mcp:<tool>` effect sent once, and the reply records the answer; gated calls run one at a time, across every proxy on a store (a lock file beside it); the binding's `load:` reads the object from the server before every gated call (new objects recorded, changed facts recorded, the stage kept as the gate's own; values checked by type); it will not start while the declaration has a `proposed` element, on a memory store, or when binding, server and declaration disagree, and offers no argument the gate does not check ([`examples/proxy/`](../examples/proxy/)). It serves over stdio; drafting a binding from a server's tool list is next | ✅ | #230, #235 |
 
 ## M0b, M2 to M5
 
@@ -418,6 +418,9 @@ it; each release's cleanup PR handles items older than one release.
   imperatives without one ("Keep PRs small") are missed, and some descriptive sentences ("these
   cannot be enforced") become questions. A sentence parser, or a model behind the same port, could
   do better; the interview covers the gap until then.
+- `toprope-proxy` (#235, review 2026-11-10): the store lock has no timeout, so a hung upstream holds
+  every proxy on the store; `proposed_elements` misses outcome rules here (fixed in the M1 recheck,
+  #199, so it closes when that merges).
 - `toprope-proxy` (#230, review 2026-11-10): an upstream reached by URL (streamable HTTP) is not
   tested yet. Upstream tools are registered in one process-wide table, so `validate_domain` in a
   process that runs a proxy also knows them. The proxy serves over stdio only, with a static
