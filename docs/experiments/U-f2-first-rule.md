@@ -41,11 +41,32 @@ This workflow is not in `examples/`, so it cannot be copied whole.
 
 Record one row per run in the table below, with the commit of `develop` the run used.
 
+### The choice measure (ADR-0053 §2)
+
+Measured on the same run, through the interview entry point the docs give
+([`docs/interview.md`](../interview.md)), with no extra step for the operator:
+
+1. When the run is done (or stopped), the observer runs `toprope-interview <the operator's domain
+   directory> --share`. It reads the interview log only.
+2. It prints `enforced_questions` (the questions whose answer became an enforced element: an
+   action's actor, `requires` or precondition, an outcome rule, an invariant, a matrix cell),
+   `offered` (those that offered choices with a recommended one), `share` (= offered ÷
+   enforced_questions), how many were answered by a choice and by the recommended one, and the
+   questions answered in open text (`open`).
+3. Record `share` in the *Choices* column below. The target is 0.8 or more. Questions about purpose
+   and wording, and the question that names the actions, are not counted.
+
+If the path goes through a template (`toprope-init --template`) and the operator never runs the
+interview, record `n/a (no interview)`: the measure is taken only where the docs send the operator
+to the interview. A dry run on a generic example (leave requests, not this task) with the
+recommended answers gives 8 of 8 (`tests/test_interview_on_the_path.py`); that is a check of the
+tool, not a measurement.
+
 ## Runs
 
-| Date | Run | `develop` at | Operator | Minutes | Touches | YAML lines | Done |
-|---|---|---|---|---|---|---|---|
-| | baseline | | | | | | |
+| Date | Run | `develop` at | Operator | Minutes | Touches | YAML lines | Choices | Done |
+|---|---|---|---|---|---|---|---|---|
+| | baseline | | | | | | | |
 
 ## The documented path today (not a run)
 
