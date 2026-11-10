@@ -418,6 +418,9 @@ it; each release's cleanup PR handles items older than one release.
   imperatives without one ("Keep PRs small") are missed, and some descriptive sentences ("these
   cannot be enforced") become questions. A sentence parser, or a model behind the same port, could
   do better; the interview covers the gap until then.
+- `toprope-proxy` (#235, review 2026-11-10): the store lock has no timeout, so a hung upstream holds
+  every proxy on the store; `proposed_elements` misses outcome rules here (fixed in the M1 recheck,
+  #199, so it closes when that merges).
 - `toprope-proxy` (#230, review 2026-11-10): an upstream reached by URL (streamable HTTP) is not
   tested yet. Upstream tools are registered in one process-wide table, so `validate_domain` in a
   process that runs a proxy also knows them. The proxy serves over stdio only, with a static
