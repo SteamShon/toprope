@@ -6,7 +6,7 @@ this page); plans live in [`roadmap.md`](roadmap.md) and the milestone and exper
 Every PR into `develop` or an `umbrella/*` branch fixes any line here it makes untrue, or says
 why not; each release trims it ([`AGENTS.md`](../AGENTS.md), "Progress").
 
-Updated: 2026-11-09 · Cleaned for release: `v0.1.0`
+Updated: 2026-11-10 · Cleaned for release: `v0.1.0`
 
 Legend: ✅ done · 🟡 in part · ⬜ not started
 
@@ -354,7 +354,8 @@ theme 1 records those (D1), it is measured again before it is compared (ADR-0049
 | … C2: ADR-0050 (accepted): one approval covers a low-risk change from confirm to verify (verify on the condition that the probes pass), two for a high-risk one; risk computed by `check_commit`; any change to who may take a person-only step is high. `check_commit` records `risk` with its reasons; `toprope-change` writes the one-approval request for low risk; a request's delivery steps run only on a commit checked low risk inside it | ✅ | #209, #210 |
 | Theme 2, getting started: A4 `init` and `try`, A3 templates, E1 docs, E2 a tutorial | ⬜ | |
 | Theme 3, interview and feedback: B1 choice questions, B2 examples first, B3 a live map, D2 impact as decisions, D3 counterexamples as stories | ⬜ | |
-| Theme 4, import and wrap: A1 from `AGENTS.md`, skills, OpenAPI, enums, tickets; A2 an MCP proxy (its own ADR first) | ⬜ | |
+| Theme 4, import and wrap (umbrella #224, stacked on #201; plan: [`U-theme4-import.md`](experiments/U-theme4-import.md)): A1 from `AGENTS.md`, skills, OpenAPI, enums, tickets; A2 an MCP proxy (its own ADR first) | 🟡 | |
+| … A1a + ADR-0051 (1–3 accepted): external sources through two ports, a Reader (`file`, `http`) and an Extractor (`openapi`, `sql`, `workflow`), plugged in from outside through the entry-point groups `toprope.readers` and `toprope.extractors`; a team's conventions in a profile (YAML); `toprope-import <extractor> <source> --via <reader> --profile p.yaml` writes a proposed draft citing every element's place and lists what the source cannot say ([`examples/import/`](../examples/import/)). ADR-0051 4–5 (a *Sources* self domain with drift proposals) proposed, after M1 | ✅ | #225 |
 
 ## M0b, M2 to M5
 

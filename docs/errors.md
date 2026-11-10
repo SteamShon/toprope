@@ -91,6 +91,35 @@ the error is raised.
 | on_behalf_of must be the email of a listed person | set `on_behalf_of:` to the git email of a person listed under `people:` |
 | the file has `people` and optionally `agents` | put the people under `people:` and the agents under `agents:` at the top of the file |
 
+## `importers/cli.py`
+
+| Error | Fix |
+|---|---|
+| no source given | give `toprope-import <extractor> <source>` |
+| nothing to import from {…} | check that it is {…}: no things, enums or statuses were found |
+| {…} does not read as {…}: {…} | give the export as it was written, or another extractor |
+| {…} exists | give --out a new file; to add to a draft, propose the elements there |
+
+## `importers/port.py`
+
+| Error | Fix |
+|---|---|
+| cannot read the profile {…}: {…} | give a YAML file of profile keys |
+| no extractor {…} | use one of {…}, or install a package that plugs one into `{…}` |
+| no reader {…} | use one of {…}, or install a package that plugs one into `{…}` |
+| the profile {…} has unknown key(s) {…} | use {…}; put an extractor's own settings under `options` |
+| the profile {…} is a {…}, not a mapping of keys | write `key: value` lines, e.g. `stage_fields: [status]` |
+| the profile {…}: `{…}` holds something other than names | write `{…}` as a list of names |
+| the profile {…}: `{…}` is a {…} | write it as {…} |
+
+## `importers/readers.py`
+
+| Error | Fix |
+|---|---|
+| cannot fetch {…}: {…} | check the URL and that the network allows it |
+| cannot read {…}: {…} | give the path of the file to import |
+| {…} is not a URL | give an http(s) URL, or use the file reader |
+
 ## `kernel/services.py`
 
 | Error | Fix |
