@@ -24,9 +24,9 @@ def test_a_changed_window_reads_as_the_rule_s_own_words_and_its_check():
     r = change_check(load_domain(EX / "refunds/refunds.30-days.domain.yaml"),
                      load_domain(EX / "refunds/refunds.domain.yaml"), examples=5)
     assert [d["decide"] for d in r.decisions] == [
-        f"refund_order: {L}Refunds are allowed within 7 days of purchase.{R} becomes "
+        f"{L}refund a paid order{R}: {L}Refunds are allowed within 7 days of purchase.{R} becomes "
         f"{L}Refunds are allowed within 30 days of purchase.{R}",
-        f"refund_order: the rule {L}Refunds are allowed within 30 days of purchase.{R} checks "
+        f"{L}refund a paid order{R}: the rule {L}Refunds are allowed within 30 days of purchase.{R} checks "
         "`target.days_since_purchase <= 30` (was `target.days_since_purchase <= 7`)"]
     assert r.to_json()["decisions"] == r.decisions
 
@@ -40,17 +40,17 @@ def test_cells_actors_the_person_floor_and_new_rules_each_say_what_changes():
     new["actions"]["refund_order"]["preconditions"].append(
         {"id": "small", "check": "true", "reason": "Only small orders are refunded here."})
     out = said(new, old)
-    assert (f"When an Order is refunded, refund_order is refused ({L}This order is already refunded.{R}); "
+    assert (f"When an Order is refunded, {L}refund a paid order{R} is refused ({L}This order is already refunded.{R}); "
             "it will be: moves it to paid") in out
-    assert "refund_order: who may take it changes from support to support, finance (a person only)" in out
-    assert f"refund_order gets a new rule: {L}Only small orders are refunded here.{R} (checks `true`)" in out
+    assert f"{L}refund a paid order{R}: who may take it changes from support to support, finance (a person only)" in out
+    assert f"{L}refund a paid order{R} gets a new rule: {L}Only small orders are refunded here.{R} (checks `true`)" in out
 
 
 def test_a_removed_rule_says_what_will_no_longer_be_refused():
     old = refunds()
     new = copy.deepcopy(old)
     new["actions"]["refund_order"]["preconditions"] = []
-    assert said(new, old) == [f"refund_order loses the rule {L}Refunds are allowed within 7 days of purchase.{R}: "
+    assert said(new, old) == [f"{L}refund a paid order{R} loses the rule {L}Refunds are allowed within 7 days of purchase.{R}: "
                               "it will no longer refuse on it"]
 
 
@@ -58,7 +58,7 @@ def test_a_check_changed_under_the_same_reason_is_said():
     old = refunds()
     new = copy.deepcopy(old)
     new["actions"]["refund_order"]["preconditions"][0]["check"] = "true"
-    assert said(new, old) == [f"refund_order: the rule {L}Refunds are allowed within 7 days of purchase.{R} "
+    assert said(new, old) == [f"{L}refund a paid order{R}: the rule {L}Refunds are allowed within 7 days of purchase.{R} "
                               "checks `true` (was `target.days_since_purchase <= 7`)"]
 
 
@@ -92,7 +92,7 @@ def test_inputs_effects_stages_and_the_approval_rule_are_never_left_out():
     new["transitions"]["Order"]["initial"] = "paid"
     new["approval"] = {"distinct_from_author": True}
     out = said(new, old)
-    assert any(s.startswith("refund_order takes a new input, amount") for s in out)
+    assert any(s.startswith(f"{L}refund a paid order{R} takes a new input, amount") for s in out)
     assert any("its records decision changes from false to true" in s for s in out)
     assert any(s.startswith("Order's stages:") and '"initial": "paid"' in s for s in out)
     assert any(s.startswith("Who may approve a commit of this domain changes") for s in out)
@@ -113,7 +113,8 @@ def test_a_removed_cell_says_what_it_did_before():
     old = refunds()
     new = copy.deepcopy(old)
     del new["transitions"]["Order"]["matrix"]["paid"]["refund_order"]
-    assert said(new, old) == ["When an Order is paid, refund_order moves it to refunded; it will be undecided, so refused"]
+    assert said(new, old) == [f"When an Order is paid, {L}refund a paid order{R} moves it to refunded; it will be undecided, "
+                              "so refused"]
 
 
 def test_a_reason_cannot_add_a_line_to_the_list():
@@ -131,4 +132,6 @@ def test_the_review_a_person_confirms_from_ends_with_what_it_decides(tmp_path):
     ws.approve_commit(c0, via="terminal", who="ana")
     ws.propose("actions.launch_experiment.actor", ["eng", "pm"], ws.chunks("docs")[0].ref)
     text = ws.render_review()
-    assert "Approving this decides:" in text and "launch_experiment: who may take it changes from eng to eng, pm" in text
+    assert "Approving this decides:" in text and \
+        f"{L}start traffic to an approved experiment{R}: who may take it changes from eng to eng, pm" in text
+    assert "its status changes" not in text and "its source changes" not in text     # provenance decides nothing

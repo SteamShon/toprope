@@ -2,13 +2,15 @@
 
 A minimal flow that breaks an invariant reads, for the reviewer, as `analyst eli
 propose_budget_change C-holdout → ...`. For the owner it reads as: who did what to which thing,
-what became of it, and which rule no longer holds, in the words of the rule's reason.
+what became of it, and which rule no longer holds, in the words of the rule's reason. A thing, a
+role or a fact the glossary defines is named by its term (#225's review).
 """
 from __future__ import annotations
 
 from typing import Any
 
 from ..decl.models import Domain
+from ..decl.words import term
 
 # Outcomes that are not the rules refusing: the command or an effect went wrong (#222's review).
 FAILURES = {"invalid-command", "effect-error", "unsupported-effect", "unauthenticated", "unknown-action",
@@ -41,18 +43,18 @@ def _rule(d: Domain, invariant: Any) -> str:
     return "“" + _one_line(reason) + "”" if reason else "one of its invariants"
 
 
-def _who(actor: str) -> str:
-    """`analyst eli` → `eli (analyst)`."""
+def _who(d: Domain, actor: str) -> str:
+    """`analyst eli` → `eli (analyst)`, the role by its glossary term."""
     role, _, who = str(actor).partition(" ")
-    return f"{who} ({role})" if who else role
+    return f"{who} ({term(d, role)})" if who else term(d, role)
 
 
 def facts(d: Domain, obj: str, data: dict[str, Any]) -> str:
     """The thing's facts, whole, up to a budget; a declared fact it lacks is said to be missing,
     first, since a missing fact is often why a rule breaks."""
     props = d.objects[obj].properties if obj in d.objects else {}
-    parts = [f"no {k}" for k in props if data.get(k) in (None, "")]          # first: often the cause
-    parts += [f"{k} {v}" for k, v in data.items() if k != "id" and v not in (None, "")]
+    parts = [f"no {term(d, k)}" for k in props if data.get(k) in (None, "")]          # first: often the cause
+    parts += [f"{term(d, k)} {v}" for k, v in data.items() if k != "id" and v not in (None, "")]
     out, used = [], 0
     for p_ in parts:
         if used + len(p_) > BUDGET:
@@ -82,12 +84,12 @@ def flow_story(d: Domain, flow: dict[str, Any]) -> str:
     lines, last = [], None
     for i, s in enumerate(steps, 1):
         obj = d.actions[s["action"]].target if s["action"] in d.actions else "thing"
-        field_ = d.transitions[obj].field if obj in d.transitions else "stage"
+        field_ = term(d, d.transitions[obj].field) if obj in d.transitions else "stage"
         on = ""
         if s["target"] != last:
-            on = f" on {_a(obj)}, {s['target']}" + (f" (whose {field_} is {s['from']})" if s.get("from") else "") + ","
+            on = f" on {_a(term(d, obj))}, {s['target']}" + (f" (whose {field_} is {s['from']})" if s.get("from") else "") + ","
             last = s["target"]
-        lines.append(f"{i}. {_who(s['actor'])}{on} asks to {_did(d, s['action'])}, {_result(s.get('outcome'))}.")
+        lines.append(f"{i}. {_who(d, s['actor'])}{on} asks to {_did(d, s['action'])}, {_result(s.get('outcome'))}.")
     lines.append(f"Then the rule {_rule(d, flow.get('invariant'))} would no longer hold.")
     return " ".join(lines)
 
@@ -100,10 +102,10 @@ def inductive_story(d: Domain, case: str, detail: dict[str, Any]) -> str:
     parts = cell.split(".")
     obj = parts[0] if parts else "thing"
     action = parts[2] if len(parts) >= 3 else parts[-1]
-    role = f"the {parts[3]}" if len(parts) >= 4 else "someone"
+    role = f"the {term(d, parts[3])}" if len(parts) >= 4 else "someone"
     reason = detail.get("reason")
     rule = "“" + _one_line(reason) + "”" if reason else "one of its invariants"
-    return (f"Take {_a(obj)} like this: {facts(d, obj, start)}. Every rule allows it. Yet if {role} may "
+    return (f"Take {_a(term(d, obj))} like this: {facts(d, obj, start)}. Every rule allows it. Yet if {role} may "
             f"{_did(d, action)} now, the rule {rule} breaks. Either the rules should not allow such a "
             "start, or this move should be refused.")
 
