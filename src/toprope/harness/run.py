@@ -59,7 +59,7 @@ class Report:
     def to_json(self) -> dict[str, Any]:
         return {"ok": self.ok, "levels": list(self.levels), "findings": [asdict(f) for f in self.findings],
                 "coverage": self.coverage, "minimal_flows": self.minimal_flows,
-                "warnings": [asdict(f) for f in self.warnings]}
+                "warnings": [asdict(f) for f in self.warnings], "stories": self.stories}
 
     def summary(self) -> str:
         c = self.coverage["cells"]
@@ -319,9 +319,10 @@ class Harness:
         mech = self.mechanical(mechanical) if mechanical else None
         coverage = self._coverage(cases, results, flows, n_races)
         coverage["mechanical"] = mech.coverage() if mech else None
-        from .story import flow_story, inductive_story
+        from .story import case_stories, flow_story, inductive_story
         stories = [flow_story(self.d, minimal)] if minimal else []
-        stories += [inductive_story(self.d, w.case, w.detail) for w in self.warnings[:5] if w.kind == "inductive"]
+        stories += case_stories(self.d, self.findings)
+        stories += [inductive_story(self.d, w.case, w.detail) for w in self.warnings if w.kind == "inductive"][:5]
         return Report(self.levels, self.findings, coverage, [minimal] if minimal else [], self.warnings, stories)
 
     def _edge_verdicts(self, cases, results) -> dict[str, str]:

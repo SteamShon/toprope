@@ -10,57 +10,132 @@ from typing import Any
 
 from ..decl.models import Domain
 
+# Outcomes that are not the rules refusing: the command or an effect went wrong (#222's review).
+FAILURES = {"invalid-command", "effect-error", "unsupported-effect", "unauthenticated", "unknown-action",
+            "not-found"}
+BUDGET = 200                                     # characters of facts, cut between facts, never inside one
+
 
 def _a(word: str) -> str:
     return f"{'an' if word[:1].lower() in 'aeiou' else 'a'} {word}"
 
 
+def _one_line(text: Any) -> str:
+    return " ".join(str(text).split())
+
+
 def _did(d: Domain, action: str) -> str:
+    """What asking for the action means, as a verb phrase: its description when that starts with a
+    verb, else `take the action <name>`."""
     a = d.actions.get(action)
-    text = (a.description or action).rstrip(".") if a else action
+    text = _one_line(a.description or "").rstrip(".") if a else ""
+    first = text.split(" ", 1)[0].lower() if text else ""
+    if not text or first in ("the", "a", "an", "this", "that", "one", "each", "every") or text[:1].isdigit():
+        return f"take the action {action}" + (f" ({text[:1].lower() + text[1:]})" if text else "")
     return text[:1].lower() + text[1:]
 
 
-def _rule(d: Domain, invariant: str) -> str:
+def _rule(d: Domain, invariant: Any) -> str:
     inv = next((v for v in d.invariants if v.id == invariant), None)
-    return f"“{' '.join((inv.reason if inv else invariant).split())}”"
+    reason = inv.reason if inv else invariant
+    return "“" + _one_line(reason) + "”" if reason else "one of its invariants"
+
+
+def _who(actor: str) -> str:
+    """`analyst eli` → `eli (analyst)`."""
+    role, _, who = str(actor).partition(" ")
+    return f"{who} ({role})" if who else role
+
+
+def facts(d: Domain, obj: str, data: dict[str, Any]) -> str:
+    """The thing's facts, whole, up to a budget; a declared fact it lacks is said to be missing,
+    first, since a missing fact is often why a rule breaks."""
+    props = d.objects[obj].properties if obj in d.objects else {}
+    parts = [f"no {k}" for k in props if data.get(k) in (None, "")]          # first: often the cause
+    parts += [f"{k} {v}" for k, v in data.items() if k != "id" and v not in (None, "")]
+    out, used = [], 0
+    for p_ in parts:
+        if used + len(p_) > BUDGET:
+            out.append(f"and {len(parts) - len(out)} more")
+            break
+        out.append(p_)
+        used += len(p_) + 2
+    return ", ".join(out) or "any"
+
+
+def _result(outcome: Any) -> str:
+    if outcome in ("ok", None):
+        return "and it is done"
+    if outcome == "invariant-guard":
+        return "and nothing in the rules refuses it: only the last-resort guard stops it"
+    if outcome in FAILURES:
+        return f"and it fails ({outcome}), which is not a rule refusing it"
+    return f"and it is refused ({outcome})"
 
 
 def flow_story(d: Domain, flow: dict[str, Any]) -> str:
-    """`explore`'s minimal flow: `{invariant, steps: [{actor, action, target, from, outcome}]}`."""
+    """`explore`'s minimal flow: `{invariant, steps: [{actor, action, target, from, outcome}]}`.
+    Each step names the thing it acts on whenever that changes, with its stage then."""
     steps = flow.get("steps") or []
     if not steps:
-        return f"The rule {_rule(d, flow.get('invariant', ''))} can be broken."
-    first = steps[0]
-    obj = d.actions[first["action"]].target if first["action"] in d.actions else "thing"
-    field_ = d.transitions[obj].field if obj in d.transitions else "stage"
-    lines = [f"Start with {_a(obj)}, {first['target']}"
-             + (f", whose {field_} is {first['from']}" if first.get("from") else "") + "."]
+        return f"The rule {_rule(d, flow.get('invariant'))} can be broken."
+    lines, last = [], None
     for i, s in enumerate(steps, 1):
-        who = s["actor"].replace(" ", ", ", 1) if " " in s["actor"] else s["actor"]
-        outcome = s.get("outcome")
-        result = ("and it is done" if outcome in ("ok", None) else
-                  "and it is refused" if outcome != "invariant-guard" else
-                  "and nothing in the rules refuses it: only the last-resort guard stops it")
-        lines.append(f"{i}. The {who} asks to {_did(d, s['action'])}, {result}.")
-    lines.append(f"Then the rule {_rule(d, flow['invariant'])} would no longer hold.")
+        obj = d.actions[s["action"]].target if s["action"] in d.actions else "thing"
+        field_ = d.transitions[obj].field if obj in d.transitions else "stage"
+        on = ""
+        if s["target"] != last:
+            on = f" on {_a(obj)}, {s['target']}" + (f" (whose {field_} is {s['from']})" if s.get("from") else "") + ","
+            last = s["target"]
+        lines.append(f"{i}. {_who(s['actor'])}{on} asks to {_did(d, s['action'])}, {_result(s.get('outcome'))}.")
+    lines.append(f"Then the rule {_rule(d, flow.get('invariant'))} would no longer hold.")
     return " ".join(lines)
 
 
 def inductive_story(d: Domain, case: str, detail: dict[str, Any]) -> str:
     """A move that breaks an invariant from a state the invariants allow (ADR-0035). The case is
-    `mechanical:<Object>.<state>.<action>[.<role>]`."""
+    `mechanical:<Object>.<state>.<action>.<role>`."""
     start = detail.get("start") or {}
     cell = case.split(":", 1)[1] if ":" in case else case
     parts = cell.split(".")
     obj = parts[0] if parts else "thing"
     action = parts[2] if len(parts) >= 3 else parts[-1]
     role = f"the {parts[3]}" if len(parts) >= 4 else "someone"
-    facts = ", ".join(f"{k} {v}" for k, v in start.items() if k != "id" and v not in (None, ""))[:160]
-    reason = " ".join(str(detail.get("reason")).split())
-    return (f"Take {_a(obj)} like this: {facts or 'any'}. Every rule allows it. Yet if {role} may "
-            f"{_did(d, action)} now, the rule \u201c{reason}\u201d breaks. Either the rules should not "
-            "allow such a start, or this move should be refused.")
+    reason = detail.get("reason")
+    rule = "“" + _one_line(reason) + "”" if reason else "one of its invariants"
+    return (f"Take {_a(obj)} like this: {facts(d, obj, start)}. Every rule allows it. Yet if {role} may "
+            f"{_did(d, action)} now, the rule {rule} breaks. Either the rules should not allow such a "
+            "start, or this move should be refused.")
 
 
-__all__ = ["flow_story", "inductive_story"]
+def case_action(d: Domain, case: str) -> str | None:
+    """The declared action a generated case exercises: its ids are `<kind>:<Object>.<state>.<action>.<role>`,
+    `create:<action>.<role>`, with `@…` details after."""
+    body = case.split(":", 1)[1] if ":" in case else case
+    for seg in body.split("@", 1)[0].split("."):
+        if seg in d.actions:
+            return seg
+    return None
+
+
+def case_stories(d: Domain, findings: list[Any], limit: int = 5) -> list[str]:
+    """Generated cases whose action only the last-resort guard stopped, one story per action and
+    broken rule, with how many cases showed it."""
+    groups: dict[tuple[str, str], list[str]] = {}
+    for f in findings:
+        if f.kind != "invariant":
+            continue
+        observed = (f.detail or {}).get("observed") or {}
+        action = case_action(d, f.case) or f.case
+        groups.setdefault((action, _one_line(observed.get("reason") or "")), []).append(f.case)
+    out = []
+    for (action, reason), cases in list(groups.items())[:limit]:
+        rule = "\u201c" + reason + "\u201d" if reason else "one of its invariants"
+        did = _did(d, action) if action in d.actions else f"run the case {action}"
+        out.append(f"The rules let someone {did}, and then the rule {rule} would no longer hold: only the "
+                   f"last-resort guard stopped it ({len(cases)} case(s), e.g. {cases[0]}). A precondition or "
+                   "a matrix cell should refuse it.")
+    return out
+
+
+__all__ = ["case_action", "case_stories", "facts", "flow_story", "inductive_story"]
