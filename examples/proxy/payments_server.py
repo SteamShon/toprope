@@ -5,7 +5,9 @@ from __future__ import annotations
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
-ORDERS = {"O-3": {"total": 80.0}, "O-8": {"total": 120.0}}
+ORDERS = {"O-3": {"total": 80.0, "status": "paid", "days_since_purchase": 3},
+          "O-8": {"total": 120.0, "status": "paid", "days_since_purchase": 8},
+          "O-21": {"total": 40.0, "status": "paid", "days_since_purchase": 1}}   # not among the declaration's fixtures
 REFUNDS: list[dict] = []
 
 

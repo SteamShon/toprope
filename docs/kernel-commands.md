@@ -92,7 +92,7 @@ Its subcommands are the domain's actions, one per action, plus `get`, `history`,
 | `--domain` `DOMAIN` | the declaration whose rules gate the calls (required) |
 | `--binding` `BINDING` | the binding: the upstream server and which tool is which action (required) |
 | `--identity` `IDENTITY` | static:FILE (token -> caller) or jwt, as for toprope-server (required) |
-| `--store` `STORE` | memory (default), sqlite:FILE, postgres:DSN or jsonl:DIR (default `memory`) |
+| `--store` `STORE` | sqlite:FILE or jsonl:DIR: the gate's record, shared with a lock by every proxy on it (required) |
 | `--audit` `AUDIT` | append every call, gated or read, to this JSONL file |
 | `--no-seed` | do not load the declaration's example fixtures |
 
