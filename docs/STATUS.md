@@ -15,7 +15,7 @@ Legend: ✅ done · 🟡 in part · ⬜ not started
 | Milestone | Link | Status | Note |
 |---|---|---|---|
 | M0a thin slice | none (enabler) | ✅ | released as `v0.1.0` (#65); the tag is not pushed yet |
-| M1 self-compile | ① ⑥ pilot, no verdict | 🟡 | reported ([`M1-report.md`](experiments/M1-report.md)): with its LLM review Toprope's recall is 0.84 against 0.64 for the NL skill (at the noise floor) and level with the structured spec; the compiler alone weakens ①; ⑥ inconclusive; self-compile not shown (probes) |
+| M1 self-compile | ① ⑥ pilot, no verdict | ✅ | closed after the recheck ([`M1-report.md`](experiments/M1-report.md)): Toprope with its LLM review leads on recall (first run 0.84 against 0.64 NL; recheck 0.94–1.0 against 0.44–0.62, biased and a reference only); the grader's noise (0.18) moves to M2's grader redesign; six probes carried to M2's probe design; ⑥ inconclusive |
 | M0b surfaces and effects | none (enabler) | ⬜ | |
 | M2 dogfood | ① ② ③ | ⬜ | the first ① and ② verdicts |
 | M3 shared language | ④ | ⬜ | |
@@ -347,7 +347,7 @@ gate, a clean pipeline and the grader's measured noise.
 | Harness fixes found closing the recheck: the script no longer scripts capability or info findings as `seeded` (their `where` is the edited element by construction; 67 and 70 flags in the two sittings), `rescript` takes those labels back from graded sittings (an unlabelled repeat takes the grader's label of the same finding); `to-decide` stops asking about a disagreement marked `decided`; `regrade-missing` grades once more a probe run left without a grade; the probes before any change record their tokens; an end-to-end test runs the recheck's closing steps | ✅ | |
 | Every Toprope probe of the recheck ran without its domain servers' tools (they did not connect; nothing stopped it): a conversation whose servers gave no tool now stops as an error, with their status and stderr; servers get longer to connect (`MCP_TIMEOUT`); `check-probe-tools` checks them; `arm --redo-baseline-probes` and `regrade-missing --redo` run and grade the probes before any change again. Toprope's found-after-deploy is not measured in the recheck | ✅ | |
 | Phase B rerun (local session, RUNBOOK's recheck section): the NL skill rendered from authoring@12 and delivery@6, accepted by the researcher; three arms and the combined arm run, graded twice, script labels taken back (`rescript`) and one probe run graded again (`regrade-missing`); confirmed and scored. Criterion 3: the two sittings differ by up to 0.18 of recall (limit 0.1), measured; Toprope's probes before any change run again with the domain servers connected (#234, #243, #245) and graded again; criterion 1: P01, P02, P04, P06, P07 and P08 fail the probe gate | 🟡 | #212 |
-| The recheck report; M1 closed | ⬜ | |
+| The recheck report ([`M1-report.md`](experiments/M1-report.md), *The recheck*): criterion 1 met by its rule (P03, P05 pass the gate; six probes carried to M2 with their causes), 2 met (faults fixed and recorded; #96 outside M1's harness, for the researcher to confirm), 3 met by measuring the noise (0.18, over the limit); M1 closed | ✅ | |
 
 ## M0b, M2 to M5
 
@@ -355,8 +355,8 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 
 ## Next
 
-1. The M1 recheck ([`M1-recheck.md`](experiments/M1-recheck.md)), in the order it gives; M1 closes
-   when its three exit criteria hold.
+1. Merge `umbrella/m1-recheck` into `develop` (a merge commit), then the researcher decides M2's
+   grader (`docs/experiments/M2-grader.md`).
 2. M2's spec, from the draft (`docs/experiments/M2-design.md`): the researcher decides each point,
    freezes the verdict rules, and finds the domain expert who is not the builder; the expert
    writes the change list, seeds it and keeps the key.
