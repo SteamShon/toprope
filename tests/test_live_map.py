@@ -16,7 +16,8 @@ def test_the_map_shows_where_actions_lead_what_is_refused_and_what_is_open(ws): 
     assert lines[0] == "Order (status; starts open)"
     assert "  open: ship -> shipped, reopen -" in lines
     assert "  shipped: ship x, reopen ?" in lines
-    assert "Order" in m["mermaid"] and m["mermaid"]["Order"].startswith("stateDiagram-v2")
+    assert m["mermaid"] == {}                                              # only on request
+    assert ws.live_map(mermaid=True)["mermaid"]["Order"].startswith("stateDiagram-v2")
 
 
 def test_each_bundle_and_each_answer_carries_the_map_as_it_now_is(ws):  # noqa: F811
@@ -32,3 +33,28 @@ def test_each_bundle_and_each_answer_carries_the_map_as_it_now_is(ws):  # noqa: 
 def test_a_draft_that_does_not_parse_has_an_empty_map(ws):  # noqa: F811
     put(ws, {"domain": "shop", "objects": "not a mapping"})
     assert ws.live_map() == {"text": "", "mermaid": {}}
+
+
+def test_a_missing_cell_and_a_stage_with_no_row_show_as_open(ws):  # noqa: F811
+    doc = upto("invariants")
+    doc["objects"]["Order"]["properties"]["status"]["enum"] = ["open", "shipped", "held"]
+    del doc["transitions"]["Order"]["matrix"]["open"]["reopen"]
+    put(ws, doc)
+    text = ws.live_map()["text"]
+    assert "  open: ship -> shipped, reopen ?" in text
+    assert "  held: ship ?, reopen ?" in text                                 # a stage the matrix lacks
+
+
+def test_a_per_role_cell_shows_each_role(ws):  # noqa: F811
+    doc = upto("invariants")
+    doc["transitions"]["Order"]["matrix"]["open"]["ship"] = {"by_role": {"clerk": "shipped", "manager": {"deny": "No."}}}
+    put(ws, doc)
+    assert "ship by role: clerk -> shipped; manager x (other roles -)" in ws.live_map()["text"]
+
+
+def test_every_reply_of_questions_carries_the_map(ws):  # noqa: F811
+    import copy
+    from test_staged_interview import FULL
+    put(ws, copy.deepcopy(FULL))
+    b = ws.questions(limit=50)
+    assert "map" in b and "Order (status; starts open)" in b["map"]

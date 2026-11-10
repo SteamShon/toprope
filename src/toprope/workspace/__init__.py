@@ -675,39 +675,47 @@ class Workspace:
                         "main": main.id if main else None})
         return out
 
-    def live_map(self) -> dict[str, Any]:
-        """The draft as a map while the owner answers (ADR-0049, B3): per thing with stages, where
-        each action leads from each stage, what is refused, what is still open (`?`), and what is
-        only proposed (`*`). `mermaid` holds the world map's state diagrams for a renderer. Empty
-        when the draft does not parse."""
-        try:
-            d = Domain.model_validate(self.draft())
-        except ValidationError:
-            return {"text": "", "mermaid": {}}
+    def live_map(self, d: Domain | None = None, mermaid: bool = False) -> dict[str, Any]:
+        """The draft as a map while the owner answers (ADR-0049, B3): per thing with stages, every
+        stage and every action on it, saying where the action leads (`-> X`), that it is refused
+        (`x`), does not apply (`-`), is still open (`?`, also for a cell or a stage row the draft
+        lacks, which is refused until decided) or only proposed (`*`); a per-role cell shows each
+        role. `n/a` carries no provenance in schema v1, so it never shows `*`. With `mermaid`, also
+        the world map's state diagrams. `d` is the parsed draft when the caller has it."""
+        if d is None:
+            try:
+                d = Domain.model_validate(self.draft())
+            except ValidationError:
+                return {"text": "", "mermaid": {}}
+
+        def show(c: Any) -> str:
+            mark = "*" if getattr(c, "status", None) == "proposed" else ""
+            if isinstance(c, str):
+                return "?" if c == UNDECIDED else "-" if c == "n/a" else f"-> {c}"
+            if hasattr(c, "by_role"):
+                return "by role: " + "; ".join(f"{r} {show(v)}" for r, v in c.by_role.items()) + \
+                    " (other roles -)" + mark
+            if hasattr(c, "deny"):
+                return "x" + mark
+            return f"-> {getattr(c, 'to', '?')}{mark}"
+
         lines = []
         for obj, tr in d.transitions.items():
+            acts = [n for n, a in d.actions.items() if a.target == obj and a.creates is None]
+            prop = d.objects[obj].properties.get(tr.field) if obj in d.objects else None
+            states = list(tr.matrix) + [s for s in (getattr(prop, "enum", None) or []) if s not in tr.matrix]
             lines.append(f"{obj} ({tr.field}; starts {tr.initial or '?'})")
-            for state, row in tr.matrix.items():
-                cells = []
-                for action, c in row.items():
-                    mark = "*" if getattr(c, "status", None) == "proposed" else ""
-                    if isinstance(c, str):
-                        cells.append(f"{action} ?" if c == UNDECIDED else f"{action} -" if c == "n/a" else f"{action} -> {c}")
-                    elif hasattr(c, "deny"):
-                        cells.append(f"{action} x{mark}")
-                    elif hasattr(c, "by_role"):
-                        cells.append(f"{action} by role{mark}")
-                    else:
-                        cells.append(f"{action} -> {getattr(c, 'to', '?')}{mark}")
-                lines.append(f"  {state}: " + ", ".join(cells))
+            for state in states:
+                row = tr.matrix.get(state) or {}
+                lines.append(f"  {state}: " + ", ".join(f"{n} {show(row.get(n, UNDECIDED))}" for n in acts))
         if lines:
-            lines.append("(-> leads to, x refused, - does not apply, ? still open, * proposed, not yet confirmed)")
-        from ..worldmap import build_world_map, to_mermaid
-        try:
-            mermaid = to_mermaid(build_world_map(d)).get("states", {})
-        except Exception:                               # noqa: BLE001 - the text map is enough
-            mermaid = {}
-        return {"text": "\n".join(lines), "mermaid": mermaid}
+            lines.append("(-> leads to, x refused, - does not apply, ? still open and refused until decided, "
+                         "* proposed, not yet confirmed)")
+        out: dict[str, Any] = {"text": "\n".join(lines), "mermaid": {}}
+        if mermaid:
+            from ..worldmap import build_world_map, to_mermaid
+            out["mermaid"] = to_mermaid(build_world_map(d)).get("states", {})
+        return out
 
     def decisions(self) -> list[dict[str, str]]:
         """What confirming and approving the draft decides, in the domain's words (ADR-0049, D2).
@@ -796,16 +804,17 @@ class Workspace:
                 Domain.model_validate(plan.doc)
             except ValidationError as e:
                 why = f"the draft does not parse: {e.errors()[0]['msg']}"
-            return {"stage": None, "questions": [], "progress": [], "stop": {"stop": False, "why": why}}
+            return {"stage": None, "questions": [], "progress": [], "stop": {"stop": False, "why": why}, "map": ""}
         if stage is not None and stage not in BY_NAME:
             raise AuthoringError(fixed(f"unknown stage {stage!r}: one of {list(BY_NAME)}", "use one of the stages listed"))
         st = BY_NAME[stage] if stage else plan.current()
         if st is None:
             return {"stage": None, "goal": "Every stage is done.", "questions": [], "total": 0,
+                    "map": self.live_map(plan.d)["text"],
                     "progress": plan.progress(), "stop": self._stop(plan.d, plan.attempts)}
         qs = plan.bundle(st)
         return {"stage": st.name, "title": st.title, "goal": st.goal, "optional": st.optional,
-                "map": self.live_map()["text"],
+                "map": self.live_map(plan.d)["text"],
                 "bundle_id": self._bundle_id(st.name, qs),
                 "questions": [x.as_dict() for x in qs[:limit]], "total": len(qs),
                 "progress": plan.progress(), "stop": self._stop(plan.d, plan.attempts)}
