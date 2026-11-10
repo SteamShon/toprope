@@ -54,6 +54,7 @@ Start a domain from a template and see its rules work (ADR-0049, A3 and A4; ADR-
 | `--json` | the steps as JSON |
 | `--accept` | make each step's expectation in story.yaml what happens now, and show what changed |
 | `--reset` | start the domain's store (the one toprope-run uses) again from domain.yaml's examples; the old file is kept |
+| `--yes` | with --accept: also accept steps that showed a rule refusing and now pass |
 
 ## `toprope-set`
 
@@ -198,6 +199,39 @@ Add your own rules, roles, people and fields to a domain by command, with no YAM
 | `NEW` | its new name |
 | `--kind` `{object,action,role,field}` | when the name is used twice |
 | `--dir` `DIR` | the domain's directory (default: here) (default `.`) |
+
+## `toprope-remove`
+
+Add your own rules, roles, people and fields to a domain by command, with no YAML (ADR-0053, F2).
+
+| Argument | What |
+|---|---|
+| `--dir` `DIR` | the domain's directory (default: here) (default `.`) |
+
+### `toprope-remove field`
+
+A field no rule, effect or state reads (its values leave the examples).
+
+| Argument | What |
+|---|---|
+| `NAME` |  |
+| `--on` `OBJECT` | the object, when several have the field |
+
+### `toprope-remove role`
+
+A role no rule, cell or person holds (it leaves the actions' actor lists).
+
+| Argument | What |
+|---|---|
+| `NAME` |  |
+
+### `toprope-remove person`
+
+A person or an agent from tokens.yaml, with the story steps they act in.
+
+| Argument | What |
+|---|---|
+| `NAME` |  |
 
 ## `toprope-change`
 

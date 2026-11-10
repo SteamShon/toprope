@@ -496,6 +496,8 @@ def try_parser() -> argparse.ArgumentParser:
     ap.add_argument("--reset", action="store_true",
                     help="start the domain's store (the one toprope-run uses) again from domain.yaml's examples; "
                          "the old file is kept")
+    ap.add_argument("--yes", action="store_true",
+                    help="with --accept: also accept steps that showed a rule refusing and now pass")
     return ap
 
 
@@ -569,18 +571,20 @@ def report_story(where: Path) -> None:
 CANNOT_RUN = ("not-found", "exists", "invalid-command", "unauthenticated", "unknown-action")
 
 
-def accept(where: Path) -> list[str]:
+def accept(where: Path, yes: bool = False) -> list[str]:
     """Make each step's expectation what happens now (the person has seen the outcome and says it
     is intended). A step that cannot run at all is not accepted: it names its fix instead."""
     ok, rows = play(where)
     story = yaml.safe_load((where / "story.yaml").read_text())
-    said, broken = [], []
+    said, broken, undone = [], [], []
     for i, (st, r) in enumerate(zip(story.get("steps", []), rows), 1):
         if r["as_told"]:
             continue
         if r["code"] in CANNOT_RUN:
             broken.append(f"step {i} ({st['action']} {st['target']}): {r['reason']}")
             continue
+        if st.get("rule") and st.get("expect") == "denied" and r["result"] == "ok" and not yes:
+            undone.append(f"step {i} showed {st['rule']} refusing and now passes")
         was = f"{st.get('expect')}" + (f" ({st['code']})" if st.get("code") else "")
         st["expect"] = r["result"]
         if r["result"] == "denied":
@@ -593,6 +597,10 @@ def accept(where: Path) -> list[str]:
         raise SystemExit(fixed("these steps cannot run on domain.yaml as it is: " + "; ".join(broken),
                                "undo the hand edit that removed or renamed what the step names (`toprope-rename` "
                                "renames a thing everywhere, the story too); nothing was written"))
+    if undone:
+        raise SystemExit(fixed("; ".join(undone) + " (a rule may no longer hold)",
+                               "if that is what you meant, run `toprope-try --accept --yes`; otherwise undo the "
+                               "change; nothing was written"))
     if said:
         (where / "story.yaml").write_text(dump_yaml(story, "story.yaml", yaml.safe_load))
     return said
@@ -608,7 +616,7 @@ def try_main(argv: list[str] | None = None) -> None:
         print(reset_store(where))
         return
     if a.accept:
-        said = accept(where)
+        said = accept(where, a.yes)
         for line in said:
             print(line)
         print("story.yaml now expects what happens today" if said else "the story already ends as told")

@@ -25,11 +25,15 @@ class Commands:
         return {str(p.relative_to(self.root)): hashlib.sha256(p.read_bytes()).hexdigest()
                 for p in sorted(self.root.rglob("*")) if p.is_file() and ".toprope" not in p.parts}
 
-    def __call__(self, command, *argv: str, cwd: Path | None = None, refused: bool = False) -> str:
+    def __call__(self, command, *argv: str, cwd: Path | None = None, refused: bool = False,
+                 refused_with: str | None = None) -> str:
         assert self._files() == self.seen, "a file changed outside a command"
         if cwd is not None:
             self.mp.chdir(cwd)
-        if refused:
+        if refused_with:
+            with pytest.raises(SystemExit, match=refused_with):
+                command(list(argv))
+        elif refused:
             with pytest.raises(SystemExit) as e:
                 command(list(argv))
             assert e.value.code == 1
@@ -71,7 +75,7 @@ def test_from_a_sentence_to_an_own_rule_enforced_on_the_store(tmp_path, monkeypa
     assert "rules drafted from your sentence" in said
     where = tmp_path / "trips"
     assert "amount-over-2000-needs-director  (approve_trip_request)" in do(rule_main, "--dir", str(where), "list")
-    do(rule_main, "--dir", str(where), "confirm")                      # the person checked the draft: theirs now
+    do(rule_main, "--dir", str(where), "confirm", refused_with="needs a person at a terminal")  # not by a script
     shown = do(try_main, "--dir", str(where))
     assert "-> denied: When amount > 2000, only director may approve trip request." in shown
     enforced_on_the_store(do, where, "amount", "approve_trip_request", "amount-over-2000-needs-director")

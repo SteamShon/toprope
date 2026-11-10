@@ -58,27 +58,39 @@ the error is raised.
 | --when {…} is not `field op value` | give e.g. --when "amount > 1000" |
 | a date field takes no --default | leave --default out; the field starts empty |
 | a window counts days from something | give --field (one of {…}: a date, or a number of days), or --since ACTION (one of {…}) to count from when it was taken |
+| confirming makes rules a person's, and needs a person at a terminal | run `toprope-rule confirm` yourself in a terminal; run by an agent or a script, the rules stay proposed (they are enforced either way) |
 | no action {…} | use one of {…} |
+| no field {…} | give a field as domain.yaml names it (`toprope-rule list` shows the rules that read fields) |
 | no object {…} | give --on, one of {…} |
+| no person or agent {…} in tokens.yaml | give one of {…} |
 | no person {…} in tokens.yaml | give --for, one of {…} |
 | no role {…} | add it first: toprope-add role {…} |
+| no role {…} | give one of {…} |
 | no rule {…} | see `toprope-rule list` for the ids |
 | no type {…} | use one of {…}, or give --choices a,b,c |
 | no {…} in {…} | run this in a directory toprope-init wrote, or give --dir |
 | not proposed: {…} | confirm one of {…}, or give no id to confirm all |
+| not removed | type yes to remove {…} |
 | nothing called {…}{…} | give the name of an object, an action, a role or a field, as `toprope-rule list` and domain.yaml show it |
+| nothing confirmed | type yes to confirm them |
 | nothing records who made a {…} theirs | give --by ACTION, the action that does (one of {…}) |
 | the harness finds a problem with this change: {…} | nothing was written; change the command (or undo the hand edit it builds on), then try again |
+| the role {…} is still used: {…} | remove those first (`toprope-rule remove ID`, `toprope-remove person NAME`); nothing was removed |
 | the story would no longer run: {…} | nothing was written; change the command so the story's actions and objects stay |
 | there is already a rule {…} | give another --id, or `toprope-rule remove {…}` first |
+| there is already a rule {…}-known | give another --id |
 | which object gets {…}? | give --on, one of {…} |
 | {…} ({…}) cannot be compared with {…} in a threshold | compare a number, a choice (enum) or plain text; for time limits use `toprope-rule window` |
 | {…} acts on {…}, not {…} | give --set-by an action on that object |
 | {…} already has a field {…} | give another --by, or rename that field |
 | {…} already has {…} | choose another name, or rename it with toprope-rename |
 | {…} already takes a param {…} | choose another field name |
+| {…} does not hold {…}, so an agent acting for them may not either | give --roles from {…}, or give {…} the role first |
+| {…} has agents acting for them: {…} | remove those first (`toprope-remove person <the agent's name>`); nothing was removed |
 | {…} has no {…} (it has {…}) | add it first: toprope-add field {…} --type integer --set-by {…} --default 0 |
+| {…} is a field of {…} | give --on, one of {…} |
 | {…} is a number, not {…} | give e.g. --when "{…} > 1000" |
+| {…} is a rule a person made theirs, and removing it needs a person | run `toprope-rule remove {…}` yourself in a terminal; nothing was removed |
 | {…} is already a role | choose another name |
 | {…} is already in tokens.yaml | choose another name |
 | {…} is already taken | choose another name |
@@ -91,6 +103,7 @@ the error is raised.
 | {…} is not person-only | see `toprope-rule list` |
 | {…} is one of {…}, not {…} | give one of those |
 | {…}.{…} is not a date or a number of days | give --field naming one, or --since ACTION |
+| {…}.{…} is still used: {…} | remove those first (`toprope-rule remove ID` for a rule); nothing was removed |
 
 ## `adapters/cli/start.py`
 
@@ -109,6 +122,7 @@ the error is raised.
 | the story names {…}, which domain.yaml does not declare | rename the step's action in story.yaml, or put the action back |
 | these steps cannot run on domain.yaml as it is: {…} | undo the hand edit that removed or renamed what the step names (`toprope-rename` renames a thing everywhere, the story too); nothing was written |
 | {…} | use one of {…}, as name=value |
+| {…} (a rule may no longer hold) | if that is what you meant, run `toprope-try --accept --yes`; otherwise undo the change; nothing was written |
 | {…} cannot be read: {…} | fix the YAML at the line named |
 | {…} exists | choose another name, or remove that directory |
 | {…} is a whole number, not {…} | give e.g. {…}={…} |

@@ -29,6 +29,7 @@ toprope-set = "toprope.adapters.cli.start:set_main"
 toprope-rule = "toprope.adapters.cli.rule:rule_main"
 toprope-add = "toprope.adapters.cli.rule:add_main"
 toprope-rename = "toprope.adapters.cli.rule:rename_main"
+toprope-remove = "toprope.adapters.cli.rule:remove_main"
 toprope-change = "toprope.adapters.cli.change:main"
 
 [dependency-groups]
