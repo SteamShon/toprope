@@ -562,6 +562,9 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     sc.add_argument("--out", type=Path, default=DEFAULT_OUT)
     sc.add_argument("--instruments", type=Path, default=INSTRUMENTS)
     args = ap.parse_args(argv)
+    for k, v in vars(args).items():               # every path absolute: subprocesses run elsewhere
+        if isinstance(v, Path):
+            setattr(args, k, v.resolve())
 
     if args.cmd == "freeze-prompts":
         print(json.dumps(freeze_prompts(args.instruments, args.reason), indent=2))
