@@ -49,7 +49,9 @@ def enforced_on_the_store(do: Commands, where: Path, field: str, approve: str, r
     assert json.loads(out)["state"][field] == 2500
     denied = json.loads(do(run, approve, "R-wiki", "--token", "t-max", refused=True))
     assert denied["code"] == rule
-    assert denied["reason"] == f"When {field} > 2000, only director may {approve.replace('_', ' ')}."
+    # the rule's words exactly, then the generic fix every refusal carries (theme 1, ADR-0053 §5)
+    said, fix = denied["reason"].split(" Fix: ")
+    assert said == f"When {field} > 2000, only director may {approve.replace('_', ' ')}." and fix
     ok = json.loads(do(run, approve, "R-wiki", "--token", "t-kim"))       # the director the rule added
     assert ok["status"] == "ok" and ok["state"]["status"] == "approved"
 
