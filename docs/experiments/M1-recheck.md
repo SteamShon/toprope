@@ -44,11 +44,13 @@ change list someone else writes.
    the recheck of the Toprope arm, every grade in JSON (after the retry), and `phase_b status`
    lists nothing stale. *Left from reviews* in `docs/STATUS.md` holds no item from M1, #179 or
    this umbrella.
-3. **The grader's noise, measured.** The combined run is graded twice, in separate sittings. Each
-   arm's recall differs by at most 0.1 between the two. Both gradings are reported; if the
-   difference is larger, the researcher decides **each disagreement that can change recall** and
-   that decision counts (amended 2026-11-10, below). The rest keep the first sitting's label;
-   precision, a reference only, is reported from both sittings.
+3. **The grader's noise, measured.** The combined run is graded twice, in separate sittings, and
+   each arm's recall from the two is reported. The criterion is met by measuring it (amended
+   twice on 2026-11-10, below): the measured difference, **0.18 of recall, is over the 0.1 limit**,
+   and is reported as such. No person adjudicates the grades. The reference recall is reported
+   per arm as the range of the two sittings; precision likewise, from both. Making the grader
+   steady enough is M2's, in its preregistration
+   ([`M2-grader.md`](M2-grader.md)).
 
 **Reported for reference only** (not a criterion): recall, grouped precision and found-after-deploy
 per arm, next to M1's.
@@ -63,6 +65,18 @@ per arm, next to M1's.
   question per remaining run ("does any of these findings catch the seeded problem?"); answering
   them all gives the recall that labelling every disagreement would. No sampling, no new grading.
   Changing how the grader works is left to M2's preregistration.
+- **2026-11-10, criterion 3 again, replacing the amendment above** (the researcher: "어느 연구자가
+  이 간단하건 하려고 … 27개 케이스를 다 하나씩 검토 하겠어", "동의하고 하네스 세션의 분할
+  요청문 정리해줘", "두개 통합해서 다시 핸드오프 메세지 하나로 만들어줘"). The questions came
+  down to 27, and the researcher could not decide the first, a borderline case. The
+  disagreements lie mostly between `seeded` and `other-real`: whether a free-text finding names
+  the seeded problem is itself ambiguous, so the noise is in the question, and a person's answer
+  would only polish a number that is a reference anyway (ADR-0048 §6). So the criterion is met by
+  measuring the noise (0.18, over the limit, reported as such); the recheck's recall is reported
+  as the range of the two sittings; nobody adjudicates; the grader is redesigned before M2
+  (`M2-grader.md`). M1 is not measured again. `recall-questions` and `apply-recall-answers` are
+  removed; the run's `recall-questions.yaml` (it holds the key's entries) and
+  `disagreements.yaml` are deleted without being committed.
 
 ## Order
 
