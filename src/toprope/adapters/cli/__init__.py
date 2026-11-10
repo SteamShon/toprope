@@ -305,10 +305,57 @@ def _execution(args: Any, d: Domain) -> Execution:
     if args.composition:
         args.no_seed = not args.seed
         return _member(args, identity, services)
+    _keep_in_step(args, d)
     ex = Execution(d, open_store(args.store or "memory"), identity, services=services)
     if args.seed:
         ex.seed_world()
     return ex
+
+
+def _started_here(args: Any) -> Path | None:
+    """The directory of a domain `toprope-init` wrote whose store is its own SQLite file."""
+    if not args.domain or not str(args.store or "").startswith("sqlite:") or args.store == "sqlite::memory:":
+        return None
+    where = Path(args.domain).resolve().parent
+    return where if (where / ".template").is_file() else None
+
+
+def _keep_in_step(args: Any, d: Domain) -> None:
+    """A domain started with `toprope-init`: if its store was seeded from an earlier domain.yaml
+    and nothing was done in it, seed it again from this one (ADR-0053, F2); if something was,
+    say how to start it again, and leave it as it is."""
+    where = _started_here(args)
+    f = Path(args.store[len("sqlite:"):]) if where else None
+    if where is None or f is None or not f.exists():
+        return
+    from .start import _drift_of, hint, sync_store
+    drift, done = _drift_of(f, d)
+    if drift and done == 0:
+        sync_store(where, d)
+        print("note: the store was seeded from an earlier domain.yaml and nothing had been done in it; "
+              "it now holds the examples of this one", file=sys.stderr)
+    elif drift:
+        print(f"note: the store was seeded from an earlier domain.yaml ({'; '.join(drift[:3])}); "
+              f"to start it again from this one: {hint('toprope-try --reset')} (the old file is kept)", file=sys.stderr)
+
+
+def refusal_fix(args: Any, d: Domain, ex: Execution, code: str | None, reason: str | None) -> str | None:
+    """What to do about a refusal that comes from the store, not from a rule."""
+    stale = ""
+    if (where := _started_here(args)) is not None:
+        from .start import _drift_of, hint
+        if _drift_of(Path(args.store[len("sqlite:"):]), d)[0]:
+            stale = (f"the store was seeded from an earlier domain.yaml: start it again from this one with "
+                     f"`{hint('toprope-try --reset')}` in {where} (the old file is kept)")
+    if code == "not-found":
+        obj = d.actions[args.cmd].object_type
+        ids = [s for s in ex.store.streams() if (ex.lookup(s) or ("",))[0] == obj][:5]
+        return stale or (f"use the id of a {obj} the store has ({', '.join(ids) or 'none yet'}); "
+                         f"`toprope-run get <id>` shows one")
+    if reason and "(could not evaluate:" in reason:
+        return stale or (f"the object lacks a value this rule reads: `toprope-run get {args.target}` shows it; "
+                         "if domain.yaml changed since the store was seeded, run `toprope-try --reset` in its directory")
+    return None
 
 
 def followed(ex: Execution, d: Domain, target: str, before: int) -> list[dict[str, Any]]:
@@ -490,6 +537,8 @@ def _main(argv: list[str]) -> None:
         out = outcome_json(o)
         if o.ok and (follow := followed(ex, d, args.target, before)):
             out["then"] = follow
+        if not o.ok and (fix := refusal_fix(args, d, ex, o.code, o.reason)):
+            out["fix"] = fix
     except Exception as e:                                   # noqa: BLE001 - reached the gate
         raise _AtTheGate() from e
     print(json.dumps(out, indent=2, ensure_ascii=False, default=str))

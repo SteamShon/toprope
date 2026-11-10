@@ -1,4 +1,5 @@
 title: An agent ships releases; a person approves them
+keywords: [release, ship, deploy, version, test, build, engineer]   # toprope-init "<a sentence>" picks the template whose words it uses most
 about: >
   An agent records test results and ships releases. A release manager approves each release,
   only after its tests pass, and never one they wrote.

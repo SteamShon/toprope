@@ -17,6 +17,7 @@ from pathlib import Path
 def _commands() -> list[tuple[str, Callable[[], argparse.ArgumentParser], str]]:
     from ..adapters.cli import _base_parser
     from ..adapters.cli.change import build_parser as change
+    from ..adapters.cli.rule import add_parser, rename_parser, rule_parser
     from ..adapters.cli.start import init_parser, set_parser, try_parser
     from ..adapters.mcp.cli import build_parser as server
     from ..commits.cli import build_parser as commits
@@ -29,6 +30,9 @@ def _commands() -> list[tuple[str, Callable[[], argparse.ArgumentParser], str]]:
         ("toprope-init", init_parser, ""),
         ("toprope-try", try_parser, ""),
         ("toprope-set", set_parser, ""),
+        ("toprope-rule", rule_parser, ""),
+        ("toprope-add", add_parser, ""),
+        ("toprope-rename", rename_parser, ""),
         ("toprope-change", change, ""),
         ("toprope-server", server, ""),
         ("toprope-harness", harness, ""),

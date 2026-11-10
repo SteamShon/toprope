@@ -1,4 +1,5 @@
 title: An agent proposes ad budget changes; a person approves them
+keywords: [budget, spend, campaign, ad, daily, media, holdout, increase]   # toprope-init "<a sentence>" picks the template whose words it uses most
 about: >
   Holdout campaigns keep their budget, a budget rises by at most 500 at a time, and whoever
   proposed a change cannot approve it.
