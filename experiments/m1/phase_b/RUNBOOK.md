@@ -138,7 +138,8 @@ record their decision.
 Then:
 1. Copy `proposed.yaml` to `confirmed.yaml`.
 2. Set each decided `label`, edit `fidelity` and probe `passed` as the researcher said. Leave
-   `script_label` and `grader_label` as they are.
+   `script_label` and `grader_label` as they are; on a flag where they differ, add
+   `decided: true` once the researcher has decided it.
 3. Set `status: confirmed`.
 
 Run `to-decide` again: it must report `count: 0`.
@@ -189,6 +190,19 @@ with these differences:
   ```bash
   rm -f runs/phase-b-recheck-combined/recall-questions.yaml runs/phase-b-recheck-combined/disagreements.yaml
   ```
+- **Script labels from before #233.** Both sittings were graded when the script still matched
+  capability and info findings to the binding (their `where` is the edited element by
+  construction). Take those back, then measure the noise again:
+  ```bash
+  uv run python -m phase_b rescript --out runs/phase-b-recheck-combined --scoring scoring
+  uv run python -m phase_b rescript --out runs/phase-b-recheck-combined --scoring scoring-2
+  uv run python -m phase_b regrade-missing --model MODEL --out runs/phase-b-recheck-combined --scoring scoring
+  uv run python -m phase_b regrade-missing --model MODEL --out runs/phase-b-recheck-combined --scoring scoring-2
+  uv run python -m phase_b compare-gradings --out runs/phase-b-recheck-combined
+  ```
+  `rescript` must report `flags_without_label: 0`, and `regrade-missing` `still_without_a_grade: 0`;
+  if not, stop and report. `to-decide` should then list nothing; anything it lists goes to the
+  researcher as in step 5.
 - Then step 5's `to-decide` and confirmation, and step 6's `score`, on
   `runs/phase-b-recheck-combined` (its `scoring/`, the first sitting). `metrics.json` holds, under
   `by_sitting`, each arm's recall and precision from both sittings with their range: report those

@@ -257,6 +257,7 @@ def test_a_run_probes_after_every_change(worlds, tmp_path):
     assert [len(list((out / "nl/seq-01/probes" / f"run-{k}").glob("P0*.jsonl"))) for k in (1, 2, 3)] == [8, 8, 8]
     before = json.loads((out / "nl/seq-00/record.json").read_text())             # the probes before any change
     assert all([p["probe"] for p in r["results"]] == PROBES for r in before["probes"])
+    assert set(before["tokens"]) >= {"input", "output"}                         # what the probes before any change cost
     man = json.loads((out / "nl/manifest.json").read_text())
     assert man["probes"] and man["sessions"][-1]["probes"] == man["probes"]
     assert man["sessions"][-1]["jobs"] == 4                                  # probes four at a time by default
