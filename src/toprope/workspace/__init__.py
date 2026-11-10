@@ -28,6 +28,7 @@ from pydantic import ValidationError
 
 from ..decl import Domain, load_yaml, validate_domain
 from ..sources import (
+    redact,
     DEFAULT_EXCLUDE,
     ELEMENT_KIND,
     SNAPSHOTS,
@@ -151,6 +152,61 @@ def _answer_of(text: str) -> str | None:
         if line.startswith("answer: "):
             return line[len("answer: "):]
     return None
+
+
+CARD = re.compile(r"(?<!\d)(?:\d[ -]?){13,19}(?!\d)")
+
+
+def _add_fixture(doc: dict, fixture: Any) -> None:
+    """Add one example (`{Object: {id: ..., ...}}`), replacing an example with the same id. It
+    must fit the draft: a declared object, its own facts, an allowed value for each enum, and no
+    personal data or secret, since a real case is asked for (#220's review)."""
+    if not (isinstance(fixture, dict) and len(fixture) == 1 and isinstance(next(iter(fixture.values())), dict)):
+        raise AuthoringError(fixed("an example is one object, such as `{Order: {id: O-7, ...}}`",
+                                   "give one example per decision, as one object with an `id` and its facts"))
+    (obj, data), = fixture.items()
+    spec = (doc.get("objects") or {}).get(obj)
+    if not isinstance(spec, dict):
+        raise AuthoringError(fixed(f"no object {obj!r} in the draft", f"use one of {', '.join(doc.get('objects') or {})}"))
+    if not isinstance(data.get("id"), (str, int)) or isinstance(data.get("id"), bool) or data.get("id") == "":
+        raise AuthoringError(fixed(f"the {obj} example has no id", "give it an `id`, such as O-7"))
+    props = spec.get("properties") or {}
+    links = {n for n, ln in (doc.get("links") or {}).items() if isinstance(ln, dict) and ln.get("from") == obj}
+    unknown = sorted(set(data) - set(props) - links - {"id"})
+    if unknown:
+        raise AuthoringError(fixed(f"{obj} has no fact {', '.join(unknown)}",
+                                   f"use its facts: {', '.join(props) or '(none yet)'}; or add the fact first"))
+    for k, v in data.items():
+        enum = (props.get(k) or {}).get("enum") if isinstance(props.get(k), dict) else None
+        if enum and v not in enum:
+            raise AuthoringError(fixed(f"{obj}.{k} is {v!r}, not one of {', '.join(map(str, enum))}",
+                                       f"use one of {', '.join(map(str, enum))}"))
+        if isinstance(v, str) and (redact(v)[1] or CARD.search(v)):
+            raise AuthoringError(fixed(f"{obj}.{k} looks like personal data or a secret",
+                                       "use a made-up value with the same shape; examples are kept in git"))
+    fixtures = doc.setdefault("world", {}).setdefault("fixtures", [])
+    clash = [next(iter(f)) for f in fixtures if isinstance(f, dict) and f and next(iter(f)) != obj
+             and (next(iter(f.values())) or {}).get("id") == data["id"]]
+    if clash:
+        raise AuthoringError(fixed(f"id {data['id']!r} is already {_a(clash[0])} example", "give the example its own id"))
+    fixtures[:] = [f for f in fixtures if not (isinstance(f, dict) and (f.get(obj) or {}).get("id") == data["id"])]
+    fixtures.append({obj: data})
+
+
+def _like(d: Domain, obj: str, field_: str, state: str) -> str:
+    """`(like O1: total 10)`: a real example in that state, when the owner gave one (B2). Only
+    numbers, yes/no and enum facts are shown: free text may hold what nobody should repeat."""
+    props = d.objects[obj].properties if obj in d.objects else {}
+
+    def shown(k: str) -> bool:
+        p_ = props.get(k)
+        return p_ is not None and (getattr(p_, "enum", None) or getattr(p_, "type", None) in ("number", "integer", "boolean"))
+    for f in d.world.fixtures:
+        data = f.get(obj) if isinstance(f, dict) else None
+        if isinstance(data, dict) and data.get(field_) == state:
+            facts = ", ".join(f"{k} {v}" for k, v in data.items() if k not in ("id", field_) and shown(k))
+            return f" (like {data.get('id')}" + (f": {facts})" if facts else ")")
+    return ""
 
 
 def _a(word: str) -> str:
@@ -512,10 +568,15 @@ class Workspace:
         if text is None:
             raise AuthoringError(fixed(f"unknown question {question_id!r}: pass its text", "pass the question's text with the answer, or use an id `next_questions` returned"))
         doc = self.draft()
+        examples: list[Any] = []                     # kept in the log: an example has no provenance
         n = self._lines(self.log_path) + 1
         ref = f"{self._log_source_id()}:{self.log_path.relative_to(self.root).as_posix()}#L{n}"
         for dec in decisions:
             segs = element_path(dec["path"])
+            if segs == ["world", "fixtures"]:
+                _add_fixture(doc, dec.get("value"))      # one real example joins the others (B2)
+                examples.append(dec.get("value"))
+                continue
             _no_provenance_path(segs)
             src = {"kind": "interview", "ref": ref, "quote": answer}
             _set(doc, segs, self._with_provenance(segs, dec.get("value"), src))
@@ -524,7 +585,8 @@ class Workspace:
         stage = question_id.split(":")[1] if question_id.startswith("bundle:") else stage_now
         self._append(self.log_path, {"at": _now(), "kind": "answer", "stage": stage, "question_id": question_id,
                                      "question": text, "answer": answer,
-                                     "decisions": [d["path"] for d in decisions]})
+                                     "decisions": [d["path"] for d in decisions],
+                                     **({"examples": examples} if examples else {})})
         return {"ref": ref, "applied": [d["path"] for d in decisions], "issues": issues}
 
     def _log_source_id(self) -> str:
@@ -777,8 +839,8 @@ class Workspace:
                     (f"none of them applies to {_a(state)} {obj}", [{"path": p_, "value": "n/a"} for p_ in paths],
                      False, ""),
                 ]
-                q("row", f"{obj}.{state}", f"Once a {obj} is {state}, can anyone still: {names}? "
-                  "If so, who, and what does it become?", paths,
+                q("row", f"{obj}.{state}", f"Once {_a(obj)} is {state}{_like(d, obj, tr.field, state)}, can anyone "
+                  f"still: {names}? If so, who, and what does it become?", paths,
                   max(self._priority([state], acts[n], attempts.get(n, 0)) for n in undecided) + len(undecided),
                   choices)
         return qs

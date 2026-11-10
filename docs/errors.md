@@ -122,15 +122,18 @@ the error is raised.
 | a confirmation through the kernel names the person who took it | pass the person who confirmed, as the kernel recorded them |
 | a skip quotes the owner's reason | pass the owner's reason for skipping, in their words |
 | an answer quotes the owner's words | pass the owner's answer, in their words, as the answer text |
+| an example is one object, such as `{Order: {id: O-7, ...}}` | give one example per decision, as one object with an `id` and its facts |
 | bad element path {…} | write the path as dot-separated names, such as `actions.approve.preconditions` |
 | cannot read the working copy: {…} | fix the declaration file so it parses, or restore it with `git checkout -- <file>`, then check out again |
 | decisions {…} are neither a list nor a choice | pass a list of {path, value}, or `choice:<id>` |
 | event_store: {…} | set `event_store:` in the workspace file to `sqlite:FILE`, `jsonl:DIR` or `memory` |
+| id {…} is already {…} example | give the example its own id |
 | no branch {…}; branches: {…} | use one of the branches listed |
 | no choice {…} among the open questions: the question was answered, or its choices changed since they were shown | ask `next_questions` again, show the owner the choices now offered, and answer with one of those ids |
 | no chunk {…} | run `search` with words from the passage, and cite the `ref` it returns, or quote the words |
 | no chunk {…}, and no passage contains those words | run `search` with words from the passage, and cite the `ref` it returns or words it shows |
 | no deploy environment at {…} | pass `--env` the directory of a local deploy environment, or set `env:` in toprope.yaml |
+| no object {…} in the draft | use one of {…} |
 | no source {…} | use a source id listed in the workspace file's `sources:`, or add the source there with a `path:` or `url:` |
 | no source {…} | use a source id listed in the workspace file's `sources:`, or add the source there with a `path:` or `url:` |
 | no source {…} | use a source id listed in the workspace file's `sources:`, or add the source there with a `path:` or `url:` |
@@ -150,12 +153,16 @@ the error is raised.
 | the draft names no `domain`, so there is no commit log to check out from | set `domain:` at the top of the draft |
 | the draft names no `domain`, so there is no commit log to merge in | set `domain:` at the top of the draft |
 | the draft would not parse: {…}: {…} | fix the element at that location so the declaration matches the schema (docs/domain-schema.md) |
+| the {…} example has no id | give it an `id`, such as O-7 |
 | unknown question {…}: pass its text | pass the question's text with the answer, or use an id `next_questions` returned |
 | unknown source in ref {…} | cite a ref of the form `<source>:<chunk>`, as `search` returns it, or quote words from the passage |
 | unknown stage {…}: one of {…} | use one of the stages listed |
+| {…} has no fact {…} | use its facts: {…}; or add the fact first |
 | {…} is committed, and its tools refuse a declaration with errors; this change would add {…}. Propose what it refers to first. | propose the elements it refers to first, then this one |
 | {…} is not a drafted element with a source | confirm only elements that were proposed with a source; `next_questions` lists them |
 | {…} must be an object | give the value as a mapping |
 | {…} passages contain {…}: {…} | quote more of the passage, or cite one of those refs |
+| {…}.{…} is {…}, not one of {…} | use one of {…} |
+| {…}.{…} looks like personal data or a secret | use a made-up value with the same shape; examples are kept in git |
 | {…}: an item of {…} must be an object | give the item as a mapping, such as `{id: x, check: ...}` |
 | {…}: provenance is set by the tool; propose the element itself | propose the element at its own path; the tool records its source and status |

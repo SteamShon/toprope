@@ -162,6 +162,14 @@ class Plan:
                 if len(d.objects) > 1 and d.links and name not in linked:
                     q("cast", f"relate:{name}", f"How does a {name} relate to the other things?", ["links"])
         elif n == "actions":
+            have = {next(iter(f)) for f in d.world.fixtures if isinstance(f, dict) and f}
+            for name, o in d.objects.items():       # examples first (ADR-0049, B2): a real case, then rules
+                if name not in have and o.properties:
+                    facts = ", ".join(list(o.properties)[:4])
+                    q("example", name, f"Before any rule: tell me about one real {name} from your work. What "
+                      f"were its {facts}, and what happened to it next? Use made-up names and numbers for "
+                      "people, accounts and cards. (It becomes an example the checks run on, and the "
+                      "questions after this use it.)", ["world.fixtures"], 2)
             if not d.actions:
                 q("actions", "all", "What does each role do, to which thing? For each action: what must be "
                   "true first, and what it changes.", ["actions"])

@@ -355,6 +355,7 @@ theme 1 records those (D1), it is measured again before it is compared (ADR-0049
 | Theme 2, getting started: A4 `init` and `try`, A3 templates, E1 docs, E2 a tutorial | ⬜ | |
 | Theme 3, interview and feedback (umbrella #218, stacked on #201; plan: [`U-theme3-interview.md`](experiments/U-theme3-interview.md)): B1 choice questions, B2 examples first, B3 a live map, D2 impact as decisions, D3 counterexamples as stories | 🟡 | |
 | … B1: transition questions offer choices with their decisions, one recommended with its reason (a plain move only where every other state moves it the same way for every role, else refused: fail-closed; never n/a, which a person would not confirm); a choice id names what it decides, so a changed choice is refused; optional stages offer to skip; answering by `choice:<id>` applies them, citing the owner's words, also through the kernel's `record_answer`; `choice_share` measures the target | ✅ | #219 |
+| … B2: examples first: right after the cast, the actions stage first asks for one real case of each thing with facts (made-up personal data), before any rule; an answered example (`world.fixtures` with one object) must fit the draft (its object, facts, enum values, no personal data or secret) and joins the others, replacing one with the same id, and the answer log keeps it; transition questions repeat only its numbers and choices (`like O-7: total 42`) | ✅ | #220 |
 | Theme 4, import and wrap: A1 from `AGENTS.md`, skills, OpenAPI, enums, tickets; A2 an MCP proxy (its own ADR first) | ⬜ | |
 
 ## M0b, M2 to M5
@@ -426,6 +427,8 @@ it; each release's cleanup PR handles items older than one release.
 - Outcome rules (#179): the `check`-expression form of `requires`, an agent actor in the harness
   world (a `human` rule is tested at the interpreter for now), rules in the generated guide, and the
   interview stage that asks for them (ADR-0048 §4) are not done yet (#179, 2026-11-09)
+
+- Examples (`world.fixtures`) carry no provenance in schema v1, so an example an agent adds from an answer is never confirmed by a person; the answer log keeps it. A schema change (provenance on fixtures, and the review listing them) needs an ADR (#220, 2026-11-10)
 
 ## Open questions
 
