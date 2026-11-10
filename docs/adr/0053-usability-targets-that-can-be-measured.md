@@ -1,8 +1,8 @@
 # ADR-0053: The usability program's targets, stated so they can be measured
 
-- Link: none (an enabler: it restates ADR-0049's targets) · Status: **proposed**, 2026-11-10, for
-  the researcher (drafted by the assistant after the integrated review of the four usability
-  umbrellas)
+- Link: none (an enabler: it restates ADR-0049's targets) · Status: **accepted**, 2026-11-10,
+  decided by SteamShon ("추천대로": the recommendation on each open point; drafted by the assistant
+  after the integrated review of the four usability umbrellas)
 - Amends: ADR-0049 §5 (done when), §2 (F1). Builds on: ADR-0050 (approvals by risk)
 
 ## Context
@@ -27,7 +27,7 @@ are written, and that one measures the wrong thing:
 5. **"Every error names its fix."** The scan covers seven modules. The gate's own refusals,
    which agents hit most, are outside it.
 
-## Decision (proposed)
+## Decision
 1. **F2 is measured on one named path:** the README's first step → `toprope-init` (from a
    template, or from a sentence of prose) → the person's own rule, added by command → `toprope-try`
    shows it enforced → `toprope-run` enforces it on the store. "No YAML by hand" means no line of
@@ -66,8 +66,10 @@ are written, and that one measures the wrong thing:
   program has already decided to change.
 - No claim status changes; ADR-0049's other decisions stand.
 
-## Open, for the researcher
-1. The prose start (`toprope-init "<a sentence>"`) on F2's path: in this program (recommended,
-   because a newcomer without a matching template otherwise has no start), or later?
-2. The 80% denominator: questions that become enforced elements (recommended), or every question
-   asked?
+## Decided on the open points (2026-11-10)
+1. **A prose start is part of this program.** `toprope-init "<a sentence>"` starts a domain from a
+   sentence, for a newcomer whose workflow matches no template. Its output is `proposed`, like any
+   draft; a person confirms it.
+2. **The 80% denominator is the questions whose answer becomes an enforced element.** These are
+   an action's actor or precondition, a rule, or a matrix cell. Questions about purpose and wording
+   are not counted.
