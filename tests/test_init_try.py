@@ -162,3 +162,11 @@ def test_a_budget_exception_is_used_up_by_a_rejection_too(tmp_path):
     assert (again.status, again.code) == ("denied", "not-a-holdout")
     neg = go("t-bot", "propose_budget_change", "C-search", daily_budget=-5, reason="x")
     assert (neg.status, neg.code) == ("denied", "positive-budget")
+
+
+def test_who_you_are_may_follow_a_read_command_too(tmp_path):
+    from toprope.adapters.cli import build_parser
+    p = build_parser(load_domain(init("my-access", "approval", tmp_path) / "domain.yaml"))
+    assert p.parse_args(["history", "R-wiki", "--token", "t-max"]).token == "t-max"
+    assert p.parse_args(["whoami", "--token", "t-max"]).token == "t-max"
+    assert p.parse_args(["--token", "t-max", "get", "R-wiki"]).token == "t-max"

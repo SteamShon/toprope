@@ -1,0 +1,93 @@
+# Tutorial: your first enforced rule in about 15 minutes
+
+Link: none (ADR-0049, E2). You will start a domain from a template, see the gate refuse an
+agent with the rule's own reason, change the rule without writing YAML, and connect the domain
+to your agent. `tests/test_tutorial.py` runs every command on this page, in order, so it stays
+true.
+
+You need [`uv`](https://docs.astral.sh/uv/) and this repository. Work in one shell from start
+to end: the first block remembers where the repository is, and every later command uses it.
+
+```bash
+uv sync
+```
+```bash
+export TOPROPE="$(pwd)"            # the repository; run this from its root
+```
+
+## 1. Start a domain (1 minute)
+
+```bash
+uv run --project "$TOPROPE" toprope-init --list
+uv run --project "$TOPROPE" toprope-init my-access --template approval --dir /tmp/toprope-tutorial
+```
+
+`my-access/` now holds `domain.yaml` (the rules), `tokens.yaml` (the people and the agent of
+the template's story), `story.yaml`, and `toprope.yaml`, so the commands below need no options.
+
+## 2. See the rules work (2 minutes)
+
+```bash
+cd /tmp/toprope-tutorial/my-access
+uv run --project "$TOPROPE" toprope-try
+```
+
+An agent files access requests for the team. It cannot approve one (only a person can), a
+manager cannot approve prod access (security does), and nobody approves their own request. Each
+refusal comes with the rule's reason, the same one the agent gets.
+
+## 3. Act as the agent (3 minutes)
+
+The domain's own store keeps what happens. Act as the agent (`t-bot`), then as a person:
+
+```bash
+uv run --project "$TOPROPE" toprope-run submit_request R-wiki --token t-bot
+uv run --project "$TOPROPE" toprope-run approve_request R-wiki --token t-bot || echo "refused, as it should be"
+uv run --project "$TOPROPE" toprope-run approve_request R-wiki --token t-max
+uv run --project "$TOPROPE" toprope-run history R-wiki --token t-max
+```
+
+The second command is refused with `"code": "actor"` and the reason *Only a person can
+approve_request.* (`toprope-run` exits 1 on a refusal, hence the `||`). The third is approved
+by `max`, a manager. `history` shows what happened to the request: created, submitted, approved,
+and the decision. A refusal changes nothing, so it is not among them; the store keeps it as an
+attempt (query tools over attempts are planned, M0b).
+
+## 4. Change a rule without YAML (3 minutes)
+
+```bash
+uv run --project "$TOPROPE" toprope-set --list
+uv run --project "$TOPROPE" toprope-set prod_approver=manager
+uv run --project "$TOPROPE" toprope-set prod_approver=security
+```
+
+Before anything ships, you see what the change touches (the change check) and which steps of
+the story now end differently: a manager may now approve prod access. The last command sets it
+back. To change a rule that has no setting, edit `domain.yaml` and run `toprope-try --check`.
+
+## 5. Connect your agent (5 minutes)
+
+Serve the domain over MCP to Claude Code, Codex, Cursor or your own agent:
+
+```bash
+uv run --project "$TOPROPE" toprope-server --help
+```
+
+The server does not read `toprope.yaml`: give it the same three things as options, with
+absolute paths, since an MCP client starts it from elsewhere. For this domain:
+
+```
+toprope-server --domain /tmp/toprope-tutorial/my-access/domain.yaml \
+  --store sqlite:/tmp/toprope-tutorial/my-access/.toprope/events.db \
+  --identity static:/tmp/toprope-tutorial/my-access/tokens.yaml
+```
+
+with `TOPROPE_TOKEN=t-bot` for the agent ([`server.md`](server.md) has an MCP client entry). The
+agent then gets one tool per action and is held to the same rules: what it may not do is refused
+with the reason.
+
+## Next
+
+- Your own workflow: let your agent interview you about it ([`workflow.md`](workflow.md)).
+- Every part and how they fit: [`concepts.md`](concepts.md).
+- What each refusal and error means: [`errors.md`](errors.md).
