@@ -99,6 +99,11 @@ uv run --project "$TOPROPE" toprope-run approve_request R-wiki --token t-kim
 `max` is refused with `"code": "amount-over-1000-needs-finance"` and your rule's reason; `kim`, from
 finance, approves. (`--reset` keeps the old store as `.toprope/events-<time>.db`.)
 
+Run in a script, as here, the rule is written `proposed`: a rule becomes a person's only when they
+confirm it at a terminal, when they type the command or later with `toprope-rule confirm`. Proposed
+or not, it is enforced. `toprope-remove field|role|person` takes out a template's leftovers once
+nothing uses them.
+
 ## 6. Connect your agent (5 minutes)
 
 Serve the domain over MCP to Claude Code, Codex, Cursor or your own agent:

@@ -80,6 +80,12 @@ it recognises (you confirm them with `toprope-rule confirm`) and asks about the 
 kinds: `no-self-approval`, `person-only`, `window` (`toprope-rule --help`); `toprope-rename` fits
 the template's names to yours.
 
+A rule added this way is `proposed` unless you confirm it at the terminal where you typed it (you
+are asked to type yes); a proposed rule is enforced all the same, and `toprope-rule confirm`, run by
+a person at a terminal, makes it yours. This is a local guard, not authentication: there is no
+identity behind it, only a check that a terminal answered. It keeps an agent that runs these
+commands in a script or a pipeline from making rules a person's on its own.
+
 ### A worked example
 
 An agent proposes ad budget changes; a person approves them
