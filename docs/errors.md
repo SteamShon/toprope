@@ -122,12 +122,13 @@ the error is raised.
 | a confirmation through the kernel names the person who took it | pass the person who confirmed, as the kernel recorded them |
 | a skip quotes the owner's reason | pass the owner's reason for skipping, in their words |
 | an answer quotes the owner's words | pass the owner's answer, in their words, as the answer text |
+| an example is one object with an id, such as `{Order: {id: O-7, ...}}` | give the example as one object, with an `id` and its facts |
 | bad element path {…} | write the path as dot-separated names, such as `actions.approve.preconditions` |
 | cannot read the working copy: {…} | fix the declaration file so it parses, or restore it with `git checkout -- <file>`, then check out again |
 | decisions {…} are neither a list nor a choice | pass a list of {path, value}, or `choice:<id>` |
 | event_store: {…} | set `event_store:` in the workspace file to `sqlite:FILE`, `jsonl:DIR` or `memory` |
 | no branch {…}; branches: {…} | use one of the branches listed |
-| no choice {…} among the open questions | pick a choice id `next_questions` returned now; an answered question's choices are gone |
+| no choice {…} among the open questions: the question was answered, or its choices changed since they were shown | ask `next_questions` again, show the owner the choices now offered, and answer with one of those ids |
 | no chunk {…} | run `search` with words from the passage, and cite the `ref` it returns, or quote the words |
 | no chunk {…}, and no passage contains those words | run `search` with words from the passage, and cite the `ref` it returns or words it shows |
 | no deploy environment at {…} | pass `--env` the directory of a local deploy environment, or set `env:` in toprope.yaml |

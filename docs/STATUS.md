@@ -355,6 +355,7 @@ theme 1 records those (D1), it is measured again before it is compared (ADR-0049
 | Theme 2, getting started: A4 `init` and `try`, A3 templates, E1 docs, E2 a tutorial | ⬜ | |
 | Theme 3, interview and feedback (umbrella #218, stacked on #201; plan: [`U-theme3-interview.md`](experiments/U-theme3-interview.md)): B1 choice questions, B2 examples first, B3 a live map, D2 impact as decisions, D3 counterexamples as stories | 🟡 | |
 | … B1: transition questions offer choices with their decisions, one recommended with its reason (a plain move only where every other state moves it the same way for every role, else refused: fail-closed; never n/a, which a person would not confirm); a choice id names what it decides, so a changed choice is refused; optional stages offer to skip; answering by `choice:<id>` applies them, citing the owner's words, also through the kernel's `record_answer`; `choice_share` measures the target | ✅ | #219 |
+| … B2: examples first: the cast stage asks for one real case of each thing with facts before any rule; an answered example (`world.fixtures` with one object) joins the others, replacing one with the same id; transition questions name a real example in that state (`like O-7: total 42`) | ✅ | #220 |
 | Theme 4, import and wrap: A1 from `AGENTS.md`, skills, OpenAPI, enums, tickets; A2 an MCP proxy (its own ADR first) | ⬜ | |
 
 ## M0b, M2 to M5

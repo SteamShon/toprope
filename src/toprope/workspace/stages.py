@@ -155,6 +155,13 @@ class Plan:
             if d.objects and not d.links and len(d.objects) > 1:
                 q("cast", "links", "How do these things relate? For each pair: which refers to which, "
                   "one or many, and whether it is required.", ["links"])
+            have = {next(iter(f)) for f in d.world.fixtures if isinstance(f, dict) and f}
+            for name, o in d.objects.items():       # examples first (ADR-0049, B2): a real case, then rules
+                if name not in have and o.properties:
+                    facts = ", ".join(list(o.properties)[:4])
+                    q("example", name, f"Before any rule: tell me about one real {name} from your work. What "
+                      f"were its {facts}, and what happened to it next? (It becomes an example the checks "
+                      "run on, and the questions after this use it.)", ["world.fixtures"], 0.5)
             linked = {e for l in d.links.values() for e in (l.from_, l.to)}
             for name, o in d.objects.items():
                 if not o.description:

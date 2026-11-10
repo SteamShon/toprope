@@ -153,6 +153,28 @@ def _answer_of(text: str) -> str | None:
     return None
 
 
+def _add_fixture(doc: dict, fixture: dict[str, Any]) -> None:
+    """Add one example (`{Object: {id: ..., ...}}`), replacing an example with the same id."""
+    if len(fixture) != 1 or not isinstance(next(iter(fixture.values())), dict) \
+            or not next(iter(fixture.values())).get("id"):
+        raise AuthoringError(fixed("an example is one object with an id, such as `{Order: {id: O-7, ...}}`",
+                                   "give the example as one object, with an `id` and its facts"))
+    (obj, data), = fixture.items()
+    fixtures = doc.setdefault("world", {}).setdefault("fixtures", [])
+    fixtures[:] = [f for f in fixtures if not (isinstance(f, dict) and (f.get(obj) or {}).get("id") == data["id"])]
+    fixtures.append({obj: data})
+
+
+def _like(d: Domain, obj: str, field_: str, state: str) -> str:
+    """`(like O1: total 10)`: a real example in that state, when the owner gave one (B2)."""
+    for f in d.world.fixtures:
+        data = f.get(obj) if isinstance(f, dict) else None
+        if isinstance(data, dict) and data.get(field_) == state:
+            facts = ", ".join(f"{k} {v}" for k, v in data.items() if k not in ("id", field_))[:80]
+            return f" (like {data.get('id')}" + (f": {facts})" if facts else ")")
+    return ""
+
+
 def _a(word: str) -> str:
     return f"{'an' if word[:1].lower() in 'aeiou' else 'a'} {word}"
 
@@ -516,6 +538,9 @@ class Workspace:
         ref = f"{self._log_source_id()}:{self.log_path.relative_to(self.root).as_posix()}#L{n}"
         for dec in decisions:
             segs = element_path(dec["path"])
+            if segs == ["world", "fixtures"] and isinstance(dec.get("value"), dict):
+                _add_fixture(doc, dec["value"])         # one real example joins the others (B2)
+                continue
             _no_provenance_path(segs)
             src = {"kind": "interview", "ref": ref, "quote": answer}
             _set(doc, segs, self._with_provenance(segs, dec.get("value"), src))
@@ -777,8 +802,8 @@ class Workspace:
                     (f"none of them applies to {_a(state)} {obj}", [{"path": p_, "value": "n/a"} for p_ in paths],
                      False, ""),
                 ]
-                q("row", f"{obj}.{state}", f"Once a {obj} is {state}, can anyone still: {names}? "
-                  "If so, who, and what does it become?", paths,
+                q("row", f"{obj}.{state}", f"Once {_a(obj)} is {state}{_like(d, obj, tr.field, state)}, can anyone "
+                  f"still: {names}? If so, who, and what does it become?", paths,
                   max(self._priority([state], acts[n], attempts.get(n, 0)) for n in undecided) + len(undecided),
                   choices)
         return qs
