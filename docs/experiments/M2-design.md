@@ -51,8 +51,9 @@ New in M2:
   carried left out). The grouped one is primary, since M1's ungrouped precision was dominated by
   one check's repetition.
 - **Two noise floors:** the reviews' spread, and the grader's. M1's grader moved recall by about
-  0.1 between sittings. So in M2, either several graders grade independently and their
-  disagreements go to the researcher, or the researcher grades every flag.
+  0.1 between sittings, and by 0.18 in the M1 recheck. The grader is redesigned before M2 so that
+  no person adjudicates grades after the results: options, a recommendation and the decisions
+  left are in [`M2-grader.md`](M2-grader.md) (draft).
 - **Probes:** a probe counts only if it passes, in most runs, before any change in every arm.
   Each arm gets the same power for the same task (M1's `probe-baseline-findings.md`).
 - **Iteration time**, edit to validated preview, with its limiter, as in M1.

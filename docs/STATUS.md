@@ -6,7 +6,7 @@ this page); plans live in [`roadmap.md`](roadmap.md) and the milestone and exper
 Every PR into `develop` or an `umbrella/*` branch fixes any line here it makes untrue, or says
 why not; each release trims it ([`AGENTS.md`](../AGENTS.md), "Progress").
 
-Updated: 2026-11-10
+Updated: 2026-11-10 · Cleaned for release: `v0.1.0`
 
 Legend: ✅ done · 🟡 in part · ⬜ not started
 
@@ -355,8 +355,9 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 
 ## Next
 
-1. Merge `umbrella/m1-recheck` into `develop` (a merge commit), then the researcher decides M2's
-   grader (`docs/experiments/M2-grader.md`).
+1. Merge `umbrella/m1-recheck` into `develop` (a merge commit). Then M2's grader, as decided
+   (`docs/experiments/M2-grader.md`, 2026-11-10): the checklist, the majority of three, rule B and
+   the noise gate, validated on M1's combined run for consistency only.
 2. M2's spec, from the draft (`docs/experiments/M2-design.md`): the researcher decides each point,
    freezes the verdict rules, and finds the domain expert who is not the builder; the expert
    writes the change list, seeds it and keeps the key.
