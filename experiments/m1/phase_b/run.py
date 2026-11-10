@@ -13,10 +13,6 @@ opens the key, the binding or the blind labels, and never takes a role:
   uv run python -m phase_b grade --model M                        propose the grades (opens the key)
   uv run python -m phase_b grade --model M --into scoring-2       the second sitting (the M1 recheck)
   uv run python -m phase_b compare-gradings                       the grader's noise between the two
-  uv run python -m phase_b group-disagreements                    where they differ, grouped for the researcher
-  uv run python -m phase_b apply-disagreements                    the researcher's labels onto the first
-  uv run python -m phase_b recall-questions                       only what can change recall, as yes/no questions
-  uv run python -m phase_b apply-recall-answers                   the researcher's answers onto the first sitting
   uv run python -m phase_b to-decide                              what the researcher must decide
   uv run python -m phase_b score                                  the metrics, from confirmed.yaml
 
@@ -497,19 +493,6 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     cg = sub.add_parser("compare-gradings", help="the grader's noise: each arm's recall from two sittings")
     cg.add_argument("--out", type=Path, default=DEFAULT_OUT)
     cg.add_argument("--instruments", type=Path, default=INSTRUMENTS)
-    gd = sub.add_parser("group-disagreements", help="the flags two sittings labelled differently, grouped for "
-                        "the researcher (disagreements.yaml)")
-    gd.add_argument("--out", type=Path, default=DEFAULT_OUT)
-    ad = sub.add_parser("apply-disagreements", help="the researcher's labels from disagreements.yaml onto the "
-                        "first sitting (scoring/confirmed.yaml, status proposed)")
-    ad.add_argument("--out", type=Path, default=DEFAULT_OUT)
-    rq = sub.add_parser("recall-questions", help="only the disagreements that can change recall, as yes/no "
-                        "questions for the researcher (opens the key; prints counts only)")
-    rq.add_argument("--out", type=Path, default=DEFAULT_OUT)
-    rq.add_argument("--instruments", type=Path, default=INSTRUMENTS)
-    ra = sub.add_parser("apply-recall-answers", help="the researcher's answers onto the first sitting "
-                        "(scoring/confirmed.yaml, status proposed)")
-    ra.add_argument("--out", type=Path, default=DEFAULT_OUT)
     sc = sub.add_parser("score", help="the metrics and pilot verdicts, from scoring/confirmed.yaml")
     sc.add_argument("--out", type=Path, default=DEFAULT_OUT)
     sc.add_argument("--instruments", type=Path, default=INSTRUMENTS)
@@ -517,19 +500,6 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
 
     if args.cmd == "freeze-prompts":
         print(json.dumps(freeze_prompts(args.instruments, args.reason), indent=2))
-        return
-    if args.cmd == "recall-questions":
-        from .score import recall_questions
-        print(json.dumps(recall_questions(args.out, args.instruments), indent=2))
-        return
-    if args.cmd == "apply-recall-answers":
-        from .score import apply_recall_answers
-        print(json.dumps(apply_recall_answers(args.out), indent=2))
-        return
-    if args.cmd in ("group-disagreements", "apply-disagreements"):
-        from .score import apply_disagreements, group_disagreements
-        fn = group_disagreements if args.cmd == "group-disagreements" else apply_disagreements
-        print(json.dumps(fn(args.out), indent=2))
         return
     if args.cmd == "compare-gradings":
         from .score import compare_gradings

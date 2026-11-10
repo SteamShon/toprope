@@ -181,17 +181,17 @@ with these differences:
   uv run python -m phase_b grade --model MODEL --out runs/phase-b-recheck-combined --into scoring-2
   uv run python -m phase_b compare-gradings --out runs/phase-b-recheck-combined
   ```
-  Report `grader-noise.json`. **STOP** if `within_limit` is false: the researcher decides the
-  disagreements that can change recall (M1-recheck.md, criterion 3 as amended):
+  Report `grader-noise.json`. If `within_limit` is false, that is the measurement criterion 3
+  asks for (M1-recheck.md, amended 2026-11-10): report it and go on. Nobody adjudicates the
+  grades. If an earlier session left `recall-questions.yaml` (it holds the key's entries) or
+  `disagreements.yaml` in the run directory, delete both without opening them, and never commit
+  them:
   ```bash
-  uv run python -m phase_b recall-questions --out runs/phase-b-recheck-combined
+  rm -f runs/phase-b-recheck-combined/recall-questions.yaml runs/phase-b-recheck-combined/disagreements.yaml
   ```
-  Report only the counts it prints. **Do not open `recall-questions.yaml`**: it holds the answer
-  key's entries. The researcher answers each question (`answer: yes` or `no`) in that file, then:
-  ```bash
-  uv run python -m phase_b apply-recall-answers --out runs/phase-b-recheck-combined
-  ```
-  It writes `scoring/confirmed.yaml` with `status: proposed`; continue with `to-decide`.
 - Then step 5's `to-decide` and confirmation, and step 6's `score`, on
-  `runs/phase-b-recheck-combined` (its `scoring/`). Report `metrics.json` with its `probe_gate`
+  `runs/phase-b-recheck-combined` (its `scoring/`, the first sitting). `metrics.json` holds, under
+  `by_sitting`, each arm's recall and precision from both sittings with their range: report those
+  as the reference numbers. Commit `scoring/` and `scoring-2/` (with their transcripts) and
+  `grader-noise.json`. Report `metrics.json` with its `probe_gate`
   (exit criterion 1): the probes that fail the gate, and the grader's reason for each failing run.
