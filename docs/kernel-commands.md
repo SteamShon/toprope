@@ -57,6 +57,7 @@ Its subcommands are the domain's actions, one per action, plus `get`, `history`,
 | `--profile` `PROFILE` | a YAML file of the team's conventions |
 | `--domain` `DOMAIN` | the new domain's name (default `imported`) |
 | `--out` `OUT` | where to write the draft (default: <domain>.domain.yaml here) |
+| `--questions` `QUESTIONS` | also write the conflicts and questions as YAML, for an agent to work from |
 | `--list` | the readers and extractors installed |
 
 ## `toprope-server`
