@@ -118,3 +118,161 @@ def test_failures_before_the_gate_are_counted_per_change_approved_since_the_firs
     assert m["failed_before_the_gate_since"] == "2026-11-09T00:00:00+00:00"
     assert m["failed_before_the_gate_per_change_approved_since"] == 2.0
     assert m["refused_or_failed_per_command"] == 0.0        # the first rate is unchanged by them
+
+
+# The measures ADR-0049 (5) and ADR-0050 name: a person's touches, approvals by risk, a window,
+# and refusals per command with failures before the gate apart.
+
+def timed(actor_id, action, target, at, status="ok", code=None):
+    """A finished command whose outcome carries the time of its events, as the kernel writes it."""
+    key = json.dumps([actor_id, action, target, f"{action}-{target}-{at}"])
+    events = [{"at": {"$dt": at}}] if status == "ok" else []
+    return [{"key": key, "state": "pending"},
+            {"key": key, "state": json.dumps({"status": status, "code": code, "events": events})}]
+
+
+def approval_run(at, steps, person=PERSON):
+    return {"run": f"https://example.com/runs/{at}", "approver": "ana", "as": person, "at": at,
+            "summary": "s", "steps": [{"run": s} for s in steps]}
+
+
+def step(member, action, target, **params):
+    return {"member": member, "action": action, "target": target, **({"params": params} if params else {})}
+
+
+def risk(commit, level, at="2026-11-10T00:00:00+00:00"):
+    return {"at": at, "check": "risk", "commit": commit, "ok": level == "low", "summary": f"{level}: reasons"}
+
+
+def one_approval_run(commit, at, minute="10"):
+    """C1's one-approval request for a low-risk change, shipped in the same run: nine steps."""
+    t = f"authoring:{commit}:local"
+    steps = [step("authoring", "confirm_all_proposed", "authoring"), step("authoring", "commit_draft", "authoring"),
+             step("authoring", "check_commit", "$commit"), step("authoring", "approve_commit", "$commit"),
+             step("authoring", "deliver", "$commit", environment="local"),
+             *(step("delivery", a, "authoring:$commit:local") for a in ("preview", "deploy", "run_probes", "verify"))]
+    targets = ["authoring", "authoring", commit, commit, commit, t, t, t, t]
+    cmds = [timed(PERSON, s["action"], tg, f"2026-11-10T{minute}:00:0{i}+00:00")
+            for i, (s, tg) in enumerate(zip(steps, targets))]
+    return steps, cmds
+
+
+def test_a_request_run_of_nine_steps_by_a_person_is_one_touch_and_one_approval(tmp_path):
+    steps, cmds = one_approval_run("2-b", "2026-11-10T10:00:30+00:00")
+    domain(tmp_path, "authoring",
+           [timed(PERSON, "search", "docs", "2026-11-10T09:00:00+00:00"),     # typed by the person
+            timed(AGENT, "propose_element", "authoring", "2026-11-10T09:30:00+00:00"), *cmds[:5]],
+           [event("X", PERSON, "person"), event("Y", AGENT, "agent")], ["2-b"], ["2-b"],
+           checks=[risk("2-b", "low")])
+    domain(tmp_path, "delivery", cmds[5:], [event("X", PERSON, "person")], [], [])
+    write(tmp_path / ".toprope/approval-runs.jsonl", [approval_run("2026-11-10T10:00:30+00:00", steps)])
+    m = ub.measure(tmp_path)
+    assert m["per_approved_change"]["commands_by_person"] == 10.0          # unchanged: kernel steps
+    assert m["person_touches"]["per_approved_change"] == 2.0               # the approval and the search
+    assert m["person_touches"]["approvals_of_human_requests"] == 1
+    assert m["person_touches"]["commands_outside_an_approved_request"] == 1
+    assert m["person_touches"]["request_steps_not_found"] == 0
+    assert m["approvals_per_approved_change_by_risk"] == {"low": {"changes": 1, "approvals": 1, "per_change": 1.0}}
+
+
+def test_approvals_per_approved_change_are_split_by_risk(tmp_path):
+    low_steps, low_cmds = one_approval_run("2-b", "2026-11-10T10:00:30+00:00", "10")
+    # A high-risk change: approved in one request, shipped in a second after its preview was read.
+    approve = [step("authoring", "confirm_all_proposed", "authoring"), step("authoring", "commit_draft", "authoring"),
+               step("authoring", "check_commit", "$commit"), step("authoring", "approve_commit", "$commit")]
+    t = "authoring:3-c:local"
+    ship = [step("authoring", "deliver", "3-c", environment="local"),
+            *(step("delivery", a, t) for a in ("preview", "deploy", "run_probes", "verify"))]
+    high_auth = [timed(PERSON, a, tg, f"2026-11-10T11:00:0{i}+00:00") for i, (a, tg) in enumerate(
+        [("confirm_all_proposed", "authoring"), ("commit_draft", "authoring"), ("check_commit", "3-c"),
+         ("approve_commit", "3-c")])]
+    deliver = timed(PERSON, "deliver", "3-c", "2026-11-10T12:00:00+00:00")
+    high_del = [timed(PERSON, a, t, f"2026-11-10T12:00:0{i + 1}+00:00")
+                for i, a in enumerate(("preview", "deploy", "run_probes", "verify"))]
+    domain(tmp_path, "authoring", [*low_cmds[:5], *high_auth, deliver],
+           [event("X", PERSON, "person")], ["2-b", "3-c"], ["2-b", "3-c"],
+           checks=[risk("2-b", "low"), risk("3-c", "high")])
+    domain(tmp_path, "delivery", [*low_cmds[5:], *high_del], [event("X", PERSON, "person")], [], [])
+    write(tmp_path / ".toprope/approval-runs.jsonl",
+          [approval_run("2026-11-10T10:00:30+00:00", low_steps),
+           approval_run("2026-11-10T11:00:30+00:00", approve),
+           approval_run("2026-11-10T12:00:30+00:00", ship)])
+    m = ub.measure(tmp_path)
+    assert m["approvals_per_approved_change_by_risk"] == {
+        "low": {"changes": 1, "approvals": 1, "per_change": 1.0},
+        "high": {"changes": 1, "approvals": 2, "per_change": 2.0}}
+    assert m["person_touches"] == {"approvals_of_human_requests": 3, "commands_outside_an_approved_request": 0,
+                                   "request_steps_not_found": 0, "approval_runs_without_a_change_step": 0,
+                                   "per_approved_change": 1.5}
+
+
+def test_an_approval_typed_outside_a_request_counts_once_and_a_change_unchecked_for_risk_is_unknown(tmp_path):
+    domain(tmp_path, "authoring", [timed(PERSON, "approve_commit", "1-a", "2026-11-06T10:00:00+00:00")],
+           [event("X", PERSON, "person")], ["1-a"], ["1-a"])
+    write(tmp_path / ".toprope/approval-runs.jsonl",
+          [{"run": "r", "approver": "ana", "as": PERSON, "at": "2026-11-06T11:00:00+00:00", "summary": "freeze",
+            "steps": [{"freeze-protocol": "experiments/m1/instruments"}]}])
+    m = ub.measure(tmp_path)
+    assert m["approvals_per_approved_change_by_risk"] == {"unknown": {"changes": 1, "approvals": 1, "per_change": 1.0}}
+    assert m["person_touches"]["approval_runs_without_a_change_step"] == 1      # not a change: kept apart
+    assert m["person_touches"]["per_approved_change"] == 1.0
+
+
+def test_since_and_until_bound_every_measure(tmp_path, capsys):
+    domain(tmp_path, "authoring",
+           [timed(PERSON, "approve_commit", "1-a", "2026-11-06T10:00:00+00:00"),         # before
+            timed(AGENT, "propose_element", "authoring", "2026-11-06T10:01:00+00:00",
+                  "rejected", "invariant-guard"),                                       # before, no events
+            timed(PERSON, "approve_commit", "2-b", "2026-11-10T10:00:00+00:00"),
+            timed(AGENT, "propose_element", "authoring", "2026-11-10T10:01:00+00:00"),
+            timed(PERSON, "approve_commit", "3-c", "2026-11-12T10:00:00+00:00")],        # after
+           [event("X", PERSON, "person"), event("Y", AGENT, "agent"),
+            {"event": json.dumps({"type": "EffectFailed", "actor": None,
+                                  "at": {"$dt": "2026-11-06T10:02:00+00:00"}}), "stream": "s"}],
+           ["1-a", "2-b", "3-c"], [])
+    write(tmp_path / ".toprope/commits/authoring/log.jsonl",
+          [{"id": c, "at": at} for c, at in (("1-a", "2026-11-06T09:00:00+00:00"),
+                                            ("2-b", "2026-11-10T09:00:00+00:00"),
+                                            ("3-c", "2026-11-12T09:00:00+00:00"))])
+    write(tmp_path / ".toprope/approval-runs.jsonl",
+          [approval_run("2026-11-06T11:00:00+00:00", [step("authoring", "approve_commit", "9-z")])])
+    f = tmp_path / ".toprope/failures"
+    f.mkdir(parents=True)
+    (f / "a.json").write_text(json.dumps({"at": "2026-11-06T00:00:00+00:00", "kind": "usage", "has_fix": True}))
+    whole = ub.measure(tmp_path)
+    assert whole["approvals_in_window"] == 3 and whole["domains"]["authoring"]["refused"] == 1
+    m = ub.measure(tmp_path, since="2026-11-10", until="2026-11-11")
+    d = m["domains"]["authoring"]
+    assert m["window"] == {"since": "2026-11-10T00:00:00+00:00", "until": "2026-11-11T00:00:00+00:00"}
+    assert m["approvals_in_window"] == 1 and d["commands"] == 2
+    assert d["refused"] == 0 and d["effects_failed"] == 0 and d["commits"] == 1
+    assert m["approval_runs"] == 0 and m["failed_before_the_gate"] == {}
+    assert ub.main(["--root", str(tmp_path), "--since", "2026-11-10", "--until", "2026-11-11", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["approvals_in_window"] == 1
+
+
+def test_a_date_that_does_not_parse_names_its_fix(tmp_path, capsys):
+    import pytest
+    with pytest.raises(SystemExit):
+        ub.main(["--root", str(tmp_path), "--since", "last tuesday"])
+    assert "Fix: " in capsys.readouterr().err
+
+
+def test_refusals_are_per_command_and_failures_before_the_gate_per_command_attempted(tmp_path):
+    domain(tmp_path, "authoring",
+           [timed(PERSON, "approve_commit", "1-a", "2026-11-10T10:00:00+00:00"),
+            timed(AGENT, "propose_element", "authoring", "2026-11-10T10:01:00+00:00"),
+            timed(AGENT, "propose_element", "authoring", "2026-11-10T10:02:00+00:00", "rejected", "invariant-guard"),
+            timed(PERSON, "deliver", "1-a", "2026-11-10T10:03:00+00:00")],
+           [event("X", PERSON, "person"), event("Y", AGENT, "agent"), event("EffectFailed")], ["1-a"], ["1-a"])
+    f = tmp_path / ".toprope/failures"
+    f.mkdir(parents=True)
+    for i in range(2):
+        (f / f"{i}.json").write_text(json.dumps({"at": f"2026-11-10T10:0{i}:30+00:00", "kind": "usage",
+                                                 "has_fix": True}))
+    m = ub.measure(tmp_path)
+    assert m["refused_or_failed_per_command"] == 0.5                       # (1 refusal + 1 effect) / 4
+    assert m["refusals_per_command"] == {
+        "commands": 4, "refused": 1, "effects_failed": 1, "refused_or_failed": 0.5,
+        "failed_before_the_gate": 2, "failed_before_the_gate_per_command_attempted": round(2 / 6, 3),
+        "all_per_command_attempted": round(4 / 6, 3)}
