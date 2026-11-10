@@ -19,6 +19,8 @@ objects:
         type: string
       commit:
         type: string
+      branch:
+        type: string
       interface:
         type: string
       environment:
@@ -43,8 +45,7 @@ objects:
       stage:
         enum:
         - requested
-        - previewing
-        - previewed
+        - built
         - deploying
         - done
         - verified
@@ -54,10 +55,12 @@ objects:
       probe_summary:
         type: string
         optional: true
+      replaced_commit:
+        type: string
+        optional: true
     source:
       kind: interview
-      ref: interview:domains/delivery/interview.jsonl#L4
-      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+      ref: interview:domains/delivery/interview.jsonl#L37
     status: confirmed
   Environment:
     description: Where a domain runs; it points at one deployed commit.
@@ -76,6 +79,7 @@ links: {}
 actions:
   request_delivery:
     description: Receive a request to deliver an approved commit, handed off by Authoring.
+      The request must say which branch the commit came from.
     actor:
     - system
     creates: DeliveryRequest
@@ -83,6 +87,8 @@ actions:
       domain_id:
         type: string
       commit:
+        type: string
+      branch:
         type: string
       interface:
         type: string
@@ -92,8 +98,7 @@ actions:
         type: string
     source:
       kind: interview
-      ref: interview:domains/delivery/interview.jsonl#L4
-      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+      ref: interview:domains/delivery/interview.jsonl#L27
     status: confirmed
   preview:
     description: Build the commit and run its harness, before anything is deployed.
@@ -188,7 +193,8 @@ actions:
     status: confirmed
   verify:
     description: Verify the deployed domain in use, after its probes passed. Only
-      a person verifies.
+      a person verifies. A built, not yet deployed request may be verified as a dry
+      run; it stays built.
     actor:
     - approver
     target: DeliveryRequest
@@ -198,15 +204,16 @@ actions:
         target.verified: true
     preconditions:
     - id: deployed
-      check: target.deployed == true
-      reason: Only a deployment that happened can be verified.
+      check: target.deployed == true or target.stage == 'built'
+      reason: Only a deployment that happened can be verified, apart from a dry run
+        on a built request.
       source:
         kind: interview
         ref: interview:domains/delivery/interview.jsonl#L5
         quote: 전부 다 추천한 거 동의.
       status: confirmed
     - id: probes-passed
-      check: target.probes_passed == true
+      check: target.probes_passed == true or target.stage == 'built'
       reason: Run the probes on the deployment first; verify only one whose probes
         passed.
       source:
@@ -214,8 +221,8 @@ actions:
         ref: records:docs/handoffs-and-deploy.md#L76-L86
       status: confirmed
     source:
-      kind: record
-      ref: records:docs/handoffs-and-deploy.md#L76-L86
+      kind: interview
+      ref: interview:domains/delivery/interview.jsonl#L31
     status: confirmed
   record_probes:
     description: Record what the probes found on the deployed commit.
@@ -255,6 +262,28 @@ actions:
       kind: record
       ref: records:docs/handoffs-and-deploy.md#L76-L86
     status: confirmed
+  auto_deploy:
+    description: Deploy the commit on its own once its preview has passed its harness,
+      without waiting for a person to press deploy.
+    actor:
+    - system
+    target: DeliveryRequest
+    records_decision: true
+    effects:
+    - call: deploy
+      with:
+        domain: target.domain_id
+        commit: target.commit
+        approver: target.approver
+      reply: record_deployment
+    preconditions:
+    - id: harness-passed
+      check: target.harness_ok == true
+      reason: Deploy only a build whose harness passed.
+    source:
+      kind: interview
+      ref: interview:domains/delivery/interview.jsonl#L41
+    status: confirmed
 transitions:
   DeliveryRequest:
     field: stage
@@ -262,7 +291,7 @@ transitions:
     matrix:
       requested:
         preview:
-          to: previewing
+          to: built
           source:
             kind: interview
             ref: interview:domains/delivery/interview.jsonl#L5
@@ -280,41 +309,27 @@ transitions:
         verify: n/a
         run_probes: n/a
         record_probes: n/a
-      previewing:
+        auto_deploy:
+          deny: Preview it first.
+          source:
+            kind: interview
+            ref: interview:domains/delivery/interview.jsonl#L41
+          status: confirmed
+      built:
         preview:
-          deny: A preview is running.
+          to: built
           source:
             kind: interview
             ref: interview:domains/delivery/interview.jsonl#L5
             quote: 전부 다 추천한 거 동의.
           status: confirmed
         record_build:
-          to: previewed
+          to: built
           source:
             kind: interview
             ref: interview:domains/delivery/interview.jsonl#L5
             quote: 전부 다 추천한 거 동의.
           status: confirmed
-        deploy:
-          deny: The preview has not finished.
-          source:
-            kind: interview
-            ref: interview:domains/delivery/interview.jsonl#L5
-            quote: 전부 다 추천한 거 동의.
-          status: confirmed
-        record_deployment: n/a
-        verify: n/a
-        run_probes: n/a
-        record_probes: n/a
-      previewed:
-        preview:
-          to: previewing
-          source:
-            kind: interview
-            ref: interview:domains/delivery/interview.jsonl#L5
-            quote: 전부 다 추천한 거 동의.
-          status: confirmed
-        record_build: n/a
         deploy:
           to: deploying
           source:
@@ -323,9 +338,20 @@ transitions:
             quote: 전부 다 추천한 거 동의.
           status: confirmed
         record_deployment: n/a
-        verify: n/a
+        verify:
+          to: built
+          source:
+            kind: interview
+            ref: interview:domains/delivery/interview.jsonl#L31
+          status: confirmed
         run_probes: n/a
         record_probes: n/a
+        auto_deploy:
+          to: deploying
+          source:
+            kind: interview
+            ref: interview:domains/delivery/interview.jsonl#L41
+          status: confirmed
       deploying:
         preview:
           deny: A deploy is running.
@@ -352,9 +378,15 @@ transitions:
         verify: n/a
         run_probes: n/a
         record_probes: n/a
+        auto_deploy:
+          deny: A deploy is running.
+          source:
+            kind: interview
+            ref: interview:domains/delivery/interview.jsonl#L41
+          status: confirmed
       done:
         preview:
-          to: previewing
+          to: built
           source:
             kind: interview
             ref: interview:domains/delivery/interview.jsonl#L5
@@ -387,6 +419,12 @@ transitions:
             kind: record
             ref: records:docs/handoffs-and-deploy.md#L76-L86
           status: confirmed
+        auto_deploy:
+          deny: Already deployed; deliver again with a new request.
+          source:
+            kind: interview
+            ref: interview:domains/delivery/interview.jsonl#L41
+          status: confirmed
       verified:
         preview: n/a
         record_build: n/a
@@ -401,6 +439,7 @@ transitions:
           status: confirmed
         run_probes: n/a
         record_probes: n/a
+        auto_deploy: n/a
 invariants:
 - id: deployed-builds-passed-their-harness
   'on': DeliveryRequest
@@ -458,6 +497,7 @@ world:
       id: R1
       domain_id: authoring
       commit: 2-c3d4
+      branch: main
       interface: 1.1.0
       environment: local
       approver: ana
@@ -466,16 +506,18 @@ world:
       id: R2
       domain_id: authoring
       commit: 3-e5f6
+      branch: main
       interface: 1.1.0
       environment: local
       approver: ana
-      stage: previewed
+      stage: built
       build: b2
       harness_ok: false
   - DeliveryRequest:
       id: R3
       domain_id: authoring
       commit: 4-a7b8
+      branch: main
       interface: 1.2.0
       environment: local
       approver: ana
@@ -488,6 +530,7 @@ world:
       id: R4
       domain_id: delivery
       commit: 5-c9d0
+      branch: main
       interface: 1.0.0
       environment: local
       approver: ana
@@ -500,6 +543,7 @@ world:
       id: R5
       domain_id: delivery
       commit: 6-e1f2
+      branch: main
       interface: 1.0.0
       environment: local
       approver: ana
@@ -514,6 +558,7 @@ world:
       id: R6
       domain_id: authoring
       commit: 7-a3b4
+      branch: main
       interface: 1.2.0
       environment: local
       approver: ana
@@ -543,7 +588,7 @@ scenarios:
     target: R1
     expect:
       state:
-        R1.stage: previewing
+        R1.stage: built
   - actor:
       external: kernel
     do: record_build
@@ -553,7 +598,7 @@ scenarios:
       harness_ok: true
     expect:
       state:
-        R1.stage: previewed
+        R1.stage: built
         R1.harness_ok: true
   - actor:
       role: approver
@@ -598,6 +643,10 @@ scenarios:
       state:
         R1.stage: verified
         R1.verified: true
+  source:
+    kind: interview
+    ref: interview:domains/delivery/interview.jsonl#L37
+  status: confirmed
 - id: a-failed-harness-is-never-deployed
   given:
     from_world: R2
@@ -630,7 +679,11 @@ scenarios:
     target: R3
     expect:
       state:
-        R3.stage: previewing
+        R3.stage: built
+  source:
+    kind: interview
+    ref: interview:domains/delivery/interview.jsonl#L37
+  status: confirmed
 - id: verify-needs-probes-that-passed
   given:
     from_world: R4
@@ -738,4 +791,4 @@ rules:
       kind: record
       ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
     status: confirmed
-version: 6
+version: 12

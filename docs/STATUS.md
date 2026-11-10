@@ -6,7 +6,7 @@ this page); plans live in [`roadmap.md`](roadmap.md) and the milestone and exper
 Every PR into `develop` or an `umbrella/*` branch fixes any line here it makes untrue, or says
 why not; each release trims it ([`AGENTS.md`](../AGENTS.md), "Progress").
 
-Updated: 2026-11-10 · Cleaned for release: `v0.1.0`
+Updated: 2026-11-10
 
 Legend: ✅ done · 🟡 in part · ⬜ not started
 
@@ -346,7 +346,7 @@ gate, a clean pipeline and the grader's measured noise.
 | The baseline moves to `authoring@12-acf2a5f6e362166c` and `delivery@6-c2678fc294429d48` (`phase_b/baseline.py`); the structured and Toprope arms' materials rebuilt; the NL skill removed, to be rendered again | ✅ | |
 | Harness fixes found closing the recheck: the script no longer scripts capability or info findings as `seeded` (their `where` is the edited element by construction; 67 and 70 flags in the two sittings), `rescript` takes those labels back from graded sittings (an unlabelled repeat takes the grader's label of the same finding); `to-decide` stops asking about a disagreement marked `decided`; `regrade-missing` grades once more a probe run left without a grade; the probes before any change record their tokens; an end-to-end test runs the recheck's closing steps | ✅ | |
 | Every Toprope probe of the recheck ran without its domain servers' tools (they did not connect; nothing stopped it): a conversation whose servers gave no tool now stops as an error, with their status and stderr; servers get longer to connect (`MCP_TIMEOUT`); `check-probe-tools` checks them; `arm --redo-baseline-probes` and `regrade-missing --redo` run and grade the probes before any change again. Toprope's found-after-deploy is not measured in the recheck | ✅ | |
-| Phase B rerun (local session, RUNBOOK's recheck section): the NL skill rendered from authoring@12 and delivery@6, accepted by the researcher; three arms and the combined arm run, graded twice, script labels taken back (`rescript`) and one probe run graded again (`regrade-missing`); confirmed and scored. Criterion 3: the two sittings differ by up to 0.18 of recall (limit 0.1), measured; criterion 1: P01, P04, P06, P07 and P08 fail the probe gate; left: Toprope's probes before any change, run again (#234) | 🟡 | #212 |
+| Phase B rerun (local session, RUNBOOK's recheck section): the NL skill rendered from authoring@12 and delivery@6, accepted by the researcher; three arms and the combined arm run, graded twice, script labels taken back (`rescript`) and one probe run graded again (`regrade-missing`); confirmed and scored. Criterion 3: the two sittings differ by up to 0.18 of recall (limit 0.1), measured; Toprope's probes before any change run again with the domain servers connected (#234, #243, #245) and graded again; criterion 1: P01, P02, P04, P06, P07 and P08 fail the probe gate | 🟡 | #212 |
 | The recheck report; M1 closed | ⬜ | |
 
 ## M0b, M2 to M5

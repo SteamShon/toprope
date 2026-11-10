@@ -120,6 +120,93 @@
         },
         "usd_estimate": 16.8855
       }
+    },
+    {
+      "started_at": "2026-11-10T10:12:40.633001+00:00",
+      "harness_commit": "338628a3be8f5099adf9a9477930aa23a1e85210",
+      "seqs": [],
+      "stopped": null,
+      "jobs": 4,
+      "backend": "cli",
+      "user_memory": null,
+      "probes": "70b149542fc5c479162c192e301f59af185779865802e0ec36fefce63081fdae",
+      "baseline": {
+        "authoring": "12-acf2a5f6e362166c",
+        "delivery": "6-c2678fc294429d48"
+      },
+      "runs": {
+        "reviews": null,
+        "probes": 3,
+        "timed": 5
+      },
+      "finished_at": "2026-11-10T10:12:58.777656+00:00",
+      "usage": {
+        "tokens": {
+          "input": 0,
+          "output": 0,
+          "cache_write": 0,
+          "cache_read": 0
+        },
+        "usd_estimate": 0.0
+      }
+    },
+    {
+      "started_at": "2026-11-10T14:02:09.213967+00:00",
+      "harness_commit": "ddfdceee0e4657c31195baeb156ad5b23716374c",
+      "seqs": [],
+      "stopped": null,
+      "jobs": 4,
+      "backend": "cli",
+      "user_memory": null,
+      "probes": "70b149542fc5c479162c192e301f59af185779865802e0ec36fefce63081fdae",
+      "baseline": {
+        "authoring": "12-acf2a5f6e362166c",
+        "delivery": "6-c2678fc294429d48"
+      },
+      "runs": {
+        "reviews": null,
+        "probes": 3,
+        "timed": 5
+      },
+      "finished_at": "2026-11-10T14:02:18.737868+00:00",
+      "usage": {
+        "tokens": {
+          "input": 0,
+          "output": 0,
+          "cache_write": 0,
+          "cache_read": 0
+        },
+        "usd_estimate": 0.0
+      }
+    },
+    {
+      "started_at": "2026-11-10T14:32:16.383085+00:00",
+      "harness_commit": "f98bcd18ba7e1c7639476ba9adb086bc1c97a890",
+      "seqs": [],
+      "stopped": null,
+      "jobs": 4,
+      "backend": "cli",
+      "user_memory": null,
+      "probes": "70b149542fc5c479162c192e301f59af185779865802e0ec36fefce63081fdae",
+      "baseline": {
+        "authoring": "12-acf2a5f6e362166c",
+        "delivery": "6-c2678fc294429d48"
+      },
+      "runs": {
+        "reviews": null,
+        "probes": 3,
+        "timed": 5
+      },
+      "finished_at": "2026-11-10T14:34:00.362942+00:00",
+      "usage": {
+        "tokens": {
+          "input": 184,
+          "output": 20230,
+          "cache_write": 118110,
+          "cache_read": 3508828
+        },
+        "usd_estimate": 1.026
+      }
     }
   ],
   "backend": "cli",

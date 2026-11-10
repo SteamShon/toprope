@@ -63,18 +63,11 @@
         "min": 0.5333,
         "max": 0.6429
       },
-      "found_after_deploy": {
-        "5": [
-          "P02"
-        ],
-        "11": [
-          "P02"
-        ],
-        "13": [
-          "P02"
-        ]
-      },
+      "found_after_deploy": {},
       "silent": [
+        5,
+        11,
+        13,
         15
       ],
       "found_after_deploy_ungated": {
@@ -93,7 +86,7 @@
           "P06"
         ]
       },
-      "breakages_found_only_after_deploy": 0.25,
+      "breakages_found_only_after_deploy": 0.0,
       "edit_fidelity": {
         "implements": 19,
         "partial": 1,
@@ -719,6 +712,7 @@
       "probes_failed": {
         "0": [
           "P01",
+          "P02",
           "P04",
           "P06",
           "P07",
@@ -1053,7 +1047,7 @@
           "runs": 3
         },
         "toprope": {
-          "passed": 3,
+          "passed": 0,
           "runs": 3
         }
       },
@@ -1081,7 +1075,7 @@
           "runs": 3
         },
         "toprope": {
-          "passed": 0,
+          "passed": 1,
           "runs": 3
         }
       },
@@ -1109,7 +1103,7 @@
           "runs": 3
         },
         "toprope": {
-          "passed": 1,
+          "passed": 0,
           "runs": 3
         }
       },
@@ -1123,7 +1117,7 @@
           "runs": 3
         },
         "toprope": {
-          "passed": 0,
+          "passed": 1,
           "runs": 3
         }
       },
@@ -1143,12 +1137,12 @@
       }
     },
     "passing": [
-      "P02",
       "P03",
       "P05"
     ],
     "failing": [
       "P01",
+      "P02",
       "P04",
       "P06",
       "P07",
