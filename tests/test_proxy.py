@@ -3,6 +3,7 @@ import asyncio
 import importlib
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -19,6 +20,7 @@ from toprope.proxy import (
     UpstreamServices,
     build_proxy,
     check,
+    confirm_binding,
     register,
 )
 from toprope.store import open_store
@@ -175,6 +177,12 @@ def test_the_command_over_stdio_in_front_of_a_real_server_process(tmp_path):
     b = yaml.safe_load(BINDING.read_text())
     b["upstream"]["command"] = [sys.executable, str(EX / "payments_server.py")]
     binding.write_text(yaml.safe_dump(b))
+    confirm = ["--domain", str(DOMAIN), "--binding", str(binding), "--identity", f"static:{TOKENS}"]
+    env = {**os.environ, "TOPROPE_TOKEN": "t-dana"}
+    proxy = [sys.executable, "-c", "from toprope.proxy.cli import main; main()"]
+    changed = subprocess.run([*proxy, "--check", *confirm[:4]], capture_output=True, text=True, env=env, check=False)
+    assert changed.returncode == 1 and "the binding changed after dana confirmed it" in changed.stderr
+    subprocess.run([*proxy, "--confirm-binding", *confirm], capture_output=True, text=True, env=env, check=True)
     params = StdioServerParameters(command="uv", args=[
         "run", "--quiet", "toprope-proxy", "--domain", str(DOMAIN), "--binding", str(binding),
         "--identity", f"static:{TOKENS}", "--store", f"sqlite:{tmp_path / 'shop.db'}",
@@ -198,8 +206,10 @@ def test_the_command_over_stdio_in_front_of_a_real_server_process(tmp_path):
 # failed, refunded twice, lost the real error, dropped an argument silently, or would not start.
 
 def _binding(tmp_path, tools, upstream=None):
+    """A binding a person (dana) confirmed, as `toprope-proxy --confirm-binding` records it."""
     f = tmp_path / "b.yaml"
     f.write_text(yaml.safe_dump({"upstream": upstream or {"command": ["x"]}, "tools": tools}))
+    confirm_binding(f, open_identity(f"static:{TOKENS}").resolve("t-dana"))
     return f
 
 
@@ -424,3 +434,100 @@ def test_a_load_tool_must_take_the_target_and_a_creating_tool_loads_nothing(paym
     finally:
         up.close()
     assert any("loads with wipe_orders, which takes no `order_id` argument" in x for x in problems)
+
+
+# Review of #240 (2026-11-10): a binding's confirmation could be written by anyone, and outlived
+# any later change to what it binds.
+
+def test_a_binding_no_person_confirmed_is_not_served(tmp_path):
+    f = tmp_path / "b.yaml"
+    b = yaml.safe_load(BINDING.read_text())
+    del b["confirmed"]
+    f.write_text(yaml.safe_dump(b))
+    assert any(p.startswith("no person has confirmed the binding") and "Fix: a person reads it and confirms it" in p
+               for p in check(load_domain(DOMAIN), Binding.load(f)))
+    f.write_text(f.read_text() + "status: confirmed\nconfirmed_by: dana\n")       # written by anyone: refused
+    with pytest.raises(SystemExit, match="unknown key\\(s\\) confirmed_by, status.*Fix: keep only"):
+        Binding.load(f)
+
+
+@pytest.mark.parametrize("change", [
+    lambda b: b["tools"]["refund_order"].update(target="amount"),
+    lambda b: b["tools"]["refund_order"].pop("load"),
+    lambda b: b["tools"]["refund_order"].update(result={"refund_id": "string", "amount": "number"}),
+    lambda b: b["upstream"].update(command=["python", "other_server.py"]),
+])
+def test_a_binding_changed_after_its_confirmation_is_refused_naming_who_confirms_again(tmp_path, change):
+    f = tmp_path / "b.yaml"
+    b = yaml.safe_load(BINDING.read_text())
+    change(b)
+    f.write_text(yaml.safe_dump(b))                                    # an agent edits it; the record stays
+    problems = check(load_domain(DOMAIN), Binding.load(f))
+    assert any("the binding changed after dana confirmed it" in p and "--confirm-binding" in p for p in problems)
+    confirm_binding(f, open_identity(f"static:{TOKENS}").resolve("t-dana"))
+    assert not any("confirmed" in p for p in check(load_domain(DOMAIN), Binding.load(f)))
+
+
+def test_an_agent_cannot_confirm_a_binding(tmp_path):
+    f = tmp_path / "b.yaml"
+    f.write_text(BINDING.read_text())
+    with pytest.raises(SystemExit, match="sam is an agent; only a person confirms a binding"):
+        confirm_binding(f, open_identity(f"static:{TOKENS}").resolve("t-sam"))
+    assert f.read_text() == BINDING.read_text()
+
+
+def test_a_drafted_fact_the_server_gives_as_a_number_is_loaded_as_one(tmp_path):
+    """An enum of numbers on the server (`priority: 1 | 2 | 3`) is drafted as an integer, so the
+    gate reads the server's own values instead of refusing them (review of #240)."""
+    from typing import Literal, TypedDict
+
+    from mcp.server.mcpserver import MCPServer
+
+    from toprope.decl import Domain
+    from toprope.importers import Raw
+    from toprope.importers.draft import build
+    from toprope.importers.extractors.mcp import McpExtractor, render_binding
+    from toprope.importers.port import Profile
+
+    class Ticket(TypedDict):
+        ticket_id: str
+        priority: Literal[1, 2, 3]
+
+    server = MCPServer(name="tickets")
+
+    @server.tool(annotations={"readOnlyHint": True})
+    def get_ticket(ticket_id: str) -> Ticket:
+        return {"ticket_id": ticket_id, "priority": 2}
+
+    @server.tool()
+    def close_ticket(ticket_id: str) -> dict:
+        return {}
+
+    up = Upstream(server)
+    tools = [t.model_dump(mode="json", by_alias=True, exclude_none=True) for t in up.tools().values()]
+    ext = McpExtractor().extract(Raw(json.dumps({"server": {"command": ["x"]}, "tools": tools}).encode(), "srv"),
+                                 Profile(roles=["support"]))
+    raw = build("tickets", ext)
+    for section in ("objects", "actions"):                      # what a person's confirmation does to the file
+        for el in raw[section].values():
+            el["status"] = "confirmed"
+    d = Domain.model_validate(raw)
+    assert d.objects["Ticket"].properties["priority"].type == "integer"
+    f = tmp_path / "b.yaml"
+    f.write_text(render_binding(ext.binding, "tickets"))
+    confirm_binding(f, open_identity(f"static:{TOKENS}").resolve("t-dana"))
+    b = Binding.load(f)
+    assert register(b, up.tools(), d) == [] and check(d, b) == []
+    ex = Execution(d, open_store("memory"), open_identity(f"static:{TOKENS}"), services=UpstreamServices(up))
+    server_ = build_proxy(ex, b, up, lambda: "t-dana")
+    from mcp import Client
+
+    async def go():
+        async with Client(server_) as c:
+            return await c.call_tool("close_ticket", {"ticket_id": "T-1"})
+    try:
+        r = asyncio.run(go())
+    finally:
+        up.close()
+    assert "cannot be checked" not in (r.content[0].text if r.content else "")
+    assert ex.state("T-1")["priority"] == 2

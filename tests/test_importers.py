@@ -510,7 +510,7 @@ def test_a_servers_tools_become_proposed_actions_with_their_call_and_reply_and_a
     assert m["paid"]["refund_order"] == "undecided" and m["refunded"]["record_refund_order"] == "undecided"
     assert "wipe_orders" not in d.actions
     b = yaml.safe_load(render_binding(ext.binding, "payments"))
-    assert b["status"] == "proposed" and b["upstream"] == {"command": ["python", "server.py"]}
+    assert "confirmed" not in b and b["upstream"] == {"command": ["python", "server.py"]}
     assert b["tools"] == {"refund_order": {"action": "refund_order", "target": "order_id",
                                            "result": {"refund_id": "string"}, "load": "get_order"},
                           "get_order": {"read": True}}
@@ -553,3 +553,81 @@ def test_a_draft_no_one_may_act_in_is_reported_as_not_ready(tmp_path, capsys):
     with pytest.raises(SystemExit):
         harness(["--domain", str(f), "--levels", "model", "--examples", "0"])
     assert "not ready: 2 of 2 action(s) no one may take yet" in capsys.readouterr().out
+
+
+# Review of #240 (2026-11-10): camelCase arguments, typed enums, and guessing the thing.
+
+def _drafted(*tools):
+    from toprope.importers.draft import build
+    from toprope.importers.extractors.mcp import McpExtractor
+    ext = McpExtractor().extract(_tools(*tools), Profile())
+    return valid(build("shop", ext)), ext
+
+
+def test_a_camel_case_argument_is_mapped_in_the_binding_and_passed_on_under_its_own_name():
+    cancel = {"name": "cancel_order", "inputSchema": {"type": "object", "required": ["orderId", "reasonCode"],
+                                                      "properties": {"orderId": {"type": "string"},
+                                                                     "reasonCode": {"type": "string"}}}}
+    d, ext = _drafted(cancel)
+    a = d.actions["cancel_order"]
+    assert a.target == "Order" and set(a.params) == {"reason_code"}
+    assert a.effects[0].with_ == {"orderId": "target.id", "reasonCode": "params.reason_code"}
+    assert ext.binding["tools"]["cancel_order"]["target"] == "orderId"
+    assert ext.binding["tools"]["cancel_order"]["params"] == {"reason_code": "reasonCode"}
+
+
+def test_numbers_in_an_enum_keep_their_type_and_are_asked_about():
+    get = {"name": "get_ticket", "annotations": {"readOnlyHint": True},
+           "inputSchema": {"type": "object", "properties": {"ticket_id": {"type": "string"}}},
+           "outputSchema": {"type": "object", "required": ["priority"], "properties": {
+               "priority": {"type": "integer", "enum": [1, 2, 3]}}}}
+    close = {"name": "close_ticket", "inputSchema": {"type": "object", "required": ["ticket_id", "level"],
+                                                     "properties": {"ticket_id": {"type": "string"},
+                                                                    "level": {"enum": [0.5, 1]}}}}
+    d, ext = _drafted(get, close)
+    assert d.objects["Ticket"].properties["priority"].type == "integer"     # never the names "1", "2", "3"
+    assert d.actions["close_ticket"].params["level"].type == "number"
+    asked = [n for n in ext.question_records() if "[1, 2, 3]" in n.text or "[0.5, 1]" in n.text]
+    assert [n.decides for n in asked] == [["actions.close_ticket.params.level"],
+                                          ["objects.Ticket.properties.priority"]]
+    out = import_source("openapi", _src_api({"type": "integer", "enum": [1, 2]}), domain="shop")
+    assert valid(out["draft"]).objects["Order"].properties["prio"].type == "integer"
+
+
+def _src_api(prio):
+    import tempfile
+    f = Path(tempfile.mkdtemp()) / "a.yaml"
+    f.write_text(yaml.safe_dump({"paths": {}, "components": {"schemas": {"Order": {
+        "type": "object", "properties": {"prio": prio}}}}}))
+    return str(f)
+
+
+def test_the_thing_is_a_whole_word_of_the_tool_and_a_server_assigned_id_is_asked_about():
+    reorder = {"name": "reorder_item", "inputSchema": {"type": "object", "properties": {
+        "order_id": {"type": "string"}, "item_id": {"type": "string"}}}}
+    create = {"name": "create_order", "inputSchema": {"type": "object", "properties": {
+        "customer": {"type": "string"}, "total": {"type": "number"}}}}
+    bare = {"name": "archive_invoice", "inputSchema": {"type": "object", "properties": {"id": {"type": "string"}}}}
+    d, ext = _drafted(reorder, create, bare)
+    assert d.actions["reorder_item"].target == "Item"                       # not Order, inside "reorder"
+    assert "create_order" not in d.actions and "create_order" not in ext.binding["tools"]
+    asked = {n.kind: n for n in ext.question_records() if "create_order" in n.text or "archive_invoice" in n.text}
+    assert "whose id the server assigns" in asked["creation"].text and "objects.Order" in asked["creation"].decides
+    assert d.actions["archive_invoice"].target == "Invoice"
+    assert "guessed Invoice from the tool's name" in asked["target"].text
+
+
+def test_joining_a_source_that_names_who_acts_fills_an_unassigned_actor(tmp_path, capsys):
+    dest = tmp_path / "shop.domain.yaml"
+    main(["openapi", API, "--domain", "shop", "--out", str(dest)])
+    api = yaml.safe_load(Path(API).read_text())
+    api["paths"]["/orders/{id}/refund"]["post"]["x-roles"] = ["clerk"]
+    f = _src(tmp_path, "roles.yaml", yaml.safe_dump(api))
+    prof = _src(tmp_path, "p.yaml", "roles_from: x-roles\n")
+    capsys.readouterr()
+    main(["openapi", f, "--into", str(dest), "--profile", prof])
+    text = capsys.readouterr().out
+    assert "0 conflict(s)" in text and "actions.refund_order" not in text.split("conflicts")[0]
+    d = valid(yaml.safe_load(dest.read_text()))
+    assert d.actions["refund_order"].actor == ["clerk"] and d.actions["refund_order"].status == "proposed"
+    assert d.actions["create_order"].actor == ["unassigned"] and "clerk" in d.roles

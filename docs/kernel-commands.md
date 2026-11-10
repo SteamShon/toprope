@@ -101,7 +101,7 @@ Its subcommands are the domain's actions, one per action, plus `get`, `history`,
 | `--audit` `AUDIT` | append every call, gated or read, to this JSONL file |
 | `--no-seed` | do not load the declaration's example fixtures |
 | `--check` | check that the binding, the server's tools and the declaration agree, as at start, and exit |
-| `--confirm-binding` | as a person: check the drafted binding as at start, then mark it confirmed, naming you |
+| `--confirm-binding` | as a person: check the binding as at start, then record that you confirmed it as it is (who, when, its hash) |
 
 ## `toprope-harness`
 

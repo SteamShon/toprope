@@ -13,12 +13,13 @@ tool that loads the thing (`load:`). The thing's facts come from that tool's out
 
 A tool whose arguments name no thing is not drafted and not bound, so the proxy never offers it;
 a question says so. Everything is proposed: the questions name what a person decides (which
-thing, which stage moves, who may call), and the binding is marked `status: proposed` until a
-person confirms it (`toprope-proxy --confirm-binding`).
+thing, which stage moves, who may call), and the binding carries no confirmation until a
+person confirms it (`toprope-proxy --confirm-binding` records who, when and its hash).
 """
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 import yaml
@@ -29,6 +30,7 @@ from . import (
     Extraction,
     Profile,
     a_,
+    enum_fact,
     ignored,
     mapping,
     pascal,
@@ -36,7 +38,7 @@ from . import (
     stages,
 )
 
-VERBS = ("create_", "add_", "new_", "open_", "register_", "start_")
+VERBS = ("create", "add", "new", "open", "register", "start")
 
 
 def _type(spec: Any, optional: bool) -> dict[str, Any] | None:
@@ -54,23 +56,51 @@ def _type(spec: Any, optional: bool) -> dict[str, Any] | None:
         rest = [t for t in types if t != "null"]
         types = rest[0] if len(rest) == 1 else None
     if spec.get("enum"):
-        vals = list(dict.fromkeys(str(v) for v in spec["enum"] if v is not None))
-        return {"enum": vals, "optional": optional} if vals else None
+        return enum_fact(list(spec["enum"]), optional)
     t = "datetime" if spec.get("format") in ("date-time", "date") else TYPES.get(str(types))
     return {"type": t, "optional": optional} if t else None
 
 
+def _values(spec: Any) -> list[Any] | None:
+    """The enum of a schema whose values are not names (numbers, booleans): kept as a typed fact,
+    and asked about."""
+    if isinstance(spec, dict) and isinstance(spec.get("anyOf"), list):
+        rest = [x for x in spec["anyOf"] if not (isinstance(x, dict) and x.get("type") == "null")]
+        return _values(rest[0]) if len(rest) == 1 else None
+    vals = [v for v in (spec.get("enum") or []) if v is not None] if isinstance(spec, dict) else []
+    return vals if vals and not all(isinstance(v, str) for v in vals) else None
+
+
+def _words(name: str) -> list[str]:
+    return snake(name).split("_")
+
+
+def _is_id(arg: str) -> bool:
+    return arg == "id" or arg.endswith("_id") or bool(re.search(r"[a-z0-9]Id$", arg))
+
+
+def _stem(arg: str) -> str:
+    return arg[:-3] if arg.endswith("_id") else arg[:-2] if arg.endswith("Id") else ""
+
+
+def _in_name(stem: str, tool: str) -> bool:
+    """The thing's words appear as whole words in the tool's name (`reorder_item` names no order)."""
+    w, t = _words(stem), _words(tool)
+    return any(t[i:i + len(w)] == w for i in range(len(t) - len(w) + 1))
+
+
 def _id_arg(name: str, props: dict[str, Any]) -> tuple[str | None, list[str]]:
-    """The argument that names the thing a tool acts on: `<thing>_id` (the one whose thing is in
-    the tool's name, if several), or `id`. Returns it and every candidate."""
-    ids = [a for a in props if a == "id" or a.endswith("_id")]
-    named = [a for a in ids if a != "id" and a[:-3] in name]
+    """The argument that names the thing a tool acts on: `<thing>_id` or `<thing>Id` (the one
+    whose thing is a word of the tool's name, if several), or `id`. Returns it and every candidate."""
+    ids = [a for a in props if _is_id(a)]
+    named = [a for a in ids if a != "id" and _in_name(_stem(a), name)]
     return (named or ids or [None])[0], ids
 
 
 def _thing(arg: str, tool: str, profile: Profile) -> str:
-    stem = arg[:-3] if arg.endswith("_id") else tool.split("_", 1)[-1]
-    return pascal(profile.name(stem))
+    """`order_id`/`orderId` → Order; a bare `id`, from the tool's name after its verb (a guess)."""
+    stem = _stem(arg) or "_".join(_words(tool)[1:] or _words(tool))
+    return pascal(profile.name(snake(stem)))
 
 
 def _readonly(t: dict[str, Any]) -> bool:
@@ -106,6 +136,15 @@ class McpExtractor:
                     loaders.setdefault(_thing(idarg, name, profile), (name, idarg, t, here))
                 continue
             action = snake(profile.name(name))
+            creates = _words(name)[0] in VERBS
+            if idarg is None and creates:
+                thing = _thing("id", name, profile)
+                unbound[name] = f"it creates {a_(thing)} whose id the server assigns"
+                out.ask(f"{name} creates {a_(thing)} whose id the server assigns, but the proxy names a new thing by "
+                        "one of the tool's arguments (`new_id:`), so it was not drafted or bound: which argument "
+                        f"names the new {thing}, or how else is it named?", "creation", [f"actions.{action}",
+                                                                                         f"objects.{thing}"], [here])
+                continue
             if idarg is None:
                 unbound[name] = "none of its arguments names a thing it acts on"
                 out.ask(f"Which thing does {name} act on? None of its arguments names one, so it was not drafted or "
@@ -113,7 +152,9 @@ class McpExtractor:
                         [f"actions.{action}"], [here])
                 continue
             thing = _thing(idarg, name, profile)
-            creates = name.startswith(VERBS)
+            if idarg == "id":
+                out.ask(f"Which thing does `id` of {name} name? The draft guessed {thing} from the tool's name.",
+                        "target", [f"actions.{action}", f"objects.{thing}"], [here])
             if len(ids) > 1:
                 out.ask(f"Which thing does {name} act on: {', '.join(ids)} each name one; the draft guessed "
                         f"`{idarg}` ({thing}).", "target", [f"actions.{action}"], [here])
@@ -123,6 +164,11 @@ class McpExtractor:
                 if arg == idarg:
                     continue
                 x = _type(spec, arg not in required)
+                if (vals := _values(spec)) and x is not None:
+                    out.ask(f"{name}.{arg} takes only {vals}; a declared enum holds names, so it was drafted as "
+                            f"{a_(x['type'])}: add a precondition for the values, or which names do they stand for?",
+                            "param", [f"actions.{action}.params.{snake(arg)}"],
+                            [f"{here}/inputSchema/properties/{arg}"])
                 if x is None:
                     out.ask(f"{name}.{arg} is not a string, number or boolean, so the gate cannot check it"
                             + (" and the proxy will not start while the server requires it" if arg in required else
@@ -148,7 +194,9 @@ class McpExtractor:
                 "params": {"ok": {"type": "boolean"}, **{f: {"type": ty, "optional": True} for f, ty in result.items()}},
                 "preconditions": [{"id": f"{snake(name).replace('_', '-')}-done", "check": "params.ok == true",
                                    "reason": f"The server did not do it ({name})."}]}, result, here)
-            bound[name] = {"action": action, ("new_id" if creates else "target"): idarg, "result": result}
+            renamed = {snake(arg): arg for arg in with_ if arg != idarg and snake(arg) != arg}
+            bound[name] = {"action": action, ("new_id" if creates else "target"): idarg,
+                           **({"params": renamed} if renamed else {}), "result": result}
             notes[name] = [f"guessed: `{idarg}` names {a_(thing)}" + (", and the tool creates it" if creates else "")]
             out.ask(f"Who may call {name}" + (f" ({action})?" if action != name else "?"), "actor",
                     [f"actions.{action}.actor"], [here])
@@ -164,6 +212,11 @@ class McpExtractor:
                         continue
                     if (x := _type(s, f not in req)) is not None:
                         facts[snake(f)] = x
+                        if vals := _values(s):
+                            out.ask(f"{a_(thing)[0].upper()}{a_(thing)[1:]}'s {snake(f)} is only ever {vals}; a "
+                                    f"declared enum holds names, so it was drafted as {a_(x['type'])}: which names do "
+                                    "they stand for, if it is a stage?", "object",
+                                    [f"objects.{thing}.properties.{snake(f)}"], [loader[3]])
             if not facts:
                 out.ask(f"What facts does {a_(thing)} have, and which one is its stage? "
                         + (f"{loader[0]} declares no output schema." if loader else
@@ -211,15 +264,14 @@ class McpExtractor:
 
 
 def render_binding(b: dict[str, Any], domain: str) -> str:
-    """The draft binding as YAML a person reads: every guess commented, `status: proposed`."""
+    """The draft binding as YAML a person reads: every guess commented, no confirmation record."""
     def flow(v: Any) -> str:
         return json.dumps(v, ensure_ascii=False)
     lines = [f"# A draft binding for {domain}, from the tool list of {b.get('source')} (toprope-import mcp).",
-             "# Every guess is commented. Read it, change what is wrong, then confirm it as the person:",
+             "# Every guess is commented. Read it and change what is wrong. The proxy serves it only once a",
+             "# person has confirmed it as it is (ADR-0041, ADR-0052 §7); any later change needs a new confirmation:",
              (f"#   toprope-proxy --confirm-binding --domain <{domain}'s declaration> --binding <this file> "
               "--identity ..."),
-             "# The proxy will not start on a binding no person has confirmed (ADR-0041, ADR-0052 §7).",
-             "status: proposed",
              f"upstream: {flow(b.get('upstream') or {})}",
              "tools:"]
     for tool, spec in (b.get("tools") or {}).items():

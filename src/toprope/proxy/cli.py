@@ -9,7 +9,9 @@ recorded. The proxy refuses to start when the binding and the declaration disagr
 
 Binding (YAML): `upstream: {command: [...]}` or `{url: ...}`; `tools: {<tool>: {action, target |
 new_id, params, result} | {read: true}}`. See `toprope.proxy`. `toprope-import mcp` drafts one
-from the server's tool list, marked `status: proposed`; a person confirms it (ADR-0052 §7):
+from the server's tool list. A binding is served only as a person confirmed it: `--confirm-binding`
+records who, when, and the hash of what is bound, and any later change needs a new confirmation
+(ADR-0052 §7):
 
     toprope-proxy --check --domain shop.domain.yaml --binding binding.yaml        # agree? then exit
     TOPROPE_TOKEN=t-dana toprope-proxy --confirm-binding --domain shop.domain.yaml \
@@ -36,26 +38,23 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--no-seed", action="store_true", help="do not load the declaration's example fixtures")
     ap.add_argument("--check", action="store_true", help="check that the binding, the server's tools and the "
                     "declaration agree, as at start, and exit")
-    ap.add_argument("--confirm-binding", action="store_true", help="as a person: check the drafted binding as at "
-                    "start, then mark it confirmed, naming you")
+    ap.add_argument("--confirm-binding", action="store_true", help="as a person: check the binding as at start, "
+                    "then record that you confirmed it as it is (who, when, its hash)")
     return ap
 
 
-def _problems(binding, domain, upstream) -> list[str]:
+def _problems(binding, domain, upstream, confirmation: bool = True) -> list[str]:
     from . import check, register
-    return register(binding, upstream.tools(), domain) + check(domain, binding)
+    return register(binding, upstream.tools(), domain) + check(domain, binding, confirmation=confirmation)
 
 
 def _confirm(a, binding, domain) -> None:
-    """A person confirms a drafted binding: only one the proxy would start with, as themselves."""
-    import re
-    from dataclasses import replace
-    from datetime import UTC, datetime
+    """A person confirms a binding as it is now: only one the proxy would start with, as themselves."""
     from pathlib import Path
 
     from ..adapters.cli import _confirm_on_terminal
     from ..adapters.mcp.cli import open_identity
-    from . import Upstream
+    from . import Upstream, confirm_binding
     if not a.identity:
         raise SystemExit(fixed("--confirm-binding needs --identity", "give the identity that says who you are"))
     identity = open_identity(a.identity)
@@ -66,13 +65,12 @@ def _confirm(a, binding, domain) -> None:
     if caller.actor.kind != "person":
         raise SystemExit(fixed(f"{caller.actor.id} is an agent; only a person confirms a binding (ADR-0041)",
                                "ask the person the agent acts for to run it"))
-    text = Path(a.binding).read_text()
-    if binding.status != "proposed":
-        print(f"{a.binding} is already confirmed")
+    if binding.unconfirmed() is None:
+        print(f"{a.binding} is confirmed as it is, by {binding.confirmed['by']}")
         return
     upstream = Upstream.open(binding.upstream)
     try:
-        problems = _problems(replace(binding, status="confirmed"), domain, upstream)
+        problems = _problems(binding, domain, upstream, confirmation=False)
     finally:
         upstream.close()
     if problems:
@@ -80,15 +78,9 @@ def _confirm(a, binding, domain) -> None:
             print(f"error: {p}", file=sys.stderr)
         raise SystemExit(fixed(f"{a.binding} would not start, so it was not confirmed", "fix what is listed, then "
                                "confirm it again"))
-    _confirm_on_terminal(identity, caller, "confirm-binding", a.binding, text)
-    at = datetime.now(UTC).isoformat(timespec="seconds")
-    new, n = re.subn(r"(?m)^status:\s*proposed\s*$",
-                     f"status: confirmed\nconfirmed_by: {caller.actor.id!r}\nconfirmed_at: {at!r}", text, count=1)
-    if not n:
-        raise SystemExit(fixed(f"{a.binding} says `status: proposed` in a form this cannot rewrite",
-                               "write `status: proposed` on its own line, then confirm again"))
-    Path(a.binding).write_text(new)
-    print(f"confirmed {a.binding} as {caller.actor.id}")
+    _confirm_on_terminal(identity, caller, "confirm-binding", a.binding, Path(a.binding).read_text())
+    h = confirm_binding(a.binding, caller)
+    print(f"confirmed {a.binding} as {caller.actor.id} (sha256 {h[:12]}…)")
 
 
 def main(argv: list[str] | None = None) -> None:

@@ -112,6 +112,8 @@ def plan(base: dict[str, Any], new: dict[str, Any], places: dict[str, str], out:
                 items.append(Item(path, bare(v), ref_of(path, v)))
             elif not _same(bare(have), bare(v)):
                 differ(path, have, v)
+            elif have.get("actor") == [UNASSIGNED] and v.get("actor") not in (None, [UNASSIGNED]):
+                items.append(Item(f"{path}.actor", v["actor"], ref_of(path, v)))     # fills it, as a cell
     for obj, tr in (new.get("transitions") or {}).items():
         path, have = f"transitions.{obj}", (base.get("transitions") or {}).get(obj)
         if have is None:
@@ -145,10 +147,11 @@ def plan(base: dict[str, Any], new: dict[str, Any], places: dict[str, str], out:
 
 
 def _same(have: Any, new: Any) -> bool:
-    """Two elements say the same, a description aside (a person words it once), and so does a
-    source that names no actor (the placeholder `unassigned`) against a draft that names one."""
+    """Two elements say the same, a description aside (a person words it once), and so does an
+    actor that is the placeholder `unassigned` on either side: it is filled, not contradicted."""
     if isinstance(have, dict) and isinstance(new, dict):
-        skip = {"description"} | ({"actor"} if new.get("actor") == [UNASSIGNED] else set())
+        skip = {"description"} | ({"actor"} if UNASSIGNED in (new.get("actor") or []) + (have.get("actor") or [])
+                                  else set())
         return {k: v for k, v in have.items() if k not in skip} == {k: v for k, v in new.items() if k not in skip}
     return have == new
 

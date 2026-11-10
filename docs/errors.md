@@ -114,10 +114,13 @@ the error is raised.
 
 | Error | Fix |
 |---|---|
-| could not add the source to {…}: its `sources:` is not a list this can extend | add `- {…}` under `sources:` yourself, then import again |
+| could not add the source to {…} so that it reads back | add `- {…}` under `sources:` yourself, then import again |
 | no workspace to register the source in | give --workspace (a `*.workspace.yaml` file; a new one is made), or set `workspace:` in toprope.yaml |
+| the source {…} already holds a different snapshot ({…}): the source changed since it was imported, and the elements proposed from it cite the old one | give --source-id a new id for this version of the source |
 | the source {…} has no text the workspace can read | import a text source (the workspace skips binary files and files over 512 KiB) |
 | the workspace {…} already has a source {…}, at {…} | give --source-id a new id for this source |
+| the workspace {…} does not read: {…} | fix the file, then import again |
+| the workspace {…} writes `sources:` in a form this cannot extend | write it as a block list, or add `- {…}` under it yourself, then import again |
 | {…} is not a workspace file | name it `<something>.workspace.yaml` |
 
 ## `importers/port.py`
@@ -175,14 +178,17 @@ the error is raised.
 |---|---|
 | cannot read the binding {…}: {…} | give the binding's YAML file |
 | no kernel services in this proxy for {…} | call only `mcp:` tools from a declaration served by toprope-proxy |
+| the binding {…} has unknown key(s) {…} | keep only `upstream`, `tools` and the `confirmed` record `toprope-proxy --confirm-binding` writes |
 | the binding {…} needs `upstream:` and `tools:` mappings | see `toprope-proxy --help` for the binding's shape |
-| the binding {…}: `status: {…}` | leave `status: proposed` for a person to confirm with `toprope-proxy --confirm-binding` |
+| the binding {…}: `confirmed` is not a confirmation record | remove it, and let a person confirm with `toprope-proxy --confirm-binding` |
 | the binding {…}: `upstream` has exactly one of `command` or `url` | give `command: [program, args…]` for stdio, or `url:` for streamable HTTP |
 | the binding {…}: tool {…} has unknown key(s) {…} | use only the keys {…} |
 | the binding {…}: tool {…} is either `read: true` or an `action` | bind it to a declared action, or mark it read-only |
 | the binding {…}: tool {…} names exactly one of `target` or `new_id` | name the argument that identifies the object |
 | the upstream MCP server did not start: {…} | check the binding's `upstream` command or URL, and that the server runs on its own |
 | toprope-proxy needs POSIX file locks, which this system lacks | run the proxy on Linux or macOS |
+| {…} is an agent; only a person confirms a binding (ADR-0041) | ask the person the agent acts for to run it |
+| {…}: the confirmation could not be written so that it reads back | write `upstream:` and `tools:` as top-level keys, then confirm again |
 
 ## `proxy/cli.py`
 
@@ -193,7 +199,6 @@ the error is raised.
 | TOPROPE_TOKEN is missing or does not resolve to a caller | set TOPROPE_TOKEN to a token in the identity file |
 | the proxy needs --store and --identity to serve | give both, or --check to only check the binding |
 | {…} is an agent; only a person confirms a binding (ADR-0041) | ask the person the agent acts for to run it |
-| {…} says `status: proposed` in a form this cannot rewrite | write `status: proposed` on its own line, then confirm again |
 | {…} would not start, so it was not confirmed | fix what is listed, then confirm it again |
 
 ## `workspace/__init__.py`

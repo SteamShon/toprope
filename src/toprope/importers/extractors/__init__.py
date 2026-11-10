@@ -38,6 +38,25 @@ def singular(name: str) -> str:
     return name
 
 
+def enum_fact(values: list[Any], optional: bool) -> dict[str, Any] | None:
+    """An enum as a declaration can hold it. Names stay an enum; numbers or booleans keep their
+    type (a declared enum holds names only, so `[1, 2, 3]` becomes an integer, never `["1", "2",
+    "3"]`, which the server's own values would never match); a mix is not a fact (None)."""
+    vals = [v for v in values if v is not None]
+    optional = optional or len(vals) < len(values)
+    if not vals:
+        return None
+    if all(isinstance(v, str) for v in vals):
+        return {"enum": list(dict.fromkeys(vals)), "optional": optional}
+    if all(isinstance(v, bool) for v in vals):
+        return {"type": "boolean", "optional": optional}
+    if all(isinstance(v, int) and not isinstance(v, bool) for v in vals):
+        return {"type": "integer", "optional": optional}
+    if all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in vals):
+        return {"type": "number", "optional": optional}
+    return None
+
+
 def ignored(profile: Profile, *names: str) -> bool:
     """By the source's name or ours (ADR-0051: a profile may name either)."""
     return any(n in profile.ignore for n in names)
@@ -72,5 +91,5 @@ from .workflow import WorkflowExtractor
 
 BUILTIN = [McpExtractor(), OpenAPIExtractor(), RulesExtractor(), SQLExtractor(), WorkflowExtractor()]
 
-__all__ = ["BUILTIN", "TYPES", "Any", "Candidate", "Extraction", "Profile", "a_", "ignored", "mapping", "pascal", "put",
+__all__ = ["BUILTIN", "TYPES", "Any", "Candidate", "Extraction", "Profile", "a_", "enum_fact", "ignored", "mapping", "pascal", "put",
            "singular", "snake", "stages"]

@@ -13,6 +13,7 @@ from . import (
     Extraction,
     Profile,
     a_,
+    enum_fact,
     ignored,
     mapping,
     pascal,
@@ -58,8 +59,7 @@ def _prop(spec: Any, optional: bool) -> dict[str, Any] | None:
     if spec.get("nullable"):
         optional = True
     if spec.get("enum"):
-        vals = list(dict.fromkeys(str(v) for v in spec["enum"] if v is not None))
-        return {"enum": vals, "optional": optional or None in spec["enum"]} if vals else None
+        return enum_fact(list(spec["enum"]), optional)
     t = "datetime" if spec.get("format") in ("date-time", "date") else TYPES.get(str(types))
     return {"type": t, "optional": optional} if t else None
 

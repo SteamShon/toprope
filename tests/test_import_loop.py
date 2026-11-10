@@ -130,7 +130,7 @@ def test_a_servers_tools_reach_an_enforced_binding_through_the_change_loop(repo)
     assert decl["actions"]["refund_order"]["status"] == "proposed"
     check = [*PROXY, "--check", "--domain", "payments.domain.yaml", "--binding", "payments.binding.yaml"]
     refused = run(check, "t-owen", ok=False).stderr
-    assert "the binding is a draft no person has confirmed" in refused and "no person has confirmed" in refused
+    assert "no person has confirmed the binding" in refused and "element(s) no person has confirmed" in refused
     confirm = [*PROXY, "--confirm-binding", "--domain", "payments.domain.yaml", "--binding", "payments.binding.yaml",
                "--identity", "static:ids.yaml"]
     assert "only a person confirms a binding" in run(confirm, "t-bot", ok=False).stderr
@@ -142,7 +142,56 @@ def test_a_servers_tools_reach_an_enforced_binding_through_the_change_loop(repo)
     assert "ok: payments.binding.yaml, the server's tools and payments.domain.yaml agree; 1 tool(s) gated" in \
         run(check, "t-owen").stdout
     binding = yaml.safe_load((repo / "payments.binding.yaml").read_text())
-    assert binding["status"] == "confirmed" and binding["confirmed_by"] == ME
+    assert binding["confirmed"]["by"] == ME and len(binding["confirmed"]["sha256"]) == 64
     q = yaml.safe_load((repo / "q.yaml").read_text())
     ask = next(x for x in q["questions"] if x["kind"] == "actor")
     run([*RUN, *base, "ask_question", ask["id"], "--stage", "import", "--text", ask["text"]], "t-bot")  # into the interview
+
+
+# Review of #240 (2026-11-10): a flow-style `sources:` got a second key, and a changed source
+# silently replaced the snapshot the proposed elements cite.
+
+@pytest.mark.parametrize("sources", ["sources: []", "sources: [{id: docs, kind: records, path: docs}]  # ours"])
+def test_a_flow_style_sources_list_is_extended_in_place(tmp_path, monkeypatch, sources):
+    monkeypatch.chdir(tmp_path)
+    ws = tmp_path / "shop.workspace.yaml"
+    ws.write_text(f"domain: shop.domain.yaml\n{sources}\nusage_log: used.jsonl\n")
+    import_main(["sql", str(SQL), "--patch", "p.yaml", "--workspace", str(ws)])
+    from toprope.decl import load_yaml
+    cfg = load_yaml(ws.read_text())                                       # one `sources:` key, every entry kept
+    assert [s["id"] for s in cfg["sources"]] == ["docs"] * ("docs" in sources) + ["shop-sql"]
+    assert cfg["usage_log"] == "used.jsonl"
+    from toprope.workspace import Workspace
+    assert Workspace(ws).chunks("shop-sql")
+
+
+def test_a_workspace_whose_sources_cannot_be_extended_is_refused_and_nothing_is_written(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    ws = tmp_path / "shop.workspace.yaml"
+    before = "domain: shop.domain.yaml\nsources: [\n  {id: docs, kind: records, path: docs}]\n"
+    ws.write_text(before)
+    with pytest.raises(SystemExit, match="writes `sources:` in a form this cannot extend.*Fix: "):
+        import_main(["sql", str(SQL), "--patch", "p.yaml", "--workspace", str(ws), "--questions", "q.yaml"])
+    assert ws.read_text() == before and not (tmp_path / "p.yaml").exists() and not (tmp_path / "q.yaml").exists()
+    assert not (tmp_path / ".toprope").exists()
+
+
+def test_a_changed_source_under_the_same_id_is_refused_before_anything_is_written(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    src = tmp_path / "elsewhere" / "orders.sql"
+    src.parent.mkdir()
+    src.write_text(SQL.read_text())
+    sub = tmp_path / "ws"
+    sub.mkdir()
+    ws = sub / "shop.workspace.yaml"
+    import_main(["sql", str(src), "--domain", "shop", "--patch", str(tmp_path / "p1.yaml"), "--workspace", str(ws)])
+    snap = sub / ".toprope/imports/shop-sql/orders.sql"
+    kept = snap.read_bytes()
+    src.write_text(SQL.read_text().replace("'store'", "'store', 'phone'"))
+    with pytest.raises(SystemExit, match="'shop-sql' already holds a different snapshot.*Fix: give --source-id a new id"):
+        import_main(["sql", str(src), "--patch", str(tmp_path / "p2.yaml"), "--workspace", str(ws),
+                     "--questions", str(tmp_path / "q.yaml")])
+    assert snap.read_bytes() == kept and not (tmp_path / "p2.yaml").exists() and not (tmp_path / "q.yaml").exists()
+    import_main(["sql", str(src), "--patch", str(tmp_path / "p2.yaml"), "--workspace", str(ws),
+                 "--source-id", "shop-sql-2"])
+    assert (sub / ".toprope/imports/shop-sql-2/orders.sql").read_text().count("phone") == 1

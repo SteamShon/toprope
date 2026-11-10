@@ -125,6 +125,11 @@ def main(argv: list[str] | None = None) -> None:
     if a.patch and not out["items"]:
         raise SystemExit(fixed(f"nothing to propose from {a.source}: the draft already says all of it",
                                "nothing to do; any conflict with the draft is for the interview (--questions)"))
+    reg = None
+    if a.patch:                                                   # its checks too run before anything is written
+        from .loop import plan_registration, source_kind
+        reg = plan_registration(ws, out["raw"], a.source_id or f"{draft['domain']}-{a.kind}", source_kind(out["raw"]),
+                                draft["domain"])
     joined = None
     if a.into:
         from . import _check
@@ -140,9 +145,9 @@ def main(argv: list[str] | None = None) -> None:
         from .extractors.mcp import render_binding
         bdest.parent.mkdir(parents=True, exist_ok=True)
         bdest.write_text(render_binding(out["binding"], draft["domain"]))
-        print(f"wrote {bdest}: a draft binding, `status: proposed` until a person confirms it")
-    if a.patch:
-        _patch(a, ws, out)
+        print(f"wrote {bdest}: a draft binding; the proxy serves it once a person confirms it (--confirm-binding)")
+    if reg is not None:
+        _patch(a, ws, out, reg)
     elif joined is not None:
         dest.write_text(yaml.safe_dump(joined, sort_keys=False, allow_unicode=True))
         print(f"joined {a.source} into {dest}: {len(out['items'])} element(s) added, each proposed and citing its "
@@ -162,13 +167,13 @@ def main(argv: list[str] | None = None) -> None:
                 print(f"  - {q}")
 
 
-def _patch(a: argparse.Namespace, ws: Path, out: dict) -> None:
-    from .loop import cites, ensure_workspace, register, source_kind, write_patch
+def _patch(a: argparse.Namespace, ws: Path, out: dict, reg) -> None:
+    from .loop import cites, source_kind, write_patch
     domain = out["draft"]["domain"]
-    made = ensure_workspace(ws, domain)
+    reg.apply()
+    made, rel = reg.made, reg.rel
     sid = a.source_id or f"{domain}-{a.kind}"
     kind = source_kind(out["raw"])
-    rel = register(ws, out["raw"], sid, kind)
     write_patch(Path(a.patch), out["items"], cites(ws, sid, out["raw"], out["items"]), f"S-{sid}")
     from ..workspace import Workspace
     decl = Workspace(ws).domain_path

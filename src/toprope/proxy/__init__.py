@@ -21,6 +21,11 @@ The binding (YAML):
         result: {refund_id: string}                  # fields of the answer the reply may take
         load: get_order                              # an order the gate has not seen: read it here
       get_order: {read: true}
+    confirmed: {by: dana, at: "2026-11-10T09:00:00+00:00", sha256: 3f…}   # written by --confirm-binding
+
+A binding is served only with a person's confirmation record whose `sha256` is the hash of its
+`upstream` and `tools` as they are now (`Binding.digest`): one no person confirmed, or one changed
+since, is refused until a person confirms it again (`toprope-proxy --confirm-binding`, ADR-0052 §7).
 """
 from __future__ import annotations
 
@@ -53,11 +58,28 @@ class ToolBinding:
     load: str | None = None            # a read tool that returns an object the gate has not seen yet
 
 
+def digest(upstream: Any, tools: Any) -> str:
+    """The hash a confirmation records: the binding's `upstream` and `tools` as data, so comments
+    and layout do not count, and any change to what is bound does."""
+    return hashlib.sha256(json.dumps({"upstream": upstream, "tools": tools}, sort_keys=True,
+                                     default=str).encode()).hexdigest()
+
+
 @dataclass
 class Binding:
     upstream: dict[str, Any]
     tools: dict[str, ToolBinding]
-    status: str = "confirmed"          # `proposed`: drafted by `toprope-import mcp`, until a person confirms it
+    digest: str = ""                   # of `upstream` and `tools` as loaded
+    confirmed: dict[str, Any] | None = None   # {by, at, sha256}: who confirmed which content
+
+    def unconfirmed(self) -> str | None:
+        """Why the binding may not be served, or None when a person confirmed it as it is."""
+        c = self.confirmed
+        if not c:
+            return "no person has confirmed the binding"
+        if c.get("sha256") != self.digest:
+            return f"the binding changed after {c.get('by')} confirmed it at {c.get('at')}"
+        return None
 
     @classmethod
     def load(cls, path: str | Path) -> Binding:
@@ -73,6 +95,15 @@ class Binding:
         if ("command" in up) == ("url" in up):
             raise SystemExit(fixed(f"the binding {path}: `upstream` has exactly one of `command` or `url`",
                                    "give `command: [program, args…]` for stdio, or `url:` for streamable HTTP"))
+        extra = sorted(set(map(str, data)) - {"upstream", "tools", "confirmed"})
+        if extra:
+            raise SystemExit(fixed(f"the binding {path} has unknown key(s) {', '.join(extra)}",
+                                   "keep only `upstream`, `tools` and the `confirmed` record `toprope-proxy "
+                                   "--confirm-binding` writes"))
+        conf = data.get("confirmed")
+        if conf is not None and not (isinstance(conf, dict) and {"by", "at", "sha256"} <= set(conf)):
+            raise SystemExit(fixed(f"the binding {path}: `confirmed` is not a confirmation record",
+                                   "remove it, and let a person confirm with `toprope-proxy --confirm-binding`"))
         tools = {}
         known = {"read", "action", "target", "new_id", "params", "result", "load"}   # `hidden` is computed
         for name, spec in data["tools"].items():
@@ -89,12 +120,7 @@ class Binding:
                 raise SystemExit(fixed(f"the binding {path}: tool {name} names exactly one of `target` or `new_id`",
                                        "name the argument that identifies the object"))
             tools[str(name)] = tb
-        status = str(data.get("status") or "confirmed")
-        if status not in ("proposed", "confirmed"):
-            raise SystemExit(fixed(f"the binding {path}: `status: {status}`",
-                                   "leave `status: proposed` for a person to confirm with `toprope-proxy "
-                                   "--confirm-binding`"))
-        return cls(up, tools, status)
+        return cls(up, tools, digest(up, data["tools"]), conf)
 
 
 class Upstream:
@@ -296,17 +322,17 @@ def register(binding: Binding, tools: dict[str, Any], d: Any) -> list[str]:
     return problems
 
 
-def check(d: Any, binding: Binding) -> list[str]:
-    """What must hold between the declaration and the binding before anything is served."""
+def check(d: Any, binding: Binding, *, confirmation: bool = True) -> list[str]:
+    """What must hold between the declaration and the binding before anything is served.
+    `confirmation=False` leaves out the binding's own confirmation, for `--confirm-binding`."""
     from ..decl import validate_domain
     from ..decl.provenance import proposed_elements
     from ..kernel import UPSTREAM_SERVICES
     problems = [fixed(f"{i.code} at {i.where}: {i.message}", "correct the declaration")
                 for i in validate_domain(d) if i.severity == "error"]
-    if binding.status == "proposed":   # a drafted binding is enforced only once a person confirmed it (ADR-0052 §7)
-        problems.append(fixed("the binding is a draft no person has confirmed (`status: proposed`)",
-                              "read it, then confirm it as the person: `toprope-proxy --confirm-binding` with the "
-                              "same --domain, --binding and --identity"))
+    if confirmation and (why := binding.unconfirmed()):   # only what a person confirmed, as it is now, is enforced (ADR-0052 §7)
+        problems.append(fixed(why, "a person reads it and confirms it: `toprope-proxy --confirm-binding` with the "
+                                   "same --domain, --binding and --identity"))
     unconfirmed = proposed_elements(d.model_dump(mode="json", by_alias=True, exclude_none=True))
     if unconfirmed:                    # agents propose; only what a person confirmed is enforced (ADR-0041)
         problems.append(fixed(f"the declaration has {len(unconfirmed)} element(s) no person has confirmed "
@@ -503,5 +529,40 @@ def build_proxy(ex: Any, binding: Binding, upstream: Upstream, credentials: Any,
                      tools=[make(n, tb) for n, tb in binding.tools.items() if n in offered], **server_kwargs)
 
 
+def confirm_binding(path: str | Path, caller: Any, at: str | None = None) -> str:
+    """Record that `caller`, a person, confirmed the binding at `path` as it is now: `confirmed:
+    {by, at, sha256}`, replacing any earlier record. Comments and layout are kept. Returns the
+    hash. `toprope-proxy --confirm-binding` calls it once the binding would start."""
+    import re
+    from datetime import UTC, datetime
+
+    from ..decl import load_yaml
+    if caller.actor.kind != "person":
+        raise SystemExit(fixed(f"{caller.actor.id} is an agent; only a person confirms a binding (ADR-0041)",
+                               "ask the person the agent acts for to run it"))
+    b = Binding.load(path)
+    rec = {"by": caller.actor.id, "at": at or datetime.now(UTC).isoformat(timespec="seconds"), "sha256": b.digest}
+    line = f"confirmed: {json.dumps(rec)}"
+    text = Path(path).read_text()
+    lines, skipping = [], False
+    for ln in text.splitlines():                       # the earlier record, with any lines that continue it
+        if re.match(r"^confirmed\s*:", ln):
+            skipping = True
+            continue
+        if skipping and ln[:1] in (" ", "\t"):
+            continue
+        skipping = False
+        lines.append(ln)
+    at_upstream = next((i for i, ln in enumerate(lines) if re.match(r"^upstream\s*:", ln)), len(lines))
+    lines.insert(at_upstream, line)
+    new = "\n".join(lines) + "\n"
+    after = load_yaml(new) or {}
+    if after.get("confirmed") != rec or digest(after.get("upstream"), after.get("tools")) != b.digest:
+        raise SystemExit(fixed(f"{path}: the confirmation could not be written so that it reads back",
+                               "write `upstream:` and `tools:` as top-level keys, then confirm again"))
+    Path(path).write_text(new)
+    return b.digest
+
+
 __all__ = ["Binding", "StoreLock", "ToolBinding", "Upstream", "UpstreamServices", "answer", "build_proxy", "check",
-           "register"]
+           "confirm_binding", "digest", "register"]

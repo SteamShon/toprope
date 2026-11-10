@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
@@ -32,62 +33,99 @@ def workspace_file(given: str | None) -> Path:
                            "toprope.yaml"))
 
 
-def ensure_workspace(path: Path, domain: str) -> bool:
-    """A new workspace for `domain`: its declaration `<domain>.domain.yaml` beside it, and its logs.
-    Returns whether it was made."""
-    if path.exists():
-        return False
+def new_workspace(path: Path, domain: str) -> str:
+    """The text of a new workspace for `domain`: its declaration `<domain>.domain.yaml` beside it,
+    and its logs."""
     if not path.name.endswith(".workspace.yaml"):
         raise SystemExit(fixed(f"{path} is not a workspace file", "name it `<something>.workspace.yaml`"))
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(f"# The workspace of {domain}'s declaration (made by toprope-import): its sources and logs.\n"
-                    f"domain: {domain}.domain.yaml\n"
-                    f"interview_log: {domain}.interview.jsonl\n"
-                    f"usage_log: {domain}.sources-used.jsonl\n")
-    return True
+    return (f"# The workspace of {domain}'s declaration (made by toprope-import): its sources and logs.\n"
+            f"domain: {domain}.domain.yaml\n"
+            f"interview_log: {domain}.interview.jsonl\n"
+            f"usage_log: {domain}.sources-used.jsonl\n")
 
 
-def register(ws_path: Path, raw: Raw, source_id: str, kind: str) -> str:
-    """Make the source one of the workspace's sources (`sources:` in its file) and return its path
-    there. An id already registered for the same path is kept; for another path it is refused."""
+@dataclass
+class Registration:
+    """What registering a source writes, decided before anything is written: the workspace's new
+    text (None: unchanged), the snapshot (None: the source is a file in the workspace), and the
+    source's path there."""
+    ws_path: Path
+    rel: str
+    text: str | None
+    snapshot: bytes | None
+    made: bool
+
+    def apply(self) -> None:
+        if self.snapshot is not None:
+            dest = self.ws_path.resolve().parent / self.rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(self.snapshot)
+        if self.text is not None:
+            self.ws_path.parent.mkdir(parents=True, exist_ok=True)
+            self.ws_path.write_text(self.text)
+
+
+def plan_registration(ws_path: Path, raw: Raw, source_id: str, kind: str, domain: str) -> Registration:
+    """Make the source one of the workspace's sources (`sources:` in its file). Every check runs
+    here, before anything is written: an id registered for another path, or holding a snapshot
+    with other content, is refused, and so is a workspace file that would not read back."""
+    from ..decl import load_yaml
+    made = not ws_path.exists()
+    text = new_workspace(ws_path, domain) if made else ws_path.read_text()
     root = ws_path.resolve().parent
     src = Path(raw.ref)
+    snapshot: bytes | None = None
     if raw.parts is None and src.is_file() and src.resolve().is_relative_to(root):
         rel = src.resolve().relative_to(root).as_posix()
     else:
         name = src.name if raw.parts is None and src.is_file() else "source.json" if kind == "repository" else "source.md"
-        rel = f"{IMPORTS}/{source_id}/{name}"
+        rel, snapshot = f"{IMPORTS}/{source_id}/{name}", raw.data
         dest = root / rel
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_bytes(raw.data)
-    text = ws_path.read_text()
-    cfg = yaml.safe_load(text) or {}
+        if dest.exists() and dest.read_bytes() != raw.data:
+            raise SystemExit(fixed(f"the source {source_id!r} already holds a different snapshot ({rel}): the "
+                                   "source changed since it was imported, and the elements proposed from it cite "
+                                   "the old one", "give --source-id a new id for this version of the source"))
+    try:
+        cfg = load_yaml(text) or {}
+    except (ValueError, yaml.YAMLError) as e:
+        raise SystemExit(fixed(f"the workspace {ws_path} does not read: {e}", "fix the file, then import again")) from None
     have = next((s for s in cfg.get("sources") or [] if isinstance(s, dict) and s.get("id") == source_id), None)
     if have is not None:
         if have.get("path") != rel:
             raise SystemExit(fixed(f"the workspace {ws_path} already has a source {source_id!r}, at {have.get('path')}",
                                    "give --source-id a new id for this source"))
-        return rel
-    entry = f"{{id: {json.dumps(source_id)}, kind: {kind}, path: {json.dumps(rel)}}}"
+        return Registration(ws_path, rel, text if made else None, snapshot, made)
+    entry = {"id": source_id, "kind": kind, "path": rel}
+    flow = f"{{id: {json.dumps(source_id)}, kind: {kind}, path: {json.dumps(rel)}}}"
     lines = text.splitlines()
-    at = next((i for i, ln in enumerate(lines) if re.match(r"^sources:\s*(#.*)?$", ln)), None)
-    if at is None:
-        lines += ["sources:", f"  - {entry}"]
-    else:
-        end = at + 1
+    block = next((i for i, ln in enumerate(lines) if re.match(r"^sources:\s*(#.*)?$", ln)), None)
+    inline = next((i for i, ln in enumerate(lines) if re.match(r"^sources:\s*\[.*\]\s*(#.*)?$", ln)), None)
+    if block is not None:
+        end = block + 1
         while end < len(lines) and (not lines[end].strip() or lines[end][:1] in (" ", "\t", "-")):
             end += 1
-        first = next((ln for ln in lines[at + 1:end] if ln.lstrip().startswith("- ")), "  - ")
+        first = next((ln for ln in lines[block + 1:end] if ln.lstrip().startswith("- ")), "  - ")
         indent = first[:len(first) - len(first.lstrip())]
-        while end > at + 1 and not lines[end - 1].strip():
+        while end > block + 1 and not lines[end - 1].strip():
             end -= 1
-        lines.insert(end, f"{indent}- {entry}")
+        lines.insert(end, f"{indent}- {flow}")
+    elif inline is not None:                                       # `sources: [...]` on one line
+        lines[inline] = f"sources: {json.dumps([*(cfg.get('sources') or []), entry])}"
+    elif "sources" in cfg:
+        raise SystemExit(fixed(f"the workspace {ws_path} writes `sources:` in a form this cannot extend",
+                               f"write it as a block list, or add `- {flow}` under it yourself, then import again"))
+    else:
+        lines += ["sources:", f"  - {flow}"]
     new = "\n".join(lines) + "\n"
-    if not any(isinstance(s, dict) and s.get("id") == source_id for s in (yaml.safe_load(new) or {}).get("sources") or []):
-        raise SystemExit(fixed(f"could not add the source to {ws_path}: its `sources:` is not a list this can extend",
-                               f"add `- {entry}` under `sources:` yourself, then import again"))
-    ws_path.write_text(new)
-    return rel
+    try:
+        after = load_yaml(new) or {}
+    except (ValueError, yaml.YAMLError) as e:
+        after = {"error": str(e)}
+    if after.get("sources") != [*(cfg.get("sources") or []), entry] or \
+            {k: v for k, v in after.items() if k != "sources"} != {k: v for k, v in cfg.items() if k != "sources"}:
+        raise SystemExit(fixed(f"could not add the source to {ws_path} so that it reads back",
+                               f"add `- {flow}` under `sources:` yourself, then import again"))
+    return Registration(ws_path, rel, new, snapshot, made)
 
 
 def line_of(place: str, ref: str, text: str) -> int:
@@ -152,4 +190,5 @@ def source_kind(raw: Raw) -> str:
     return "records" if Path(raw.ref).suffix.lower() in (".md", ".markdown") or raw.parts else "repository"
 
 
-__all__ = ["cites", "ensure_workspace", "line_of", "register", "source_kind", "workspace_file", "write_patch"]
+__all__ = ["Registration", "cites", "line_of", "new_workspace", "plan_registration", "source_kind", "workspace_file",
+           "write_patch"]
