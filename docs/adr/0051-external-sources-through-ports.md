@@ -50,7 +50,8 @@ So their output should come in through an extractor for their exchange format, a
 - A new source needs one extractor (code: it parses a format), and no change to Toprope; a new
   convention needs a profile.
 - A generator such as Auto Ontology is used, not rebuilt: it runs as its own service, and Toprope
-  reads its export (Ossie) through an extractor. It is never a dependency of Toprope.
+  reads its export (Ossie) through an extractor. It is never a dependency of Toprope. The first
+  such extractor is an outside package, `examples/plugins/toprope-ossie`.
 - Decisions 4 and 5 change the self domains' composition, so they wait for M1's recheck (AGENTS.md,
   one loop at a time).
 
