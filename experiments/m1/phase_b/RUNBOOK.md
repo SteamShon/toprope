@@ -182,7 +182,18 @@ with these differences:
   uv run python -m phase_b compare-gradings --out runs/phase-b-recheck-combined
   ```
   Report `grader-noise.json`. **STOP** if `within_limit` is false: the researcher grades the
-  labels the two sittings disagree on, and that grade counts.
+  labels the two sittings disagree on, and that grade counts. Group them first, so one label
+  covers a finding however often it recurs:
+  ```bash
+  uv run python -m phase_b group-disagreements --out runs/phase-b-recheck-combined
+  ```
+  Report its summary (groups, and those with `recall: true`). The researcher sets
+  `researcher_label` in `disagreements.yaml` on every recall group (others keep the first
+  sitting's label), then:
+  ```bash
+  uv run python -m phase_b apply-disagreements --out runs/phase-b-recheck-combined
+  ```
+  It writes `scoring/confirmed.yaml` with `status: proposed`; continue with `to-decide`.
 - Then step 5's `to-decide` and confirmation, and step 6's `score`, on
   `runs/phase-b-recheck-combined` (its `scoring/`). Report `metrics.json` with its `probe_gate`
   (exit criterion 1): the probes that fail the gate, and the grader's reason for each failing run.

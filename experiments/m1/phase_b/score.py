@@ -621,3 +621,106 @@ def to_decide(run: Path) -> dict[str, Any]:
               for a, ps in g["probes"].items() for p in ps if not isinstance(p.get("passed"), bool)]
     return {"file": str(path), "flags": flags, "edits": edits, "probes": probes,
             "count": len(flags) + len(edits) + len(probes)}
+
+
+# -- the two sittings' disagreements, grouped for the researcher (M1-recheck.md, criterion 3) --------
+
+def _norm(text: Any) -> str:
+    return " ".join(re.sub(r"[^\w.`-]+", " ", str(text or "").lower()).split())
+
+
+def _sitting(run: Path, scoring: str) -> dict[tuple[int, str, int, int], dict[str, Any]]:
+    """One sitting's flags under (seq, arm, run, index): the same finding in both sittings, whatever
+    blind letter each gave it. Opened here only, inside the harness (ADR-0040 §8)."""
+    graded = yaml.safe_load((run / scoring / "proposed.yaml").read_text())
+    labels = {int(s): v for s, v in yaml.safe_load((run / scoring / "blind-labels.yaml").read_text())["labels"].items()}
+    out = {}
+    for c in graded["changes"]:
+        for f in c["flags"]:
+            letter = f["id"].split(".")[0]
+            out[(c["seq"], labels[c["seq"]][letter], f["run"], f["index"])] = f
+    return out
+
+
+def group_disagreements(run: Path, first: str = "scoring", second: str = "scoring-2") -> dict[str, Any]:
+    """The flags the two sittings labelled differently, grouped so that one decision covers the
+    same finding however often it recurs: a compiler flag by (change, check, where, problem); a
+    review flag by (change, arm, where). Writes `disagreements.yaml` for the researcher, blind: a
+    group shows no arm, and its members are named by the first sitting's ids. A group is
+    `recall: true` when either sitting called a member seeded; those need the researcher's label."""
+    a, b = _sitting(run, first), _sitting(run, second)
+    groups: dict[tuple, dict[str, Any]] = {}
+    for key, fa in sorted(a.items()):
+        fb = b.get(key)
+        if fb is None or fa.get("label") == fb.get("label"):
+            continue
+        seq, arm, _, _ = key
+        flag = fa.get("flag") or {}
+        gk = (seq, "compiler", flag.get("check"), _norm(flag.get("where")), _norm(flag.get("problem"))) \
+            if "check" in flag else (seq, arm, _norm(flag.get("where")))
+        g = groups.setdefault(gk, {"seq": seq, "where": flag.get("where"), "check": flag.get("check"),
+                                   "problems": [], "members": [], "first": {}, "second": {},
+                                   "why_first": fa.get("why", ""), "why_second": fb.get("why", "")})
+        if _norm(flag.get("problem")) not in {_norm(p) for p in g["problems"]}:
+            g["problems"].append(flag.get("problem"))
+        g["members"].append(fa["id"])
+        g["first"][fa.get("label")] = g["first"].get(fa.get("label"), 0) + 1
+        g["second"][fb.get("label")] = g["second"].get(fb.get("label"), 0) + 1
+    rows = sorted(groups.values(), key=lambda g: (not ("seeded" in g["first"] or "seeded" in g["second"]), g["seq"]))
+    out = []
+    for i, g in enumerate(rows, 1):
+        recall = "seeded" in g["first"] or "seeded" in g["second"]
+        out.append({"group": f"G{i:03d}", "seq": g["seq"], "recall": recall,
+                    **({"check": g["check"]} if g["check"] else {}), "where": g["where"],
+                    "problems": g["problems"], "members": g["members"],
+                    "first": g["first"], "second": g["second"],
+                    "why_first": g["why_first"], "why_second": g["why_second"],
+                    "researcher_label": None, "member_labels": {}})
+    summary = {"flags": sum(len(g["members"]) for g in out), "groups": len(out),
+               "recall_groups": sum(g["recall"] for g in out),
+               "recall_flags": sum(len(g["members"]) for g in out if g["recall"])}
+    doc = {"summary": summary, "groups": out}
+    (run / "disagreements.yaml").write_text(
+        "# The flags the two sittings labelled differently, grouped (M1-recheck.md, criterion 3).\n"
+        "# Set `researcher_label` (seeded, other-real or false-alarm) on every group with `recall: true`;\n"
+        "# where one group mixes findings, set `member_labels: {<member id>: <label>}` instead.\n"
+        "# Groups left unset keep the first sitting's label. Then `apply-disagreements`.\n"
+        + yaml.safe_dump(doc, sort_keys=False, allow_unicode=True, width=110))
+    return summary
+
+
+def apply_disagreements(run: Path, first: str = "scoring") -> dict[str, Any]:
+    """The researcher's labels from `disagreements.yaml` onto the first sitting's grades, written as
+    `scoring/confirmed.yaml` with `status: proposed`: `to-decide` then lists what is left, and the
+    researcher sets `status: confirmed`. A recall group with no label is refused."""
+    doc = yaml.safe_load((run / "disagreements.yaml").read_text())
+    chosen: dict[str, str] = {}
+    missing = []
+    for g in doc["groups"]:
+        per = {str(k): v for k, v in (g.get("member_labels") or {}).items()}
+        for m in g["members"]:
+            label = per.get(m) or g.get("researcher_label")
+            if label is None:
+                if g["recall"]:
+                    missing.append(g["group"])
+                continue
+            if label not in LABELS:
+                raise SystemExit(f"{g['group']}: {label!r} is not one of {LABELS}")
+            chosen[m] = label
+    if missing:
+        raise SystemExit(f"{len(set(missing))} recall group(s) have no researcher_label: {sorted(set(missing))[:10]}")
+    target = run / first / "confirmed.yaml"
+    if target.exists():
+        raise SystemExit(f"{target} exists: apply onto a fresh copy only")
+    graded = yaml.safe_load((run / first / "proposed.yaml").read_text())
+    applied = 0
+    for c in graded["changes"]:
+        for f in c["flags"]:
+            if f["id"] in chosen:
+                f["label"], f["label_source"] = chosen[f["id"]], "researcher (two sittings disagreed)"
+                applied += 1
+    graded["status"] = "proposed"
+    target.write_text("# The first sitting's grades with the researcher's labels where the two sittings disagreed\n"
+                      "# (apply-disagreements). Finish `to-decide`, then set `status: confirmed`.\n"
+                      + yaml.safe_dump(graded, sort_keys=False, allow_unicode=True, width=110))
+    return {"applied": applied, "written": str(target)}
