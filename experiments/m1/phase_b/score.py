@@ -668,7 +668,8 @@ def rescript(run: Path, scoring: str = "scoring") -> dict[str, Any]:
     return {"file": str(path), "script_labels_cleared": n, "flags_without_label": left}
 
 
-def regrade_missing(run: Path, instruments: Path, backend: Any, scoring: str = "scoring") -> dict[str, Any]:
+def regrade_missing(run: Path, instruments: Path, backend: Any, scoring: str = "scoring",
+                    redo: list[tuple[str, int]] | None = None) -> dict[str, Any]:
     """Grade again, once, each probe run of a sitting the grader left without a pass or fail
     (no JSON even after the retry), so every grade comes from the grader (M1-recheck.md,
     criterion 2). A run that did not complete stays for the researcher."""
@@ -677,8 +678,11 @@ def regrade_missing(run: Path, instruments: Path, backend: Any, scoring: str = "
     probes = {p["id"]: p for p in yaml.safe_load((instruments / "probe-suite.yaml").read_text())["probes"]}
     tr = run / scoring / "transcripts"
     done, left = 0, 0
+    again = set(redo or [])
     for arm, rows in graded["probes"].items():
         for row in rows:
+            if (arm, row["seq"]) in again:                 # its probes ran again: the old grade is moot
+                row.update(passed=None, why="", error=None)
             if isinstance(row.get("passed"), bool) or row.get("error"):
                 continue
             rec = records(run, arm).get(row["seq"], {})
@@ -689,7 +693,7 @@ def regrade_missing(run: Path, instruments: Path, backend: Any, scoring: str = "
                 continue
             g = grade_probe(backend, probes[row["probe"]], run / arm / f"seq-{row['seq']:02d}" / pr["dir"], res,
                             tr / f"{arm}-seq-{row['seq']:02d}-run-{row.get('run', 1)}-{row['probe']}-regrade.jsonl")
-            row.update({k: g[k] for k in ("passed", "why")}, regraded=True)
+            row.update({k: g.get(k) for k in ("passed", "why", "error")}, regraded=True)
             done += 1
             left += not isinstance(g["passed"], bool)
     head = "".join(line + "\n" for line in path.read_text().splitlines() if line.startswith("#"))
