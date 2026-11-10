@@ -45,6 +45,18 @@ Its subcommands are the domain's actions, one per action, plus `get`, `history`,
 | `--request` `REQUEST` | the request file to write (default: .toprope/requests/<id>.yaml) |
 | `--run-args` `RUN_ARGS` | options passed to every toprope-run step, e.g. "--identity static:ids.yaml" (default ``) |
 
+## `toprope-interview`
+
+`toprope-interview`: the interview, in your terminal, on your own domain (ADR-0053 §2).
+
+The interview's route for a newcomer: docs/interview.md.
+
+| Argument | What |
+|---|---|
+| `DIR` | the domain's directory (default: here); it holds domain.yaml, or the interview starts one |
+| `--answers` `ANSWERS` | read the answers from this file, one per line, instead of the terminal |
+| `--share` | print ADR-0053's choice measure from the interview log and stop |
+
 ## `toprope-server`
 
 `toprope-server`: serve a declaration over MCP (stdio or streamable HTTP).

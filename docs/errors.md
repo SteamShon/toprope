@@ -43,6 +43,31 @@ the error is raised.
 | {…} names no origin | give it `origin:` (a Source object's id), or --origin for every element |
 | {…}{…} | fix that element and run the change again with the elements not yet proposed, or restore the draft with `git checkout -- <declaration>` |
 
+## `adapters/cli/interview.py`
+
+| Error | Fix |
+|---|---|
+| an invariant needs its reason | write `check \| why`, such as `target.days > 0 \| A request is for at least a day.` |
+| no action {…} | use one of {…} |
+| no answer | type an answer, or a choice's number |
+| no answer | type an answer in a few words |
+| no answers file {…} | give a file with one answer per line |
+| no directory {…} | give the domain's directory, such as one `toprope-init` wrote |
+| no {…} in {…} | give a path inside the domain's directory |
+| the question {…} came back unchanged | answer it differently, or ask your agent to draft it (Authoring) |
+| there is no choice {…} | type a number from 1 to {…} |
+| this question takes a numbered choice here | type the number of a choice; for anything else, ask your agent to draft it (Authoring) |
+| {…} | fix domain.yaml at that place (docs/domain-schema.md), or restore it from git |
+| {…} does not say up or down | end it with `, up` or `, down` |
+| {…} has no `:` | write `name: what it is` |
+| {…} has no value | write `fact value`, such as `days 12` |
+| {…} is not a link | write `Thing -> Other many-to-one` |
+| {…} is not a step | write `role action ID -> stage`, or `-> refused` |
+| {…} is not a thing in the draft | name one of {…} |
+| {…} is not a type | use number, integer, text, yes/no, date, or choices like `low/high` |
+| {…} names no thing | end it with `-> Thing`, or `-> new Thing` when it makes one |
+| {…}.{…} is a number, not {…} | give it as digits |
+
 ## `adapters/mcp/cli.py`
 
 | Error | Fix |
@@ -146,6 +171,8 @@ the error is raised.
 | source {…} is local-only, so it is not searched for words | cite its chunk ref, as the owner gives it |
 | source {…} is local-only: its content is never sent to a model | read it yourself, or remove `local_only: true` from the source if its content may be shared |
 | source {…}: give either a path or a url | give the source exactly one of `path:` or `url:` in the workspace file |
+| the action {…} acts on {…}, which is not a thing in the draft | name one of {…} |
+| the action {…} has no description | say what it does, in a few words |
 | the draft does not parse: {…} | fix the draft so it matches the schema (docs/domain-schema.md), then commit again |
 | the draft names no `domain`, so there is no commit log | set `domain:` at the top of the draft |
 | the draft names no `domain`, so there is no commit log to approve in | set `domain:` at the top of the draft |
@@ -160,6 +187,7 @@ the error is raised.
 | {…} has no fact {…} | use its facts: {…}; or add the fact first |
 | {…} is committed, and its tools refuse a declaration with errors; this change would add {…}. Propose what it refers to first. | propose the elements it refers to first, then this one |
 | {…} is not a drafted element with a source | confirm only elements that were proposed with a source; `next_questions` lists them |
+| {…} is not an action name | use letters, digits and `_`, such as `approve_leave` |
 | {…} must be an object | give the value as a mapping |
 | {…} passages contain {…}: {…} | quote more of the passage, or cite one of those refs |
 | {…}.{…} is {…}, not one of {…} | use one of {…} |
