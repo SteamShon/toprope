@@ -423,7 +423,7 @@ to do about it. `{…}` is filled in when the error is raised.
 
 | Error | Fix |
 |---|---|
-| an upstream tool's service is named `mcp:<tool>`, not {…} | **none** |
+| an upstream tool's service is named `mcp:<tool>`, not {…} | name it `mcp:` and the tool's name |
 
 ## `src/toprope/kernel/reference.py`
 
@@ -459,8 +459,8 @@ to do about it. `{…}` is filled in when the error is raised.
 
 | Error | Fix |
 |---|---|
-| Refused by the declaration ({…}): {…} | **none** |
-| Unknown or missing credentials. Fix: connect with a token the proxy's identity knows. | **none** |
+| Refused by the declaration ({…}): {…} | if the declaration is wrong, a person changes it |
+| Unknown or missing credentials | connect with a token the proxy's identity knows |
 | cannot read the binding {…}: {…} | give the binding's YAML file |
 | no kernel services in this proxy for {…} | call only `mcp:` tools from a declaration served by toprope-proxy |
 | the binding {…} has unknown key(s) {…} | keep only `upstream`, `tools` and the `confirmed` record `toprope-proxy --confirm-binding` writes |
@@ -472,17 +472,17 @@ to do about it. `{…}` is filled in when the error is raised.
 | the binding {…}: tool {…} names exactly one of `target` or `new_id` | name the argument that identifies the object |
 | the upstream MCP server did not start: {…} | check the binding's `upstream` command or URL, and that the server runs on its own |
 | toprope-proxy needs POSIX file locks, which this system lacks | run the proxy on Linux or macOS |
-| {…} failed upstream: {…}. Fix: to try again, call with a new `idempotency_key`. | **none** |
+| {…} failed upstream: {…} | to try again, call with a new `idempotency_key` |
 | {…} from {…} cannot be checked: {…} | make {…} return {…} with their declared types; nothing was sent |
 | {…} is an agent; only a person confirms a binding (ADR-0041) | ask the person the agent acts for to run it |
-| {…} needs `{…}`, the object it acts on. | **none** |
-| {…} was allowed but not sent. Fix: ask again; nothing was sent upstream. | **none** |
+| {…} needs `{…}`, the object it acts on | call it again with `{…}` |
+| {…} was allowed but not sent | ask again; nothing was sent upstream |
 | {…}: could not read {…} with {…} ({…}: {…}) | ask again when the server answers; nothing was sent |
 | {…}: the confirmation could not be written so that it reads back | write `upstream:` and `tools:` as top-level keys, then confirm again |
-| {…}: the same call is still running. Fix: ask again in a moment. | **none** |
-| {…}: the server did not answer ({…}: {…}); it may or may not have acted. Fix: read the object upstream before you call again, then call with a new `idempotency_key`. | **none** |
+| {…}: the same call is still running | ask again in a moment |
+| {…}: the server did not answer ({…}: {…}); it may or may not have acted | read the object upstream before you call again, then call with a new `idempotency_key` |
 | {…}: {…} could not read {…}: {…} | check that {…} exists on the server; nothing was sent |
-| {…}: {…} was recorded, but calls nothing upstream. Fix: check the declaration's effect for this action. | **none** |
+| {…}: {…} was recorded, but calls nothing upstream | check the declaration's effect for this action |
 
 ## `src/toprope/proxy/cli.py`
 

@@ -16,7 +16,7 @@ Legend: ✅ done · 🟡 in part · ⬜ not started
 |---|---|---|---|
 | M0a thin slice | none (enabler) | ✅ | released as `v0.1.0` (#65); the tag is not pushed yet |
 | M1 self-compile | ① ⑥ pilot, no verdict | ✅ | closed after the recheck ([`M1-report.md`](experiments/M1-report.md)): Toprope with its LLM review leads on recall (first run 0.84 against 0.64 NL; recheck 0.94–1.0 against 0.44–0.62, biased and a reference only); the grader's noise (0.18) moves to M2's grader redesign; six probes carried to M2's probe design; ⑥ inconclusive |
-| U usability before M2 (ADR-0049) | none (enabler) | 🟡 | F1 baseline recorded; F2's script written, its run waits for an operator; theme 1 started |
+| U usability before M2 (ADR-0049) | none (enabler) | 🟡 | F1 baseline recorded; F2's script written, its run waits for an operator; themes 1–4 in `develop` (code); F1 and F2 measured again next |
 | M0b surfaces and effects | none (enabler) | ⬜ | |
 | M2 dogfood | ① ② ③ | ⬜ | the first ① and ② verdicts |
 | M3 shared language | ④ | ⬜ | |
