@@ -1,0 +1,1240 @@
+{
+  "partial": false,
+  "metrics": {
+    "nl": {
+      "seeded": 10,
+      "runs": 5,
+      "flagged": [
+        3,
+        7,
+        9,
+        17,
+        18,
+        20
+      ],
+      "recall": 0.62,
+      "recall_spread": {
+        "runs": [
+          0.7,
+          0.7,
+          0.7,
+          0.5,
+          0.5
+        ],
+        "mean": 0.62,
+        "min": 0.5,
+        "max": 0.7
+      },
+      "recall_without_handoff": 0.5778,
+      "recall_by_type": {
+        "breaks-past-behavior": 0.7,
+        "breaks-reference": 1.0,
+        "conflicts-with-rule": 0.72,
+        "other:required-stages": 0.2,
+        "strands-objects": 0.0
+      },
+      "recall_by_designed_for_checks": {
+        "no": 0.6,
+        "yes": 0.625
+      },
+      "findings": 367,
+      "precision": 0.5759,
+      "precision_spread": {
+        "runs": [
+          0.5833,
+          0.6429,
+          0.5733,
+          0.5467,
+          0.5333
+        ],
+        "mean": 0.5759,
+        "min": 0.5333,
+        "max": 0.6429
+      },
+      "precision_grouped_spread": {
+        "runs": [
+          0.5833,
+          0.6429,
+          0.5733,
+          0.5467,
+          0.5333
+        ],
+        "mean": 0.5759,
+        "min": 0.5333,
+        "max": 0.6429
+      },
+      "found_after_deploy": {
+        "5": [
+          "P02"
+        ],
+        "11": [
+          "P02"
+        ],
+        "13": [
+          "P02"
+        ]
+      },
+      "silent": [
+        15
+      ],
+      "found_after_deploy_ungated": {
+        "5": [
+          "P02"
+        ],
+        "11": [
+          "P02",
+          "P06"
+        ],
+        "13": [
+          "P02",
+          "P06"
+        ],
+        "15": [
+          "P06"
+        ]
+      },
+      "breakages_found_only_after_deploy": 0.25,
+      "edit_fidelity": {
+        "implements": 19,
+        "partial": 1,
+        "does-not": 0
+      },
+      "probe_pass_rate": {
+        "runs": [
+          0.4062,
+          0.3937,
+          0.4188
+        ],
+        "mean": 0.4062,
+        "min": 0.3937,
+        "max": 0.4188
+      },
+      "probes_failed": {
+        "0": [
+          "P01",
+          "P04",
+          "P06",
+          "P07",
+          "P08"
+        ],
+        "1": [
+          "P01",
+          "P04",
+          "P06",
+          "P07",
+          "P08"
+        ],
+        "2": [
+          "P01",
+          "P04",
+          "P07",
+          "P08"
+        ],
+        "3": [
+          "P01",
+          "P04",
+          "P07",
+          "P08"
+        ],
+        "4": [
+          "P01",
+          "P04",
+          "P06",
+          "P07",
+          "P08"
+        ],
+        "5": [
+          "P01",
+          "P04",
+          "P06",
+          "P07",
+          "P08"
+        ],
+        "6": [
+          "P01",
+          "P04",
+          "P06",
+          "P07",
+          "P08"
+        ],
+        "7": [
+          "P01",
+          "P04",
+          "P06",
+          "P07",
+          "P08"
+        ],
+        "8": [
+          "P01",
+          "P04",
+          "P06",
+          "P07",
+          "P08"
+        ],
+        "9": [
+          "P01",
+          "P04",
+          "P07",
+          "P08"
+        ],
+        "10": [
+          "P01",
+          "P04",
+          "P07",
+          "P08"
+        ],
+        "11": [
+          "P01",
+          "P04",
+          "P07",
+          "P08"
+        ],
+        "12": [
+          "P01",
+          "P02",
+          "P04",
+          "P07",
+          "P08"
+        ],
+        "13": [
+          "P01",
+          "P04",
+          "P07",
+          "P08"
+        ],
+        "14": [
+          "P01",
+          "P02",
+          "P04",
+          "P07",
+          "P08"
+        ],
+        "15": [
+          "P01",
+          "P02",
+          "P04",
+          "P06",
+          "P07",
+          "P08"
+        ],
+        "16": [
+          "P01",
+          "P02",
+          "P04",
+          "P07",
+          "P08"
+        ],
+        "17": [
+          "P01",
+          "P04",
+          "P06",
+          "P07",
+          "P08"
+        ],
+        "18": [
+          "P01",
+          "P04",
+          "P06",
+          "P07",
+          "P08"
+        ],
+        "19": [
+          "P01",
+          "P04",
+          "P06",
+          "P07",
+          "P08"
+        ],
+        "20": [
+          "P01",
+          "P02",
+          "P04",
+          "P07",
+          "P08"
+        ]
+      },
+      "handoff_probe_P07_passes_throughout": false,
+      "median_edit_to_checked_s": 103.35,
+      "iteration_time_by_change": {
+        "1": {
+          "median_s": 69.96,
+          "limiter": null
+        },
+        "2": {
+          "median_s": 97.89,
+          "limiter": null
+        },
+        "3": {
+          "median_s": 134.65,
+          "limiter": null
+        },
+        "4": {
+          "median_s": 97.78,
+          "limiter": null
+        },
+        "5": {
+          "median_s": 86.39,
+          "limiter": null
+        },
+        "6": {
+          "median_s": 103.16,
+          "limiter": null
+        },
+        "7": {
+          "median_s": 130.1,
+          "limiter": null
+        },
+        "8": {
+          "median_s": 109.77,
+          "limiter": null
+        },
+        "9": {
+          "median_s": 136.57,
+          "limiter": null
+        },
+        "10": {
+          "median_s": 120.74,
+          "limiter": null
+        },
+        "11": {
+          "median_s": 121.51,
+          "limiter": null
+        },
+        "12": {
+          "median_s": 100.91,
+          "limiter": null
+        },
+        "13": {
+          "median_s": 90.1,
+          "limiter": null
+        },
+        "14": {
+          "median_s": 120.71,
+          "limiter": null
+        },
+        "15": {
+          "median_s": 103.55,
+          "limiter": null
+        },
+        "16": {
+          "median_s": 79.54,
+          "limiter": null
+        },
+        "17": {
+          "median_s": 134.5,
+          "limiter": null
+        },
+        "18": {
+          "median_s": 97.82,
+          "limiter": null
+        },
+        "19": {
+          "median_s": 85.48,
+          "limiter": null
+        },
+        "20": {
+          "median_s": 115.5,
+          "limiter": null
+        }
+      }
+    },
+    "structured": {
+      "seeded": 10,
+      "runs": 5,
+      "flagged": [
+        3,
+        5,
+        7,
+        9,
+        13,
+        15,
+        17,
+        18,
+        20
+      ],
+      "recall": 0.86,
+      "recall_spread": {
+        "runs": [
+          0.8,
+          0.8,
+          0.9,
+          0.9,
+          0.9
+        ],
+        "mean": 0.86,
+        "min": 0.8,
+        "max": 0.9
+      },
+      "recall_without_handoff": 0.8445,
+      "recall_by_type": {
+        "breaks-past-behavior": 1.0,
+        "breaks-reference": 1.0,
+        "conflicts-with-rule": 0.76,
+        "other:required-stages": 1.0,
+        "strands-objects": 0.8
+      },
+      "recall_by_designed_for_checks": {
+        "no": 1.0,
+        "yes": 0.825
+      },
+      "findings": 390,
+      "precision": 0.5024,
+      "precision_spread": {
+        "runs": [
+          0.5132,
+          0.5185,
+          0.5067,
+          0.5062,
+          0.4675
+        ],
+        "mean": 0.5024,
+        "min": 0.4675,
+        "max": 0.5185
+      },
+      "precision_grouped_spread": {
+        "runs": [
+          0.5132,
+          0.5185,
+          0.5067,
+          0.5062,
+          0.4675
+        ],
+        "mean": 0.5024,
+        "min": 0.4675,
+        "max": 0.5185
+      },
+      "found_after_deploy": {},
+      "silent": [
+        11
+      ],
+      "found_after_deploy_ungated": {
+        "11": [
+          "P04",
+          "P06"
+        ]
+      },
+      "breakages_found_only_after_deploy": 0.0,
+      "edit_fidelity": {
+        "implements": 14,
+        "partial": 6,
+        "does-not": 0
+      },
+      "probe_pass_rate": {
+        "runs": [
+          0.5312,
+          0.5437,
+          0.5125
+        ],
+        "mean": 0.5291,
+        "min": 0.5125,
+        "max": 0.5437
+      },
+      "probes_failed": {
+        "0": [
+          "P01",
+          "P04",
+          "P07",
+          "P08"
+        ],
+        "1": [
+          "P01",
+          "P06",
+          "P07",
+          "P08"
+        ],
+        "2": [
+          "P01",
+          "P07",
+          "P08"
+        ],
+        "3": [
+          "P01",
+          "P07",
+          "P08"
+        ],
+        "4": [
+          "P01",
+          "P07",
+          "P08"
+        ],
+        "5": [
+          "P01",
+          "P06",
+          "P07",
+          "P08"
+        ],
+        "6": [
+          "P01",
+          "P07",
+          "P08"
+        ],
+        "7": [
+          "P01",
+          "P07",
+          "P08"
+        ],
+        "8": [
+          "P01",
+          "P07",
+          "P08"
+        ],
+        "9": [
+          "P01",
+          "P04",
+          "P07",
+          "P08"
+        ],
+        "10": [
+          "P01",
+          "P07",
+          "P08"
+        ],
+        "11": [
+          "P01",
+          "P04",
+          "P07",
+          "P08"
+        ],
+        "12": [
+          "P01",
+          "P04",
+          "P07",
+          "P08"
+        ],
+        "13": [
+          "P01",
+          "P07",
+          "P08"
+        ],
+        "14": [
+          "P01",
+          "P04",
+          "P06",
+          "P07",
+          "P08"
+        ],
+        "15": [
+          "P01",
+          "P07",
+          "P08"
+        ],
+        "16": [
+          "P01",
+          "P07",
+          "P08"
+        ],
+        "17": [
+          "P01",
+          "P04",
+          "P07",
+          "P08"
+        ],
+        "18": [
+          "P01",
+          "P07",
+          "P08"
+        ],
+        "19": [
+          "P01",
+          "P07",
+          "P08"
+        ],
+        "20": [
+          "P01",
+          "P06",
+          "P07",
+          "P08"
+        ]
+      },
+      "handoff_probe_P07_passes_throughout": false,
+      "median_edit_to_checked_s": 117.97,
+      "iteration_time_by_change": {
+        "1": {
+          "median_s": 71.51,
+          "limiter": null
+        },
+        "2": {
+          "median_s": 101.15,
+          "limiter": null
+        },
+        "3": {
+          "median_s": 151.26,
+          "limiter": null
+        },
+        "4": {
+          "median_s": 128.69,
+          "limiter": null
+        },
+        "5": {
+          "median_s": 93.56,
+          "limiter": null
+        },
+        "6": {
+          "median_s": 117.07,
+          "limiter": null
+        },
+        "7": {
+          "median_s": 138.4,
+          "limiter": null
+        },
+        "8": {
+          "median_s": 150.56,
+          "limiter": null
+        },
+        "9": {
+          "median_s": 130.92,
+          "limiter": null
+        },
+        "10": {
+          "median_s": 136.14,
+          "limiter": null
+        },
+        "11": {
+          "median_s": 125.77,
+          "limiter": null
+        },
+        "12": {
+          "median_s": 67.48,
+          "limiter": null
+        },
+        "13": {
+          "median_s": 96.7,
+          "limiter": null
+        },
+        "14": {
+          "median_s": 117.66,
+          "limiter": null
+        },
+        "15": {
+          "median_s": 135.81,
+          "limiter": null
+        },
+        "16": {
+          "median_s": 100.23,
+          "limiter": null
+        },
+        "17": {
+          "median_s": 118.28,
+          "limiter": null
+        },
+        "18": {
+          "median_s": 138.43,
+          "limiter": null
+        },
+        "19": {
+          "median_s": 87.5,
+          "limiter": null
+        },
+        "20": {
+          "median_s": 98.33,
+          "limiter": null
+        }
+      }
+    },
+    "toprope": {
+      "seeded": 10,
+      "runs": 5,
+      "flagged": [
+        3,
+        5,
+        7,
+        9,
+        11,
+        13,
+        15,
+        17,
+        18,
+        20
+      ],
+      "recall": 1.0,
+      "recall_spread": {
+        "runs": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "mean": 1.0,
+        "min": 1.0,
+        "max": 1.0
+      },
+      "recall_without_handoff": 1.0,
+      "recall_by_type": {
+        "breaks-past-behavior": 1.0,
+        "breaks-reference": 1.0,
+        "conflicts-with-rule": 1.0,
+        "other:required-stages": 1.0,
+        "strands-objects": 1.0
+      },
+      "recall_by_designed_for_checks": {
+        "no": 1.0,
+        "yes": 1.0
+      },
+      "findings": 4403,
+      "precision": 0.1592,
+      "precision_spread": {
+        "runs": [
+          0.1631,
+          0.1574,
+          0.16,
+          0.1578,
+          0.1578
+        ],
+        "mean": 0.1592,
+        "min": 0.1574,
+        "max": 0.1631
+      },
+      "precision_grouped_spread": {
+        "runs": [
+          0.5118,
+          0.4876,
+          0.496,
+          0.48,
+          0.48
+        ],
+        "mean": 0.4911,
+        "min": 0.48,
+        "max": 0.5118
+      },
+      "found_after_deploy": {},
+      "silent": [],
+      "found_after_deploy_ungated": {},
+      "breakages_found_only_after_deploy": 0.0,
+      "edit_fidelity": {
+        "implements": 12,
+        "partial": 7,
+        "does-not": 1
+      },
+      "probe_pass_rate": {
+        "runs": [
+          0.3375,
+          0.3937,
+          0.375
+        ],
+        "mean": 0.3687,
+        "min": 0.3375,
+        "max": 0.3937
+      },
+      "probes_failed": {
+        "0": [
+          "P01",
+          "P04",
+          "P06",
+          "P07",
+          "P08"
+        ],
+        "1": [
+          "P01",
+          "P04",
+          "P06",
+          "P07",
+          "P08"
+        ],
+        "2": [
+          "P01",
+          "P04",
+          "P06",
+          "P07",
+          "P08"
+        ],
+        "3": [
+          "P01",
+          "P04",
+          "P06",
+          "P07",
+          "P08"
+        ],
+        "4": [
+          "P01",
+          "P04",
+          "P06",
+          "P07",
+          "P08"
+        ],
+        "5": [
+          "P01",
+          "P04",
+          "P07",
+          "P08"
+        ],
+        "6": [
+          "P01",
+          "P04",
+          "P06",
+          "P07",
+          "P08"
+        ],
+        "7": [
+          "P01",
+          "P04",
+          "P06",
+          "P07",
+          "P08"
+        ],
+        "8": [
+          "P01",
+          "P02",
+          "P04",
+          "P06",
+          "P07",
+          "P08"
+        ],
+        "9": [
+          "P01",
+          "P02",
+          "P04",
+          "P07",
+          "P08"
+        ],
+        "10": [
+          "P01",
+          "P04",
+          "P07",
+          "P08"
+        ],
+        "11": [
+          "P01",
+          "P04",
+          "P06",
+          "P07",
+          "P08"
+        ],
+        "12": [
+          "P01",
+          "P02",
+          "P04",
+          "P06",
+          "P07",
+          "P08"
+        ],
+        "13": [
+          "P01",
+          "P04",
+          "P07",
+          "P08"
+        ],
+        "14": [
+          "P01",
+          "P04",
+          "P07",
+          "P08"
+        ],
+        "15": [
+          "P01",
+          "P04",
+          "P06",
+          "P07",
+          "P08"
+        ],
+        "16": [
+          "P01",
+          "P02",
+          "P04",
+          "P06",
+          "P07",
+          "P08"
+        ],
+        "17": [
+          "P01",
+          "P02",
+          "P04",
+          "P06",
+          "P07",
+          "P08"
+        ],
+        "18": [
+          "P01",
+          "P02",
+          "P04",
+          "P06",
+          "P07",
+          "P08"
+        ],
+        "19": [
+          "P01",
+          "P04",
+          "P07",
+          "P08"
+        ],
+        "20": [
+          "P01",
+          "P02",
+          "P04",
+          "P07",
+          "P08"
+        ]
+      },
+      "handoff_probe_P07_passes_throughout": false,
+      "median_edit_to_checked_s": 3.53,
+      "iteration_time_by_change": {
+        "1": {
+          "median_s": 1.97,
+          "min_s": 1.96,
+          "max_s": 1.97,
+          "limiter": "other_check"
+        },
+        "2": {
+          "median_s": 2.21,
+          "min_s": 2.17,
+          "max_s": 2.22,
+          "limiter": "other_check"
+        },
+        "3": {
+          "median_s": 2.47,
+          "min_s": 2.35,
+          "max_s": 2.49,
+          "limiter": "other_check"
+        },
+        "4": {
+          "median_s": 2.7,
+          "min_s": 2.68,
+          "max_s": 2.75,
+          "limiter": "other_check"
+        },
+        "5": {
+          "median_s": 0.54,
+          "min_s": 0.52,
+          "max_s": 0.55,
+          "limiter": "preview"
+        },
+        "6": {
+          "median_s": 3.3,
+          "min_s": 3.28,
+          "max_s": 3.39,
+          "limiter": "other_check"
+        },
+        "7": {
+          "median_s": 3.76,
+          "min_s": 3.69,
+          "max_s": 3.79,
+          "limiter": "other_check"
+        },
+        "8": {
+          "median_s": 4.37,
+          "min_s": 4.32,
+          "max_s": 4.43,
+          "limiter": "other_check"
+        },
+        "9": {
+          "median_s": 5.54,
+          "min_s": 5.53,
+          "max_s": 5.61,
+          "limiter": "other_check"
+        },
+        "10": {
+          "median_s": 5.5,
+          "min_s": 5.46,
+          "max_s": 5.54,
+          "limiter": "other_check"
+        },
+        "11": {
+          "median_s": 0.59,
+          "min_s": 0.58,
+          "max_s": 0.6,
+          "limiter": "preview"
+        },
+        "12": {
+          "median_s": 0.61,
+          "min_s": 0.6,
+          "max_s": 0.63,
+          "limiter": "preview"
+        },
+        "13": {
+          "median_s": 6.5,
+          "min_s": 6.48,
+          "max_s": 6.55,
+          "limiter": "other_check"
+        },
+        "14": {
+          "median_s": 7.15,
+          "min_s": 7.12,
+          "max_s": 7.18,
+          "limiter": "other_check"
+        },
+        "15": {
+          "median_s": 0.66,
+          "min_s": 0.65,
+          "max_s": 0.67,
+          "limiter": "preview"
+        },
+        "16": {
+          "median_s": 8.29,
+          "min_s": 8.23,
+          "max_s": 8.4,
+          "limiter": "other_check"
+        },
+        "17": {
+          "median_s": 0.68,
+          "min_s": 0.66,
+          "max_s": 0.7,
+          "limiter": "preview"
+        },
+        "18": {
+          "median_s": 9.57,
+          "min_s": 9.45,
+          "max_s": 9.77,
+          "limiter": "other_check"
+        },
+        "19": {
+          "median_s": 10.09,
+          "min_s": 9.97,
+          "max_s": 10.28,
+          "limiter": "other_check"
+        },
+        "20": {
+          "median_s": 10.69,
+          "min_s": 10.49,
+          "max_s": 10.73,
+          "limiter": "other_check"
+        }
+      },
+      "undeployable": [
+        18
+      ],
+      "handoff_breaking_caught": {
+        "9": true
+      },
+      "repeat_same": {
+        "1": true,
+        "2": true,
+        "3": true
+      }
+    }
+  },
+  "verdicts": {
+    "iterate": "weakens",
+    "handoff": "inconclusive",
+    "not_measured_here": [
+      "hand_edits_to_generated_max (the self-compile result, reported separately)"
+    ],
+    "numbers": {
+      "recall": {
+        "nl": 0.62,
+        "structured": 0.86,
+        "toprope": 1.0
+      },
+      "gap_nl": 0.38,
+      "gap_structured": 0.14,
+      "toprope_precision": 0.1592,
+      "median_edit_to_checked_s": 3.53,
+      "noise_floor": 0.2
+    },
+    "within_noise": {
+      "gap_structured": "within run-to-run noise (0.14 < noise floor 0.2); affects iterate.supports.structured_recall_gap_min / narrowed_if_structured_gap_below"
+    },
+    "steps": "one run's recall moves in steps of 1/seeded (0.1)",
+    "note": "M1 pilot targets (ADR-0034): reported, not a link verdict; the claim-status table does not change"
+  },
+  "noise_floor": 0.2,
+  "probe_gate": {
+    "by_probe": {
+      "P01": {
+        "nl": {
+          "passed": 0,
+          "runs": 3
+        },
+        "structured": {
+          "passed": 0,
+          "runs": 3
+        },
+        "toprope": {
+          "passed": 0,
+          "runs": 3
+        }
+      },
+      "P02": {
+        "nl": {
+          "passed": 3,
+          "runs": 3
+        },
+        "structured": {
+          "passed": 3,
+          "runs": 3
+        },
+        "toprope": {
+          "passed": 3,
+          "runs": 3
+        }
+      },
+      "P03": {
+        "nl": {
+          "passed": 3,
+          "runs": 3
+        },
+        "structured": {
+          "passed": 3,
+          "runs": 3
+        },
+        "toprope": {
+          "passed": 3,
+          "runs": 3
+        }
+      },
+      "P04": {
+        "nl": {
+          "passed": 0,
+          "runs": 3
+        },
+        "structured": {
+          "passed": 1,
+          "runs": 3
+        },
+        "toprope": {
+          "passed": 0,
+          "runs": 3
+        }
+      },
+      "P05": {
+        "nl": {
+          "passed": 3,
+          "runs": 3
+        },
+        "structured": {
+          "passed": 3,
+          "runs": 3
+        },
+        "toprope": {
+          "passed": 3,
+          "runs": 3
+        }
+      },
+      "P06": {
+        "nl": {
+          "passed": 1,
+          "runs": 3
+        },
+        "structured": {
+          "passed": 3,
+          "runs": 3
+        },
+        "toprope": {
+          "passed": 1,
+          "runs": 3
+        }
+      },
+      "P07": {
+        "nl": {
+          "passed": 0,
+          "runs": 3
+        },
+        "structured": {
+          "passed": 0,
+          "runs": 3
+        },
+        "toprope": {
+          "passed": 0,
+          "runs": 3
+        }
+      },
+      "P08": {
+        "nl": {
+          "passed": 0,
+          "runs": 3
+        },
+        "structured": {
+          "passed": 0,
+          "runs": 3
+        },
+        "toprope": {
+          "passed": 0,
+          "runs": 3
+        }
+      }
+    },
+    "passing": [
+      "P02",
+      "P03",
+      "P05"
+    ],
+    "failing": [
+      "P01",
+      "P04",
+      "P06",
+      "P07",
+      "P08"
+    ]
+  },
+  "by_sitting": {
+    "nl": {
+      "recall": {
+        "first": 0.62,
+        "second": 0.44,
+        "range": [
+          0.44,
+          0.62
+        ]
+      },
+      "precision": {
+        "first": 0.5759,
+        "second": 0.4942,
+        "range": [
+          0.4942,
+          0.5759
+        ]
+      },
+      "precision_grouped": {
+        "first": 0.5759,
+        "second": 0.4942,
+        "range": [
+          0.4942,
+          0.5759
+        ]
+      }
+    },
+    "structured": {
+      "recall": {
+        "first": 0.86,
+        "second": 0.68,
+        "range": [
+          0.68,
+          0.86
+        ]
+      },
+      "precision": {
+        "first": 0.5024,
+        "second": 0.4666,
+        "range": [
+          0.4666,
+          0.5024
+        ]
+      },
+      "precision_grouped": {
+        "first": 0.5024,
+        "second": 0.4666,
+        "range": [
+          0.4666,
+          0.5024
+        ]
+      }
+    },
+    "toprope": {
+      "recall": {
+        "first": 1.0,
+        "second": 0.94,
+        "range": [
+          0.94,
+          1.0
+        ]
+      },
+      "precision": {
+        "first": 0.1592,
+        "second": 0.1597,
+        "range": [
+          0.1592,
+          0.1597
+        ]
+      },
+      "precision_grouped": {
+        "first": 0.4911,
+        "second": 0.4864,
+        "range": [
+          0.4864,
+          0.4911
+        ]
+      }
+    }
+  },
+  "script_and_researcher_disagree": [],
+  "unbindable": []
+}
