@@ -34,14 +34,17 @@ people and things, an example, actions, stages, rules, the world, handoffs, revi
   | What is decided | Choices | Recommended from |
   |---|---|---|
   | who may take an action | each role, or the roles your words fit | the glossary's description of each role and the action's description |
-  | who must not take it | only a person; not whoever made the thing; both; anyone with the role | a source passage that says so ("Nobody approves their own request.") |
-  | a limit on a number | over each value, only one role may; over it, nobody may; no limit | a number your sources state ("over 10 days"), else your example's value, refused above it (fail-closed) |
-  | what an action does in each stage | from one stage to the stage named after the action, refused elsewhere; refused everywhere; not applicable | the stage named after the action's verb |
+  | who must not take it | only a person; not whoever made the thing (refused while who made it is unknown); both; anyone with the role | a source passage that says so ("Nobody approves their own request.") |
+  | a limit on a number | over the stated value, only one role may; over it, nobody may; no limit | a number your words state ("over 1,000"), in a passage naming the fact, the thing or the action; otherwise **no limit**, the default |
+  | what an action does in each stage | from any stage to the stage named after the action, refused elsewhere; refused everywhere; not applicable | the stage named after the action's verb (`paid` for pay), from the last stage before it that is not another decision's outcome; nothing is recommended when no stage is named after it |
   | an outcome rule (ADR-0048) | a stage needs a person, or one role | a source passage that says so |
   | cells nobody has tried yet | each as recommended, all refused, or left undecided | ADR-0014's fail-closed default |
 
-  Where your words say nothing, the recommendation says so (for example, "anyone with the role")
-  rather than inventing a rule.
+  Where your words say nothing, the recommendation says so (for example, "anyone with the role",
+  "no limit") rather than inventing a rule. You can also type the rule you mean at a limit
+  question (`over 1,000, only finance`) or a stage question (`from submitted to approved`). An
+  answer the interview cannot take is refused with its fix and the question is asked again; the
+  session never ends on it.
 
 Everything is written `proposed`. At the end the interview shows each proposed element, where it
 came from, and what approving it decides, in your words; it confirms only when you type `yes`.
@@ -84,13 +87,19 @@ once it has them.
 
 ## The measure (ADR-0053 §2)
 
-Of the questions whose answer became an enforced element (an action's actor, `requires` or
-precondition, an outcome rule, an invariant, a matrix cell), the share that offered choices with a
+Of the questions whose answer became an enforced element, or would have (an action's actor,
+`requires` or precondition, an outcome rule, an invariant, a matrix cell, including those answered
+"none"), plus every refused or abandoned attempt at one, the share that offered choices with a
 recommended one. Purpose and wording are not counted, nor is naming the actions (it names them;
 their actors are chosen after). `toprope-interview DIR --share` prints it from the interview log,
-with the questions that were answered in open text. The target is 80% or more on F2's script
-([`experiments/U-f2-first-rule.md`](experiments/U-f2-first-rule.md)); on the leave example with the
-recommended answers it is 8 of 8 (`tests/test_interview_on_the_path.py`).
+with the declined, refused and abandoned counts and the questions answered in open text.
+
+The share alone does not show that the rules the person stated are enforced: F2's procedure also
+checks that (see [`experiments/U-f2-first-rule.md`](experiments/U-f2-first-rule.md)). The target is
+80% or more on F2's script. With the recommended answers, the leave example gives 8 of 8, and a
+purchase example in F2's shape ("A purchase over 2,500 needs a director") gives 10 of 10 with the
+limit enforced: the harness and the gate refuse a team lead's approval over 2,500
+(`tests/test_interview_on_the_path.py`).
 
 ## What it does not do yet
 
