@@ -15,6 +15,8 @@ from pydantic import (
     model_validator,
 )
 
+from ..errors import fixed
+
 Ident = Annotated[str, StringConstraints(pattern=r"^[A-Za-z_][A-Za-z0-9_-]*$")]
 RESERVED_ACTORS = {"system", "external:kernel"}   # other `external:<source>` actors: M0b (ADR-0028)
 
@@ -59,7 +61,8 @@ class Property(Strict):
     @model_validator(mode="after")
     def _one_kind(self) -> Property:
         if (self.type is None) == (self.enum is None):
-            raise ValueError("a property has exactly one of `type` or `enum`")
+            raise ValueError(fixed("a property has exactly one of `type` or `enum`",
+                                   "give the property `type` or `enum`, not both"))
         if self.read is not None:
             raise not_yet("read visibility (`read`)", "M0b")
         return self
@@ -94,7 +97,8 @@ class Param(Strict):
     @model_validator(mode="after")
     def _one_kind(self) -> Param:
         if sum(x is not None for x in (self.type, self.enum, self.ref)) != 1:
-            raise ValueError("a param has exactly one of `type`, `enum` or `ref`")
+            raise ValueError(fixed("a param has exactly one of `type`, `enum` or `ref`",
+                                   "give the param one of `type`, `enum` or `ref`"))
         return self
 
 
@@ -119,11 +123,14 @@ class Effect(Strict):
     @model_validator(mode="after")
     def _one_kind(self) -> Effect:
         if sum(x is not None for x in (self.set, self.create, self.call)) != 1:
-            raise ValueError("an effect is exactly one of `set`, `create` or `call`")
+            raise ValueError(fixed("an effect is exactly one of `set`, `create` or `call`",
+                                   "split the effect so each has one of `set`, `create` or `call`"))
         if self.call is None and (self.with_ or self.reply):
-            raise ValueError("`with` and `reply` belong to a `call` effect")
+            raise ValueError(fixed("`with` and `reply` belong to a `call` effect",
+                                   "add `call:`, or remove `with` and `reply`"))
         if self.call is not None and not self.reply:
-            raise ValueError("a `call` effect names the `reply` action that receives the result")
+            raise ValueError(fixed("a `call` effect names the `reply` action that receives the result",
+                                   "add `reply:` with the action that receives the result"))
         return self
 
 
@@ -165,7 +172,8 @@ class Action(Provenance):
     @model_validator(mode="after")
     def _target_or_creates(self) -> Action:
         if (self.target is None) == (self.creates is None):
-            raise ValueError("an action has exactly one of `target` or `creates`")
+            raise ValueError(fixed("an action has exactly one of `target` or `creates`",
+                                   "give the action `target` (it acts on an object) or `creates` (it makes one)"))
         if self.approvals is not None:
             raise not_yet("approvals", "M0b")
         for r in self.actor:
@@ -214,7 +222,8 @@ class Invariant(Provenance):
     @model_validator(mode="after")
     def _cross_not_yet(self) -> Invariant:
         if self.enforced_by is not None and self.scope != "cross":
-            raise ValueError("`enforced_by` is only valid on `scope: cross` invariants")
+            raise ValueError(fixed("`enforced_by` is only valid on `scope: cross` invariants",
+                                   "remove `enforced_by`, or make the invariant `scope: cross`"))
         if self.scope == "cross":   # would otherwise be skipped by the guard: fail closed
             raise not_yet("invariants[].scope: cross", "M0b")
         return self
@@ -239,9 +248,11 @@ class Step(Strict):
         if self.advance is not None:
             raise not_yet("scenario `advance` steps", "M0b")
         if (self.do is None) == (self.read is None):
-            raise ValueError("a step has exactly one of `do` or `read`")
+            raise ValueError(fixed("a step has exactly one of `do` or `read`",
+                                   "give the step `do` or `read`, not both"))
         if not self.actor:
-            raise ValueError("a `do` or `read` step needs an actor")
+            raise ValueError(fixed("a `do` or `read` step needs an actor",
+                                   "add `actor:` with the role that takes the step"))
         return self
 
 

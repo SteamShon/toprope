@@ -38,6 +38,7 @@ from ..sources import (
     read,
     stale,
 )
+from ..errors import fixed
 
 CONFIG = "toprope.workspace.yaml"
 LIST_BY_ID = {"invariants", "preconditions", "scenarios"}
@@ -71,7 +72,7 @@ def _now() -> str:
 def element_path(path: str) -> list[str]:
     segs = path.split(".")
     if not path or any(not s for s in segs):
-        raise AuthoringError(f"bad element path {path!r}")
+        raise AuthoringError(fixed(f"bad element path {path!r}", "write the path as dot-separated names, such as `actions.approve.preconditions`"))
     return segs
 
 
@@ -80,6 +81,37 @@ def is_element(segs: list[str]) -> bool:
     return ((len(segs) == 2 and segs[0] in ("objects", "links", "actions", "invariants", "rules", "handoffs", "scenarios"))
             or (len(segs) == 4 and segs[0] == "actions" and segs[2] == "preconditions")
             or (len(segs) == 5 and segs[0] == "transitions" and segs[2] == "matrix"))
+
+
+def _show(x: Any) -> str:
+    return yaml.safe_dump(x, sort_keys=False, allow_unicode=True, default_flow_style=False, width=100)
+
+
+def _bare(el: Any) -> Any:
+    """An element without its provenance, as a person reads it. Provenance sits on the element
+    itself and on a matrix cell's per-role parts; a property named `status` or `source` deeper
+    inside is the element's content and stays (#207's review)."""
+    if not isinstance(el, dict):
+        return el
+    out = {k: v for k, v in el.items() if k not in ("source", "status")}
+    if isinstance(out.get("by_role"), dict):
+        out["by_role"] = {r: ({k: v for k, v in part.items() if k not in ("source", "status")}
+                              if isinstance(part, dict) else part) for r, part in out["by_role"].items()}
+    return out
+
+
+def _words_pattern(words: str) -> re.Pattern:
+    """The words as typed, matched whole: case and spacing ignored, never inside another word."""
+    parts = [re.escape(w) for w in words.split()]
+    return re.compile(r"(?<!\w)" + r"\s+".join(parts) + r"(?!\w)", re.IGNORECASE)
+
+
+def _answer_of(text: str) -> str | None:
+    """The owner's answer in an interview line (`question: …`, `answer: …`)."""
+    for line in text.splitlines():
+        if line.startswith("answer: "):
+            return line[len("answer: "):]
+    return None
 
 
 def _get(doc: Any, segs: list[str]) -> Any:
@@ -112,7 +144,7 @@ def _set(doc: dict, segs: list[str], value: Any) -> None:
         cur = cur[s]
     last = segs[-1]
     if isinstance(cur, list) and value is not None and not isinstance(value, dict):
-        raise AuthoringError(f"{'.'.join(segs)}: an item of {segs[-2]} must be an object")
+        raise AuthoringError(fixed(f"{'.'.join(segs)}: an item of {segs[-2]} must be an object", "give the item as a mapping, such as `{id: x, check: ...}`"))
     if isinstance(cur, list):
         idx = next((k for k, x in enumerate(cur) if isinstance(x, dict) and x.get("id") == last), None)
         if value is None:
@@ -144,7 +176,7 @@ def _no_provenance_path(segs: list[str]) -> None:
     """`source` and `status` are set by the tool, never written directly: otherwise an agent
     could write `actions.X.status: confirmed` (only a person confirms)."""
     if segs[0] != "glossary" and segs[-1] in ("status", "source") and len(segs) > 1 and segs[-2] != "properties":
-        raise AuthoringError(f"{'.'.join(segs)}: provenance is set by the tool; propose the element itself")
+        raise AuthoringError(fixed(f"{'.'.join(segs)}: provenance is set by the tool; propose the element itself", "propose the element at its own path; the tool records its source and status"))
 
 
 def _demote(v: Any) -> Any:
@@ -167,7 +199,7 @@ class Workspace:
         else:
             self.root, cfg_path = given, given / CONFIG
         if not cfg_path.exists():
-            raise AuthoringError(f"no {CONFIG} in {self.root}")
+            raise AuthoringError(fixed(f"no {CONFIG} in {self.root}", "check the path given by `--workspace` or by `workspace:` in toprope.yaml; it names a workspace file or its directory"))
         cfg = load_yaml(cfg_path.read_text()) or {}
         self.domain_path = self.root / cfg["domain"]
         self.log_path = self.root / cfg.get("interview_log", "interview/log.jsonl")
@@ -180,7 +212,7 @@ class Workspace:
         self.sources: dict[str, SourceSpec] = {}
         for s in cfg.get("sources", []):
             if bool(s.get("url")) == bool(s.get("path")):
-                raise AuthoringError(f"source {s.get('id')!r}: give either a path or a url")
+                raise AuthoringError(fixed(f"source {s.get('id')!r}: give either a path or a url", "give the source exactly one of `path:` or `url:` in the workspace file"))
             path = s.get("path") or f"{SNAPSHOTS}/{s['id']}"
             spec = SourceSpec(s["id"], s.get("kind", "records"), path, tuple(s.get("globs", [])),
                               bool(s.get("local_only", False)), tuple(s.get("exclude", [])), s.get("url"))
@@ -191,7 +223,7 @@ class Workspace:
     def chunks(self, source_id: str) -> list[Chunk]:
         spec = self.sources.get(source_id)
         if spec is None:
-            raise AuthoringError(f"no source {source_id!r}")
+            raise AuthoringError(fixed(f"no source {source_id!r}", "use a source id listed in the workspace file's `sources:`, or add the source there with a `path:` or `url:`"))
         if spec.kind == "interview-log" or source_id not in self._chunks:
             self._chunks[source_id] = read(spec, self.root, self.extra, self.exclude)
         return self._chunks[source_id]
@@ -215,12 +247,12 @@ class Workspace:
         """Fetch link sources into their snapshots (all, or one). Re-fetching replaces the
         snapshot; refs into it may change, so fetch before drafting from it."""
         if source_id and source_id not in self.sources:
-            raise AuthoringError(f"no source {source_id!r}")
+            raise AuthoringError(fixed(f"no source {source_id!r}", "use a source id listed in the workspace file's `sources:`, or add the source there with a `path:` or `url:`"))
         targets = [self.sources[source_id]] if source_id else [s for s in self.sources.values() if s.url]
         out = []
         for spec in targets:
             if not spec.url:
-                raise AuthoringError(f"source {spec.id!r} is a path, not a link")
+                raise AuthoringError(fixed(f"source {spec.id!r} is a path, not a link", "fetch only a source with a `url:`; a `path:` source is read in place"))
             try:
                 out.append({"id": spec.id, **fetch(spec, self.root)})
             except FetchError as e:
@@ -231,9 +263,9 @@ class Workspace:
     def read_source(self, source_id: str, offset: int = 0, limit: int = 20) -> dict[str, Any]:
         spec = self.sources.get(source_id)
         if spec is None:
-            raise AuthoringError(f"no source {source_id!r}")
+            raise AuthoringError(fixed(f"no source {source_id!r}", "use a source id listed in the workspace file's `sources:`, or add the source there with a `path:` or `url:`"))
         if spec.local_only:
-            raise AuthoringError(f"source {source_id!r} is local-only: its content is never sent to a model")
+            raise AuthoringError(fixed(f"source {source_id!r} is local-only: its content is never sent to a model", "read it yourself, or remove `local_only: true` from the source if its content may be shared"))
         cs = self.chunks(source_id)[offset:offset + limit]
         self._used(source_id, [c.ref for c in cs])
         return {"source": source_id, "offset": offset, "total": len(self.chunks(source_id)),
@@ -260,16 +292,62 @@ class Workspace:
     def _used(self, source_id: str, refs: list[str]) -> None:
         self._append(self.usage_path, {"at": _now(), "source": source_id, "refs": refs})
 
+    def resolve_ref(self, ref: str) -> tuple[str, str | None]:
+        """A citation as written: an exact chunk ref, or words from the passage (ADR-0049, B4).
+        Words resolve to the one chunk that contains them (case and spacing ignored), within the
+        source named before a colon if there is one. Returns (ref, the quote, if words were given)."""
+        sid, _, rest = ref.partition(":")
+        if sid in self.sources and any(c.ref == ref for c in self.chunks(sid)):
+            return ref, None
+        if len(ref.split()) < 2:                     # one token: meant as a ref, not as words
+            if sid not in self.sources or not rest:
+                raise AuthoringError(fixed(f"unknown source in ref {ref!r}",
+                                           "cite a ref of the form `<source>:<chunk>`, as `search` returns "
+                                           "it, or quote words from the passage"))
+            raise AuthoringError(fixed(f"no chunk {ref!r}", "run `search` with words from the passage, and "
+                                       "cite the `ref` it returns, or quote the words"))
+        if sid in self.sources and rest.strip():
+            specs, words = [self.sources[sid]], rest
+        else:
+            specs, words = list(self.sources.values()), ref
+        if any(s.local_only for s in specs) and len(specs) == 1:
+            # matching would tell a model whether a phrase is in content it may not read (#206's review)
+            raise AuthoringError(fixed(f"source {specs[0].id!r} is local-only, so it is not searched for words",
+                                       "cite its chunk ref, as the owner gives it"))
+        specs = [s for s in specs if not s.local_only]
+        words = words.strip().strip('"').strip()
+        pattern = _words_pattern(words)
+        hits: list[tuple[str, str, str]] = []           # (ref, the passage's own words, source)
+        for s in specs:
+            for c in self.chunks(s.id):
+                # in an interview line only the owner's answer is quoted, never the question asked
+                text = (_answer_of(c.text) if s.kind == "interview-log" else c.text) or ""
+                if m := pattern.search(text):
+                    hits.append((c.ref, m.group(0), s.id))
+        if len(hits) > 1:            # the same passage read through several sources: the first declared
+            places = {h[0].split(":", 1)[1] for h in hits}
+            if len(places) == 1:
+                hits = hits[:1]
+        if not hits:
+            raise AuthoringError(fixed(f"no chunk {ref!r}, and no passage contains those words",
+                                       "run `search` with words from the passage, and cite the `ref` it "
+                                       "returns or words it shows"))
+        if len(hits) > 1:
+            shown = ", ".join(h[0] for h in hits[:5]) + (f" and {len(hits) - 5} more" if len(hits) > 5 else "")
+            raise AuthoringError(fixed(f"{len(hits)} passages contain {words!r}: {shown}",
+                                       "quote more of the passage, or cite one of those refs"))
+        ref, said, source = hits[0]
+        self._used(source, [ref])
+        return ref, " ".join(said.split())             # the passage's own words, not what was typed
+
     def source_of(self, ref: str, quote: str | None = None) -> dict[str, Any]:
-        sid = ref.split(":", 1)[0]
-        spec = self.sources.get(sid)
-        if spec is None:
-            raise AuthoringError(f"unknown source in ref {ref!r}")
-        if not any(c.ref == ref for c in self.chunks(sid)):
-            raise AuthoringError(f"no chunk {ref!r}: cite a ref returned by read_source or search_sources")
+        """Where an element came from: its chunk, and the owner's words if given. A citation by
+        quote records the chunk it resolved to, and the quote."""
+        ref, quoted = self.resolve_ref(ref)
+        spec = self.sources[ref.split(":", 1)[0]]
         out = {"kind": ELEMENT_KIND[spec.kind], "ref": ref}
-        if quote:
-            out["quote"] = quote
+        if quote or quoted:
+            out["quote"] = quote or quoted
         return out
 
     # -- the draft -------------------------------------------------------------------------
@@ -286,7 +364,7 @@ class Workspace:
         try:
             d = Domain.model_validate(doc)
         except ValidationError as e:
-            raise AuthoringError(f"the draft would not parse: {e.errors()[0]['loc']}: {e.errors()[0]['msg']}") from None
+            raise AuthoringError(fixed(f"the draft would not parse: {e.errors()[0]['loc']}: {e.errors()[0]['msg']}", "fix the element at that location so the declaration matches the schema (docs/domain-schema.md)")) from None
         issues = validate_domain(d)
         if self.domain_path.exists() and self.commits.log(d.domain):
             before = {(i.code, i.where) for i in validate_domain(Domain.model_validate(self.draft()))
@@ -294,9 +372,9 @@ class Workspace:
             new = [i for i in issues if i.severity == "error" and (i.code, i.where) not in before]
             if new:
                 raise AuthoringError(
-                    f"{d.domain} is committed, and its tools refuse a declaration with errors; this change "
+                    fixed(f"{d.domain} is committed, and its tools refuse a declaration with errors; this change "
                     "would add " + "; ".join(f"{i.code} at {i.where}: {i.message}" for i in new) +
-                    ". Propose what it refers to first.")
+                    ". Propose what it refers to first.", "propose the elements it refers to first, then this one"))
         self.domain_path.parent.mkdir(parents=True, exist_ok=True)
         self.domain_path.write_text(yaml.safe_dump(doc, sort_keys=False, allow_unicode=True))
         return [{"code": i.code, "where": i.where, "message": i.message, "severity": i.severity}
@@ -312,7 +390,7 @@ class Workspace:
                 return value            # a bare cell carries no provenance in schema v1
             value = {"to": value}
         if not isinstance(value, dict):
-            raise AuthoringError(f"{'.'.join(segs)} must be an object")
+            raise AuthoringError(fixed(f"{'.'.join(segs)} must be an object", "give the value as a mapping"))
         return {**value, "source": source, "status": "proposed"}
 
     def propose(self, path: str, value: Any, source_ref: str, quote: str | None = None) -> dict[str, Any]:
@@ -336,10 +414,10 @@ class Workspace:
         """Record the owner's answer (their words) and apply its decisions as proposed
         elements citing the answer. Confirmation is a separate, human-only step."""
         if not answer.strip():
-            raise AuthoringError("an answer quotes the owner's words")
+            raise AuthoringError(fixed("an answer quotes the owner's words", "pass the owner's answer, in their words, as the answer text"))
         text = question or self._all_questions().get(question_id)
         if text is None:
-            raise AuthoringError(f"unknown question {question_id!r}: pass its text")
+            raise AuthoringError(fixed(f"unknown question {question_id!r}: pass its text", "pass the question's text with the answer, or use an id `next_questions` returned"))
         doc = self.draft()
         n = self._lines(self.log_path) + 1
         ref = f"{self._log_source_id()}:{self.log_path.relative_to(self.root).as_posix()}#L{n}"
@@ -400,10 +478,10 @@ class Workspace:
         checked was taken by that person (`kernel`, naming them), or at their own terminal
         (`terminal`, where `who` defaults to the terminal's identity)."""
         if via not in CHANNELS:
-            raise AuthoringError("only a person confirms: at their own terminal, or through a declared action the "
-                                 "kernel checked was taken by that person")
+            raise AuthoringError(fixed("only a person confirms: at their own terminal, or through a declared action the "
+                                 "kernel checked was taken by that person", "ask the person to run the confirm action themselves, at their terminal or through a human request"))
         if via == "kernel" and not who:
-            raise AuthoringError("a confirmation through the kernel names the person who took it")
+            raise AuthoringError(fixed("a confirmation through the kernel names the person who took it", "pass the person who confirmed, as the kernel recorded them"))
         if who is None and via == "terminal":
             who = self.identity()
         doc = self.draft()
@@ -411,7 +489,7 @@ class Workspace:
             segs = element_path(p)
             el = _get(doc, segs)
             if not is_element(segs) or not isinstance(el, dict) or "source" not in el:
-                raise AuthoringError(f"{p} is not a drafted element with a source")
+                raise AuthoringError(fixed(f"{p} is not a drafted element with a source", "confirm only elements that were proposed with a source; `next_questions` lists them"))
             el["status"] = "confirmed"
             for part in (el.get("by_role") or {}).values():   # a cell's per-role parts are one element
                 if isinstance(part, dict) and part.get("status") == "proposed":
@@ -419,6 +497,47 @@ class Workspace:
         issues = self._write(doc)
         self._append(self.log_path, {"at": _now(), "kind": "confirm", "paths": paths, "via": via, "who": who})
         return {"confirmed": paths, "issues": issues}
+
+    # -- one diff to confirm (ADR-0049, B5) ---------------------------------------------------
+    def review(self) -> list[dict[str, Any]]:
+        """Every element still proposed in the working copy: what it says now, what the domain's
+        approved `main` says there (None: new), and where it came from. A person confirms from this
+        one view instead of reading the draft element by element."""
+        doc = self.draft()
+        before: dict[str, Any] = {}
+        d = doc.get("domain")
+        main = self.commits.main(d) if isinstance(d, str) and d and self.commits.log(d) else None
+        if main is not None:
+            before = self.commits.declaration(d, main.id)
+        out = []
+        for path in self._proposed(doc):
+            segs = element_path(path)
+            el = _get(doc, segs)
+            old = _get(before, segs) if before else None
+            out.append({"path": path, "now": _bare(el), "before": _bare(old) if old is not None else None,
+                        "source": (el or {}).get("source") if isinstance(el, dict) else None,
+                        "main": main.id if main else None})
+        return out
+
+    def render_review(self) -> str:
+        items = self.review()
+        if not items:
+            return "Nothing is proposed: there is nothing to confirm.\n"
+        lines = [f"{len(items)} proposed element(s), against main "
+                 f"{items[0]['main'] or '(none yet: every element is new)'}:", ""]
+        for it in items:
+            src = it["source"] or {}
+            lines.append(f"{'~' if it['before'] is not None else '+'} {it['path']}"
+                         f"    (from {src.get('ref', '?')})")
+            if src.get("quote"):
+                lines.append(f'    "{src["quote"]}"')
+            if it["before"] is not None:
+                for ln in _show(it["before"]).rstrip().splitlines():
+                    lines.append(f"    - {ln}")
+            for ln in _show(it["now"]).rstrip().splitlines():
+                lines.append(f"    + {ln}")
+            lines.append("")
+        return "\n".join(lines)
 
     # -- interview questions (ADR-0014) ----------------------------------------------------
     def attempts_by_action(self) -> dict[str, int]:
@@ -431,7 +550,7 @@ class Workspace:
         try:
             store = open_store(self.event_store)
         except ValueError as e:
-            raise AuthoringError(f"event_store: {e}") from None
+            raise AuthoringError(fixed(f"event_store: {e}", "set `event_store:` in the workspace file to `sqlite:FILE`, `jsonl:DIR` or `memory`")) from None
         out: dict[str, int] = {}
         for stream in store.streams():
             for e in store.read_attempts(stream):
@@ -462,7 +581,7 @@ class Workspace:
                 why = f"the draft does not parse: {e.errors()[0]['msg']}"
             return {"stage": None, "questions": [], "progress": [], "stop": {"stop": False, "why": why}}
         if stage is not None and stage not in BY_NAME:
-            raise AuthoringError(f"unknown stage {stage!r}: one of {list(BY_NAME)}")
+            raise AuthoringError(fixed(f"unknown stage {stage!r}: one of {list(BY_NAME)}", "use one of the stages listed"))
         st = BY_NAME[stage] if stage else plan.current()
         if st is None:
             return {"stage": None, "goal": "Every stage is done.", "questions": [], "total": 0,
@@ -508,10 +627,10 @@ class Workspace:
         from .stages import BY_NAME
         st = BY_NAME.get(stage)
         if st is None or not st.optional:
-            raise AuthoringError(f"only optional stages can be skipped: "
-                                 f"{[s for s, x in BY_NAME.items() if x.optional]}")
+            raise AuthoringError(fixed(f"only optional stages can be skipped: "
+                                 f"{[s for s, x in BY_NAME.items() if x.optional]}", "skip only an optional stage listed; answer the others"))
         if not reason.strip():
-            raise AuthoringError("a skip quotes the owner's reason")
+            raise AuthoringError(fixed("a skip quotes the owner's reason", "pass the owner's reason for skipping, in their words"))
         self._append(self.log_path, {"at": _now(), "kind": "skip", "stage": stage, "reason": reason})
         return self.progress()
 
@@ -593,7 +712,7 @@ class Workspace:
             c, created = self.commits.commit(self.domain_path, message=message, branch=branch, merge=merge,
                                              author=author)
         except ValidationError as e:
-            raise AuthoringError(f"the draft does not parse: {e.errors()[0]['msg']}") from None
+            raise AuthoringError(fixed(f"the draft does not parse: {e.errors()[0]['msg']}", "fix the draft so it matches the schema (docs/domain-schema.md), then commit again")) from None
         except CommitError as e:
             raise AuthoringError(str(e)) from None
         base_id = self.commits.review_base(c.domain, c.id)   # ADR-0033
@@ -614,24 +733,24 @@ class Workspace:
         from ..commits import CommitError
         d = self.draft().get("domain")
         if not isinstance(d, str) or not d:
-            raise AuthoringError("the draft names no `domain`, so there is no commit log to check")
+            raise AuthoringError(fixed("the draft names no `domain`, so there is no commit log to check", "set `domain:` at the top of the draft"))
         try:
             if commit_id is None:
                 refs = self.commits.refs(d)
                 if not refs:
-                    raise AuthoringError("nothing to check: commit first")
+                    raise AuthoringError(fixed("nothing to check: commit first", "run `commit_draft` first, then check the commit it makes"))
                 if branch not in refs:
-                    raise AuthoringError(f"no branch {branch!r}; branches: {sorted(refs)}")
+                    raise AuthoringError(fixed(f"no branch {branch!r}; branches: {sorted(refs)}", "use one of the branches listed"))
                 commit_id = refs[branch]
             base = since if since is not None else "merge-base"
             from ..incremental import ResultCache
             if full and not cache:
-                raise AuthoringError("--full compares with the result cache; it cannot run with --no-cache")
+                raise AuthoringError(fixed("--full compares with the result cache; it cannot run with --no-cache", "drop `--no-cache`, or drop `--full`"))
             rc = ResultCache(self.root / ".toprope" / "cache") if cache else None
             if env is not None:
                 from ..deploy import LocalEnvironment
                 if not Path(env).is_dir():
-                    raise AuthoringError(f"no deploy environment at {env}")
+                    raise AuthoringError(fixed(f"no deploy environment at {env}", "pass `--env` the directory of a local deploy environment, or set `env:` in toprope.yaml"))
                 with LocalEnvironment(env).events(d) as store:
                     report = check_commit(self.commits, d, commit_id, base, events=store, examples=examples,
                                           cache=rc, full=full)
@@ -653,11 +772,11 @@ class Workspace:
             d = self.draft().get("domain")
         except Exception as e:                       # noqa: BLE001 - an unreadable draft
             if not force:
-                raise AuthoringError(f"cannot read the working copy: {e}") from None
+                raise AuthoringError(fixed(f"cannot read the working copy: {e}", "fix the declaration file so it parses, or restore it with `git checkout -- <file>`, then check out again")) from None
             d = next((x.name for x in sorted(self.commits.root.glob("*")) if x.is_dir()
                       and any(c.id == commit_id for c in self.commits.log(x.name))), None)
         if not isinstance(d, str) or not d:
-            raise AuthoringError("the draft names no `domain`, so there is no commit log to check out from")
+            raise AuthoringError(fixed("the draft names no `domain`, so there is no commit log to check out from", "set `domain:` at the top of the draft"))
         try:
             c = self.commits.checkout(d, commit_id, self.domain_path, force=force)
         except CommitError as e:
@@ -669,7 +788,7 @@ class Workspace:
         from ..commits import CommitError
         d = self.draft().get("domain")
         if not isinstance(d, str) or not d:
-            raise AuthoringError("the draft names no `domain`, so there is no commit log")
+            raise AuthoringError(fixed("the draft names no `domain`, so there is no commit log", "set `domain:` at the top of the draft"))
         try:
             return self.commits.element_log(d, key, at)
         except CommitError as e:
@@ -683,7 +802,7 @@ class Workspace:
         Refuses when the working copy has changes not yet committed to the branch."""
         d = self.draft().get("domain")
         if not isinstance(d, str) or not d:
-            raise AuthoringError("the draft names no `domain`, so there is no commit log to merge in")
+            raise AuthoringError(fixed("the draft names no `domain`, so there is no commit log to merge in", "set `domain:` at the top of the draft"))
         from ..commits import CommitError
         try:
             return self.commits.merge_main(d, self.domain_path, branch, self.draft().get("version", 1))
@@ -695,10 +814,10 @@ class Workspace:
         through a human channel (as `confirm`). Conflicts are an error that lists them; bring
         `main` into the branch with `merge_main`, resolve, commit, and approve again."""
         if via not in CHANNELS:
-            raise AuthoringError("only a person approves: at their own terminal, or through a declared action")
+            raise AuthoringError(fixed("only a person approves: at their own terminal, or through a declared action", "ask the person to run `approve_commit` themselves, at their terminal or through a human request"))
         d = self.draft().get("domain")
         if not isinstance(d, str) or not d:
-            raise AuthoringError("the draft names no `domain`, so there is no commit log to approve in")
+            raise AuthoringError(fixed("the draft names no `domain`, so there is no commit log to approve in", "set `domain:` at the top of the draft"))
         from ..commits import CommitError
         try:
             target = self.commits.approve(d, commit_id, who)

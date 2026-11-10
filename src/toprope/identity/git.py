@@ -31,6 +31,7 @@ from typing import Any
 
 from ..types import Actor, Grant
 from . import Caller, Identity, str_list
+from ..errors import fixed
 
 FILE = "toprope.identity.yaml"
 
@@ -47,10 +48,10 @@ def git_email(root: str | Path = ".") -> str:
 
 def _entry(email: str, c: Any, kind: str) -> Actor:
     if not isinstance(c, dict):
-        raise ValueError("an entry is a mapping with name and roles")
+        raise ValueError(fixed("an entry is a mapping with name and roles", "write the entry as `{name: ..., roles: [...]}`"))
     name = c.get("name", email.split("@")[0])
     if not isinstance(name, str) or not name:
-        raise ValueError("name must be a non-empty string")
+        raise ValueError(fixed("name must be a non-empty string", "give the entry a `name:`"))
     return Actor(f"{name} <{email}>", kind, str_list(c.get("roles", []), "roles"))
 
 
@@ -64,11 +65,11 @@ def load_table(path: str | Path) -> dict[str, Caller]:
     except yaml.YAMLError as e:
         raise ValueError(str(e)) from None
     if not isinstance(raw, dict) or set(raw) - {"people", "agents"}:
-        raise ValueError("the file has `people` and optionally `agents`")
+        raise ValueError(fixed("the file has `people` and optionally `agents`", "put the people under `people:` and the agents under `agents:` at the top of the file"))
     people = raw.get("people") or {}
     agents = raw.get("agents") or {}
     if not isinstance(people, dict) or not isinstance(agents, dict):
-        raise ValueError("`people` and `agents` map an email to an entry")
+        raise ValueError(fixed("`people` and `agents` map an email to an entry", "key each entry by its git email"))
     table: dict[str, Caller] = {}
     for email, c in people.items():
         try:
@@ -78,13 +79,13 @@ def load_table(path: str | Path) -> dict[str, Caller]:
     for email, c in agents.items():
         try:
             if str(email) in table:
-                raise ValueError("already listed as a person")
+                raise ValueError(fixed("already listed as a person", "list the email under `people:` or under `agents:`, not both"))
             principal = table.get(str(c.get("on_behalf_of"))) if isinstance(c, dict) else None
             if principal is None:
-                raise ValueError("on_behalf_of must be the email of a listed person")
+                raise ValueError(fixed("on_behalf_of must be the email of a listed person", "set `on_behalf_of:` to the git email of a person listed under `people:`"))
             g = c.get("grant")
             if not isinstance(g, dict) or not isinstance(g.get("id"), str):
-                raise ValueError("an agent needs a grant with an id and its actions")
+                raise ValueError(fixed("an agent needs a grant with an id and its actions", "give the agent `grant: {id: ..., actions: [...]}`"))
             grant = Grant(g["id"], frozenset(str_list(g.get("actions", []), "grant.actions")),
                           None if g.get("targets") is None else frozenset(str_list(g["targets"], "grant.targets")))
             table[str(email)] = Caller(_entry(str(email), c, "agent"), principal.actor, grant)

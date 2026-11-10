@@ -19,6 +19,7 @@ from ..kernel import KERNEL
 from ..semantics.model import ReferenceModel
 from ..semantics.types import Actor, Command, Event, Outcome
 from ..store import EventStore, MemoryEventStore
+from ..errors import fixed
 
 Observed = dict[str, Any]   # {"status", "code"?, "reason"?, "state"?}: what a caller sees
 
@@ -173,7 +174,8 @@ class MCPSurface(ExecutionSurface):
         self._session = asyncio.run_coroutine_threadsafe(session(), self._loop)
         if not ready.wait(30):
             self._session.result(timeout=1)   # surface the startup error
-            raise RuntimeError("the MCP session did not start")
+            raise RuntimeError(fixed("the MCP session did not start",
+                                     "run the MCP adapter alone (`toprope-mcp`) to see why it does not start"))
 
     def _call(self, coro):
         return asyncio.run_coroutine_threadsafe(coro, self._loop).result(timeout=60)

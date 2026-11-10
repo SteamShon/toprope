@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any
 
 from ..store import ConcurrencyError
 from ..types import Event, Outcome
+from ..errors import fixed
 
 if TYPE_CHECKING:
     from ..exec import Execution
@@ -205,7 +206,8 @@ class Outbox:
         from ..kernel import CATALOG
         pl = p.event.payload
         svc = CATALOG[pl["service"]]
-        result = (svc.failure(f"mapping-error: {pl['error']}") if pl.get("error")
+        result = (svc.failure(fixed(f"mapping-error: {pl['error']}", "fix the call's `with` mapping in the declaration"))
+                  if pl.get("error")
                   else services.call(pl["service"], pl["inputs"], caller=p.event.actor))
         reply = self.ex.d.actions[pl["reply"]]
         params = {k: result[k] for k in reply.params if k in result}
