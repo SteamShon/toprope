@@ -44,25 +44,29 @@ def no_upstream_services():
 class Proxy:
     """The proxy in process, in front of the stand-in payments server; `call` as an agent."""
 
-    def __init__(self, payments, tmp_path, binding=BINDING):
+    def __init__(self, payments, tmp_path, binding=BINDING, store="memory", seed=True, server=None):
         self.b = Binding.load(binding)
-        self.up = Upstream(payments.build())
-        assert register(self.b, self.up.tools()) == []
+        self.up = Upstream(server or payments.build())
         d = load_domain(DOMAIN)
+        assert register(self.b, self.up.tools(), d) == []
         assert check(d, self.b) == []
-        self.ex = Execution(d, open_store("memory"), open_identity(f"static:{TOKENS}"),
+        self.ex = Execution(d, open_store(store), open_identity(f"static:{TOKENS}"),
                             services=UpstreamServices(self.up))
-        self.ex.seed_world()
+        if seed:
+            self.ex.seed_world()
         self.token = "t-sam"
         self.audit = tmp_path / "audit.jsonl"
         self.server = build_proxy(self.ex, self.b, self.up, lambda: self.token, audit=self.audit)
 
-    def run(self, steps):
+    def run(self, steps, together=False):
         from mcp import Client
 
         async def go():
             out = []
             async with Client(self.server) as c:
+                if together:                                   # all at once, as parallel agents would
+                    rs = await asyncio.gather(*[c.call_tool(*s) for s in steps])
+                    return [("error", r.content[0].text) if r.is_error else ("ok", r.structured_content) for r in rs]
                 for step in steps:
                     if step == "list":
                         out.append(sorted(t.name for t in (await c.list_tools()).tools))
@@ -96,7 +100,8 @@ def test_an_allowed_call_is_sent_once_and_its_answer_moves_the_object(payments, 
     p = Proxy(payments, tmp_path)
     first, again = p.run([("refund_order", {"order_id": "O-3", "amount": 50}),
                           ("refund_order", {"order_id": "O-3", "amount": 50})])
-    assert first == again == ("ok", {"refund_id": "R-1", "amount": 50.0})
+    assert first == ("ok", {"refund_id": "R-1", "amount": 50.0})
+    assert again == ("ok", {"refund_id": "R-1"})                                   # as recorded: not sent again
     assert payments.REFUNDS == [{"order_id": "O-3", "amount": 50.0}]           # sent once
     assert p.ex.state("O-3") == {"id": "O-3", "status": "refunded", "days_since_purchase": 3, "refund_id": "R-1"}
     last = p.ex.history("O-3")[-1]
@@ -127,7 +132,7 @@ def test_the_proxy_will_not_start_when_binding_server_and_declaration_disagree(p
         "refund_order": {"action": "record_refund", "target": "order_id"}, "send_money": {"read": True}}}))
     up = Upstream(payments.build())
     try:
-        problems = register(Binding.load(b), up.tools())
+        problems = register(Binding.load(b), up.tools(), load_domain(DOMAIN))
     finally:
         up.close()
     assert any("send_money, which the upstream server does not offer" in p for p in problems)
@@ -140,7 +145,7 @@ def test_once_registered_an_upstream_call_is_checked_like_a_kernel_call(payments
     assert [i.code for i in validate_domain(d)] == ["upstream-service"]       # before: a warning only
     up = Upstream(payments.build())
     try:
-        register(Binding.load(BINDING), up.tools())
+        register(Binding.load(BINDING), up.tools(), load_domain(DOMAIN))
     finally:
         up.close()
     raw = yaml.safe_load(DOMAIN.read_text())
@@ -187,3 +192,109 @@ def test_the_command_over_stdio_in_front_of_a_real_server_process(tmp_path):
     assert not done.is_error and done.structured_content == {"refund_id": "R-1", "amount": 20.0}
     gated = [json.loads(x) for x in (tmp_path / "audit.jsonl").read_text().splitlines()]
     assert [(g["tool"], g["status"]) for g in gated] == [("refund_order", "denied"), ("refund_order", "ok")]
+
+
+# Review of #230 (2026-11-10): each case below let a write through, reported a done refund as
+# failed, refunded twice, lost the real error, dropped an argument silently, or would not start.
+
+def _binding(tmp_path, tools, upstream=None):
+    f = tmp_path / "b.yaml"
+    f.write_text(yaml.safe_dump({"upstream": upstream or {"command": ["x"]}, "tools": tools}))
+    return f
+
+
+REFUND = {"action": "refund", "target": "order_id", "result": {"refund_id": "string"}}
+
+
+def test_a_tool_is_read_only_only_when_the_server_says_so(payments, tmp_path):
+    up = Upstream(payments.build())
+    try:
+        problems = register(Binding.load(_binding(tmp_path, {"wipe_orders": {"read": True}})), up.tools(),
+                            load_domain(DOMAIN))
+    finally:
+        up.close()
+    assert problems and "marks wipe_orders read-only, but the server does not (readOnlyHint)" in problems[0]
+
+
+def test_a_refund_done_before_a_restart_is_answered_as_done(payments, tmp_path):
+    store = f"sqlite:{tmp_path / 'shop.db'}"
+    assert Proxy(payments, tmp_path, store=store).run([("refund_order", {"order_id": "O-3", "amount": 50})]) == [
+        ("ok", {"refund_id": "R-1", "amount": 50.0})]
+    kernel.UPSTREAM_SERVICES.clear()
+    again = Proxy(payments, tmp_path, store=store, seed=False).run([("refund_order", {"order_id": "O-3", "amount": 50})])
+    assert again == [("ok", {"refund_id": "R-1"})] and len(payments.REFUNDS) == 1      # as recorded, not sent
+
+
+def test_two_calls_at_once_do_not_both_pass_the_gate(payments, tmp_path):
+    p = Proxy(payments, tmp_path)
+    out = p.run([("refund_order", {"order_id": "O-3", "amount": 7}), ("refund_order", {"order_id": "O-3", "amount": 9})],
+                together=True)
+    assert sorted(s for s, _ in out) == ["error", "ok"] and len(payments.REFUNDS) == 1
+    assert any("already refunded" in text for s, text in out if s == "error")
+    assert p.ex.dispatch() == []                                                   # nothing left to send later
+
+
+def test_no_answer_from_the_server_says_it_may_have_acted(payments, tmp_path):
+    def silent(**kw):
+        raise TimeoutError("no answer in 30 s")
+    p = Proxy(payments, tmp_path)
+    p.up.call = lambda tool, args: silent()
+    [(status, text)] = p.run([("refund_order", {"order_id": "O-3", "amount": 5})])
+    assert status == "error" and "did not answer (TimeoutError: no answer in 30 s)" in text
+    assert "may or may not have acted" in text and p.ex.state("O-3")["status"] == "paid"
+
+
+def test_a_failure_says_how_to_try_again_and_a_new_key_does(payments, tmp_path):
+    p = Proxy(payments, tmp_path)
+    first, same, fresh = p.run([("refund_order", {"order_id": "O-3", "amount": 500}),
+                                ("refund_order", {"order_id": "O-3", "amount": 500}),
+                                ("refund_order", {"order_id": "O-3", "amount": 50, "idempotency_key": "k2"})])
+    assert first[0] == "error" and "Fix: to try again, call with a new `idempotency_key`" in first[1]
+    assert same[0] == "error" and fresh == ("ok", {"refund_id": "R-1", "amount": 50.0})
+
+
+def _server_with(note_required: bool):
+    from mcp.server.mcpserver import MCPServer
+    server = MCPServer(name="payments")
+    if note_required:
+        @server.tool()
+        def refund_order(order_id: str, amount: float, currency: str) -> dict:
+            return {"refund_id": "R-x"}
+    else:
+        @server.tool()
+        def refund_order(order_id: str, amount: float, currency: str = "USD", note: str | None = None) -> dict:
+            return {"refund_id": f"R-{currency}", "amount": amount}
+    return server
+
+
+def test_an_argument_the_gate_does_not_check_is_not_offered_or_stops_the_start(payments, tmp_path):
+    up = Upstream(_server_with(note_required=True))
+    try:
+        problems = register(Binding.load(BINDING), up.tools(), load_domain(DOMAIN))
+    finally:
+        up.close()
+    assert any("refund_order.currency is required by the server, but the gate never checks it" in x for x in problems)
+    kernel.UPSTREAM_SERVICES.clear()
+    only_refund = _binding(tmp_path, {"refund_order": REFUND})
+    p = Proxy(payments, tmp_path, binding=only_refund, server=_server_with(note_required=False))
+    sent, smuggled = p.run([("refund_order", {"order_id": "O-3", "amount": 5}),
+                            ("refund_order", {"order_id": "O-3", "amount": 5, "currency": "JPY"})])
+    assert sent == ("ok", {"refund_id": "R-USD", "amount": 5.0})                  # the server's default
+    assert smuggled[0] == "error" and "currency" in smuggled[1]                    # not offered, so refused
+    assert p.b.tools["refund_order"].hidden == {"currency", "note"}
+
+
+def test_a_call_to_an_unbound_upstream_tool_stops_the_start(payments, tmp_path):
+    raw = yaml.safe_load(DOMAIN.read_text())
+    raw["actions"]["refund"]["effects"].append({"call": "mcp:wipe_orders", "reply": "record_refund"})
+    from toprope.decl import Domain
+    problems = check(Domain.model_validate(raw), Binding.load(BINDING))
+    assert any("action refund calls mcp:wipe_orders, which the binding does not bind" in x for x in problems)
+
+
+def test_an_upstream_that_does_not_start_fails_fast_with_a_fix(tmp_path):
+    import time
+    t0 = time.monotonic()
+    with pytest.raises(SystemExit, match="the upstream MCP server did not start: .*Fix: check the binding"):
+        Upstream.open({"command": [str(tmp_path / "no-such-server")]})
+    assert time.monotonic() - t0 < 30

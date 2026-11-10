@@ -48,6 +48,7 @@ class ToolBinding:
     new_id: str | None = None          # for a creating action: the argument that names the new object
     params: dict[str, str] = field(default_factory=dict)   # action param -> tool argument
     result: dict[str, str] = field(default_factory=dict)   # answer field -> service type
+    hidden: set[str] = field(default_factory=set)          # optional arguments the gate never sees: not offered
 
 
 @dataclass
@@ -70,7 +71,7 @@ class Binding:
             raise SystemExit(fixed(f"the binding {path}: `upstream` has exactly one of `command` or `url`",
                                    "give `command: [program, args…]` for stdio, or `url:` for streamable HTTP"))
         tools = {}
-        known = {"read", "action", "target", "new_id", "params", "result"}
+        known = {"read", "action", "target", "new_id", "params", "result"}   # `hidden` is computed, not written
         for name, spec in data["tools"].items():
             spec = spec or {}
             bad = sorted(set(spec) - known) if isinstance(spec, dict) else ["(not a mapping)"]
@@ -107,10 +108,17 @@ class Upstream:
                 await self._stop.wait()
 
         self._session = asyncio.run_coroutine_threadsafe(session(), self._loop)
-        if not ready.wait(60):
-            self._session.result(timeout=1)
-            raise RuntimeError(fixed("the upstream MCP session did not start within a minute",
-                                     "check the binding's `upstream` command or URL, and that the server runs on its own"))
+        for _ in range(600):                                     # up to a minute, unless the session fails first
+            if ready.wait(0.1) or self._session.done():
+                break
+        if not ready.is_set():
+            why = "it did not answer within a minute"
+            if self._session.done() and self._session.exception() is not None:
+                e = self._session.exception()
+                why = f"{type(e).__name__}: {e}"
+            self._loop.call_soon_threadsafe(self._loop.stop)
+            raise SystemExit(fixed(f"the upstream MCP server did not start: {why}",
+                                   "check the binding's `upstream` command or URL, and that the server runs on its own"))
 
     @classmethod
     def open(cls, spec: dict[str, Any]) -> Upstream:
@@ -167,7 +175,11 @@ class UpstreamServices(KernelServices):
                                          "call only `mcp:` tools from a declaration served by toprope-proxy"))
             return self.fallback.run(service, inputs)
         tool = service[len(UPSTREAM):]
-        res = self.upstream.call(tool, inputs)
+        try:
+            res = self.upstream.call(tool, inputs)
+        except Exception as e:                                    # no answer: it may or may not have acted
+            self.last[key(tool, inputs)] = e
+            raise
         self.last[key(tool, inputs)] = res
         data = answer(res)
         if getattr(res, "is_error", False):
@@ -179,26 +191,56 @@ def key(tool: str, inputs: dict[str, Any]) -> str:
     return json.dumps([tool, inputs], sort_keys=True, default=str)
 
 
-def register(binding: Binding, tools: dict[str, Any]) -> list[str]:
-    """Register each gated tool as a service, typed from the server's input schema. Returns the
-    problems: a bound tool the server lacks, an input whose type a declaration cannot pass."""
+def _scalar(spec: Any) -> str | None:
+    """A JSON schema a declaration can pass: a scalar type, or `anyOf` one scalar and null."""
+    if not isinstance(spec, dict):
+        return None
+    if "type" in spec:
+        return JSON_TYPES.get(str(spec["type"]))
+    kinds = [s.get("type") for s in spec.get("anyOf") or [] if isinstance(s, dict)]
+    rest = [k for k in kinds if k != "null"]
+    return JSON_TYPES.get(str(rest[0])) if len(rest) == 1 and len(kinds) == len(spec.get("anyOf") or []) else None
+
+
+def register(binding: Binding, tools: dict[str, Any], d: Any) -> list[str]:
+    """Register each gated tool as a service, typed from the server's input schema, and decide
+    what the agent is offered. Every argument the agent can send must be one the gate sees (the
+    target, or an action param) and the call passes on (the effect's `with`); an optional one
+    that is neither is not offered. Returns the problems, each with its fix."""
     problems = []
     for name, tb in binding.tools.items():
         if name not in tools:
             problems.append(fixed(f"the binding names {name}, which the upstream server does not offer",
                                   f"use one of {', '.join(sorted(tools))}"))
             continue
+        hint = getattr(getattr(tools[name], "annotations", None), "read_only_hint", None)
         if tb.read:
+            if hint is not True:
+                problems.append(fixed(f"the binding marks {name} read-only, but the server does not (readOnlyHint)",
+                                      f"bind {name} to a declared action, or leave it out"))
             continue
+        a = d.actions.get(tb.action)
+        call = next((e for e in (a.effects if a else []) if e.call == f"{UPSTREAM}{name}"), None)
+        if a is None or call is None:
+            continue                                              # `check` names it
         schema = tools[name].input_schema or {}
         props, required = schema.get("properties") or {}, set(schema.get("required") or [])
+        seen = {tb.new_id or tb.target} | {tb.params.get(p, p) for p in a.params}
         inputs: dict[str, str] = {}
         for arg, spec in props.items():
-            t = JSON_TYPES.get(str((spec or {}).get("type")))
+            if arg not in seen or arg not in call.with_:
+                if arg in required:
+                    problems.append(fixed(f"{name}.{arg} is required by the server, but the gate never checks it "
+                                          f"or the call does not pass it on",
+                                          f"map it to a param of {tb.action} (`params:`) and pass it in the effect's "
+                                          f"`with`"))
+                else:
+                    tb.hidden.add(arg)
+                continue
+            t = _scalar(spec)
             if t is None:
-                problems.append(fixed(f"{name}.{arg} is a {spec.get('type', 'shape')} input",
-                                      "a declaration passes strings, numbers and booleans; bind a tool whose "
-                                      "inputs are those"))
+                problems.append(fixed(f"{name}.{arg} is not a string, number or boolean",
+                                      "bind a tool whose checked inputs are those, or leave the argument out"))
                 continue
             inputs[arg] = t
         register_upstream(Service(f"{UPSTREAM}{name}", str(tools[name].description or name), inputs,
@@ -209,7 +251,14 @@ def register(binding: Binding, tools: dict[str, Any]) -> list[str]:
 def check(d: Any, binding: Binding) -> list[str]:
     """What must hold between the declaration and the binding before anything is served."""
     from ..decl import validate_domain
-    problems = [f"error {i.code} at {i.where}: {i.message}" for i in validate_domain(d) if i.severity == "error"]
+    from ..kernel import UPSTREAM_SERVICES
+    problems = [fixed(f"{i.code} at {i.where}: {i.message}", "correct the declaration")
+                for i in validate_domain(d) if i.severity == "error"]
+    for an, a in d.actions.items():
+        for e in a.effects:
+            if e.call and e.call.startswith(UPSTREAM) and e.call not in UPSTREAM_SERVICES:
+                problems.append(fixed(f"action {an} calls {e.call}, which the binding does not bind",
+                                      f"bind {e.call[len(UPSTREAM):]} to {an} in the binding, or remove the call"))
     for name, tb in binding.tools.items():
         if tb.read:
             continue
@@ -240,6 +289,7 @@ def build_proxy(ex: Any, binding: Binding, upstream: Upstream, credentials: Any,
 
     offered = upstream.tools()
     services: UpstreamServices = ex.services
+    gate = threading.Lock()          # one gated call at a time: the next sees what the last one did
 
     def log(entry: dict[str, Any]) -> None:
         if audit:
@@ -249,6 +299,8 @@ def build_proxy(ex: Any, binding: Binding, upstream: Upstream, credentials: Any,
     def make(name: str, tb: ToolBinding) -> Tool:
         up = offered[name]
         schema = json.loads(json.dumps(up.input_schema or {"type": "object", "properties": {}}))
+        for arg in tb.hidden:
+            schema.get("properties", {}).pop(arg, None)
         if not tb.read:
             schema.setdefault("properties", {})["idempotency_key"] = {
                 "type": "string", "description": "Optional. The same key never runs the call twice; "
@@ -273,23 +325,37 @@ def build_proxy(ex: Any, binding: Binding, upstream: Upstream, credentials: Any,
             action = ex.d.actions[tb.action]
             params = {p: args[arg] for p in action.params
                       if (arg := tb.params.get(p, p)) in args and args[arg] is not None}
-            out = ex.submit(token, tb.action, str(target), params, f"proxy:{ikey}")
-            log({"tool": name, "caller": caller.actor.id, "args": args, "gated": True, "action": tb.action,
-                 "status": out.status, "code": out.code})
-            if not out.ok:
-                raise ToolError(f"Refused by the declaration ({out.code}): {out.reason}")
-            requested = [e for e in out.events if e.type == "EffectRequested"
-                         and e.payload.get("service") == f"{UPSTREAM}{name}"]
-            if not requested:                   # the same key again: the call already happened
-                return {"status": "ok", "note": "already done: this call ran before, and is not sent again"}
-            res = ex.store.read(f"{EFFECT_PREFIX}{effect_id(requested[0])}")
-            raw = services.last.get(key(name, requested[0].payload.get("inputs") or {}))
+            with gate:
+                out = ex.submit(token, tb.action, str(target), params, f"proxy:{ikey}")
+                log({"tool": name, "caller": caller.actor.id, "args": args, "gated": True, "action": tb.action,
+                     "status": out.status, "code": out.code})
+                if out.code == "in-progress":
+                    raise ToolError(f"{name}: the same call is still running. Fix: ask again in a moment.")
+                if not out.ok:
+                    raise ToolError(f"Refused by the declaration ({out.code}): {out.reason}")
+                requested = [e for e in out.events if e.type == "EffectRequested"
+                             and e.payload.get("service") == f"{UPSTREAM}{name}"]
+                if not requested:
+                    raise ToolError(f"{name}: {tb.action} was recorded, but calls nothing upstream. Fix: check the "
+                                    "declaration's effect for this action.")
+                res = ex.store.read(f"{EFFECT_PREFIX}{effect_id(requested[0])}")
+                if not res:                       # the outbox raised before it could answer
+                    ex._dispatch_events(list(out.events))
+                    res = ex.store.read(f"{EFFECT_PREFIX}{effect_id(requested[0])}")
+                raw = services.last.pop(key(name, requested[0].payload.get("inputs") or {}), None)
             if not res:
-                raise ToolError(f"{name} was allowed, but the upstream server has not answered yet; it is retried.")
-            if res[0].type == "EffectFailed" or raw is None or raw.is_error:
-                why = (raw and answer(raw).get("result")) or res[0].payload.get("reason") or res[0].payload.get("result", {}).get("error")
-                raise ToolError(f"{name} failed upstream: {why}")
-            return answer(raw)
+                raise ToolError(f"{name} was allowed but not sent. Fix: ask again; nothing was sent upstream.")
+            result = res[0].payload.get("result") or {}
+            if isinstance(raw, Exception):
+                raise ToolError(f"{name}: the server did not answer ({type(raw).__name__}: {raw}); it may or may not "
+                                "have acted. Fix: read the object upstream before you call again, then call with a new "
+                                "`idempotency_key`.")
+            if res[0].type == "EffectFailed":
+                why = (raw is not None and answer(raw).get("result")) or result.get("error") or res[0].payload.get("reason")
+                raise ToolError(f"{name} failed upstream: {why}. Fix: to try again, call with a new `idempotency_key`.")
+            if raw is not None:
+                return answer(raw)
+            return {k: v for k, v in result.items() if k not in ("ok", "error")}   # answered before: as recorded
 
         # The upstream's own arguments, as they are; the upstream server validates them.
         fields = {f"a{i}": (Any, Field(None, alias=arg)) for i, arg in enumerate(schema.get("properties") or {})}

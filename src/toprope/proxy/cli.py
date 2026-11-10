@@ -46,7 +46,7 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit(fixed("TOPROPE_TOKEN is missing or does not resolve to a caller",
                                "set TOPROPE_TOKEN to a token in the identity file"))
     upstream = Upstream.open(binding.upstream)
-    problems = register(binding, upstream.tools())
+    problems = register(binding, upstream.tools(), domain)
     problems += check(domain, binding)
     if problems:
         upstream.close()

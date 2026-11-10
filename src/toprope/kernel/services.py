@@ -47,7 +47,7 @@ class KernelServices(ABC):
         missing = [i for i in svc.required() if i not in inputs]
         if missing:
             return svc.failure(fixed(f"missing inputs {missing}", "map them in the effect's `inputs` in the declaration"))
-        if "approver" in svc.inputs:
+        if "approver" in svc.inputs and not service.startswith("mcp:"):   # an upstream tool's own argument
             if not caller or caller.get("kind") != "person" or caller.get("id") != inputs["approver"]:
                 return svc.failure(fixed(f"{service} records a person's decision: the calling person must be the approver",
                                          "the person named as approver takes the action themselves"))

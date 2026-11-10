@@ -154,7 +154,7 @@ the error is raised.
 | the binding {…}: tool {…} has unknown key(s) {…} | use only the keys {…} |
 | the binding {…}: tool {…} is either `read: true` or an `action` | bind it to a declared action, or mark it read-only |
 | the binding {…}: tool {…} names exactly one of `target` or `new_id` | name the argument that identifies the object |
-| the upstream MCP session did not start within a minute | check the binding's `upstream` command or URL, and that the server runs on its own |
+| the upstream MCP server did not start: {…} | check the binding's `upstream` command or URL, and that the server runs on its own |
 
 ## `proxy/cli.py`
 

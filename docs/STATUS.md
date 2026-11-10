@@ -357,7 +357,7 @@ theme 1 records those (D1), it is measured again before it is compared (ADR-0049
 | Theme 4, import and wrap (umbrella #224, stacked on #201; plan: [`U-theme4-import.md`](experiments/U-theme4-import.md)): A1 from `AGENTS.md`, skills, OpenAPI, enums, tickets; A2 an MCP proxy (its own ADR first) | 🟡 | |
 | … A1a + ADR-0051 (1–3 accepted): external sources through two ports, a Reader (`file`, `http`) and an Extractor (`openapi`, `sql`, `workflow`), plugged in from outside through the entry-point groups `toprope.readers` and `toprope.extractors`; a team's conventions in a profile (YAML); `toprope-import <extractor> <source> --via <reader> --profile p.yaml` writes a proposed draft citing every element's place and lists what the source cannot say ([`examples/import/`](../examples/import/)). ADR-0051 4–5 (a *Sources* self domain with drift proposals) proposed, after M1 | ✅ | #225 |
 | … the first outside extractor, [`examples/plugins/toprope-ossie`](../examples/plugins/toprope-ossie/): reads an Apache Ossie ontology (what NVIDIA Auto Ontology and the Ossie converters export) into proposed things, facts, enums, links and stages, and asks what Ossie cannot say (actions, who acts, derived facts, constraints); found through its own entry point, no change to Toprope | ✅ | #226 |
-| … A2: `toprope-proxy` (ADR-0052): an MCP server in front of an existing one; a binding maps each tool to a declared action, unbound tools are hidden, read-only tools pass through to an audit log, the kernel decides before the call, the call is the action's `call: mcp:<tool>` effect sent once, and the reply records the answer; it will not start when binding, server and declaration disagree ([`examples/proxy/`](../examples/proxy/)). Stdio only; drafting a binding from a server's tool list is next | ✅ | #230 |
+| … A2: `toprope-proxy` (ADR-0052): an MCP server in front of an existing one; a binding maps each tool to a declared action, unbound tools are hidden, read-only tools pass through to an audit log, the kernel decides before the call, the call is the action's `call: mcp:<tool>` effect sent once, and the reply records the answer; gated calls run one at a time; it will not start when binding, server and declaration disagree, and offers no argument the gate does not check ([`examples/proxy/`](../examples/proxy/)). It serves over stdio; drafting a binding from a server's tool list is next | ✅ | #230 |
 
 ## M0b, M2 to M5
 
@@ -412,6 +412,10 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 Each item names the PR it came from and the review date. The PR that resolves an item deletes
 it; each release's cleanup PR handles items older than one release.
 
+- `toprope-proxy` (#230, review 2026-11-10): an upstream reached by URL (streamable HTTP) is not
+  tested yet. Upstream tools are registered in one process-wide table, so `validate_domain` in a
+  process that runs a proxy also knows them. The proxy serves over stdio only, with a static
+  identity map (M0b brings HTTP serving and identity providers).
 - The Ossie extractor (#226, review 2026-11-10) takes a stage field's first enum value as `initial`
   and keeps a stage field optional if the source does; the interview asks which stage comes first,
   but the draft does not mark the guess. Auto Ontology's certification does not reach the draft

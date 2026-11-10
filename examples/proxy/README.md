@@ -29,6 +29,8 @@ What the agent sees:
 | `refund_order(O-3, 500)` | allowed, and sent; the server refuses (more than the total); O-3 stays `paid` |
 | `refund_order(O-3, 50)` | allowed, and sent once; the answer (`R-1`) comes back through `record_refund`, and O-3 is `refunded` |
 | the same call again | not sent again: the same caller, tool and arguments are one call (or pass `idempotency_key`) |
+| two refunds of O-3 at once | one at a time: the second sees O-3 `refunded` and is refused |
+| the server does not answer | reported as such: it may or may not have acted, so read the order before calling again with a new `idempotency_key` |
 
 How it works:
 - The action `refund` declares the call `call: mcp:refund_order` (ADR-0028). The kernel decides
@@ -39,6 +41,12 @@ How it works:
   not take.
 - A call that goes straight to the payments server, past the proxy, is not governed. Take that
   access away from the agent.
+- `read: true` is accepted only for a tool the server itself marks read-only (`readOnlyHint`).
+- Every argument the agent may send is either checked by the gate and passed on by the effect's
+  `with`, or not offered. An optional argument outside both is left to the server's default. A
+  required one stops the start.
+- An action only a person may take is refused for an agent, naming who may. Toprope has no
+  waiting approval for a domain action yet (ADR-0052, decision 6).
 
 `tests/test_proxy.py` runs all of this in process. It also runs the real command over stdio in
 front of the server as a separate process.
