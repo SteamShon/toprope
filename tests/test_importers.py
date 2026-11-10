@@ -276,7 +276,7 @@ def test_a_plugged_in_extractor_that_makes_an_invalid_draft_is_stopped():
         def extract(self, raw, profile):
             return Extraction([Candidate("actions.go", {"description": "Go.", "actor": ["x"]}, "here")])
     register_extractor(Bad())
-    with pytest.raises(SystemExit, match="the bad extractor made a draft that does not validate.*Fix: report it"):
+    with pytest.raises(SystemExit, match="the bad extractor made a draft that does not validate.*Fix: .*report it to the extractor"):
         import_source("bad", API)
 
 

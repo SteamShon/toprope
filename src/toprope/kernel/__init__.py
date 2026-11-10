@@ -15,6 +15,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from ..errors import fixed
+
 KERNEL = "external:kernel"
 
 
@@ -132,7 +134,8 @@ def service(name: str) -> Service | None:
 
 def register_upstream(svc: Service) -> None:
     if not svc.name.startswith(UPSTREAM):
-        raise ValueError(f"an upstream tool's service is named `{UPSTREAM}<tool>`, not {svc.name!r}")
+        raise ValueError(fixed(f"an upstream tool's service is named `{UPSTREAM}<tool>`, not {svc.name!r}",
+                               f"name it `{UPSTREAM}` and the tool's name"))
     UPSTREAM_SERVICES[svc.name] = svc
 
 

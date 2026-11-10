@@ -458,7 +458,7 @@ def build_proxy(ex: Any, binding: Binding, upstream: Upstream, credentials: Any,
             token = credentials()
             caller = ex.identity.resolve(token)
             if caller is None:
-                raise ToolError("Unknown or missing credentials. Fix: connect with a token the proxy's identity knows.")
+                raise ToolError(fixed("Unknown or missing credentials", "connect with a token the proxy's identity knows"))
             if tb.read:
                 log({"tool": name, "caller": caller.actor.id, "args": args, "gated": False})
                 res = upstream.call(name, args)
@@ -469,7 +469,8 @@ def build_proxy(ex: Any, binding: Binding, upstream: Upstream, credentials: Any,
                 json.dumps([caller.actor.id, name, args], sort_keys=True, default=str).encode()).hexdigest()[:32]
             target = args.get(tb.new_id or tb.target or "")
             if target is None:
-                raise ToolError(f"{name} needs `{tb.new_id or tb.target}`, the object it acts on.")
+                raise ToolError(fixed(f"{name} needs `{tb.new_id or tb.target}`, the object it acts on",
+                                      f"call it again with `{tb.new_id or tb.target}`"))
             action = ex.d.actions[tb.action]
             params = {p: args[arg] for p in action.params
                       if (arg := tb.params.get(p, p)) in args and args[arg] is not None}
@@ -480,29 +481,30 @@ def build_proxy(ex: Any, binding: Binding, upstream: Upstream, credentials: Any,
                 log({"tool": name, "caller": caller.actor.id, "args": args, "gated": True, "action": tb.action,
                      "status": out.status, "code": out.code})
                 if out.code == "in-progress":
-                    raise ToolError(f"{name}: the same call is still running. Fix: ask again in a moment.")
+                    raise ToolError(fixed(f"{name}: the same call is still running", "ask again in a moment"))
                 if not out.ok:
-                    raise ToolError(f"Refused by the declaration ({out.code}): {out.reason}")
+                    raise ToolError(fixed(f"Refused by the declaration ({out.code}): {out.reason}",
+                                          "if the declaration is wrong, a person changes it"))
                 requested = [e for e in out.events if e.type == "EffectRequested"
                              and e.payload.get("service") == f"{UPSTREAM}{name}"]
                 if not requested:
-                    raise ToolError(f"{name}: {tb.action} was recorded, but calls nothing upstream. Fix: check the "
-                                    "declaration's effect for this action.")
+                    raise ToolError(fixed(f"{name}: {tb.action} was recorded, but calls nothing upstream",
+                                          "check the declaration's effect for this action"))
                 res = ex.store.read(f"{EFFECT_PREFIX}{effect_id(requested[0])}")
                 if not res:                       # the outbox raised before it could answer
                     ex._dispatch_events(list(out.events))
                     res = ex.store.read(f"{EFFECT_PREFIX}{effect_id(requested[0])}")
                 raw = services.last.pop(key(name, requested[0].payload.get("inputs") or {}), None)
             if not res:
-                raise ToolError(f"{name} was allowed but not sent. Fix: ask again; nothing was sent upstream.")
+                raise ToolError(fixed(f"{name} was allowed but not sent", "ask again; nothing was sent upstream"))
             result = res[0].payload.get("result") or {}
             if isinstance(raw, Exception):
-                raise ToolError(f"{name}: the server did not answer ({type(raw).__name__}: {raw}); it may or may not "
-                                "have acted. Fix: read the object upstream before you call again, then call with a new "
-                                "`idempotency_key`.")
+                raise ToolError(fixed(f"{name}: the server did not answer ({type(raw).__name__}: {raw}); it may or may "
+                                      "not have acted", "read the object upstream before you call again, then call "
+                                      "with a new `idempotency_key`"))
             if res[0].type == "EffectFailed":
                 why = (raw is not None and answer(raw).get("result")) or result.get("error") or res[0].payload.get("reason")
-                raise ToolError(f"{name} failed upstream: {why}. Fix: to try again, call with a new `idempotency_key`.")
+                raise ToolError(fixed(f"{name} failed upstream: {why}", "to try again, call with a new `idempotency_key`"))
             if raw is not None:
                 return answer(raw)
             return {k: v for k, v in result.items() if k not in ("ok", "error")}   # answered before: as recorded
