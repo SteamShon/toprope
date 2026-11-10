@@ -7,6 +7,7 @@ several links, but a milestone ends with a verdict. Budget is ~10h+/week. Dates 
 |---|---|---|---|
 | M0a | none (enabler) | Thin slice: declaration + semantics, model interpreter, Execution, event store, `toprope-server` MCP and authoring MCP, source readers, world map, harness (model, Execution, MCP), change check incl. log replay and in-flight check, incremental analysis; kernel services as declared effects so the self domains are generated end to end (ADR-0028) | 5–7 weeks |
 | M1 | self-compile feasibility; ① and ⑥ piloted on the self domains, no link verdict (ADR-0030, ADR-0034) | Model Toprope's own Authoring and Delivery workflows by iterating, joined by a typed handoff (ADR-0022), and generate both. A pilot: do compile-time checks catch what natural-language skills and structured specs without a compiler cannot? | 4–5 weeks (re-estimated in M1's spec PR) |
+| U | none (enabler) | Usability before M2 (ADR-0049): the change loop, getting started, the interview and its feedback, import and wrap; measured against a baseline | in four umbrellas; may run alongside M0b |
 | M0b | none (enabler) | Surfaces and effects: representation compiler, `toprope-shell` (A2UI + CopilotKit), UI-level harness, GitHub brownfield adapter, embedded shape, migration plans, query tools, timers and functions, external sources other than `kernel`; regenerate the self domain's UI | 3–4 weeks |
 | M2 | ① ② ③ (dogfood; the first ① and ② verdicts) | Do compile-time checks catch the seeded problems on a domain whose expert is not the builder, and does the harness-passing software work in real use? | 3–4 weeks |
 | M3 | ④ | Do people and agents act on the same meaning through the capsule? | 3 weeks |
@@ -16,6 +17,11 @@ several links, but a milestone ends with a verdict. Budget is ~10h+/week. Dates 
 **Order rationale (ADR-0019):** M1 needs only the thin slice, so M1 runs before the
 surfaces and effects are built. That brings the first verdict to about 10–12 weeks (M0a 5–7 + M1 4–5,
 after ADR-0022 added Delivery and ADR-0028 added kernel effects), down from about 15. This is a target at about 10 h/week, not a commitment.
+
+**Usability before M2 (ADR-0049):** after M1 closes, a usability program removes the
+friction M1 showed, so that M2's expert measures the claims and not the tools. It gives no
+verdict, and M2's spec waits for it. Its themes, order and targets are in the ADR; progress is
+in [`STATUS.md`](STATUS.md).
 
 **Overrun rule:** if M0a runs past 6 weeks, cut it to what M1 strictly needs (semantics,
 model interpreter, Execution, event store, MCP, authoring MCP, model and Execution-level

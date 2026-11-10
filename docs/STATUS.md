@@ -16,6 +16,7 @@ Legend: ✅ done · 🟡 in part · ⬜ not started
 |---|---|---|---|
 | M0a thin slice | none (enabler) | ✅ | released as `v0.1.0` (#65); the tag is not pushed yet |
 | M1 self-compile | ① ⑥ pilot, no verdict | ✅ | closed after the recheck ([`M1-report.md`](experiments/M1-report.md)): Toprope with its LLM review leads on recall (first run 0.84 against 0.64 NL; recheck 0.94–1.0 against 0.44–0.62, biased and a reference only); the grader's noise (0.18) moves to M2's grader redesign; six probes carried to M2's probe design; ⑥ inconclusive |
+| U usability before M2 (ADR-0049) | none (enabler) | 🟡 | F1 baseline recorded; F2's script written, its run waits for an operator; theme 1 started |
 | M0b surfaces and effects | none (enabler) | ⬜ | |
 | M2 dogfood | ① ② ③ | ⬜ | the first ① and ② verdicts |
 | M3 shared language | ④ | ⬜ | |
@@ -349,6 +350,28 @@ gate, a clean pipeline and the grader's measured noise.
 | Phase B rerun (local session, RUNBOOK's recheck section): the NL skill rendered from authoring@12 and delivery@6, accepted by the researcher; three arms and the combined arm run, graded twice, script labels taken back (`rescript`) and one probe run graded again (`regrade-missing`); confirmed and scored. Criterion 3: the two sittings differ by up to 0.18 of recall (limit 0.1), measured; Toprope's probes before any change run again with the domain servers connected (#234, #243, #245) and graded again; criterion 1: P01, P02, P04, P06, P07 and P08 fail the probe gate | 🟡 | #212 |
 | The recheck report ([`M1-report.md`](experiments/M1-report.md), *The recheck*): criterion 1 met by its rule (P03, P05 pass the gate; six probes carried to M2 with their causes), 2 met (faults fixed and recorded; #96 dropped: no push token in this public repository, the researcher's decision), 3 met by measuring the noise (0.18, over the limit); M1 closed | ✅ | |
 
+## Usability before M2 (ADR-0049, link: none)
+
+Four umbrellas after a baseline. A sub-PR that runs the self domains' loop waits until no other
+open PR changes their commit store or logs (`umbrella/m1-recheck` has them now).
+
+F1 baseline (2026-11-09, `uv run python tools/usability_baseline.py`; the self domains' logs as
+of M1, from 2026-11-06 05:12, when the command log begins): per change approved in that window (6),
+18.8 commands by a person or an agent, 8.3 of them by a person; 6 approved human requests; 1
+refusal and 5 failed effects in 113 commands by a person or an agent (0.053); 1 commit with a
+failed check. The logs do not see commands that fail before the gate, so that rate is low; once
+theme 1 records those (D1), it is measured again before it is compared (ADR-0049, 5).
+
+| Item | Status | PR |
+|---|---|---|
+| ADR-0049: the program, its order and targets | ✅ | #196 |
+| Baseline F1: friction in the change loop, from the logs (`tools/usability_baseline.py`) | ✅ | #197 |
+| Baseline F2: time to a first enforced rule. The script is written ([`U-f2-first-rule.md`](experiments/U-f2-first-rule.md)); the run needs an operator who has not used Toprope (the researcher finds one) | 🟡 | #200 |
+| Theme 1, the change loop: B4 citations from a query, C1 `toprope change`, C3 `toprope.yaml`, B5 one diff to confirm, D1 a fix in every error, C2 approvals by risk (its own ADR first) | ⬜ | |
+| Theme 2, getting started: A4 `init` and `try`, A3 templates, E1 docs, E2 a tutorial | ⬜ | |
+| Theme 3, interview and feedback: B1 choice questions, B2 examples first, B3 a live map, D2 impact as decisions, D3 counterexamples as stories | ⬜ | |
+| Theme 4, import and wrap: A1 from `AGENTS.md`, skills, OpenAPI, enums, tickets; A2 an MCP proxy (its own ADR first) | ⬜ | |
+
 ## M0b, M2 to M5
 
 Not started. Plans: [`roadmap.md`](roadmap.md).
@@ -358,16 +381,17 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 1. Merge `umbrella/m1-recheck` into `develop` (a merge commit). Then M2's grader, as decided
    (`docs/experiments/M2-grader.md`, 2026-11-10): the checklist, the majority of three, rule B and
    the noise gate, validated on M1's combined run for consistency only.
-2. M2's spec, from the draft (`docs/experiments/M2-design.md`): the researcher decides each point,
+2. ADR-0049: the F2 baseline run (an operator the researcher finds), and theme 1 (the change loop).
+3. M2's spec, from the draft (`docs/experiments/M2-design.md`): the researcher decides each point,
    freezes the verdict rules, and finds the domain expert who is not the builder; the expert
    writes the change list, seeds it and keeps the key.
-3. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
-4. When a domain is shared by several people or agents (M2, or a hosted server): its event
+4. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
+5. When a domain is shared by several people or agents (M2, or a hosted server): its event
    log moves from git to a database (`--store postgres:DSN` for a composition, one schema per
    member), through a new ADR superseding decision 29A for that case; an export to git can
    keep the audit trail (decided 2026-11-06). Until then the self domains keep their logs in
    git (`domains/<domain>/events/`).
-5. ADR-0041's follow-up work (decided 2026-11-06), the third on in
+6. ADR-0041's follow-up work (decided 2026-11-06), the third on in
    `umbrella/adr-0041-follow-ups` (#114). Done: approval refuses commits with proposed
    elements, and the change check records how many are left (#110); every decision action takes
    an optional `rationale` (#111); a check can read `actor.principal` (#113);
@@ -375,7 +399,7 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    permissions it ran under (#116); a commit may cite its evidence (#117, #118: free strings
    on `commit`, Authoring commit `5-c8fd1b8fc98be17c`), replaced by typed evidence that must
    resolve, cited with `cite_evidence` (#124, in the pstack umbrella).
-6. ADR-0042's follow-up work (accepted 2026-11-07): done: `domain_version` with the deployment
+7. ADR-0042's follow-up work (accepted 2026-11-07): done: `domain_version` with the deployment
    log gives the rule in force when an event was decided, documented, the self domains too
    (ADR-0045, #150); read visibility defined in the schema (`read`, refused until M0b); in M0b,
    deadlines with timers, read visibility enforced by the query and MCP read tools, an observed
@@ -385,11 +409,11 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    (recommendation, evidence, rules and version applied, the person's decision and reason, the
    action, the outcome). A source kind for process mining (event logs of existing systems) is a
    candidate for the authoring interview's sources, with the adapters (M0b).
-7. ADR-0043's follow-ups: make `tla` a required check on `develop` (maintainer). Creation
+8. ADR-0043's follow-ups: make `tla` a required check on `develop` (maintainer). Creation
    (#155), link paths to what no action changes (#156) and time, frozen at the harness's clock
    (#157), are modeled; no declaration in the repository leaves anything out.
 
-8. Before M2's Phase B: a probe's starting state written as conditions on objects (for example
+9. Before M2's Phase B: a probe's starting state written as conditions on objects (for example
    a Commit with `checks_passed` true and `approved` false), and generated from the declarations
    by searching their actions for a way to reach it, instead of a hand-written setup per probe.
    This needs a format change to the probe suite (an ADR). M1 keeps the hand-written setups in
