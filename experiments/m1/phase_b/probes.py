@@ -392,7 +392,7 @@ def _user(p: dict[str, Any], situation: dict[str, Any]) -> str:
 
 def server_logs(logs: Path) -> dict[str, str]:
     """Where each domain server's stderr goes (`serverwrap.py`), beside the probe's transcript."""
-    return {m: str(logs / f"{m}-server.stderr") for m in DOMAINS}
+    return {m: str(logs.resolve() / f"{m}-server.stderr") for m in DOMAINS}
 
 
 def servers(root: Path, logs: Path | None = None) -> dict[str, Any]:
@@ -402,6 +402,10 @@ def servers(root: Path, logs: Path | None = None) -> dict[str, Any]:
     if not exe.exists():
         raise RuntimeError(f"toprope-server is not installed next to this Python ({sys.executable})")
     exe = str(exe)
+    # Claude Code starts the servers in its own working directory: every path must be absolute
+    # (the M1 recheck's `--out runs/...` gave relative ones, and every Toprope probe's servers died).
+    root = root.resolve()
+    logs = logs.resolve() if logs is not None else None
     out = {}
     for m in DOMAINS:
         args = ["--composition", str(root / COMPOSITION), "--working-copy", "--member", m, "--kernel-root",
