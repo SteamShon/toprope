@@ -136,7 +136,7 @@ def judge(d: Domain, invariant_op: str | None, steps: list[Step], harness_broken
     outcomes = replay(d, steps)
     *before, last = outcomes
     reproduced = (all(o["status"] == "ok" for o in before) and last["code"] == "invariant-guard"
-                  and last["reason"] == refusals.invariant(inv.reason, inv.check))
+                  and last["reason"] == refusals.invariant(inv.reason, inv.check, d))
     if not reproduced:
         bad = next((o for o in outcomes if o["status"] != "ok"), last)
         return {"verdict": MISMATCH, "invariant": inv.id, "steps": outcomes,
@@ -155,7 +155,7 @@ def harness_broken(d: Domain) -> set[str]:
             det = f.detail
             inv = det.get("invariant") or ((det.get("observed") or {}).get("reason"))
             out.add(next((i.id for i in d.invariants
-                          if inv in (i.id, i.reason, refusals.invariant(i.reason, i.check))), inv))
+                          if inv in (i.id, i.reason, refusals.invariant(i.reason, i.check, d))), inv))
         elif f.kind == "exploration":
             out.add(f.detail.get("invariant"))
     return out

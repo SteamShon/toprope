@@ -18,7 +18,7 @@ $R refund_order O-3     # day 3: refunded
 
 Day 8:
 ```json
-{"status": "denied", "code": "within-window", "reason": "Refunds are allowed within 7 days of purchase.", ...}
+{"status": "denied", "code": "within-window", "reason": "Refunds are allowed within 7 days of purchase. Fix: the action is allowed when `target.days_since_purchase <= 7` holds; change the object or the params first", ...}
 ```
 
 ## Change the window to 30 days

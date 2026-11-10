@@ -1,16 +1,19 @@
-"""Every error a person or an agent meets names its fix (ADR-0049, D1).
+"""Every error a person or an agent meets names its fix (ADR-0049, D1; ADR-0053 §5).
 
     raise AuthoringError(fixed(f"no source {sid!r}", "list the sources with `search_sources`"))
 
 `tests/test_error_fixes.py` scans every module of `src/toprope/` and `tools/human_request.py`, and
-fails on an error raised with a message that does not go through `fixed`, on a kernel service's
-`failure(…)` reply without one, on a command's refusal (`Outcome("denied" | "rejected", code,
-reason)`, the interpreter's `deny`/`_attempt`, a reason a gate function returns) without one, and on
-a message with two `Fix:` parts.
+fails on an error raised with a message that does not go through `fixed` (a `DeployRefused`'s
+reason included), on a kernel service's `failure(…)` reply without one, on a reply's `error` or
+`reason` text without one, on a command's refusal (`Outcome("denied" | "rejected", code, reason)`,
+the interpreter's `deny`/`_attempt`, a reason a gate function returns) without one, and on a message
+with two `Fix:` parts.
 
-What the scan cannot see: a message held in a variable (`raise E(msg)`), and the text of an error
-passed on from a module outside the scan (`f"identity file: {e}"`, where `e` came from YAML or the
-OS). Those are named here so they are not mistaken for covered. `docs/errors.md` is the catalog, generated
+The scan is static. What it cannot see: a message held in a variable (`raise E(msg)`, `reason =
+…`), a message built by a call it does not read (`"; ".join(errors)`), an exception type it does not
+list, and the text of an error passed on from a module outside the scan (`f"identity file: {e}"`,
+where `e` came from YAML or the OS); at run time, a passed-on message may hold its own fix, which
+`fixed` merges into one. Those are named here so they are not mistaken for covered. `docs/errors.md` is the catalog, generated
 from the same scan (`python -m toprope.errors --out docs/errors.md`).
 """
 from __future__ import annotations
@@ -35,7 +38,12 @@ def covered(root: Path = ROOT) -> tuple[str, ...]:
 
 # Exceptions whose message is shown as it is.
 SHOWN = {"SystemExit", "ValueError", "RuntimeError", "KeyError", "AuthoringError", "CommitError",
-         "MergeConflict", "FetchError"}
+         "MergeConflict", "FetchError", "ToolError"}
+# Exceptions whose message is not their first argument: the position of the one shown.
+SHOWN_AT = {"DeployRefused": 1}
+# A reply's keys that hold a message shown to its caller (`{"error": "…"}`, `{"reason": "…"}`).
+REPLY_KEYS = ("error", "reason")
+TYPE_NAMES = {"string", "strings", "boolean", "integer", "number", "datetime"}   # a schema's dict, not a reply
 # A command's refusal: the call, and the position of its reason. `Outcome` counts only when its
 # status is "denied" or "rejected".
 REFUSALS = {"Outcome": 2, "deny": 1, "_attempt": 3}
@@ -44,12 +52,28 @@ REASONS = {"actor_allowed", "invalid_params", "_moved_since", "no_action"}
 REASON_MODULES = ("src/toprope/semantics/refusals.py",)   # every function there returns a reason
 
 
-def fixed(message: str, fix: str) -> str:
-    """`message`, then what to do about it. A message that already names a fix (one passed on from
-    a step) keeps one `Fix:` part: its fix comes first, then `fix`."""
+def fixed(message: str, fix: str, *, verbatim: bool = False) -> str:
+    """`message`, then what to do about it.
+
+    Our own message may pass on another's that already names a fix (a failed step's): it keeps one
+    `Fix:` part, every fix it held first, then `fix`, each once; so `fixed(fixed(m, f), f)` is
+    `fixed(m, f)`. With `verbatim`, the message is someone else's words (a domain's declared
+    reason): it is kept exactly, `Fix:` in it included, and `fix` follows it."""
+    if verbatim:
+        return f"{message} {MARK}{fix}"
     if MARK in message:
-        message, _, first = message.partition(MARK)
-        fix = f"{first.strip().rstrip('.;')}; then {fix}"
+        kept, before = [], []
+        for line in message.split("\n"):             # a fix runs to the end of its line
+            head, *fs = line.split(MARK)
+            kept.append(head)
+            before += fs
+        message = "\n".join(k for k in kept if k.strip())
+        fixes: list[str] = []
+        for f in [*before, fix]:
+            f = f.strip().rstrip(".;").strip()
+            if f and f not in fixes:
+                fixes.append(f)
+        fix = "; then ".join(fixes)
     message = message.rstrip().rstrip(":;,").rstrip()
     return f"{message}{'' if message.endswith(('.', '?', '!')) else '.'} {MARK}{fix}"
 
@@ -88,9 +112,12 @@ def _text(node: ast.AST) -> str | None:
 def _passes_on(arg: ast.AST, caught: set[str]) -> bool:
     """A message that includes the error it caught (`f"people.{x}: {e}"`) passes that error's own
     message, and its fix, on."""
+    def caught_name(x: ast.AST) -> bool:      # `e`, or a part of it (`e.reason`)
+        while isinstance(x, ast.Attribute):
+            x = x.value
+        return isinstance(x, ast.Name) and x.id in caught
     return isinstance(arg, ast.JoinedStr) and any(
-        isinstance(v, ast.FormattedValue) and isinstance(v.value, ast.Name) and v.value.id in caught
-        for v in arg.values)
+        isinstance(v, ast.FormattedValue) and caught_name(v.value) for v in arg.values)
 
 
 def _call_name(call: ast.Call) -> str | None:
@@ -114,7 +141,18 @@ def _message_of(node: ast.AST) -> tuple[ast.AST, str] | None:
         name = _call_name(node.exc)
         if name in SHOWN and node.exc.args:
             return node.exc.args[0], name
+        if name in SHOWN_AT and len(node.exc.args) > SHOWN_AT[name]:
+            return node.exc.args[SHOWN_AT[name]], name
     return None
+
+
+def _replies(tree: ast.AST) -> list[tuple[ast.Dict, ast.AST]]:
+    """The messages replies carry: `{"error": "…"}`, `{"reason": "…"}`."""
+    return [(n, v) for n in ast.walk(tree) if isinstance(n, ast.Dict)
+            and not all(isinstance(x, ast.Constant) and x.value in TYPE_NAMES
+                        for k, x in zip(n.keys, n.values) if k is not None)
+            for k, v in zip(n.keys, n.values)
+            if isinstance(k, ast.Constant) and k.value in REPLY_KEYS]
 
 
 def _returned(tree: ast.AST, every: bool = False) -> list[tuple[ast.Return, ast.AST]]:
@@ -162,10 +200,11 @@ def scan(src: Path = ROOT, modules: tuple[str, ...] | None = None) -> list[Raise
         for h in ast.walk(tree):
             if isinstance(h, ast.ExceptHandler) and h.name:
                 for n in ast.walk(h):
-                    if isinstance(n, (ast.Raise, ast.Call, ast.Return)):
+                    if isinstance(n, (ast.Raise, ast.Call, ast.Return, ast.Dict)):
                         caught.setdefault(id(n), set()).add(h.name)
         found = [(node, *m) for node in ast.walk(tree) if (m := _message_of(node)) is not None]
         found += [(r, v, "refusal") for r, v in _returned(tree, mod in REASON_MODULES)]
+        found += [(r, v, "reply") for r, v in _replies(tree)]
         for node, first, name in found:
             branches = [first]
             while any(isinstance(b, ast.IfExp) for b in branches):   # either branch may be shown

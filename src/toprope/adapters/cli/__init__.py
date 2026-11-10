@@ -51,7 +51,7 @@ CONFIG = "toprope.yaml"
 # The keys `toprope.yaml` may set, and the option each one stands for.
 CONFIG_KEYS = {"composition": "--composition", "member": "--member", "kernel_root": "--kernel-root",
                "workspace": "--workspace", "env": "--env", "store_dir": "--store-dir",
-               "identity": "--identity", "failures": "--failures"}
+               "identity": "--identity", "failures": "--failures", "person_route": "--person-route"}
 
 
 _USAGE: list[str] = []          # the last usage error argparse reported, for the failure record
@@ -93,6 +93,8 @@ def _base_parser(add_help: bool) -> argparse.ArgumentParser:
     ap.add_argument("--no-config", action="store_true", help=f"ignore {CONFIG}")
     ap.add_argument("--failures", help="a directory where a command that fails before the gate is recorded, "
                     "one file per failure (ADR-0049, D1b)")
+    ap.add_argument("--person-route", help="how a person takes a step an agent is refused here, added to such "
+                    "refusals' fix (for the self domains: the human request, ADR-0039)")
     return ap
 
 
@@ -284,10 +286,12 @@ def _execution(args: Any, d: Domain) -> Execution:
     services = _kernel(args)
     if args.composition:
         args.no_seed = not args.seed
-        return _member(args, identity, services)
-    ex = Execution(d, open_store(args.store or "memory"), identity, services=services)
-    if args.seed:
-        ex.seed_world()
+        ex = _member(args, identity, services)
+    else:
+        ex = Execution(d, open_store(args.store or "memory"), identity, services=services)
+        if args.seed:
+            ex.seed_world()
+    ex.person_route = args.person_route
     return ex
 
 

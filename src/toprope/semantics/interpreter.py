@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
-from ..decl.models import Action, ActorRule, ByRole, Deny, Domain, Invariant, Target
+from ..decl.models import Action, ActorRule, Deny, Domain, Invariant
 from ..expr import Env, EvalError, evaluate, parse, paths_read
 from ..errors import fixed
 from ..kernel import CATALOG
@@ -122,6 +122,9 @@ class Interpreter:
         self.d = domain
         self.clock = clock or (lambda: datetime.now(timezone.utc))
         self._parsed: dict[str, Any] = {}
+        # How a person takes a step an agent is refused, in this deployment (for the self domains,
+        # the human request): added to such refusals' fix. None: the fix says only to ask a person.
+        self.person_route: str | None = None
 
     # -- helpers -------------------------------------------------------------------------
     def _expr(self, src: str):
@@ -180,9 +183,9 @@ class Interpreter:
         a = cmd.actor
         assert a is not None
         if action.requires == "human" and a.kind != "person":
-            return False, refusals.by_person(cmd.action)
+            return False, refusals.by_person(cmd.action, self.person_route)
         if not any(self._rule_ok(r, a, view, cmd.params) for r in action.actor):
-            return False, refusals.not_allowed(a.id, cmd.action, action.actor)
+            return False, refusals.not_allowed(a.id, cmd.action, action.actor, a.kind, self.person_route)
         if a.kind == "agent":
             p, g = cmd.on_behalf_of, cmd.grant
             if p is None or g is None:
@@ -194,13 +197,14 @@ class Interpreter:
                                     "make the agent's principal a person in the identity file")
             if cmd.action not in g.actions or (g.targets is not None and cmd.target not in g.targets):
                 return False, fixed(f"Grant {g.id} does not cover {cmd.action} on {cmd.target}.",
-                                    "ask the person the agent works for to add it to the grant in the identity "
-                                    f"file, or {refusals.ASK_A_PERSON}")
+                                    "ask the person the agent works for to widen the grant, or to take it "
+                                    "themselves" + (f": {self.person_route}" if self.person_route
+                                                                         else ""))
             if g.expires_at is not None and (cmd.at or self.clock()) >= g.expires_at:
                 return False, fixed(f"Grant {g.id} has expired.",
                                     "ask the person the agent works for to renew the grant in the identity file")
             if not any(self._rule_ok(r, p, view, cmd.params) for r in action.actor):
-                return False, refusals.principal_not_allowed(p.id, cmd.action, action.actor)
+                return False, refusals.principal_not_allowed(p.id, cmd.action, action.actor, self.person_route)
         return True, ""
 
     def cell(self, obj_type: str, state: str, action: str, actors: list[Actor]) -> str | Deny:
@@ -211,24 +215,7 @@ class Interpreter:
         only if all of them allow the same target state; otherwise the most restrictive outcome
         wins: deny, then n/a, then undecided (ADR-0021). The result never depends on role order.
         """
-        tr = self.d.transitions[obj_type]
-        c = tr.matrix.get(state, {}).get(action, "undecided")
-        if isinstance(c, Target):
-            return c.to
-        if not isinstance(c, ByRole):
-            return c
-        outcomes: list[str | Deny] = []
-        for actor in actors:
-            listed = [r for r in actor.roles if r in c.by_role]
-            outcomes += [c.by_role[r] for r in listed] or ["n/a"]
-        denies = [o for o in outcomes if isinstance(o, Deny)]
-        if denies:
-            return denies[0]
-        for special in ("n/a", "undecided"):
-            if special in outcomes:
-                return special
-        targets = set(outcomes)
-        return targets.pop() if len(targets) == 1 else Deny(deny="Roles disagree on this transition.")
+        return refusals.resolve(self.d, obj_type, state, action, [a.roles for a in actors])
 
     # -- the decision ----------------------------------------------------------------------
     def decide(self, cmd: Command, state: dict[str, Any] | None, lookup: Lookup) -> Decision:
@@ -252,8 +239,8 @@ class Interpreter:
             roles = {r.role if isinstance(r, ActorRule) else r for r in action.actor}
             principal = cmd.on_behalf_of if cmd.actor.kind == "agent" else None
             if not roles & set(cmd.actor.roles) or (principal is not None and not roles & set(principal.roles)):
-                return self._attempt(cmd, obj, "actor", refusals.not_allowed(cmd.actor.id, cmd.action, action.actor),
-                                     state)
+                return self._attempt(cmd, obj, "actor", refusals.not_allowed(
+                    cmd.actor.id, cmd.action, action.actor, cmd.actor.kind, self.person_route), state)
             code, why = (("exists", fixed(f"{cmd.target} already exists.", "choose a new id, or act on the "
                                           "existing object with an action that does not create one")) if creating
                          else ("not-found", fixed(f"No {obj} {cmd.target}.", f"check the id, or create the {obj} "
@@ -281,14 +268,15 @@ class Interpreter:
             next_state = tr.initial if tr else None
         elif tr is not None:                                                                # step 5
             who = [cmd.actor] + ([cmd.on_behalf_of] if cmd.actor.kind == "agent" and cmd.on_behalf_of else [])
-            c = self.cell(obj, current.get(tr.field), cmd.action, who)
             frm_ = current.get(tr.field)
+            c = self.cell(obj, frm_, cmd.action, who)
+            held = [a.roles for a in who]
             if c == "n/a":
-                return deny("not-applicable", refusals.not_applicable(d, obj, frm_, cmd.action))
+                return deny("not-applicable", refusals.not_applicable(d, obj, frm_, cmd.action, held))
             if c == "undecided":
                 return deny("undecided", refusals.undecided(obj, frm_, cmd.action))
             if isinstance(c, Deny):
-                return deny("matrix", refusals.matrix_denied(d, obj, frm_, cmd.action, c.deny))
+                return deny("matrix", refusals.matrix_denied(d, obj, frm_, cmd.action, c.deny, held))
             next_state = c
         else:
             next_state = None
@@ -298,7 +286,7 @@ class Interpreter:
         principal = cmd.on_behalf_of if cmd.actor.kind == "agent" else None
         for rid, rule in covering(d, cmd.action, frm):
             if not meets(rule, cmd.actor.kind, cmd.actor.roles, principal.roles if principal else None):
-                return deny(rid, refusals.rule_unmet(rule.reason, rule.requires))
+                return deny(rid, refusals.rule_unmet(rule.reason, rule.requires, cmd.actor.kind, self.person_route))
 
         for pre in action.preconditions:                                                    # step 6
             try:
@@ -307,7 +295,7 @@ class Interpreter:
                 return deny(pre.id, fixed(f"{pre.reason} (could not evaluate: {e})",
                                           "give the params the check reads, or fix the check in the declaration"))
             if not passed:
-                return deny(pre.id, refusals.precondition(pre.reason, pre.check))
+                return deny(pre.id, refusals.precondition(pre.reason, pre.check, d))
 
         new = copy.deepcopy(current)                                                        # step 9
         changes: dict[str, Any] = {}
@@ -348,7 +336,7 @@ class Interpreter:
         for inv in self.violated_invariants(obj, new, lookup, cmd.actor, cmd.params):        # step 10
             ev = Event("InvariantGuardTriggered", stream, obj, kind="attempt",
                        payload={"action": cmd.action, "invariant": inv.id, "reason": inv.reason}, **meta)
-            return Decision(Outcome("rejected", "invariant-guard", refusals.invariant(inv.reason, inv.check), state),
+            return Decision(Outcome("rejected", "invariant-guard", refusals.invariant(inv.reason, inv.check, d), state),
                             (), (ev,))
 
         etype = action.event or (f"{obj}Created" if creating else f"{obj}{_pascal(cmd.action)}")

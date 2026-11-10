@@ -28,6 +28,7 @@ Its subcommands are the domain's actions, one per action, plus `get`, `history`,
 | `--config` `CONFIG` | the options file (default: toprope.yaml in the current directory, if any) |
 | `--no-config` | ignore toprope.yaml |
 | `--failures` `FAILURES` | a directory where a command that fails before the gate is recorded, one file per failure (ADR-0049, D1b) |
+| `--person-route` `PERSON_ROUTE` | how a person takes a step an agent is refused here, added to such refusals' fix (for the self domains: the human request, ADR-0039) |
 
 ## `toprope-change`
 

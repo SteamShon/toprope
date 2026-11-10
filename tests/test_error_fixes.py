@@ -44,6 +44,13 @@ def test_fixed_puts_the_fix_after_the_message():
     assert MARK in fixed("a", "b")
 
 
+def test_fixed_is_idempotent_and_merges_every_fix():
+    once = fixed("no source", "add it")
+    assert fixed(once, "add it") == once
+    assert fixed("step failed: a. Fix: do x. Fix: do y.", "push again") == "step failed: a. Fix: do x; then do y; then push again"
+    assert fixed("Leads may not. Fix: wait", "ask", verbatim=True) == "Leads may not. Fix: wait Fix: ask"
+
+
 def test_fixed_keeps_one_fix_when_the_message_names_its_own():
     assert fixed("step 2 failed: no chunk 'x'. Fix: run `search`.", "run the step again") == \
         "step 2 failed: no chunk 'x'. Fix: run `search`; then run the step again"
@@ -111,6 +118,18 @@ def test_the_scan_finds_a_refusal_without_a_fix(tmp_path):
         ("refusal", "Missing param {…}.", None), ("refusal", "Only a person can {…}.", None)]
 
 
+def test_the_scan_finds_a_deploy_refusal_and_a_reply_without_a_fix(tmp_path):
+    r = scan_text(tmp_path, (
+        'def f(c):\n'
+        '    raise DeployRefused("unapproved", f"commit {c} has no approval")\n'
+        'def g(o):\n'
+        '    return {"reachable": False, "reason": f"No object {o}."}\n'
+        'def h():\n'
+        '    return {"error": "string", "ok": "boolean"}\n'))      # a schema, not a reply
+    assert sorted((r0.exception, r0.message, r0.fix) for r0 in r) == [
+        ("DeployRefused", "commit {…} has no approval", None), ("reply", "No object {…}.", None)]
+
+
 def test_the_scan_reads_a_fix_held_in_a_module_constant(tmp_path):
     r = scan_text(tmp_path, ('VIA = "on a terminal"\nASK = f"ask a person: {VIA}"\n'
                              'def f(a):\n    raise ValueError(fixed(f"only a person can {a}", ASK))\n'))
@@ -123,11 +142,12 @@ def test_a_merge_conflict_names_its_fix():
 
 
 # -- the gate refusals agents meet most: each names what to do (ADR-0049 §5) -------------------
-def gate_refusals():
+def gate_refusals(route=None):
     """One refusal of each kind the interpreter gives, on the schema doc's domain."""
     from datetime import timedelta
 
-    from test_semantics import ANA, BOT, ELI, NOW, PAT, do, model
+    from test_semantics import ANA, BOT, ELI, NOW, PAT, do
+    from test_semantics import model as make_model
     from toprope.semantics import Actor, Command, Grant
 
     def human(raw):
@@ -138,6 +158,11 @@ def gate_refusals():
 
     def creates_effect(raw):
         raw["actions"]["approve_experiment"]["effects"].append({"create": "Readout"})
+
+    def model(mutate=None):
+        out = make_model(mutate)
+        out.interp.person_route = route
+        return out
 
     m = model()
     m.seed("Experiment", {"id": "E-run", "status": "running", "approved_by": "ana", "started_at": "x"})
@@ -176,12 +201,26 @@ def test_every_gate_refusal_names_one_fix():
     assert not bad, f"refusals without exactly one fix: {bad}"
 
 
-def test_a_refusal_only_a_person_can_resolve_names_the_human_request():
+def test_a_refusal_only_a_person_can_resolve_asks_one_in_the_domains_terms():
+    """A domain's refusal names no deployment's route (Toprope's own human request is not a refund
+    desk's), unless the deployment gives one."""
     out = gate_refusals()
+    assert out["requires-human"].reason == "Only a person can approve_experiment. Fix: ask a person to take it"
+    assert out["role"].reason == "eli may not approve_experiment. Fix: ask a person with the role approver to take it"
+    assert out["principal-role"].reason == \
+        "Principal pat may not approve_experiment. Fix: ask a person with the role approver to take it"
     for k in ("requires-human", "role", "principal-role", "grant-scope"):
-        fix = out[k].reason.split(MARK, 1)[1]
-        assert "ask a person" in fix and "human request" in fix and "toprope-change" in fix, (k, fix)
-    assert out["requires-human"].reason.startswith("Only a person can approve_experiment. Fix: ask a person")
+        assert "human request" not in out[k].reason and "GitHub" not in out[k].reason, k
+
+
+def test_the_route_a_deployment_gives_is_told_to_an_agent_never_to_a_person():
+    out = gate_refusals(route="through a human request")
+    for k in ("requires-human", "principal-role", "grant-scope"):             # an agent was refused
+        assert out[k].reason.endswith("to take it: through a human request") or \
+            out[k].reason.endswith("themselves: through a human request"), (k, out[k].reason)
+    assert "human request" not in out["role"].reason                           # eli is a person
+    long = {k: len(o.reason) for k, o in gate_refusals().items() if o.code == "actor" and len(o.reason) > 160}
+    assert not long, f"an actor refusal reads in one breath: {long}"
 
 
 def test_a_declared_reason_stays_the_domains_words_and_gains_a_generic_fix():
@@ -190,9 +229,46 @@ def test_a_declared_reason_stays_the_domains_words_and_gains_a_generic_fix():
     out = gate_refusals()
     pre = next(p for p in d.actions["approve_experiment"].preconditions if p.id == out["precondition"].code)
     assert out["precondition"].reason == \
-        f"{pre.reason} Fix: the action is allowed when `{pre.check}`; change the object or the params first"
+        f"{pre.reason} Fix: the action is allowed when `{pre.check}` holds; change the object or the params first"
     deny = d.transitions["Experiment"].matrix["draft"]["launch_experiment"].deny
-    assert out["matrix"].reason == (f"{deny} Fix: launch_experiment is denied when the Experiment is draft; it applies "
-                                    "when the Experiment is approved")
+    assert out["matrix"].reason == (f"{deny} Fix: launch_experiment applies when the Experiment is approved; move the "
+                                    "Experiment there first, or take an action that `allowed` (CLI) or "
+                                    "`allowed_actions` (MCP) lists for it")
     assert out["not-applicable"].reason.startswith("Not applicable when running. Fix: launch_experiment applies when "
                                                    "the Experiment is approved")
+
+
+def test_a_declared_reason_is_kept_exactly_even_when_it_reads_like_a_fix():
+    from test_semantics import ANA, do, model
+
+    def odd(raw):
+        raw["actions"]["approve_experiment"]["preconditions"][0]["reason"] = "Guardrails first. Fix: wait for them:"
+    out = do(model(odd), ANA, "approve_experiment", "E-bare")
+    assert out.reason.startswith("Guardrails first. Fix: wait for them: Fix: the action is allowed when `")
+
+
+def by_role(raw):
+    raw["roles"].append("lead")
+    raw["actions"]["approve_experiment"]["actor"] = ["approver", "lead"]
+    raw["transitions"]["Experiment"]["matrix"]["draft"]["approve_experiment"] = {
+        "by_role": {"lead": {"deny": "Leads do not approve."}, "approver": "approved"}}
+
+
+def test_a_by_role_deny_names_the_role_it_applies_for():
+    from test_semantics import do, model
+    from toprope.semantics import Actor
+    out = do(model(by_role), Actor("lee", "person", ("lead",)), "approve_experiment", "E-onboarding")
+    assert out.reason == ("Leads do not approve. Fix: approve_experiment applies when the Experiment is draft for "
+                          "approver: ask a person with that role to take it")
+
+
+def test_a_by_role_cell_that_does_not_list_the_role_names_the_role_it_applies_for():
+    from test_semantics import do, model
+    from toprope.semantics import Actor
+
+    def listed(raw):
+        by_role(raw)
+        del raw["transitions"]["Experiment"]["matrix"]["draft"]["approve_experiment"]["by_role"]["lead"]
+    out = do(model(listed), Actor("lee", "person", ("lead",)), "approve_experiment", "E-onboarding")
+    assert (out.code, out.reason) == ("not-applicable", "Not applicable when draft. Fix: approve_experiment applies "
+                                      "when the Experiment is draft for approver: ask a person with that role to take it")

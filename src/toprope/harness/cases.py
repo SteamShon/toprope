@@ -53,14 +53,17 @@ def undecided_cells(d: Domain, world: Any) -> list[str]:
                    for role in world.actors if raw_cell(d, obj, st, a, role) == "undecided"})
 
 
-def cell_expectation(d: Domain, obj: str, state: str, action: str, c: Any) -> dict[str, Any]:
-    """What a cell gives: the interpreter's reason, with its fix, for a cell that refuses."""
+def cell_expectation(d: Domain, obj: str, state: str, action: str, role: str, c: Any) -> dict[str, Any]:
+    """What a cell gives a person with one role: the interpreter's reason, with its fix, for a
+    cell that refuses."""
     if c == "n/a":
-        return {"status": "denied", "code": "not-applicable", "reason": refusals.not_applicable(d, obj, state, action)}
+        return {"status": "denied", "code": "not-applicable",
+                "reason": refusals.not_applicable(d, obj, state, action, [(role,)])}
     if c == "undecided":
         return {"status": "denied", "code": "undecided", "reason": refusals.undecided(obj, state, action)}
     if isinstance(c, Deny):
-        return {"status": "denied", "code": "matrix", "reason": refusals.matrix_denied(d, obj, state, action, c.deny)}
+        return {"status": "denied", "code": "matrix",
+                "reason": refusals.matrix_denied(d, obj, state, action, c.deny, [(role,)])}
     return {"status": "ok", "to": c}
 
 
@@ -146,7 +149,7 @@ class Planner:
                 if not self.actor_ok(name, a, role, inst, rules=False):
                     expect = {"status": "denied", "code": "actor"}
                 else:
-                    expect = cell_expectation(self.d, obj, state, name, raw_cell(self.d, obj, state, name, role))
+                    expect = cell_expectation(self.d, obj, state, name, role, raw_cell(self.d, obj, state, name, role))
                     if expect["status"] == "ok" and (rule := self.rule_refusing(name, a, role, inst)):
                         expect = {"status": "denied", "code": rule}
                     elif expect["status"] == "ok" and (pre := self.first_failing(a, inst.data, role)):
@@ -169,7 +172,7 @@ class Planner:
             return out
         for state in self.d.transitions[obj].matrix:
             for role in self.w.actors:
-                cell = cell_expectation(self.d, obj, state, name, raw_cell(self.d, obj, state, name, role))
+                cell = cell_expectation(self.d, obj, state, name, role, raw_cell(self.d, obj, state, name, role))
                 if cell["status"] != "ok":
                     continue
                 for k, inst in enumerate(self.w.in_state(obj, state)):
@@ -209,7 +212,7 @@ class Planner:
         obj = a.object_type
         for state in self.d.transitions[obj].matrix:
             for role in self.w.actors:
-                if cell_expectation(self.d, obj, state, name, raw_cell(self.d, obj, state, name, role))["status"] != "ok":
+                if cell_expectation(self.d, obj, state, name, role, raw_cell(self.d, obj, state, name, role))["status"] != "ok":
                     continue
                 for inst in self.w.in_state(obj, state):
                     for data, params in self._variants(a, pre, inst.data):

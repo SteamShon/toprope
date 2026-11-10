@@ -73,8 +73,8 @@ def test_flow_through_mcp():
             who.token = "t-eli"
             out = payload(await call("launch_experiment", target_id="E-onboarding", idempotency_key="k1"))
             assert out["status"] == "denied" and out["code"] == "matrix" and out["reason"] == (
-                "Launch requires approval. Fix: launch_experiment is denied when the Experiment is draft; it applies "
-                "when the Experiment is approved")
+                "Launch requires approval. Fix: launch_experiment applies when the Experiment is approved; move the "
+                "Experiment there first, or take an action that `allowed` (CLI) or `allowed_actions` (MCP) lists for it")
             who.token = "t-ana"
             out = payload(await call("approve_experiment", target_id="E-onboarding", note="ok", idempotency_key="k2"))
             assert out["status"] == "ok" and out["state"]["status"] == "approved"

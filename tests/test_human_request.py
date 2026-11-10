@@ -94,6 +94,18 @@ def test_a_step_whose_kernel_call_failed_fails_the_request(tmp_path, monkeypatch
     assert hr.run(req, "ana-gh", identity="ids.yaml", cwd=tmp_path)[0]["returncode"] == 0
 
 
+def test_a_failed_step_whose_message_names_fixes_reports_one_fix(tmp_path, monkeypatch):
+    (tmp_path / "ids.yaml").write_text(yaml.safe_dump(IDS))
+    err = "no chunk 'x'. Fix: run `search`.\nwarning: stale. Fix: run it again"
+    monkeypatch.setattr(hr.subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(cmd, 1, "", err))
+    req = {"summary": "x", "steps": [{"run": {"member": "authoring", "action": "next_questions", "target": "a"}}]}
+    with pytest.raises(SystemExit) as e:
+        hr.run(req, "ana-gh", identity="ids.yaml", cwd=tmp_path)
+    assert str(e.value).count("Fix:") == 1, str(e.value)
+    assert str(e.value).endswith("Fix: run `search`; then run it again; then fix what the step's message says, "
+                                 "then push the request again for a new approval")
+
+
 def test_one_request_takes_a_change_from_proposed_to_approved():
     req = hr.change("authoring")
     assert [(st["run"]["action"], st["run"]["target"]) for st in req["steps"]] == [

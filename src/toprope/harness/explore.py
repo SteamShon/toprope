@@ -50,7 +50,7 @@ def explore(h: Harness, *, examples: int = 200, depth: int = 5) -> dict[str, Any
                           "from": before, "path": [f"{m.role} {m.action}" for m in inst.path],
                           "outcome": o.get("code") or o.get("status")})
             if o.get("code") == "invariant-guard":
-                inv = next((v.id for v in d.invariants if refusals.invariant(v.reason, v.check) == o.get("reason")),
+                inv = next((v.id for v in d.invariants if refusals.invariant(v.reason, v.check, d) == o.get("reason")),
                            o.get("reason"))
                 return {"invariant": inv, "steps": steps}
             st_ = s.state(ids[i])

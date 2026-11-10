@@ -7,10 +7,8 @@ from toprope.check import change_check
 from toprope.decl import load_domain
 from toprope.store import open_store
 
-# what a refusal only a person can resolve says to do (ADR-0039)
-ASK_A_PERSON = ("Fix: ask a person to take it: on their terminal, or from a cloud session through a human request "
-                "they approve in GitHub (`toprope-change` writes one for a change; `tools/human_request.py` for any "
-                "step)")
+# what a refusal only a person can resolve says to do, in a domain that names no route
+ASK_A_PERSON = "Fix: ask a person to take it"
 
 EX = Path(__file__).resolve().parents[1] / "examples/refunds"
 
@@ -30,7 +28,7 @@ def test_a_refund_after_day_7_is_refused_with_the_declared_reason(capsys, tmp_pa
     assert out["status"] == "denied"
     assert out["code"] == "within-window"
     assert out["reason"] == ("Refunds are allowed within 7 days of purchase. Fix: the action is allowed when "
-                             "`target.days_since_purchase <= 7`; change the object or the params first")
+                             "`target.days_since_purchase <= 7` holds; change the object or the params first")
 
 
 def test_a_refund_within_the_window_runs(capsys, tmp_path):

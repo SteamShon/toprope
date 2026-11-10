@@ -73,7 +73,7 @@ actions:
 | the agent | raise the holdout campaign to 1200 | denied: *Holdout campaigns keep their budget; changing it would break the test. A media lead can grant a one-time exception.* |
 | the agent | raise `C-search` from 1000 to 2500 | denied: *Raise a daily budget by at most 500 at a time.* |
 | the agent | raise `C-search` to 1400 | proposed |
-| the agent | approve it | denied: *Only a person can approve_budget_change.* |
+| the agent | approve it | denied: *Only a person can approve_budget_change. Fix: ask a person to take it* |
 | the media lead | approve it | approved: the daily budget is 1400 |
 
 From the same file you also get MCP tools for the agent, a command line, a guide, and tests that

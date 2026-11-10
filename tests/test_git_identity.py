@@ -94,10 +94,22 @@ def test_an_action_that_requires_a_person_needs_your_terminal(tmp_path, monkeypa
 def test_an_agent_git_identity_cannot_take_a_person_only_action(tmp_path):
     root = repo(tmp_path, "bot@example.com")
     out = cli(root, "--seed", "approve_experiment", "E-onboarding", "--note", "ok")
-    assert out.returncode == 1 and json.loads(out.stdout)["reason"] == (
-        "Only a person can approve_experiment. Fix: ask a person to take it: on their terminal, or from a cloud session "
-        "through a human request they approve in GitHub (`toprope-change` writes one for a change; "
-        "`tools/human_request.py` for any step)")
+    assert out.returncode == 1 and json.loads(out.stdout)["reason"] == "Only a person can approve_experiment. Fix: ask a person to take it"
+
+
+def test_the_route_given_is_told_to_an_agent_a_person_only_action_refuses(tmp_path):
+    root = repo(tmp_path, "bot@example.com")
+    out = cli(root, "--person-route", "through a human request", "--seed", "approve_experiment", "E-onboarding",
+              "--note", "ok")
+    assert out.returncode == 1 and json.loads(out.stdout)["reason"] == \
+        "Only a person can approve_experiment. Fix: ask a person to take it: through a human request"
+
+
+def test_toprope_yaml_gives_the_route(tmp_path, monkeypatch):
+    from toprope.adapters.cli import with_config
+    (tmp_path / "toprope.yaml").write_text("person_route: through a human request\n")
+    monkeypatch.chdir(tmp_path)
+    assert with_config(["whoami"]) == ["--person-route", "through a human request", "whoami"]
 
 
 def test_the_repository_identity_file_grants_agents_no_person_only_action():

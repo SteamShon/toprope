@@ -47,7 +47,11 @@ to do about it. `{…}` is filled in when the error is raised.
 
 | Error | Fix |
 |---|---|
+| No object {…}. | check the id; `history` and the domain's tools take ids |
+| No object {…}. | check the id, or create the object |
+| Unknown or missing credentials. | give a token or git identity the identity file lists |
 | action {…}: param name(s) {…} are reserved tool arguments | rename those params in the declaration |
+| {…} has no states. | act on it with the actions `describe_domain` lists |
 
 ## `src/toprope/adapters/mcp/cli.py`
 
@@ -105,6 +109,13 @@ to do about it. `{…}` is filled in when the error is raised.
 | diff takes [FROM] TO | give one commit (diffed with its parent) or two |
 | no commits for domain {…} in {…} | check --domain and --commits, or commit the draft first (`commit_draft`) |
 
+## `src/toprope/compose/__init__.py`
+
+| Error | Fix |
+|---|---|
+| No declared path from {…}.{…} to {…}.{…} {…}. | declare the missing transition or handoff, or aim for a state the map shows as reachable |
+| no wiring leads there | wire a handoff toward that domain in the composition |
+
 ## `src/toprope/decl/models.py`
 
 | Error | Fix |
@@ -118,6 +129,23 @@ to do about it. `{…}` is filled in when the error is raised.
 | a step has exactly one of `do` or `read` | give the step `do` or `read`, not both |
 | an action has exactly one of `target` or `creates` | give the action `target` (it acts on an object) or `creates` (it makes one) |
 | an effect is exactly one of `set`, `create` or `call` | split the effect so each has one of `set`, `create` or `call` |
+
+## `src/toprope/deploy/__init__.py`
+
+| Error | Fix |
+|---|---|
+| a person approves a deploy, never an agent or the system | ask a person to deploy it |
+| commit {…} has no approval on main | approve the commit (`approve_commit`) after its check passes |
+| commit {…} has not been previewed | preview it first (Delivery's `preview`) |
+| commit {…} holds {…} proposed element(s) | have a person confirm them, commit and approve again |
+| commit {…} is superseded by approved {…} | deploy {…}, the approved commit on main |
+| no build {…} | preview the commit first (Delivery's `preview`) |
+| nothing is deployed in this environment | deploy an approved commit first (Delivery's `deploy`) |
+| the build's declaration changed after preview | preview the commit again |
+| the harness did not pass for this build | fix what the harness found, commit, approve and preview again |
+| the toolchain changed since the harness ran | preview the commit again |
+| {…} is deployed; {…} is not newer (rollback comes in M2) | deploy a commit newer than the deployed one |
+| {…} object(s) would be stranded: {…} (migration plans come in M0b) | keep the states and types those objects are in, or finish them before the change |
 
 ## `src/toprope/exec/__init__.py`
 
@@ -133,6 +161,12 @@ to do about it. `{…}` is filled in when the error is raised.
 | Error | Fix |
 |---|---|
 | mapping-error: {…} | fix the call's `with` mapping in the declaration |
+
+## `src/toprope/harness/mechanical.py`
+
+| Error | Fix |
+|---|---|
+| no generated object satisfies the invariants in this stage | give an example in this stage |
 
 ## `src/toprope/harness/surfaces.py`
 
@@ -218,7 +252,7 @@ to do about it. `{…}` is filled in when the error is raised.
 |---|---|
 | An agent acts only on behalf of a person. | make the agent's principal a person in the identity file |
 | An agent needs a principal and a grant. | give the agent the person it works for and a grant (an `agents` entry of the identity file) |
-| Grant {…} does not cover {…} on {…}. | ask the person the agent works for to add it to the grant in the identity file, or {…} |
+| Grant {…} does not cover {…} on {…}. | ask the person the agent works for to widen the grant, or to take it themselves{…} |
 | Grant {…} has expired. | ask the person the agent works for to renew the grant in the identity file |
 | Missing param '{…}'. | give the param '{…}' a value |
 | No action {…}. | use an action the declaration lists under `actions` (`--help` lists them) |
@@ -245,16 +279,18 @@ to do about it. `{…}` is filled in when the error is raised.
 
 | Error | Fix |
 |---|---|
-| Not applicable when {…}. | {…} applies {…}; move the {…} there first, or take an action that `allowed` (CLI) or `allowed_actions` (MCP) lists for it |
-| Only a person can {…}. | ask a person to take it: on their terminal, or from a cloud session through a human request they approve in GitHub (`toprope-change` writes one for a change; `tools/human_request.py` for any step) |
-| Principal {…} may not {…}. | {…} is for {…}, and the person an agent works for must hold it too; ask a person who holds that role to take it: on their terminal, or from a cloud session through a human request they approve in GitHub (`toprope-change` writes one for a change; `tools/human_request.py` for any step) |
+| Not applicable when {…}. | {…} applies when the {…} is {…} for {…}: ask a person with that role to take it |
+| Not applicable when {…}. | {…} applies when the {…} is {…}; move the {…} there first, or take an action that `allowed` (CLI) or `allowed_actions` (MCP) lists for it |
+| Only a person can {…}. | ask a person to take it{…} |
+| Principal {…} may not {…}. | ask a person with {…} to take it{…} |
 | Undecided. | the declaration has not decided `{…}` when the {…} is {…}: decide that cell of {…}'s transition matrix in the declaration (a person confirms it) |
-| {…} | {…} is denied when the {…} is {…}; it applies {…} |
-| {…} | ask a person to take it: on their terminal, or from a cloud session through a human request they approve in GitHub (`toprope-change` writes one for a change; `tools/human_request.py` for any step) |
-| {…} | this outcome is for {…}; ask a person who holds that role to take it: on their terminal, or from a cloud session through a human request they approve in GitHub (`toprope-change` writes one for a change; `tools/human_request.py` for any step) |
-| {…} | the action is allowed when `{…}`; change the object or the params first |
-| {…} | the result must keep `{…}` true; change the params or the object first |
-| {…} may not {…}. | {…} is for {…}; ask a person who holds that role to take it: on their terminal, or from a cloud session through a human request they approve in GitHub (`toprope-change` writes one for a change; `tools/human_request.py` for any step) |
+| {…} | {…} applies when the {…} is {…} for {…}: ask a person with that role to take it |
+| {…} | {…} applies when the {…} is {…}; move the {…} there first, or take an action that `allowed` (CLI) or `allowed_actions` (MCP) lists for it |
+| {…} | ask a person to take it{…} |
+| {…} | ask a person with {…} to take it{…} |
+| {…} | the action is allowed when {…} holds; change the object or the params first |
+| {…} | the result must keep {…} true; change the params or the object first |
+| {…} may not {…}. | ask a person with {…} to take it{…} |
 
 ## `src/toprope/sources/__init__.py`
 
@@ -325,6 +361,12 @@ to do about it. `{…}` is filled in when the error is raised.
 | {…} passages contain {…}: {…} | quote more of the passage, or cite one of those refs |
 | {…}: an item of {…} must be an object | give the item as a mapping, such as `{id: x, check: ...}` |
 | {…}: provenance is set by the tool; propose the element itself | propose the element at its own path; the tool records its source and status |
+
+## `src/toprope/worldmap/__init__.py`
+
+| Error | Fix |
+|---|---|
+| No declared transition leads from {…} to {…}. | declare the missing transition, or aim for a reachable state |
 
 ## `tools/human_request.py`
 

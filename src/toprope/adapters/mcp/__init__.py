@@ -122,14 +122,16 @@ def build_server(ex: Execution, credentials: Credentials, *, harness: dict[str, 
     def caller() -> Caller:
         c = ex.identity.resolve(credentials())
         if c is None:
-            raise ToolError("Unknown or missing credentials.")
+            raise ToolError(fixed("Unknown or missing credentials.",
+                                  "give a token or git identity the identity file lists"))
         return c
 
     def get_object(object_id: str) -> dict[str, Any]:
         """Current state of an object (a projection of its events)."""
         caller()
         st = ex.state(object_id)
-        return st if st is not None else {"error": f"No object {object_id}."}
+        return st if st is not None else {"error": fixed(f"No object {object_id}.",
+                                                          "check the id; `history` and the domain's tools take ids")}
 
     def history(object_id: str) -> list[dict[str, Any]]:
         """Recorded domain and decision events for an object, oldest first."""
@@ -170,11 +172,12 @@ def build_server(ex: Execution, credentials: Credentials, *, harness: dict[str, 
         c = caller()
         found = ex.lookup(object_id)
         if found is None:
-            return {"reachable": False, "reason": f"No object {object_id}."}
+            return {"reachable": False, "reason": fixed(f"No object {object_id}.", "check the id, or create the object")}
         obj, st = found
         tr = d.transitions.get(obj)
         if tr is None:
-            return {"reachable": False, "reason": f"{obj} has no states."}
+            return {"reachable": False, "reason": fixed(f"{obj} has no states.",
+                                                        "act on it with the actions `describe_domain` lists")}
         roles = set(c.actor.roles)
         if c.actor.kind == "agent":               # an agent can do only what its principal can
             roles &= set(c.on_behalf_of.roles) if c.on_behalf_of is not None else set()

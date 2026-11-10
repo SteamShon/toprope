@@ -38,6 +38,16 @@ class Execution:
         self._dispatching = False
         self._model = ReferenceModel(domain, store, clock=self.clock, seed_world=False)
 
+    @property
+    def person_route(self) -> str | None:
+        """How a person takes a step an agent is refused, in this deployment: added to such
+        refusals' fix. Set by the adapter from its configuration; None says only to ask a person."""
+        return self._model.interp.person_route
+
+    @person_route.setter
+    def person_route(self, route: str | None) -> None:
+        self._model.interp.person_route = route or None
+
     # -- commands ----------------------------------------------------------------------------
     def submit(self, credentials: str | None, action: str, target: str | None,
                params: dict[str, Any] | None = None, idempotency_key: str | None = None,
