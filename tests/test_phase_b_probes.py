@@ -362,3 +362,13 @@ def test_token_counts_add_up_when_conversations_run_at_once(tmp_path, monkeypatc
     for th in threads:
         th.join()
     assert b.report()["tokens"]["input"] == 8 * 50
+
+
+def test_the_servers_are_given_absolute_paths_whatever_the_run_was_given(tmp_path, monkeypatch):
+    """The recheck ran with `--out runs/phase-b-recheck`: the servers got relative paths, Claude Code
+    started them in its own directory, and every Toprope probe's servers died before writing a line."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "rel" / "P07").mkdir(parents=True)
+    cfg = servers(Path("rel/P07"), Path("rel/logs"))["authoring"]
+    paths = [a for a in cfg["args"] if "/" in a]
+    assert paths and all(Path(a.split("static:")[-1]).is_absolute() for a in paths), paths
