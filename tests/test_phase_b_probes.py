@@ -176,6 +176,24 @@ def test_each_probe_agent_may_take_what_its_task_asks_and_a_person_still_decides
     assert "grant" not in (request.get("reason") or "").lower()
 
 
+def test_a_server_run_through_the_wrapper_still_serves_and_keeps_its_stderr(worlds, tmp_path):
+    from mcp import ClientSession
+    from mcp.client.stdio import StdioServerParameters, stdio_client
+
+    from phase_b.probes import server_logs
+    root = tmp_path / "w"
+    shutil.copytree(worlds[0] / "P07", root)
+    cfg = servers(root, tmp_path / "logs")["delivery"]
+
+    async def go():
+        params = StdioServerParameters(command=cfg["command"], args=cfg["args"], env={**os.environ, **cfg["env"]})
+        async with stdio_client(params) as (r, w), ClientSession(r, w) as s:
+            await s.initialize()
+            return {t.name for t in (await s.list_tools()).tools}
+    assert "deploy" in asyncio.run(go())
+    assert Path(server_logs(tmp_path / "logs")["delivery"]).exists()
+
+
 FAKE = r'''#!{python}
 import json, os, sys
 args = sys.argv[1:]

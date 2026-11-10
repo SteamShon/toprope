@@ -381,17 +381,27 @@ def probe_worlds(out: Path) -> Path:
     return worlds
 
 
-def check_probe_tools(backend: Backend, worlds: Path) -> dict[str, Any]:
-    """One conversation with a Toprope probe's servers, on a copy of P07's starting state: which
-    tools it got, each server's status, and the error if the domain servers did not connect."""
+def check_probe_tools(backend: Backend, worlds: Path, toolchain: Path | None = None,
+                      where: Path | None = None) -> dict[str, Any]:
+    """One conversation with a Toprope probe's servers, on a copy of P07's starting state, set up as
+    `run_probe` does: inside `where` (the run directory), with `toolchain`'s declarations (the arm's
+    deployed ones) over the world's. Reports the tools it got, each server's status, and each
+    server's own stderr."""
     from .agent import Transcript
-    from .probes import servers
+    from .probes import DOMAINS, servers
     from .toolserver import ToolSpec
-    with tempfile.TemporaryDirectory(prefix="probe-tools-") as tmp:
+    if where is not None:
+        where.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="probe-tools-", dir=where) as tmp:
         root = Path(tmp) / "P07"
         shutil.copytree(worlds / "P07", root)
+        for d in DOMAINS if toolchain is not None else ():
+            shutil.copy(toolchain / d / f"{d}.domain.yaml", root / "toolchain" / d / f"{d}.domain.yaml")
         t = Transcript(Path(tmp) / "t.jsonl")
-        spec = ToolSpec("probe", str(root), json.dumps({"objects": False, "servers": servers(root)}))
+        from .probes import server_logs
+        logs = Path(tmp) / "logs"
+        spec = ToolSpec("probe", str(root), json.dumps({"objects": False, "servers": servers(root, logs),
+                                                       "server_logs": server_logs(logs)}))
         try:
             backend.converse("You check which tools you have.", "Name three of your tools, then stop.", spec, t,
                              max_turns=2)
@@ -399,9 +409,10 @@ def check_probe_tools(backend: Backend, worlds: Path) -> dict[str, Any]:
         except Exception as e:                        # what the run would have recorded
             error = f"{type(e).__name__}: {e}"
         rows = [json.loads(x) for x in t.path.read_text().splitlines()]
-    init = next((r for r in rows if r["kind"] in ("init", "refused")), {})
+        init = next((r for r in rows if r["kind"] in ("init", "refused")), {})
+        server_err = {m: Path(f).read_text()[-1500:] for m, f in server_logs(logs).items() if Path(f).exists()}
     return {"connected": error is None, "error": error, "tools": len(init.get("tools") or []),
-            "mcp_servers": init.get("mcp_servers"), "stderr": init.get("stderr")}
+            "mcp_servers": init.get("mcp_servers"), "stderr": init.get("stderr"), "server_stderr": server_err}
 
 
 def baseline() -> dict[str, str]:
@@ -541,6 +552,9 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     cp = sub.add_parser("check-probe-tools", parents=[common], help="start one Toprope probe's conversation as a run "
                         "does and report whether its domain servers connected (no probe is graded)")
     cp.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    cp.add_argument("--toolchain", type=Path, default=None,
+                    help="the deployed declarations to use, as a run does (e.g. OUT/toprope/seq-00/probes/run-1/"
+                         "deployed-toolchain)")
     cg = sub.add_parser("compare-gradings", help="the grader's noise: each arm's recall from two sittings")
     cg.add_argument("--out", type=Path, default=DEFAULT_OUT)
     cg.add_argument("--instruments", type=Path, default=INSTRUMENTS)
@@ -591,7 +605,8 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
         print(json.dumps({**combine(args.out, args.to, backend), "usage": backend.report()}))
         return
     if args.cmd == "check-probe-tools":
-        print(json.dumps(check_probe_tools(backend, probe_worlds(args.out)), indent=2))
+        print(json.dumps(check_probe_tools(backend, probe_worlds(args.out), args.toolchain,
+                                           args.out / "toprope" / "probe-tools-check"), indent=2))
         return
     if args.cmd == "regrade-missing":
         from .score import regrade_missing
