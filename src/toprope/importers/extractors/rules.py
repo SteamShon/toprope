@@ -174,11 +174,13 @@ class RulesExtractor:
                 found += 1
                 if found <= self.LIMIT:
                     pos, neg = (a, b) if a.kind == "must" else (b, a)
-                    out.conflicts.append(f"{pos.where} says “{pos.text}”, but {neg.where} says “{neg.text}”")
+                    out.conflict(f"{pos.where} says “{pos.text}”, but {neg.where} says “{neg.text}”", [],
+                                 [pos.where, neg.where], kind="contradiction", quote=[pos.text, neg.text],
+                                 modality=[pos.kind, neg.kind], terms=sorted(pos.words & neg.words))
         if found > self.LIMIT:
-            out.conflicts.append(f"… and {found - self.LIMIT} more like these: the texts repeat one rule both ways, or "
-                                 "set `options: {overlap: 0.9}` in the profile to list fewer")
+            out.conflict(f"… and {found - self.LIMIT} more like these: the texts repeat one rule both ways, or "
+                         "set `options: {overlap: 0.9}` in the profile to list fewer", kind="more")
         for r in rules:
-            out.questions.append(f"[{r.kind}] {r.where}: “{r.text}” Which action, rule or role is this, and who "
-                                 "enforces it?")
+            out.ask(f"[{r.kind}] {r.where}: “{r.text}” Which action, rule or role is this, and who "
+                    "enforces it?", "rule", [], [r.where], quote=r.text, modality=r.kind, terms=sorted(r.words))
         return out

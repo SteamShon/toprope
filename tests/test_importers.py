@@ -424,3 +424,210 @@ def test_a_run_that_fails_writes_nothing(tmp_path):
     with pytest.raises(SystemExit, match="nothing to import"):
         main(["rules", _src(tmp_path, "empty.md", "# Just a heading\n"), "--questions", str(q)])
     assert not q.exists()
+
+
+# Review of theme 4 (2026-11-10): an import did not reach an enforced declaration without hand work.
+
+def test_questions_and_conflicts_are_records_naming_what_they_decide_and_where(tmp_path):
+    out = import_source("openapi", API, domain="shop")
+    who = next(n for n in out["question_records"] if n.kind == "actor" and "refund_order" in n.text)
+    assert who.decides == ["actions.refund_order.actor"]
+    assert who.places == [f"{API}#/paths/~1orders~1{{id}}~1refund/post"]
+    assert [n.text for n in out["question_records"]] == out["questions"]         # the strings stay, one record each
+    rules = import_source("rules", str(RULES), via="tree")
+    (c,) = rules["conflict_records"]
+    agents, skill = str(RULES / "AGENTS.md"), str(RULES / "skills/hotfix/SKILL.md")
+    assert c.kind == "contradiction" and c.places == [f"{skill}#L8", f"{agents}#L5"]
+    assert c.modality == ["must", "never"] and c.quote[1] == "Never push a release tag to `main` by hand."
+    rule = next(n for n in rules["question_records"] if n.places == [f"{agents}#L5"])
+    assert rule.kind == "rule" and rule.modality == "never" and rule.quote == "Never push a release tag to `main` by hand."
+    assert {"push", "release", "tag"} <= set(rule.terms)
+
+
+def test_the_command_writes_question_records_an_agent_can_put_in_the_interview(tmp_path):
+    q = tmp_path / "q.yaml"
+    main(["openapi", API, "--domain", "shop", "--out", str(tmp_path / "d.yaml"), "--questions", str(q)])
+    saved = yaml.safe_load(q.read_text())
+    rec = next(r for r in saved["questions"] if r["kind"] == "actor" and "refund_order" in r["text"])
+    assert rec["id"].startswith("Q-import-") and rec["decides"] == ["actions.refund_order.actor"]
+    assert rec["places"] == [f"{API}#/paths/~1orders~1{{id}}~1refund/post"]
+
+
+def test_a_second_source_joins_a_draft_and_a_disagreement_is_a_conflict_not_an_overwrite(tmp_path, capsys):
+    dest = tmp_path / "shop.domain.yaml"
+    main(["openapi", API, "--domain", "shop", "--out", str(dest)])
+    with pytest.raises(SystemExit, match="exists. Fix: give --out a new file, or --into it"):
+        main(["sql", SQL, "--out", str(dest)])
+    main(["sql", SQL, "--into", str(dest)])
+    d = valid(yaml.safe_load(dest.read_text()))
+    order = d.objects["Order"]
+    assert order.properties["channel"].enum == ["web", "store"] and "placed_at" in order.properties   # both sources
+    assert order.source.ref == f"{SQL}#L3" and order.status == "proposed"       # changed, so proposed again
+    assert set(d.actions) == {"create_order", "refund_order"}
+    other = _src(tmp_path, "other.sql", "CREATE TABLE orders (status text CHECK (status IN ('open', 'closed')));\n")
+    main(["sql", other, "--into", str(dest)])
+    text = capsys.readouterr().out
+    assert "objects.Order.properties.status: the draft has" in text and f"{other}#L1" in text
+    d = valid(yaml.safe_load(dest.read_text()))
+    assert d.objects["Order"].properties["status"].enum == ["paid", "shipped", "refunded"]   # kept the draft's
+    assert d.transitions["Order"].matrix.keys() == {"paid", "shipped", "refunded"}
+
+
+def _tools(*tools):
+    return Raw(json.dumps({"server": {"command": ["python", "server.py"]}, "tools": list(tools)}).encode(), "srv")
+
+
+ORDER_OUT = {"type": "object", "required": ["status", "total"], "properties": {
+    "order_id": {"type": "string"}, "status": {"enum": ["paid", "refunded"], "type": "string"},
+    "total": {"type": "number"}, "refund_id": {"anyOf": [{"type": "string"}, {"type": "null"}]}}}
+REFUND = {"name": "refund_order", "description": "Refund an order.",
+          "inputSchema": {"type": "object", "required": ["order_id", "amount"], "properties": {
+              "order_id": {"type": "string"}, "amount": {"type": "number"},
+              "note": {"anyOf": [{"type": "string"}, {"type": "null"}]}, "lines": {"type": "array"}}},
+          "outputSchema": {"type": "object", "properties": {"refund_id": {"type": "string"}}}}
+GET = {"name": "get_order", "inputSchema": {"type": "object", "properties": {"order_id": {"type": "string"}}},
+       "outputSchema": ORDER_OUT, "annotations": {"readOnlyHint": True}}
+WIPE = {"name": "wipe_orders", "inputSchema": {"type": "object", "properties": {}}}
+
+
+def test_a_servers_tools_become_proposed_actions_with_their_call_and_reply_and_a_draft_binding():
+    from toprope.importers.draft import build
+    from toprope.importers.extractors.mcp import McpExtractor, render_binding
+    ext = McpExtractor().extract(_tools(REFUND, GET, WIPE), Profile())
+    d = valid(build("payments", ext))
+    a = d.actions["refund_order"]
+    assert a.target == "Order" and a.actor == ["unassigned"] and a.status == "proposed"
+    assert a.params["amount"].type == "number" and a.params["note"].optional and "lines" not in a.params
+    (e,) = a.effects
+    assert e.call == "mcp:refund_order" and e.reply == "record_refund_order"
+    assert e.with_ == {"order_id": "target.id", "amount": "params.amount", "note": "params.note"}
+    r = d.actions["record_refund_order"]
+    assert r.actor == ["external:kernel"] and set(r.params) == {"ok", "refund_id"}
+    assert r.preconditions[0].check == "params.ok == true"
+    assert r.effects[0].set == {"target.refund_id": "params.refund_id"}           # a fact the thing keeps
+    assert set(d.objects["Order"].properties) == {"status", "total", "refund_id"}  # from get_order's output schema
+    m = d.transitions["Order"].matrix
+    assert m["paid"]["refund_order"] == "undecided" and m["refunded"]["record_refund_order"] == "undecided"
+    assert "wipe_orders" not in d.actions
+    b = yaml.safe_load(render_binding(ext.binding, "payments"))
+    assert "confirmed" not in b and b["upstream"] == {"command": ["python", "server.py"]}
+    assert b["tools"] == {"refund_order": {"action": "refund_order", "target": "order_id",
+                                           "result": {"refund_id": "string"}, "load": "get_order"},
+                          "get_order": {"read": True}}
+    kinds_asked = {n.kind: n for n in ext.question_records()}
+    assert {"actor", "target", "param", "cell", "stage"} <= set(kinds_asked)
+    assert kinds_asked["target"].decides == ["actions.wipe_orders"] and kinds_asked["target"].places == ["srv#/tools/2"]
+    assert "transitions.Order.matrix.paid.record_refund_order" in kinds_asked["cell"].decides
+
+
+def test_openapi_asks_how_a_thing_is_created_and_drafts_a_call_only_when_it_is_named(tmp_path):
+    api = yaml.safe_load(Path(API).read_text())
+    del api["paths"]["/orders"], api["components"]["schemas"]["NewOrder"]
+    api["paths"]["/orders/{id}/refund"]["post"]["x-toprope-call"] = "mcp:refund_order"
+    f = tmp_path / "api.yaml"
+    f.write_text(yaml.safe_dump(api))
+    out = import_source("openapi", str(f), domain="shop")
+    d = valid(out["draft"])
+    (e,) = d.actions["refund_order"].effects
+    assert e.call == "mcp:refund_order" and e.with_ == {"id": "target.id", "reason": "params.reason",
+                                                         "amount": "params.amount"}
+    assert d.actions["record_refund_order"].actor == ["external:kernel"]
+    assert d.transitions["Order"].matrix["paid"]["record_refund_order"] == "undecided"
+    created = [n for n in out["question_records"] if n.kind == "creation"]
+    assert [n.decides[0] for n in created] == ["objects.Order"]
+    plain = import_source("openapi", API, domain="shop")
+    assert not valid(plain["draft"]).actions["refund_order"].effects                  # no call named: asked instead
+    assert {n.decides[0] for n in plain["question_records"] if n.kind == "call"} == {
+        "actions.refund_order.effects", "actions.create_order.effects"}
+    assert not [n for n in plain["question_records"] if n.kind == "creation"]       # createOrder creates it
+
+
+def test_a_draft_no_one_may_act_in_is_reported_as_not_ready(tmp_path, capsys):
+    from toprope.harness.cli import main as harness
+    d = valid(import_source("openapi", API, domain="shop")["draft"])
+    warned = [i for i in validate_domain(d) if i.code == "unassigned-actor"]
+    assert {i.where for i in warned} == {"actions.create_order.actor", "actions.refund_order.actor"}
+    assert all(i.severity == "warning" and "Fix: answer who may take it" in i.message for i in warned)
+    f = tmp_path / "shop.domain.yaml"
+    main(["openapi", API, "--domain", "shop", "--out", str(f)])
+    with pytest.raises(SystemExit):
+        harness(["--domain", str(f), "--levels", "model", "--examples", "0"])
+    assert "not ready: 2 of 2 action(s) no one may take yet" in capsys.readouterr().out
+
+
+# Review of #240 (2026-11-10): camelCase arguments, typed enums, and guessing the thing.
+
+def _drafted(*tools):
+    from toprope.importers.draft import build
+    from toprope.importers.extractors.mcp import McpExtractor
+    ext = McpExtractor().extract(_tools(*tools), Profile())
+    return valid(build("shop", ext)), ext
+
+
+def test_a_camel_case_argument_is_mapped_in_the_binding_and_passed_on_under_its_own_name():
+    cancel = {"name": "cancel_order", "inputSchema": {"type": "object", "required": ["orderId", "reasonCode"],
+                                                      "properties": {"orderId": {"type": "string"},
+                                                                     "reasonCode": {"type": "string"}}}}
+    d, ext = _drafted(cancel)
+    a = d.actions["cancel_order"]
+    assert a.target == "Order" and set(a.params) == {"reason_code"}
+    assert a.effects[0].with_ == {"orderId": "target.id", "reasonCode": "params.reason_code"}
+    assert ext.binding["tools"]["cancel_order"]["target"] == "orderId"
+    assert ext.binding["tools"]["cancel_order"]["params"] == {"reason_code": "reasonCode"}
+
+
+def test_numbers_in_an_enum_keep_their_type_and_are_asked_about():
+    get = {"name": "get_ticket", "annotations": {"readOnlyHint": True},
+           "inputSchema": {"type": "object", "properties": {"ticket_id": {"type": "string"}}},
+           "outputSchema": {"type": "object", "required": ["priority"], "properties": {
+               "priority": {"type": "integer", "enum": [1, 2, 3]}}}}
+    close = {"name": "close_ticket", "inputSchema": {"type": "object", "required": ["ticket_id", "level"],
+                                                     "properties": {"ticket_id": {"type": "string"},
+                                                                    "level": {"enum": [0.5, 1]}}}}
+    d, ext = _drafted(get, close)
+    assert d.objects["Ticket"].properties["priority"].type == "integer"     # never the names "1", "2", "3"
+    assert d.actions["close_ticket"].params["level"].type == "number"
+    asked = [n for n in ext.question_records() if "[1, 2, 3]" in n.text or "[0.5, 1]" in n.text]
+    assert [n.decides for n in asked] == [["actions.close_ticket.params.level"],
+                                          ["objects.Ticket.properties.priority"]]
+    out = import_source("openapi", _src_api({"type": "integer", "enum": [1, 2]}), domain="shop")
+    assert valid(out["draft"]).objects["Order"].properties["prio"].type == "integer"
+
+
+def _src_api(prio):
+    import tempfile
+    f = Path(tempfile.mkdtemp()) / "a.yaml"
+    f.write_text(yaml.safe_dump({"paths": {}, "components": {"schemas": {"Order": {
+        "type": "object", "properties": {"prio": prio}}}}}))
+    return str(f)
+
+
+def test_the_thing_is_a_whole_word_of_the_tool_and_a_server_assigned_id_is_asked_about():
+    reorder = {"name": "reorder_item", "inputSchema": {"type": "object", "properties": {
+        "order_id": {"type": "string"}, "item_id": {"type": "string"}}}}
+    create = {"name": "create_order", "inputSchema": {"type": "object", "properties": {
+        "customer": {"type": "string"}, "total": {"type": "number"}}}}
+    bare = {"name": "archive_invoice", "inputSchema": {"type": "object", "properties": {"id": {"type": "string"}}}}
+    d, ext = _drafted(reorder, create, bare)
+    assert d.actions["reorder_item"].target == "Item"                       # not Order, inside "reorder"
+    assert "create_order" not in d.actions and "create_order" not in ext.binding["tools"]
+    asked = {n.kind: n for n in ext.question_records() if "create_order" in n.text or "archive_invoice" in n.text}
+    assert "whose id the server assigns" in asked["creation"].text and "objects.Order" in asked["creation"].decides
+    assert d.actions["archive_invoice"].target == "Invoice"
+    assert "guessed Invoice from the tool's name" in asked["target"].text
+
+
+def test_joining_a_source_that_names_who_acts_fills_an_unassigned_actor(tmp_path, capsys):
+    dest = tmp_path / "shop.domain.yaml"
+    main(["openapi", API, "--domain", "shop", "--out", str(dest)])
+    api = yaml.safe_load(Path(API).read_text())
+    api["paths"]["/orders/{id}/refund"]["post"]["x-roles"] = ["clerk"]
+    f = _src(tmp_path, "roles.yaml", yaml.safe_dump(api))
+    prof = _src(tmp_path, "p.yaml", "roles_from: x-roles\n")
+    capsys.readouterr()
+    main(["openapi", f, "--into", str(dest), "--profile", prof])
+    text = capsys.readouterr().out
+    assert "0 conflict(s)" in text and "actions.refund_order" not in text.split("conflicts")[0]
+    d = valid(yaml.safe_load(dest.read_text()))
+    assert d.actions["refund_order"].actor == ["clerk"] and d.actions["refund_order"].status == "proposed"
+    assert d.actions["create_order"].actor == ["unassigned"] and "clerk" in d.roles

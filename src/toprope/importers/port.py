@@ -40,10 +40,62 @@ class Candidate:
 
 
 @dataclass
+class Note:
+    """A question or a conflict as a record an agent can act on: what it concerns (`decides`,
+    the declaration paths an answer would settle), its kind, the place(s) it cites, the words
+    quoted from there and, for a written rule, its modality. Shaped like the interview's own
+    questions (`id`, `kind`, `text`, `decides`), so `ask_question` can put it in the interview."""
+    kind: str                       # e.g. actor, target, creation, stage, cell, call, rule, contradiction
+    text: str
+    decides: list[str] = field(default_factory=list)
+    places: list[str] = field(default_factory=list)
+    quote: str | list[str] | None = None
+    modality: str | list[str] | None = None   # rules: never, must, only, before
+    terms: list[str] = field(default_factory=list)   # rules: the words it is about
+
+    @property
+    def id(self) -> str:
+        import hashlib
+        return "Q-import-" + hashlib.sha256(f"{self.kind}\0{self.text}".encode()).hexdigest()[:10]
+
+    def as_dict(self) -> dict[str, Any]:
+        out: dict[str, Any] = {"id": self.id, "kind": self.kind, "text": self.text, "decides": list(self.decides),
+                               "places": list(self.places)}
+        for k in ("quote", "modality"):
+            if getattr(self, k) is not None:
+                out[k] = getattr(self, k)
+        if self.terms:
+            out["terms"] = list(self.terms)
+        return out
+
+
+@dataclass
 class Extraction:
+    """`questions` and `conflicts` are the plain sentences (what older extractors write); `ask`
+    and `conflict` also keep each one's structured record (`Note`), which `question_records` and
+    `conflict_records` return, one per sentence. A drafted binding (ADR-0052 §7) goes in
+    `binding`."""
     candidates: list[Candidate] = field(default_factory=list)
     questions: list[str] = field(default_factory=list)
     conflicts: list[str] = field(default_factory=list)       # two places that disagree, both named
+    binding: dict[str, Any] | None = None
+    notes: dict[str, Note] = field(default_factory=dict)      # sentence -> its record
+
+    def ask(self, text: str, kind: str, decides: list[str] | None = None, places: list[str] | None = None,
+            **more: Any) -> None:
+        self.questions.append(text)
+        self.notes.setdefault(text, Note(kind, text, list(decides or []), list(places or []), **more))
+
+    def conflict(self, text: str, decides: list[str] | None = None, places: list[str] | None = None,
+                 kind: str = "conflict", **more: Any) -> None:
+        self.conflicts.append(text)
+        self.notes.setdefault(text, Note(kind, text, list(decides or []), list(places or []), **more))
+
+    def question_records(self) -> list[Note]:
+        return [self.notes.get(q) or Note("question", q) for q in self.questions]
+
+    def conflict_records(self) -> list[Note]:
+        return [self.notes.get(c) or Note("conflict", c) for c in self.conflicts]
 
 
 @dataclass

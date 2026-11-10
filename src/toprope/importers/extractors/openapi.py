@@ -12,6 +12,8 @@ from . import (
     Candidate,
     Extraction,
     Profile,
+    a_,
+    enum_fact,
     ignored,
     mapping,
     pascal,
@@ -57,8 +59,7 @@ def _prop(spec: Any, optional: bool) -> dict[str, Any] | None:
     if spec.get("nullable"):
         optional = True
     if spec.get("enum"):
-        vals = list(dict.fromkeys(str(v) for v in spec["enum"] if v is not None))
-        return {"enum": vals, "optional": optional or None in spec["enum"]} if vals else None
+        return enum_fact(list(spec["enum"]), optional)
     t = "datetime" if spec.get("format") in ("date-time", "date") else TYPES.get(str(types))
     return {"type": t, "optional": optional} if t else None
 
@@ -77,6 +78,8 @@ class OpenAPIExtractor:
         objects: dict[str, str] = {}                              # declared name -> its stage field ("" if none)
         by_source: dict[str, str] = {}                            # path words -> declared name
         refs_out: list[tuple[str, str, str, str]] = []           # (obj, fact, target schema, where)
+        created: set[str] = set()
+        obj_place: dict[str, str] = {}
         for name, sch in schemas.items():
             sch = _flat(sch, schemas)
             obj = pascal(profile.name(name))
@@ -92,12 +95,14 @@ class OpenAPIExtractor:
                 if isinstance(s, dict) and "$ref" in s:
                     refs_out.append((obj, snake(p), str(s["$ref"]).rsplit("/", 1)[-1], here))
                 elif (x := _prop(s, p not in req)) is not None:
-                    put(props, snake(p), x, out, here)
+                    put(props, snake(p), x, out, here, f"objects.{obj}.properties")
                 else:
-                    out.questions.append(f"{name}.{p} is a list or a nested shape: which thing holds it, if any?")
+                    out.ask(f"{name}.{p} is a list or a nested shape: which thing holds it, if any?", "nested",
+                            [f"objects.{obj}.properties.{snake(p)}"], [f"{here}/properties/{_esc(p)}"])
             out.candidates.append(Candidate(f"objects.{obj}", {"description": str(sch.get("description") or f"A {name}."),
                                                                "properties": props}, here))
             objects[obj] = next((p for p in props if p in profile.stage_fields and "enum" in props[p]), "")
+            obj_place.setdefault(obj, here)
             if objects[obj]:
                 stages(out, obj, objects[obj], props[objects[obj]]["enum"], here)
             for word in (name, singular(name), f"{name}s", snake(name), f"{snake(name)}s"):
@@ -117,8 +122,8 @@ class OpenAPIExtractor:
                 continue
             here = f"{ref}#/paths/{_esc(path)}/{method}"
             if target is None:
-                out.questions.append(f"Which thing does {name} ({method.upper()} {path}) act on? The source names "
-                                     "none it describes, so it was left out.")
+                out.ask(f"Which thing does {name} ({method.upper()} {path}) act on? The source names "
+                        "none it describes, so it was left out.", "target", [f"actions.{name}"], [here])
                 continue
             body = _flat((((op.get("requestBody") or {}).get("content") or {}).get("application/json") or {})
                          .get("schema") or {}, schemas)
@@ -126,18 +131,45 @@ class OpenAPIExtractor:
             params: dict[str, Any] = {}
             for p, s in (body.get("properties") or {}).items():
                 if (x := _prop(s, p not in req)) is not None:
-                    put(params, snake(p), x, out, here)
+                    put(params, snake(p), x, out, here, f"actions.{name}.params")
             roles = op.get(profile.roles_from) if profile.roles_from else None
             roles = [roles] if isinstance(roles, str) else roles
             creates = method == "post" and len(segs) == 1 and "{" not in path.rstrip("/").rsplit("/", 1)[-1]
             action = {"description": str(op.get("summary") or op.get("description") or name.replace("_", " ")).strip(),
                       "actor": [str(r) for r in roles] if isinstance(roles, list) and roles else list(profile.roles),
                       "params": params, ("creates" if creates else "target"): target}
+            call = op.get("x-toprope-call") or (profile.options.get("calls") or {}).get(source_name) \
+                or (profile.options.get("calls") or {}).get(name)
+            reply = f"record_{name}"
+            if call:                                              # a known call target: the effect and its reply
+                ids = [s[1:-1] for s in path.strip("/").split("/") if s.startswith("{") and s.endswith("}")]
+                with_ = {**({ids[-1]: "target.id"} if ids and not creates else {}),
+                         **{p: f"params.{p}" for p in params}}
+                action["effects"] = [{"call": str(call), "with": with_, "reply": reply}]
+                out.candidates.append(Candidate(f"actions.{reply}", {
+                    "description": f"Record the answer to {name}.", "actor": ["external:kernel"], "target": target,
+                    "params": {"ok": {"type": "boolean"}},
+                    "preconditions": [{"id": f"{name.replace('_', '-')}-done", "check": "params.ok == true",
+                                       "reason": f"The call behind {name} did not succeed."}]}, here))
+            else:
+                out.ask(f"What carries out {name} once it is allowed? The source names no call, so the draft has no "
+                        "effect: name the tool (`call: mcp:<tool>`, with a reply action), or say it changes only "
+                        "Toprope's record.", "call", [f"actions.{name}.effects"], [here])
             out.candidates.append(Candidate(f"actions.{name}", action, here))
+            if creates:
+                created.add(target)
             if not (isinstance(roles, list) and roles):
-                out.questions.append(f"Who may {action['description'].rstrip('.').lower()} ({name})?")
+                out.ask(f"Who may {action['description'].rstrip('.').lower()} ({name})?", "actor",
+                        [f"actions.{name}.actor"], [here])
             if objects.get(target) and not creates:
                 for c in [c for c in out.candidates if c.path == f"transitions.{target}"]:
                     for state in c.value["matrix"]:
-                        out.candidates.append(Candidate(f"transitions.{target}.matrix.{state}.{name}", "undecided", here))
+                        for x in (name, reply) if call else (name,):
+                            out.candidates.append(Candidate(f"transitions.{target}.matrix.{state}.{x}", "undecided",
+                                                            here))
+        for obj in objects:
+            if obj not in created:
+                out.ask(f"How is {a_(obj)} created? No operation in the source creates one: name the action that does "
+                        "(and who may take it), or say it comes from elsewhere (another system, an import).",
+                        "creation", [f"objects.{obj}", "actions"], [obj_place[obj]])
         return out

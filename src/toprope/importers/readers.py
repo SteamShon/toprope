@@ -1,4 +1,5 @@
-"""Built-in readers (ADR-0051): a file, and a URL. Others plug in through `toprope.readers`."""
+"""Built-in readers (ADR-0051): a file, a URL, a folder, and an MCP server's tool list. Others plug in
+through `toprope.readers`."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -58,4 +59,39 @@ class TreeReader:
         return Raw(b"\n".join(x.data for x in parts), location, parts)
 
 
-BUILTIN = [FileReader(), HttpReader(), TreeReader()]
+def upstream_spec(location: str) -> dict:
+    """An MCP server as a binding names it: `{url: ...}` for streamable HTTP, or `{command: [...]}`."""
+    import shlex
+    if location.startswith(("https://", "http://")):
+        return {"url": location}
+    try:
+        cmd = shlex.split(location)
+    except ValueError as e:
+        raise SystemExit(fixed(f"cannot read the server command {location!r}: {e}",
+                               "quote the command as one argument, e.g. \"python server.py\"")) from None
+    if not cmd:
+        raise SystemExit(fixed("no server command given", "give the command that starts the server, or its URL"))
+    return {"command": cmd}
+
+
+class McpReader:
+    """An MCP server's tool list (`tools/list`, ADR-0052 §7), from the command that starts it
+    (stdio) or its URL (streamable HTTP), through the same client the proxy uses. The source is
+    the list as JSON: `{server, tools: [{name, description, inputSchema, outputSchema,
+    annotations}]}`; a draft cites `<location>#/tools/<i>`."""
+    kind = "mcp"
+
+    def read(self, location: str, profile: Profile) -> Raw:
+        import json
+
+        from ..proxy import Upstream
+        spec = upstream_spec(location)
+        up = Upstream.open(spec)
+        try:
+            tools = [t.model_dump(mode="json", by_alias=True, exclude_none=True) for t in up.tools().values()]
+        finally:
+            up.close()
+        return Raw(json.dumps({"server": spec, "tools": tools}, indent=2, ensure_ascii=False).encode() + b"\n", location)
+
+
+BUILTIN = [FileReader(), HttpReader(), TreeReader(), McpReader()]

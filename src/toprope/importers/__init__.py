@@ -13,10 +13,11 @@ from __future__ import annotations
 from typing import Any
 
 from ..errors import fixed
-from .draft import build
+from .draft import Item, apply, build, plan
 from .port import (
     Candidate,
     Extraction,
+    Note,
     Profile,
     Raw,
     extractor,
@@ -28,13 +29,24 @@ from .port import (
 
 
 def import_source(kind: str, location: str, *, domain: str = "imported", profile: Profile | None = None,
-                  via: str = "file") -> dict[str, Any]:
+                  via: str | None = None, into: dict[str, Any] | None = None) -> dict[str, Any]:
+    """The draft a source gives, and what it cannot say. `via` defaults to the reader of the same
+    name as the extractor if there is one (`mcp`), else `file`. With `into` (an existing draft),
+    `items` is what joining the source to it adds (`draft.plan`): the draft's own elements are never
+    overwritten, and each disagreement is a conflict naming both places."""
     profile = profile or Profile()
+    via = via or ("mcp" if kind == "mcp" else "file")
     raw = reader(via).read(location, profile)
     ext = extractor(kind).extract(raw, profile)
-    draft = build(domain, ext)
+    places: dict[str, str] = {}
+    draft = build(domain, ext, places)
     _check(draft, kind)
-    return {"draft": draft, "questions": ext.questions, "conflicts": ext.conflicts, "candidates": len(ext.candidates)}
+    out: dict[str, Any] = {"draft": draft, "candidates": len(ext.candidates), "raw": raw, "places": places}
+    if into is not None:
+        out["items"] = plan(into, draft, places, ext)
+    out.update(questions=ext.questions, conflicts=ext.conflicts, question_records=ext.question_records(),
+               conflict_records=ext.conflict_records(), binding=ext.binding)
+    return out
 
 
 def _check(draft: dict[str, Any], kind: str) -> None:
@@ -52,5 +64,5 @@ def _check(draft: dict[str, Any], kind: str) -> None:
                                "named part out"))
 
 
-__all__ = ["Candidate", "Extraction", "Profile", "Raw", "import_source", "kinds", "register_extractor",
-           "register_reader"]
+__all__ = ["Candidate", "Extraction", "Item", "Note", "Profile", "Raw", "apply", "import_source", "kinds", "plan",
+           "register_extractor", "register_reader"]
