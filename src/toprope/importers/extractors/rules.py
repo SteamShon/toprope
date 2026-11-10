@@ -6,7 +6,8 @@ cited by file and line. Two candidates that say opposite things about the same t
 conflict, both places named. Neither is a rule: they are questions for the interview, and an
 agent drafts elements from the answers (ADR-0041). Deterministic: no model reads the text.
 
-Several files come in one source through the `tree` reader, which marks where each file starts.
+Several files come in one source through the `tree` reader, as its parts. An imperative with no
+binding word ("Keep PRs small") is not read: the interview asks for what the text leaves out.
 """
 from __future__ import annotations
 
@@ -16,10 +17,9 @@ from itertools import combinations
 
 from . import Extraction, Profile
 
-FILE_MARK = re.compile(r"^<!-- toprope:file (.+?) -->$")
-NEGATIVE = r"must\s+not|mustn't|never|cannot|can't|can\s+not|do\s+not|don't|does\s+not|doesn't|may\s+not|shall\s+not|should\s+not|shouldn't"
-POSITIVE = r"must|always|shall|has\s+to|have\s+to|needs?\s+to|is\s+required\s+to|are\s+required\s+to"
-MODAL = re.compile(rf"\b(?P<neg>{NEGATIVE})\b|\b(?P<only>only)\b|\b(?P<pos>{POSITIVE})\b|\b(?P<before>before)\b",
+NEGATIVE = r"must\s+not|mustn't|never|no\s+\w+\s+may|nobody\s+may|no\s+one\s+may|cannot|can't|can\s+not|do\s+not|don't|does\s+not|doesn't|may\s+not|shall\s+not|should\s+not|shouldn't"
+POSITIVE = r"must|always|shall|should|has\s+to|have\s+to|needs?\s+to|is\s+required\s+to|are\s+required\s+to"
+MODAL = re.compile(rf"\b(?P<neg>{NEGATIVE})\b|\b(?P<only>only)\b|\b(?P<pos>{POSITIVE})\b|\b(?P<before>before)\b(?!\s+\d)",
                    re.IGNORECASE)
 STOP = frozenset("""
 a an the to of in on at by for from with into onto and or but if then than that this these those it
@@ -46,6 +46,12 @@ def _stem(w: str) -> str:
     return w
 
 
+def _plain(sentence: str) -> str:
+    """Bold markers out, outside code spans only (`__init__.py` stays as written)."""
+    return "".join(part if part.startswith("`") else re.sub(r"\*\*|(?<!\w)__|__(?!\w)", "", part)
+                   for part in re.split(r"(`[^`]*`)", sentence))
+
+
 def _split(parts: list[tuple[str, int]]) -> list[tuple[str, int]]:
     """One paragraph's lines → its sentences, each with the line it starts on. A code span may
     hold a dot (`docs/STATUS.md`); a sentence ends only at `. ` before a capital, a quote or `."""
@@ -54,43 +60,70 @@ def _split(parts: list[tuple[str, int]]) -> list[tuple[str, int]]:
         text += ("" if not text else " ") + s
         lines.append((at, n))
         at = len(text) + 1
-    text = re.sub(r"\*\*|__", "", text)
     masked = re.sub(r"`[^`]*`", lambda m: "x" * len(m.group(0)), text)
+    masked = re.sub(r"\*\*", "  ", masked)
     out, start = [], 0
-    for m in [*re.finditer(r"(?<=[.!?])\s+(?=[A-Z`(\"“])", masked), None]:
+    for m in [*re.finditer(r"(?<=[.!?])\s+(?=[A-Z`(\"“*])", masked), None]:
         end = m.start() if m else len(text)
-        if sentence := text[start:end].strip():
-            out.append((sentence, max(n for off, n in lines if off <= start + 1) if lines else 0))
+        if sentence := _plain(text[start:end]).strip():
+            first = start + len(text[start:end]) - len(text[start:end].lstrip())
+            out.append((sentence, max(n for off, n in lines if off <= first)))
         start = m.end() if m else end
     return out
 
 
+def _front_matter_end(lines: list[str]) -> int:
+    """Skill front matter: `---`, `key: value` lines, `---`. A thematic break is not it."""
+    if not lines or lines[0].strip() != "---":
+        return 0
+    end = next((i for i, ln in enumerate(lines[1:], 1) if ln.strip() == "---"), 0)
+    body = [ln for ln in lines[1:end] if ln.strip()]
+    return end + 1 if end and body and re.match(r"^[A-Za-z_][\w-]*\s*:", body[0]) else 0
+
+
 def _sentences(text: str) -> list[tuple[str, int]]:
-    """Prose sentences with their line, skipping code, front matter and headings. A table row is
-    one sentence, its cells joined."""
+    """Prose sentences with their line, skipping code (fenced or indented), HTML comments, front
+    matter and headings. A table row is one sentence, its cells joined; a quote is read as prose."""
     out: list[tuple[str, int]] = []
     para: list[tuple[str, int]] = []
-    fence = False
+    fence, comment = "", False
     lines = text.splitlines()
-    if lines and lines[0].strip() == "---":                      # skill front matter
-        end = next((i for i, ln in enumerate(lines[1:], 1) if ln.strip() == "---"), 0)
-        lines = [""] * (end + 1) + lines[end + 1:]
+    skip = _front_matter_end(lines)
 
     def flush() -> None:
         out.extend(_split(para))
         para.clear()
 
     for n, line in enumerate(lines, 1):
+        if n <= skip:
+            continue
         s = line.strip()
-        if s.startswith(("```", "~~~")):
+        if fence:
+            if re.match(rf"^{re.escape(fence[0])}{{{len(fence)},}}\s*$", s):
+                fence = ""
+            continue
+        if comment:
+            comment = "-->" not in s
+            continue
+        if m := re.match(r"^(`{3,}|~{3,})", s):
             flush()
-            fence = not fence
-        elif fence or s.startswith(("#", "<!--")) or (s and set(s) <= set("|-: ")):
+            fence = m.group(1)
+            continue
+        if s.startswith("<!--"):
+            flush()
+            comment = "-->" not in s
+            continue
+        if not para and re.match(r"^( {4}|\t)", line) and not re.match(r"^\s*(?:[-*+]|\d+[.)])\s", line):
+            continue                                              # an indented code block
+        s = re.sub(r"^(?:>\s?)+", "", s).strip()                 # a quote is read as prose
+        if re.match(r"^#{1,6}(\s|$)", s) or (s and set(s) <= set("|-: ")):
             flush()
         elif s.startswith("|"):
             flush()
-            if cells := [c.strip() for c in s.strip("|").split("|") if c.strip()]:
-                out.append((re.sub(r"\*\*", "", " — ".join(cells)), n))
+            masked = re.sub(r"`[^`]*`", lambda m: m.group(0).replace("|", "\0"), s)
+            cells = [c.strip().replace("\0", "|") for c in masked.strip("|").split("|") if c.strip()]
+            if cells:
+                out.append((_plain(" — ".join(cells)), n))
         elif not s:
             flush()
         else:
@@ -105,10 +138,11 @@ def _sentences(text: str) -> list[tuple[str, int]]:
 def _rules(text: str, where: str) -> list[Rule]:
     rules = []
     for sentence, line in _sentences(text):
-        m = MODAL.search(sentence)
-        if not m:
+        found = [m for m in MODAL.finditer(sentence)]
+        if not found:
             continue
-        kind = "never" if m.group("neg") else "only" if m.group("only") else "must" if m.group("pos") else "before"
+        groups = {k for m in found for k, v in m.groupdict().items() if v}
+        kind = "never" if "neg" in groups else "only" if "only" in groups else "must" if "pos" in groups else "before"
         plain = re.sub(r"`([^`]*)`", r"\1", sentence)
         words = frozenset(_stem(w) for w in re.findall(r"[A-Za-z][A-Za-z0-9_/-]*", MODAL.sub(" ", plain))
                           if w.lower() not in STOP and len(w) > 2)
@@ -126,25 +160,24 @@ def _contradict(a: Rule, b: Rule, overlap: float) -> bool:
 
 class RulesExtractor:
     kind = "rules"
+    LIMIT = 100                                                   # conflicts listed; the rest are counted
 
     def extract(self, raw, profile: Profile) -> Extraction:
         out = Extraction()
-        text = raw.data.decode("utf-8", "replace")
-        files: list[tuple[str, list[str]]] = []
-        for line in text.splitlines():
-            if m := FILE_MARK.match(line.strip()):
-                files.append((m.group(1), []))
-            elif files:
-                files[-1][1].append(line)
-        if not files:
-            files = [(raw.ref, text.splitlines())]
-        rules = [r for name, lines in files for r in _rules("\n".join(lines), name)
+        docs = raw.parts or [raw]                                 # the tree reader gives one part per file
+        rules = [r for d in docs for r in _rules(d.data.decode("utf-8", "replace"), d.ref)
                  if not any(ig.lower() in r.text.lower() for ig in profile.ignore)]
-        overlap = float(profile.options.get("overlap", 0.6))
+        overlap = float(profile.options.get("overlap", 0.8))
+        found = 0
         for a, b in combinations(rules, 2):
             if _contradict(a, b, overlap):
-                pos, neg = (a, b) if a.kind == "must" else (b, a)
-                out.conflicts.append(f"{pos.where} says “{pos.text}”, but {neg.where} says “{neg.text}”")
+                found += 1
+                if found <= self.LIMIT:
+                    pos, neg = (a, b) if a.kind == "must" else (b, a)
+                    out.conflicts.append(f"{pos.where} says “{pos.text}”, but {neg.where} says “{neg.text}”")
+        if found > self.LIMIT:
+            out.conflicts.append(f"… and {found - self.LIMIT} more like these: the texts repeat one rule both ways, or "
+                                 "set `options: {overlap: 0.9}` in the profile to list fewer")
         for r in rules:
             out.questions.append(f"[{r.kind}] {r.where}: “{r.text}” Which action, rule or role is this, and who "
                                  "enforces it?")

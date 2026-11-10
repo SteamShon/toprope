@@ -52,27 +52,30 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit(fixed(f"{a.source} does not read as {a.kind}: {e}",
                                "give the export as it was written, or another extractor")) from None
     draft = out["draft"]
-    if a.questions:
-        qdest = Path(a.questions)
-        if qdest.exists():
-            raise SystemExit(fixed(f"{qdest} exists", "give --questions a new file"))
+    has_draft = bool(draft["objects"] or draft["actions"])
+    if not has_draft and not out["questions"] and not out["conflicts"]:
+        raise SystemExit(fixed(f"nothing to import from {a.source}",
+                               f"check that it is {a.kind}: no things, enums, statuses or rules were found"))
+    dest = Path(a.out) if a.out else Path(f"{draft['domain']}.domain.yaml")
+    qdest = Path(a.questions) if a.questions else None
+    if has_draft and dest.exists():                               # every check before anything is written
+        raise SystemExit(fixed(f"{dest} exists", "give --out a new file; to add to a draft, propose the elements there"))
+    if qdest and qdest.exists():
+        raise SystemExit(fixed(f"{qdest} exists", "give --questions a new file"))
+    if qdest and has_draft and qdest.resolve() == dest.resolve():
+        raise SystemExit(fixed("--questions and --out name the same file", "give each its own file"))
+    if qdest:
         qdest.parent.mkdir(parents=True, exist_ok=True)
         qdest.write_text(yaml.safe_dump({"source": a.source, "conflicts": out["conflicts"], "questions": out["questions"]},
                                         sort_keys=False, allow_unicode=True, width=100))
-    if not draft["objects"] and not draft["actions"]:
-        if not out["questions"] and not out["conflicts"]:
-            raise SystemExit(fixed(f"nothing to import from {a.source}",
-                                   f"check that it is {a.kind}: no things, enums, statuses or rules were found"))
-        print(f"no draft written: {a.source} names nothing to declare yet; {len(out['questions'])} question(s) and "
-              f"{len(out['conflicts'])} conflict(s) for the interview")
-    else:
-        dest = Path(a.out) if a.out else Path(f"{draft['domain']}.domain.yaml")
-        if dest.exists():
-            raise SystemExit(fixed(f"{dest} exists", "give --out a new file; to add to a draft, propose the elements there"))
+    if has_draft:
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(yaml.safe_dump(draft, sort_keys=False, allow_unicode=True))
         print(f"wrote {dest}: {len(draft['objects'])} thing(s), {len(draft['actions'])} action(s), "
               f"{len(draft['transitions'])} with stages; every element is proposed, citing {a.source}")
+    else:
+        print(f"no draft written: {a.source} names nothing to declare yet; {len(out['questions'])} question(s) and "
+              f"{len(out['conflicts'])} conflict(s) for the interview")
     for title, items in (("conflicts in the source", out["conflicts"]), ("questions for the interview", out["questions"])):
         if items:
             print(f"\n{title}:")

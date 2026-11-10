@@ -412,6 +412,10 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 Each item names the PR it came from and the review date. The PR that resolves an item deletes
 it; each release's cleanup PR handles items older than one release.
 
+- The `rules` extractor (#228, review 2026-11-10) reads only sentences with a binding word:
+  imperatives without one ("Keep PRs small") are missed, and some descriptive sentences ("these
+  cannot be enforced") become questions. A sentence parser, or a model behind the same port, could
+  do better; the interview covers the gap until then.
 - The Ossie extractor (#226, review 2026-11-10) takes a stage field's first enum value as `initial`
   and keeps a stage field optional if the source does; the interview asks which stage comes first,
   but the draft does not mark the guess. Auto Ontology's certification does not reach the draft

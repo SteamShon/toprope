@@ -95,11 +95,12 @@ the error is raised.
 
 | Error | Fix |
 |---|---|
+| --questions and --out name the same file | give each its own file |
 | no source given | give `toprope-import <extractor> <source>` |
 | nothing to import from {…} | check that it is {…}: no things, enums, statuses or rules were found |
 | {…} does not read as {…}: {…} | give the export as it was written, or another extractor |
-| {…} exists | give --questions a new file |
 | {…} exists | give --out a new file; to add to a draft, propose the elements there |
+| {…} exists | give --questions a new file |
 
 ## `importers/port.py`
 
@@ -120,6 +121,8 @@ the error is raised.
 | cannot fetch {…}: {…} | check the URL and that the network allows it |
 | cannot read {…}: {…} | give the path of the file to import |
 | no file under {…} matches {…} | set `options: {glob: ...}` in the profile |
+| the glob {…} does not work: {…} | give a pattern like `**/*.md` |
+| the glob {…} reaches outside {…} | give a pattern inside the folder, e.g. `**/*.md` |
 | {…} is not a URL | give an http(s) URL, or use the file reader |
 | {…} is not a folder | give a folder, or use the file reader for one file |
 

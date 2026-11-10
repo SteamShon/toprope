@@ -26,6 +26,12 @@ uv run toprope-import rules examples/import/rules --via tree --questions /tmp/ru
 becomes a rule by itself (ADR-0041). Run it on this repository's own `AGENTS.md` to see about
 fifty candidates and no conflict.
 
+It reads only sentences with a binding word. An imperative without one ("Keep PRs small") is not
+read; the interview asks for what the text leaves out. Some descriptive sentences ("these cannot
+be enforced from the files") become questions too, which a person dismisses. Two rules conflict
+when most of the shorter one's words are shared (`options: {overlap: 0.8}` in the profile);
+after 100 conflicts the rest are counted.
+
 A team's conventions go in a profile instead of code (ADR-0051):
 
 ```yaml

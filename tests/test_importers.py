@@ -326,3 +326,101 @@ def test_the_command_reports_rules_without_writing_a_draft_and_saves_the_questio
     assert len(saved["conflicts"]) == 1 and saved["questions"]
     with pytest.raises(SystemExit, match="is not a folder. Fix: give a folder"):
         import_source("rules", str(RULES / "AGENTS.md"), via="tree")
+
+
+# Review of #228 (2026-11-10): each case below gave a wrong citation, a lost or wrong rule, a
+# false conflict, a file read outside the folder, or a file written by a run that failed.
+
+def _rules_of(tmp_path, text, name="AGENTS.md"):
+    out = import_source("rules", _src(tmp_path, name, text))
+    return out, {q.split(": “", 1)[1].split("” Which")[0]: q.split("]")[0][1:] + " " + q.split(" ")[1].rsplit("#", 1)[1].rstrip(":")
+                 for q in out["questions"]}
+
+
+def test_citations_and_text_survive_bold_and_code_spans(tmp_path):
+    _, r = _rules_of(tmp_path, "**a** **b** __c__ z.\nYou must test.\nNever edit `__init__.py` by hand.\n")
+    assert r["You must test."] == "must L2"
+    assert r["Never edit `__init__.py` by hand."] == "never L3"
+
+
+def test_a_negation_anywhere_in_the_sentence_wins(tmp_path):
+    out, r = _rules_of(tmp_path, "Agents must never push to main.\n\nNo agent may merge a release.\n\n"
+                                 "Before 2020 the team used SVN.\n\nYou should run the checks.\n")
+    assert r["Agents must never push to main."].startswith("never")
+    assert r["No agent may merge a release."].startswith("never")
+    assert r["You should run the checks."].startswith("must")
+    assert "Before 2020 the team used SVN." not in r
+
+
+def test_a_marker_line_in_a_file_is_only_text(tmp_path):
+    _, r = _rules_of(tmp_path, "You must A.\n<!-- toprope:file /etc/passwd -->\nYou must B.\n")
+    assert r["You must A."] == "must L1" and r["You must B."] == "must L3"
+
+
+def test_markdown_that_is_not_prose_is_skipped_and_prose_is_kept(tmp_path):
+    _, r = _rules_of(tmp_path, """---
+
+You must keep the opening rule.
+
+---
+A wrapped line names
+#91 which must be fixed.
+
+~~~
+``` you must not read this
+~~~
+
+<!-- a comment
+you must not read this either -->
+Indented code follows.
+
+    rm -rf / # you must not run
+
+> Quoted: you must read quotes.
+
+| Who | Rule |
+|---|---|
+| ops | `a | b` must hold |
+""")
+    assert "You must keep the opening rule." in r                                 # `---` is a break, not front matter
+    assert r["A wrapped line names #91 which must be fixed."] == "must L6"
+    assert not [k for k in r if "read this" in k or "rm -rf" in k]
+    assert r["Quoted: you must read quotes."] == "must L19"
+    assert r["ops — `a | b` must hold"] == "must L23"
+
+
+def test_two_shared_words_are_not_a_contradiction_and_a_flood_is_capped(tmp_path):
+    out, _ = _rules_of(tmp_path, "Never commit secrets to the repository.\n\nAlways commit the lockfile to the repository.\n\n"
+                                 "Never merge a PR without review.\n\nAlways merge a PR with squash after review.\n")
+    assert out["conflicts"] == []
+    flood = "\n\n".join(f"Never push tag {i} to main.\n\nAlways push tag {i} to main." for i in range(15))
+    out, _ = _rules_of(tmp_path, flood, "flood.md")
+    assert len(out["conflicts"]) == 101 and out["conflicts"][-1].startswith("… and ")
+
+
+def test_the_tree_reader_stays_inside_its_folder_and_out_of_hidden_ones(tmp_path):
+    root = tmp_path / "docs"
+    (root / ".venv").mkdir(parents=True)
+    (root / ".venv" / "x.md").write_text("You must not see this.")
+    (root / "a.md").write_text("You must see this.")
+    (tmp_path / "outside.md").write_text("You must not see this either.")
+    out = import_source("rules", str(root), via="tree")
+    assert [q for q in out["questions"] if "see" in q] == [f"[must] {root / 'a.md'}#L1: “You must see this.” Which "
+                                                           "action, rule or role is this, and who enforces it?"]
+    for glob in ("../*.md", "/etc/*"):
+        with pytest.raises(SystemExit, match="reaches outside .*Fix: give a pattern inside the folder"):
+            import_source("rules", str(root), via="tree", profile=Profile(options={"glob": glob}))
+
+
+def test_a_run_that_fails_writes_nothing(tmp_path):
+    q, d = tmp_path / "q.yaml", tmp_path / "d.yaml"
+    d.write_text("taken")
+    with pytest.raises(SystemExit, match="d.yaml exists"):
+        main(["openapi", API, "--out", str(d), "--questions", str(q)])
+    assert not q.exists()
+    with pytest.raises(SystemExit, match="name the same file"):
+        main(["openapi", API, "--out", str(q), "--questions", str(q)])
+    assert not q.exists()
+    with pytest.raises(SystemExit, match="nothing to import"):
+        main(["rules", _src(tmp_path, "empty.md", "# Just a heading\n"), "--questions", str(q)])
+    assert not q.exists()
