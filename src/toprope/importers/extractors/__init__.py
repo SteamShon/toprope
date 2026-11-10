@@ -1,4 +1,4 @@
-"""Built-in extractors (ADR-0051): OpenAPI, SQL DDL, a workflow export. Others plug in through
+"""Built-in extractors (ADR-0051): OpenAPI, SQL DDL, a workflow export, written rules. Others plug in through
 `toprope.extractors`. Each turns one format into candidates citing their exact place."""
 from __future__ import annotations
 
@@ -42,10 +42,11 @@ def ignored(profile: Profile, *names: str) -> bool:
     return any(n in profile.ignore for n in names)
 
 
-def put(facts: dict[str, Any], key: str, value: Any, out: Extraction, where: str) -> None:
-    """Two source names that read as one fact are a conflict, not a silent overwrite."""
+def put(facts: dict[str, Any], key: str, value: Any, out: Extraction, where: str, path: str = "") -> None:
+    """Two source names that read as one fact are a conflict, not a silent overwrite. `path` is
+    the element the facts belong to (`objects.Order.properties`)."""
     if key in facts:
-        out.conflicts.append(f"{where}: two facts read as `{key}`; kept the first")
+        out.conflict(f"{where}: two facts read as `{key}`; kept the first", [f"{path}.{key}" if path else key], [where])
     else:
         facts[key] = value
 

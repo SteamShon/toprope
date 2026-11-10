@@ -424,3 +424,85 @@ def test_a_run_that_fails_writes_nothing(tmp_path):
     with pytest.raises(SystemExit, match="nothing to import"):
         main(["rules", _src(tmp_path, "empty.md", "# Just a heading\n"), "--questions", str(q)])
     assert not q.exists()
+
+
+# Review of theme 4 (2026-11-10): an import did not reach an enforced declaration without hand work.
+
+def test_questions_and_conflicts_are_records_naming_what_they_decide_and_where(tmp_path):
+    out = import_source("openapi", API, domain="shop")
+    who = next(n for n in out["question_records"] if n.kind == "actor" and "refund_order" in n.text)
+    assert who.decides == ["actions.refund_order.actor"]
+    assert who.places == [f"{API}#/paths/~1orders~1{{id}}~1refund/post"]
+    assert [n.text for n in out["question_records"]] == out["questions"]         # the strings stay, one record each
+    rules = import_source("rules", str(RULES), via="tree")
+    (c,) = rules["conflict_records"]
+    agents, skill = str(RULES / "AGENTS.md"), str(RULES / "skills/hotfix/SKILL.md")
+    assert c.kind == "contradiction" and c.places == [f"{skill}#L8", f"{agents}#L5"]
+    assert c.modality == ["must", "never"] and c.quote[1] == "Never push a release tag to `main` by hand."
+    rule = next(n for n in rules["question_records"] if n.places == [f"{agents}#L5"])
+    assert rule.kind == "rule" and rule.modality == "never" and rule.quote == "Never push a release tag to `main` by hand."
+    assert {"push", "release", "tag"} <= set(rule.terms)
+
+
+def test_the_command_writes_question_records_an_agent_can_put_in_the_interview(tmp_path):
+    q = tmp_path / "q.yaml"
+    main(["openapi", API, "--domain", "shop", "--out", str(tmp_path / "d.yaml"), "--questions", str(q)])
+    saved = yaml.safe_load(q.read_text())
+    rec = next(r for r in saved["questions"] if r["kind"] == "actor" and "refund_order" in r["text"])
+    assert rec["id"].startswith("Q-import-") and rec["decides"] == ["actions.refund_order.actor"]
+    assert rec["places"] == [f"{API}#/paths/~1orders~1{{id}}~1refund/post"]
+
+
+def test_a_second_source_joins_a_draft_and_a_disagreement_is_a_conflict_not_an_overwrite(tmp_path, capsys):
+    dest = tmp_path / "shop.domain.yaml"
+    main(["openapi", API, "--domain", "shop", "--out", str(dest)])
+    with pytest.raises(SystemExit, match="exists. Fix: give --out a new file, or --into it"):
+        main(["sql", SQL, "--out", str(dest)])
+    main(["sql", SQL, "--into", str(dest)])
+    d = valid(yaml.safe_load(dest.read_text()))
+    order = d.objects["Order"]
+    assert order.properties["channel"].enum == ["web", "store"] and "placed_at" in order.properties   # both sources
+    assert order.source.ref == f"{SQL}#L3" and order.status == "proposed"       # changed, so proposed again
+    assert set(d.actions) == {"create_order", "refund_order"}
+    other = _src(tmp_path, "other.sql", "CREATE TABLE orders (status text CHECK (status IN ('open', 'closed')));\n")
+    main(["sql", other, "--into", str(dest)])
+    text = capsys.readouterr().out
+    assert "objects.Order.properties.status: the draft has" in text and f"{other}#L1" in text
+    d = valid(yaml.safe_load(dest.read_text()))
+    assert d.objects["Order"].properties["status"].enum == ["paid", "shipped", "refunded"]   # kept the draft's
+    assert d.transitions["Order"].matrix.keys() == {"paid", "shipped", "refunded"}
+
+
+def test_openapi_asks_how_a_thing_is_created_and_drafts_a_call_only_when_it_is_named(tmp_path):
+    api = yaml.safe_load(Path(API).read_text())
+    del api["paths"]["/orders"], api["components"]["schemas"]["NewOrder"]
+    api["paths"]["/orders/{id}/refund"]["post"]["x-toprope-call"] = "mcp:refund_order"
+    f = tmp_path / "api.yaml"
+    f.write_text(yaml.safe_dump(api))
+    out = import_source("openapi", str(f), domain="shop")
+    d = valid(out["draft"])
+    (e,) = d.actions["refund_order"].effects
+    assert e.call == "mcp:refund_order" and e.with_ == {"id": "target.id", "reason": "params.reason",
+                                                         "amount": "params.amount"}
+    assert d.actions["record_refund_order"].actor == ["external:kernel"]
+    assert d.transitions["Order"].matrix["paid"]["record_refund_order"] == "undecided"
+    created = [n for n in out["question_records"] if n.kind == "creation"]
+    assert [n.decides[0] for n in created] == ["objects.Order"]
+    plain = import_source("openapi", API, domain="shop")
+    assert not valid(plain["draft"]).actions["refund_order"].effects                  # no call named: asked instead
+    assert {n.decides[0] for n in plain["question_records"] if n.kind == "call"} == {
+        "actions.refund_order.effects", "actions.create_order.effects"}
+    assert not [n for n in plain["question_records"] if n.kind == "creation"]       # createOrder creates it
+
+
+def test_a_draft_no_one_may_act_in_is_reported_as_not_ready(tmp_path, capsys):
+    from toprope.harness.cli import main as harness
+    d = valid(import_source("openapi", API, domain="shop")["draft"])
+    warned = [i for i in validate_domain(d) if i.code == "unassigned-actor"]
+    assert {i.where for i in warned} == {"actions.create_order.actor", "actions.refund_order.actor"}
+    assert all(i.severity == "warning" and "Fix: answer who may take it" in i.message for i in warned)
+    f = tmp_path / "shop.domain.yaml"
+    main(["openapi", API, "--domain", "shop", "--out", str(f)])
+    with pytest.raises(SystemExit):
+        harness(["--domain", str(f), "--levels", "model", "--examples", "0"])
+    assert "not ready: 2 of 2 action(s) no one may take yet" in capsys.readouterr().out

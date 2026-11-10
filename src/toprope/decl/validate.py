@@ -8,8 +8,9 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from ..errors import fixed
 from ..expr import ParseError, Path, parse, paths_read
-from .models import RESERVED_ACTORS, ActorRule, ByRole, Deny, Domain, Target
+from .models import RESERVED_ACTORS, UNASSIGNED, ActorRule, ByRole, Deny, Domain, Target
 
 RESERVED_CELLS = {"n/a", "undecided"}
 ROOTS = {"target", "actor", "params", "new"}
@@ -142,6 +143,11 @@ def validate_domain(d: Domain) -> list[Issue]:
         for p in a.preconditions:
             issues += _check_expr(d, p.check, f"{where}.preconditions.{p.id}", a.object_type, set(a.params))
         roles_named = {r.role if isinstance(r, ActorRule) else r for r in a.actor}
+        if roles_named and roles_named <= {UNASSIGNED}:
+            add(Issue("unassigned-actor", f"{where}.actor", fixed(
+                f"no one may take {name} yet: its actor is `{UNASSIGNED}`, the role an import names until a person "
+                "says who acts, so the draft is not ready", "answer who may take it in the interview, and propose "
+                "those roles as its actor"), severity="warning"))
         if "external:kernel" in roles_named and roles_named - {"external:kernel"}:
             add(Issue("mixed-external", f"{where}.actor",
                       "an action is either for `external:kernel` or for others: declare two actions"))

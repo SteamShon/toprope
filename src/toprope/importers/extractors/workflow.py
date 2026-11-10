@@ -26,7 +26,8 @@ class WorkflowExtractor:
         statuses = list(dict.fromkeys(snake(str(s.get("name") if isinstance(s, dict) else s))
                                       for s in doc.get("statuses") or []))
         if not statuses:
-            out.questions.append("The export lists no statuses: which stages does it go through?")
+            out.ask("The export lists no statuses: which stages does it go through?", "stage",
+                    [f"transitions.{obj}"], [ref])
             return out
         out.candidates.append(Candidate(f"objects.{obj}", {"description": f"{a_(obj)[0].upper()}{a_(obj)[1:]} in this workflow.",
                                                            "properties": {"status": {"enum": statuses}}}, f"{ref}#/statuses"))
@@ -43,15 +44,16 @@ class WorkflowExtractor:
             m = moves.setdefault(name, {"ref": here, "label": source_name, "cells": {}})
             to = snake(str(tr["to"])) if tr.get("to") is not None else None
             if to not in statuses:
-                out.questions.append(f"“{source_name}” ({here}) moves to {tr.get('to')!r}, which is not among the "
-                                     "statuses: which stage is it?")
+                out.ask(f"“{source_name}” ({here}) moves to {tr.get('to')!r}, which is not among the "
+                        "statuses: which stage is it?", "stage", [f"transitions.{obj}.matrix"], [here])
                 continue
             froms = tr.get("from") or []
             froms = [snake(str(f)) for f in (froms if isinstance(froms, list) else [froms])] or statuses
             for f in froms:
                 if f in m["cells"] and m["cells"][f][0] != to:
-                    out.conflicts.append(f"“{source_name}” from {f} goes to {m['cells'][f][0]} ({m['cells'][f][1]}) "
-                                         f"and to {to} ({here}); kept the first")
+                    out.conflict(f"“{source_name}” from {f} goes to {m['cells'][f][0]} ({m['cells'][f][1]}) "
+                                 f"and to {to} ({here}); kept the first", [f"transitions.{obj}.matrix.{f}.{name}"],
+                                 [m['cells'][f][1], here])
                     continue
                 m["cells"].setdefault(f, (to, here))
         for name, m in moves.items():
@@ -61,5 +63,5 @@ class WorkflowExtractor:
                 cell = m["cells"].get(st)
                 out.candidates.append(Candidate(f"transitions.{obj}.matrix.{st}.{name}",
                                                 {"to": cell[0]} if cell else "undecided", cell[1] if cell else m["ref"]))
-            out.questions.append(f"Who may move {a_(obj)} with “{m['label']}”?")
+            out.ask(f"Who may move {a_(obj)} with “{m['label']}”?", "actor", [f"actions.{name}.actor"], [m["ref"]])
         return out

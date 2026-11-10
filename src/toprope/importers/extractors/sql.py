@@ -118,9 +118,10 @@ class SQLExtractor:
                 col, typ = _last(c.group(1)), _last(c.group(2)).lower()
                 optional = not re.search(r"\bNOT\s+NULL\b|\bPRIMARY\s+KEY\b", item, re.IGNORECASE)
                 if typ == "enum" and c.group(3):                 # MySQL: status ENUM('a', 'b')
-                    put(props, snake(col), {"enum": _values(_inside(item, c.end())[0]), "optional": optional}, out, here)
+                    put(props, snake(col), {"enum": _values(_inside(item, c.end())[0]), "optional": optional}, out, here,
+                        f"objects.{obj}.properties")
                 elif typ in enums:
-                    put(props, snake(col), {"enum": enums[typ], "optional": optional}, out, here)
+                    put(props, snake(col), {"enum": enums[typ], "optional": optional}, out, here, f"objects.{obj}.properties")
                 for ck_col, vals in checks:
                     if ck_col.lower() == col.lower() and snake(col) not in props:
                         props[snake(col)] = {"enum": vals, "optional": optional}
@@ -132,5 +133,6 @@ class SQLExtractor:
             field = next((p for p in props if p in profile.stage_fields), None)
             if field:
                 stages(out, obj, field, props[field]["enum"], here)
-                out.questions.append(f"What can be done to {a_(obj)} in each {field} ({', '.join(props[field]['enum'])})?")
+                out.ask(f"What can be done to {a_(obj)} in each {field} ({', '.join(props[field]['enum'])})?", "cell",
+                        [f"transitions.{obj}.matrix"], [here])
         return out

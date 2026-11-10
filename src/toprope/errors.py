@@ -24,6 +24,7 @@ COVERED = (
     "adapters/cli/__init__.py",
     "adapters/cli/change.py",
     "importers/cli.py",
+    "importers/loop.py",
     "importers/port.py",
     "importers/readers.py",
     "proxy/__init__.py",
