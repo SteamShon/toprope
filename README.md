@@ -106,6 +106,10 @@ In this example, approving updates Toprope's own record. Calling the ad platform
 - **Rules reviewed like code.** A change is a commit, checked before review, approved by a person
   merging it into `main`, and deployed only if its tests pass. Why we think every workflow needs
   this loop: [`docs/problem.md`](docs/problem.md).
+- **One approval per change.** An agent drafts a change and writes it up as one request; a person
+  reads it and approves it once, in GitHub or at their own terminal (`toprope-apply`, one `yes`),
+  and that approval confirms, commits, checks and approves it, and ships it when its risk is low
+  ([`docs/workflow.md`](docs/workflow.md)).
 - **Tests you do not write.** The harness is generated from the declaration and tries every
   state × action × role combination.
 - **You do not write the rules either.** An agent drafts them from your systems and your answers to

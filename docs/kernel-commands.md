@@ -46,6 +46,16 @@ Its subcommands are the domain's actions, one per action, plus `get`, `history`,
 | `--request` `REQUEST` | the request file to write (default: .toprope/requests/<id>.yaml) |
 | `--run-args` `RUN_ARGS` | options passed to every toprope-run step, e.g. "--identity static:ids.yaml" (default ``) |
 
+## `toprope-apply`
+
+`toprope-apply`: a person applies a human request at their own terminal, with one confirmation (ADR-0053, 3; ADR-0039 without GitHub).
+
+| Argument | What |
+|---|---|
+| `REQUEST` | the request file, .toprope/requests/<id>.yaml |
+| `--identity` `IDENTITY` | the identity file your git email is looked up in (default `toprope.identity.yaml`) |
+| `--ship` | also deliver, preview, deploy, probe and verify the commit the request approves; a commit not recorded low risk stops after its preview |
+
 ## `toprope-server`
 
 `toprope-server`: serve a declaration over MCP (stdio or streamable HTTP).

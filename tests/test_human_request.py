@@ -33,6 +33,10 @@ def test_a_request_is_checked_before_it_is_shown():
     assert "run takes" in hr.check({"summary": "x", "steps": [{"run": {"member": "a", "action": "b"}}]})[0]
     assert "amend takes" in hr.check({"summary": "x", "steps": [{"amend": {"dir": "d", "file": "f"}}]})[0]
     assert hr.check({"summary": "x", "steps": [{"freeze": "d"}], "extra": 1})
+    risk = {"level": "high", "reasons": ["an invariant or outcome rule changed: invariant:x"]}
+    assert hr.check({**ok, "risk": risk}) == []            # what the change check found, shown on the page
+    assert "risk:" in hr.check({**ok, "risk": {"level": "high"}})[0]
+    assert "an invariant or outcome rule changed" in hr.render({**ok, "risk": risk})
 
 
 def test_what_is_shown_is_what_runs():
@@ -251,6 +255,7 @@ def test_an_approved_run_is_recorded_so_a_commit_can_cite_it_after_any_merge(tmp
     (row,) = [json.loads(x) for x in (tmp_path / hr.APPROVAL_RUNS).read_text().splitlines()]
     assert row["run"] == url and row["approver"] == "Ana-GH" and row["as"] == "ana <ana@example.com>"
     assert row["steps"] == req["steps"] and row["summary"] == "Approve commit 6"
+    assert row["channel"] == "github"                     # a local apply records `local` (ADR-0053, 3)
     workflow = (ROOT / ".github/workflows/human-request.yml").read_text()
     assert "human_request.py record" in workflow.split("git rm")[0]          # recorded, then committed
     ignored = subprocess.run(["git", "check-ignore", "-q", hr.APPROVAL_RUNS], cwd=ROOT)

@@ -17,6 +17,7 @@ from ..errors import fixed
 
 def _commands() -> list[tuple[str, Callable[[], argparse.ArgumentParser], str]]:
     from ..adapters.cli import _base_parser
+    from ..adapters.cli.apply import build_parser as apply
     from ..adapters.cli.change import build_parser as change
     from ..adapters.mcp.cli import build_parser as server
     from ..commits.cli import build_parser as commits
@@ -27,6 +28,7 @@ def _commands() -> list[tuple[str, Callable[[], argparse.ArgumentParser], str]]:
          "Its subcommands are the domain's actions, one per action, plus `get`, `history`, `allowed`, "
          "`whoami` and `guide`; each domain's guide lists them with who may take each."),
         ("toprope-change", change, ""),
+        ("toprope-apply", apply, ""),
         ("toprope-server", server, ""),
         ("toprope-harness", harness, ""),
         ("toprope-worldmap", worldmap, ""),

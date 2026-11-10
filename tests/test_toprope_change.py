@@ -78,6 +78,11 @@ def test_an_agent_proposes_checks_and_writes_one_request_and_no_commit(repo, cap
         "confirm_all_proposed", "commit_draft", "check_commit", "approve_commit"]
     assert req["summary"] == "[high risk: approval only] Drafts name their declaration"   # a new invariant
     assert result["risk"] == "high" and any("invariant" in r for r in result["risk_reasons"])
+    assert req["risk"] == {"level": "high", "reasons": result["risk_reasons"]}   # shown before approving
+    shown = hr.render(req)
+    assert "**Risk written in the request: high**: " in shown and "not the kernel's record" in shown
+    assert "in GitHub" in result["next"] and f"toprope-apply {result['request']}" in result["next"]   # both routes
+    assert f"toprope-apply --ship {result['request']}" in result["then"]
     decl = yaml.safe_load((repo / "domains/authoring/authoring.domain.yaml").read_text())
     (added,) = [i for i in decl["invariants"] if i["id"] == RULE["id"]]
     assert added["status"] == "proposed"                               # nothing is confirmed by the agent

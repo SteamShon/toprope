@@ -242,10 +242,11 @@ SLACK = timedelta(seconds=1)              # a record's `at` is cut to the second
 
 def _run_steps(run: dict) -> list[dict]:
     """The `run` steps of a recorded request that ran: all of them, or, for a run recorded as
-    failed (`ran`, `failed`), the ones before the failed step."""
+    failed (`ran`, `failed`) or held after a preview (`ran`, `held`; a local apply, ADR-0050 3),
+    the ones before the step it stopped at."""
     steps = [st["run"] for st in run.get("steps") or [] if isinstance(st, dict) and isinstance(st.get("run"), dict)]
     ran = run.get("ran")
-    if run.get("failed") and isinstance(ran, int):
+    if (run.get("failed") or run.get("held")) and isinstance(ran, int):
         n = sum(1 for st in (run.get("steps") or [])[:ran] if isinstance(st, dict) and "run" in st)
         steps = steps[:n]
     return steps
@@ -460,6 +461,9 @@ def measure(root: Path, since: object = None, until: object = None) -> dict:
         },
         "approvals_per_approved_change_by_risk": by_risk,
         "approval_runs": len(matched),
+        # how each was approved: in GitHub, or applied at a person's terminal (ADR-0053, 3); a record
+        # from before the channel was written is a GitHub run
+        "approval_runs_by_channel": dict(Counter(str(r.get("channel") or "github") for r, _, _ in matched)),
         "refused_or_failed_per_command": _ratio(bad, taken),
         "refusals_per_command": {
             "commands": taken,
@@ -501,7 +505,9 @@ def render(m: dict) -> str:
              f"Per change approved in the window ({m['approvals_in_window']}): "
              f"{t['commands_by_person_or_agent']} commands by a person or agent, "
              f"{t['commands_by_person']} by a person.",
-             f"Approved human requests: {m['approval_runs']}. Refused or failed per command by a "
+             f"Approved human requests: {m['approval_runs']} ("
+             + (", ".join(f"{v} {k}" for k, v in sorted(m["approval_runs_by_channel"].items())) or "none")
+             + f"). Refused or failed per command by a "
              f"person or agent: {m['refused_or_failed_per_command']}.",
              f"Failed before the gate (recorded since D1b): {m['failed_before_the_gate'] or 'none'}, "
              f"{m['failed_before_the_gate_without_a_fix']} without a fix; per change approved since "

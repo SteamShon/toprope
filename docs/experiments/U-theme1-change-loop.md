@@ -62,6 +62,12 @@ A log line that does not parse stops the tool with its file, its line and the fi
   earlier request has its own steps), matched to a command that did not succeed, so a refusal the
   run met is not counted as typed by the person. Not finding it is not a missing step: the step
   may have failed before the gate.
+- **Approvals without GitHub** (ADR-0053, 3): a request a person applies at their terminal with
+  `toprope-apply` is recorded in the same log with `channel: local` (a record without a channel is a
+  GitHub run) and counted exactly as an approved run in GitHub: one approval, one touch.
+  `approval_runs_by_channel` reports how many runs came by each route. A local run held after a
+  preview (a commit not low risk, ADR-0050, 3) is recorded with `ran` and `held`: its first `ran`
+  steps are looked for, and the apply that takes the rest is a second approval.
 - **Approvals per approved change, by risk**: for each approved change, the approved requests in
   the window whose found commands approve it (`approve_commit`) or ship it (`deliver`, `preview`,
   `deploy`, `run_probes`, `verify` on it), plus `approve_commit` commands on it a person typed

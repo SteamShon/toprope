@@ -431,3 +431,63 @@ def test_f1_reads_a_failed_run_as_human_request_py_records_it(tmp_path):
     t = ub.measure(tmp_path)["person_touches"]
     assert (t["approvals_of_human_requests"], t["request_steps_not_found"]) == (2, 0)
     assert t["commands_outside_an_approved_request"] == 0
+
+
+def test_a_request_applied_at_a_terminal_is_one_touch_and_one_approval(tmp_path, monkeypatch):
+    """ADR-0053, 3: without GitHub, a local apply of a request with one confirmation is one approval."""
+    import subprocess
+
+    import human_request as hr
+    import yaml
+    real = subprocess.run
+    steps, cmds = one_approval_run("2-b", "2026-11-10T10:00:30+00:00")
+
+    def kernel(cmd, **kw):
+        if cmd[0] == "git":
+            return real(cmd, **kw)
+        then = [{"kernel": "commit", "status": "ok", "object": "2-b"}] if "commit_draft" in cmd else []
+        return subprocess.CompletedProcess(cmd, 0, json.dumps({"status": "ok", "then": then}), "")
+    monkeypatch.setattr(hr.subprocess, "run", kernel)
+    (tmp_path / "toprope.identity.yaml").write_text(yaml.safe_dump({"people": {"ana@example.com": {
+        "name": "ana", "roles": ["owner", "approver"]}}}))
+    (tmp_path / "gitconfig").write_text("[user]\n\temail = ana@example.com\n")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(tmp_path / "gitconfig"))
+    monkeypatch.setenv(hr.TLC_ENV, "tla2tools.jar")
+    monkeypatch.setattr(sys, "stdin", type("T", (), {"isatty": lambda self: True})())
+    req = tmp_path / ".toprope/requests/r.yaml"
+    req.parent.mkdir(parents=True)
+    req.write_text(yaml.safe_dump({"summary": "s", "steps": [{"run": s} for s in steps]}))
+    domain(tmp_path, "authoring", cmds[:6], [event("X", PERSON, "person")], ["2-b"], ["2-b"],
+           checks=[risk("2-b", "low")])
+    domain(tmp_path, "delivery", cmds[6:], [event("X", PERSON, "person")], [], [])
+    hr.apply(".toprope/requests/r.yaml", cwd=tmp_path, ask=lambda prompt: "yes")
+    log = tmp_path / ".toprope/approval-runs.jsonl"
+    (row,) = [json.loads(x) for x in log.read_text().splitlines()]
+    write(log, [row | {"at": "2026-11-10T10:00:30+00:00"}])          # the kernel's commands are at 10:00
+    m = ub.measure(tmp_path)
+    assert m["approval_runs_by_channel"] == {"local": 1}
+    assert m["person_touches"]["per_approved_change"] == 1.0
+    assert (m["person_touches"]["approvals_of_human_requests"], m["person_touches"]["request_steps_not_found"],
+            m["person_touches"]["commands_outside_an_approved_request"]) == (1, 0, 0)
+    assert m["approvals_per_approved_change_by_risk"] == {"low": {"changes": 1, "approvals": 1, "per_change": 1.0}}
+
+
+def test_a_run_held_after_its_preview_counts_the_steps_it_ran(tmp_path):
+    """A local apply holds a commit not low risk after its preview (ADR-0050, 3): the steps it left
+    are not looked for in the logs, and the second apply that takes them is a second approval."""
+    steps, cmds = one_approval_run("2-b", "x")
+    run1 = approval_run("2026-11-10T10:00:30+00:00", steps) | {"channel": "local", "ran": 6, "held": {"step": 7}}
+    run2 = approval_run("2026-11-10T10:30:30+00:00", [s | {"target": s["target"].replace("$commit", "2-b")}
+                                                     for s in steps[6:]]) | {"channel": "local"}
+    later = [timed(PERSON, a, "authoring:2-b:local", f"2026-11-10T10:30:0{i}+00:00")
+             for i, a in enumerate(("deploy", "run_probes", "verify"))]
+    _, early = one_approval_run("2-b", "x")
+    domain(tmp_path, "authoring", early[:6], [event("X", PERSON, "person")], ["2-b"], ["2-b"],
+           checks=[risk("2-b", "high")])
+    domain(tmp_path, "delivery", [early[6], *later], [event("X", PERSON, "person")], [], [])
+    write(tmp_path / ".toprope/approval-runs.jsonl", [run1, run2])
+    m = ub.measure(tmp_path)
+    assert m["person_touches"]["request_steps_not_found"] == 0
+    assert m["person_touches"]["commands_outside_an_approved_request"] == 0
+    assert m["approvals_per_approved_change_by_risk"] == {"high": {"changes": 1, "approvals": 2, "per_change": 2.0}}
+    assert m["approval_runs_by_channel"] == {"local": 2}

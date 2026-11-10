@@ -18,7 +18,8 @@ to do about it. `{…}` is filled in when the error is raised.
 | the declaration has {…} error(s), listed above | fix them, then run `toprope-harness --domain <file>` to check |
 | {…} is an action of {…} | give --member |
 | {…} reads one member | give --member, one of {…} |
-| {…} requires a person | run it yourself on a terminal, or through a human request (tools/human_request.py) |
+| {…} requires a person | run it yourself on a terminal, or through a human request (tools/human_request.py): approved in GitHub, or applied with `toprope-apply` |
+| {…} requires a person, and the apply's confirmation did not reach this step (no terminal, or {…} names no confirmation of {…} by this command's parent) | run `toprope-apply` yourself on your terminal; or unset {…} and run the step yourself |
 | {…}: `{…}` must be a single value | give one value, such as a path |
 | {…}: cannot read it ({…}) | give --config FILE, or --no-config |
 | {…}: expected a mapping such as `composition: x.composition.yaml` | fix the file, or give --no-config |
@@ -26,6 +27,15 @@ to do about it. `{…}` is filled in when the error is raised.
 | {…}: no such file | give the path of a toprope.yaml, or leave --config out |
 | {…}: not valid YAML ({…}) | fix the file, or give --no-config |
 | {…}: unknown key(s) {…} | use only the keys {…} |
+
+## `src/toprope/adapters/cli/apply.py`
+
+| Error | Fix |
+|---|---|
+| cannot make {…}: {…} | make it yours with mode 0700, or set TMPDIR to a directory of your own |
+| no tools/human_request.py here: toprope-apply runs this repository's human requests | run it from the repository root |
+| {…} cannot be loaded | run it from the repository root |
+| {…} is not a directory only you own and use (mode 0700) | remove it, or set TMPDIR to a directory of your own, then apply again |
 
 ## `src/toprope/adapters/cli/change.py`
 
@@ -374,14 +384,29 @@ to do about it. `{…}` is filled in when the error is raised.
 | Error | Fix |
 |---|---|
 | $commit, but no commit_draft step before it made a commit | put a commit_draft step before it, or name the commit |
+| --ship adds the delivery of the commit the request makes and approves; this request makes none | leave --ship out, or write the delivery request with `python tools/human_request.py ship` |
 | GitHub user {…} approved, but is not a person with `github:` in {…} | add `github: <login>` to the approver's entry under `people` in the identity file, or have a listed person approve |
+| applying a request needs a person at a terminal, and this process has none | run `toprope-apply` yourself, on your terminal; or commit and push the request, and approve its run in GitHub (the `human-request` workflow) |
+| approve_commit needs TLC's check, and TOPROPE_TLC_JAR is not set: nothing was run | set TOPROPE_TLC_JAR to a TLC jar (tla2tools.jar, as the tla workflow pins it), then apply again |
 | approve_commit needs TLC: set TOPROPE_TLC_JAR to a TLC jar (the workflow does) | run the request through the `human-request` workflow, or set the variable to a TLC jar |
 | change needs --draft | give --draft with the draft whose change to take through |
+| channel {…} | use one of {…} |
+| identity file {…}: {…} | give --identity the repository's identity file |
+| interrupted (Ctrl-C) | fix the cause, then apply the request again (it now holds only the steps that did not run) |
+| interrupted (Ctrl-C) | fix the cause, then push a change to the request (the workflow leaves the steps that did not run in it), and approve that run; do not re-run this run |
+| not applied: nothing was run | type `yes` to apply it |
 | record needs --approver, --as and --run-url | give --approver, --as and --run-url (the workflow does) |
 | run needs --approver | give --approver with the GitHub login that approved the run (the workflow does) |
 | ship needs --commit, the approved commit | give --commit with the approved commit's id |
 | {…} | edit the request into the format at the top of tools/human_request.py, then push it again |
-| {…} ... {…} | fix the cause, then push a change to the request (the workflow leaves the steps that did not run in it), and approve that run; do not re-run this run |
-| {…} ... {…} | the step's action was taken, so the rest does not send it again: fix the cause and, if the step must be taken again (e.g. an approval was refused), add it to the rest; push the rest and approve that run; do not re-run this run |
+| {…} | fix the cause, then apply the request again (it now holds only the steps that did not run) |
+| {…} | fix the cause, then push a change to the request (the workflow leaves the steps that did not run in it), and approve that run; do not re-run this run |
+| {…} | the step's action was taken, so the rest does not send it again: fix the cause and, if the step must be taken again (e.g. an approval was refused), add it to the rest; then apply the request again |
+| {…} | the step's action was taken, so the rest does not send it again: fix the cause and, if the step must be taken again (e.g. an approval was refused), add it to the rest; push the rest and approve that run; do not re-run this run |
+| {…} | apply the request from a git identity listed under `people` |
+| {…} is an agent: only a person applies a request (ADR-0041) | ask the person to apply it on their own terminal, or push it and have them approve its run in GitHub (the `human-request` workflow) |
+| {…} is not a person in {…} | apply the request as a person listed under `people` there |
 | {…} is not low risk ({…}), so this approval does not ship it | read the preview, then approve a second request with the delivery steps (the workflow leaves them in the request); do not re-run this run |
+| {…}: {…} | fix the cause, then apply the request again (it now holds only the steps that did not run) |
 | {…}: {…} | fix the cause, then push a change to the request (the workflow leaves the steps that did not run in it), and approve that run; do not re-run this run |
+| {…}: {…} | give the path of a request file, such as .toprope/requests/<id>.yaml |
