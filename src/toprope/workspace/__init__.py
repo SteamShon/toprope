@@ -587,7 +587,8 @@ class Workspace:
                                      "question": text, "answer": answer,
                                      "decisions": [d["path"] for d in decisions],
                                      **({"examples": examples} if examples else {})})
-        return {"ref": ref, "applied": [d["path"] for d in decisions], "issues": issues}
+        return {"ref": ref, "applied": [d["path"] for d in decisions], "issues": issues,
+                "map": self.live_map()["text"]}
 
     def _log_source_id(self) -> str:
         rel = self.log_path.relative_to(self.root).as_posix()
@@ -673,6 +674,40 @@ class Workspace:
                         "source": (el or {}).get("source") if isinstance(el, dict) else None,
                         "main": main.id if main else None})
         return out
+
+    def live_map(self) -> dict[str, Any]:
+        """The draft as a map while the owner answers (ADR-0049, B3): per thing with stages, where
+        each action leads from each stage, what is refused, what is still open (`?`), and what is
+        only proposed (`*`). `mermaid` holds the world map's state diagrams for a renderer. Empty
+        when the draft does not parse."""
+        try:
+            d = Domain.model_validate(self.draft())
+        except ValidationError:
+            return {"text": "", "mermaid": {}}
+        lines = []
+        for obj, tr in d.transitions.items():
+            lines.append(f"{obj} ({tr.field}; starts {tr.initial or '?'})")
+            for state, row in tr.matrix.items():
+                cells = []
+                for action, c in row.items():
+                    mark = "*" if getattr(c, "status", None) == "proposed" else ""
+                    if isinstance(c, str):
+                        cells.append(f"{action} ?" if c == UNDECIDED else f"{action} -" if c == "n/a" else f"{action} -> {c}")
+                    elif hasattr(c, "deny"):
+                        cells.append(f"{action} x{mark}")
+                    elif hasattr(c, "by_role"):
+                        cells.append(f"{action} by role{mark}")
+                    else:
+                        cells.append(f"{action} -> {getattr(c, 'to', '?')}{mark}")
+                lines.append(f"  {state}: " + ", ".join(cells))
+        if lines:
+            lines.append("(-> leads to, x refused, - does not apply, ? still open, * proposed, not yet confirmed)")
+        from ..worldmap import build_world_map, to_mermaid
+        try:
+            mermaid = to_mermaid(build_world_map(d)).get("states", {})
+        except Exception:                               # noqa: BLE001 - the text map is enough
+            mermaid = {}
+        return {"text": "\n".join(lines), "mermaid": mermaid}
 
     def decisions(self) -> list[dict[str, str]]:
         """What confirming and approving the draft decides, in the domain's words (ADR-0049, D2).
@@ -770,6 +805,7 @@ class Workspace:
                     "progress": plan.progress(), "stop": self._stop(plan.d, plan.attempts)}
         qs = plan.bundle(st)
         return {"stage": st.name, "title": st.title, "goal": st.goal, "optional": st.optional,
+                "map": self.live_map()["text"],
                 "bundle_id": self._bundle_id(st.name, qs),
                 "questions": [x.as_dict() for x in qs[:limit]], "total": len(qs),
                 "progress": plan.progress(), "stop": self._stop(plan.d, plan.attempts)}
