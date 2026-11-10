@@ -1,9 +1,8 @@
 # M2's grader: a redesign, drafted for the researcher
 
-Link: ① ② (M2's verdicts), and none for the tooling. Status: **draft**. Nothing here is built or
-frozen. The researcher decides each point under *Decisions*. After that, the chosen parts are
-implemented, validated as *Validation* says, and frozen in M2's preregistration before M2's main
-run. Context: [`M1-recheck.md`](M1-recheck.md), criterion 3 and its amendments;
+Link: ① ② (M2's verdicts), and none for the tooling. Status: **decided** (2026-11-10, the researcher: "추천대로 진행해줘"), not built yet. The chosen
+parts are implemented, validated as *Validation* says, and frozen in M2's preregistration before
+M2's main run. Context: [`M1-recheck.md`](M1-recheck.md), criterion 3 and its amendments;
 [`M2-design.md`](M2-design.md).
 
 ## The problem
@@ -117,16 +116,19 @@ and they can be checked now on M1's runs, for consistency only. Treat option 1 a
 decided on the pilot's evidence. Its effect on the arms is the risk M2 can least afford, since M2
 compares the arms.
 
-## Decisions for the researcher
+## Decisions (the researcher, 2026-11-10: as recommended)
 
-1. Which options to adopt. The draft recommends 2, 3, 4 and 5 now, and 1 only after the pilot.
-2. The noise limit (draft: 0.05 of recall per arm) and the revision cap (draft: 2).
-3. k for the majority (draft: 3).
-4. The checklist's items and formula, and rule B's wording, with the invented examples.
-5. The calibration set: M1's combined run for options 2 to 4, and M2's pilot for option 1 and for
-   the final check.
+1. **Adopted now: options 2, 3, 4 and 5.** Option 1 (the reviewer's structured output) is decided in
+   M2's pilot, on its evidence.
+2. **Noise limit: 0.05 of recall per arm**; at most **2** revisions of the grader before it is frozen.
+3. **k = 3** for the majority.
+4. The checklist's items (a), (b), (c) and the formula `seeded = (a) and ((b) or (c))`, as above;
+   rule B's wording as option 4 gives it. The invented examples are drafted with the
+   implementation, and the researcher reviews them before the grader is frozen.
+5. **Calibration:** M1's combined run, graded twice, for options 2 to 4 (consistency only); M2's
+   pilot for option 1 and for the final check.
 
-## After the decisions
+## Next: the implementation
 
 1. A grader prompt for the checklist goes into `phase_b/prompts/`, next to `grade_change.md`, which
    stays as M1 used it.
