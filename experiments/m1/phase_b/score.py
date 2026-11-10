@@ -645,14 +645,56 @@ def rescript(run: Path, scoring: str = "scoring") -> dict[str, Any]:
     path = run / scoring / "proposed.yaml"
     graded = yaml.safe_load(path.read_text())
     n = 0
+    same: dict[tuple, str] = {}                          # the grader's label of a finding, by change and text
     for c in graded["changes"]:
         for f in c["flags"]:
-            if f.get("script_label") and not scriptable(f.get("flag") or {}):
-                f["script_label"], f["label"], f["script_cleared"] = None, f.get("grader_label"), True
+            fl = f.get("flag") or {}
+            if f.get("grader_label"):
+                same.setdefault((c["seq"], f["id"].split(".")[0], fl.get("check"), fl.get("where"), fl.get("problem")),
+                                f["grader_label"])
+    for c in graded["changes"]:
+        for f in c["flags"]:
+            fl = f.get("flag") or {}
+            if f.get("script_label") and not scriptable(fl):
+                # A grader that left it unlabelled gave the same finding of the same label elsewhere
+                # in this change (the compiler repeats it in every run): that label, else none.
+                label = f.get("grader_label") or same.get(
+                    (c["seq"], f["id"].split(".")[0], fl.get("check"), fl.get("where"), fl.get("problem")))
+                f["script_label"], f["label"], f["script_cleared"] = None, label, True
                 n += 1
     head = "".join(line + "\n" for line in path.read_text().splitlines() if line.startswith("#"))
     path.write_text(head + yaml.safe_dump(graded, sort_keys=False, allow_unicode=True, width=110))
-    return {"file": str(path), "script_labels_cleared": n}
+    left = sum(1 for c in graded["changes"] for f in c["flags"] if f.get("label") not in LABELS)
+    return {"file": str(path), "script_labels_cleared": n, "flags_without_label": left}
+
+
+def regrade_missing(run: Path, instruments: Path, backend: Any, scoring: str = "scoring") -> dict[str, Any]:
+    """Grade again, once, each probe run of a sitting the grader left without a pass or fail
+    (no JSON even after the retry), so every grade comes from the grader (M1-recheck.md,
+    criterion 2). A run that did not complete stays for the researcher."""
+    path = run / scoring / "proposed.yaml"
+    graded = yaml.safe_load(path.read_text())
+    probes = {p["id"]: p for p in yaml.safe_load((instruments / "probe-suite.yaml").read_text())["probes"]}
+    tr = run / scoring / "transcripts"
+    done, left = 0, 0
+    for arm, rows in graded["probes"].items():
+        for row in rows:
+            if isinstance(row.get("passed"), bool) or row.get("error"):
+                continue
+            rec = records(run, arm).get(row["seq"], {})
+            pr = next((x for x in probe_runs(rec) if x["run"] == row.get("run", 1)), None)
+            res = next((x for x in (pr or {}).get("results", []) if x["probe"] == row["probe"]), None)
+            if pr is None or res is None:
+                left += 1
+                continue
+            g = grade_probe(backend, probes[row["probe"]], run / arm / f"seq-{row['seq']:02d}" / pr["dir"], res,
+                            tr / f"{arm}-seq-{row['seq']:02d}-run-{row.get('run', 1)}-{row['probe']}-regrade.jsonl")
+            row.update({k: g[k] for k in ("passed", "why")}, regraded=True)
+            done += 1
+            left += not isinstance(g["passed"], bool)
+    head = "".join(line + "\n" for line in path.read_text().splitlines() if line.startswith("#"))
+    path.write_text(head + yaml.safe_dump(graded, sort_keys=False, allow_unicode=True, width=110))
+    return {"file": str(path), "regraded": done, "still_without_a_grade": left}
 
 
 def to_decide(run: Path) -> dict[str, Any]:

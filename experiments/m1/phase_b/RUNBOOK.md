@@ -196,8 +196,13 @@ with these differences:
   ```bash
   uv run python -m phase_b rescript --out runs/phase-b-recheck-combined --scoring scoring
   uv run python -m phase_b rescript --out runs/phase-b-recheck-combined --scoring scoring-2
+  uv run python -m phase_b regrade-missing --model MODEL --out runs/phase-b-recheck-combined --scoring scoring
+  uv run python -m phase_b regrade-missing --model MODEL --out runs/phase-b-recheck-combined --scoring scoring-2
   uv run python -m phase_b compare-gradings --out runs/phase-b-recheck-combined
   ```
+  `rescript` must report `flags_without_label: 0`, and `regrade-missing` `still_without_a_grade: 0`;
+  if not, stop and report. `to-decide` should then list nothing; anything it lists goes to the
+  researcher as in step 5.
 - Then step 5's `to-decide` and confirmation, and step 6's `score`, on
   `runs/phase-b-recheck-combined` (its `scoring/`, the first sitting). `metrics.json` holds, under
   `by_sitting`, each arm's recall and precision from both sittings with their range: report those

@@ -220,7 +220,8 @@ def run_arm(arm: Any, out: Path, requests: list[dict[str, Any]], backend: Backen
             for pr in probes0:
                 _log_probes(log, arm.name, 0, pr["run"], d0 / pr["dir"], pr["results"])
             (d0 / "record.json").write_text(json.dumps({"seq": 0, "probes": probes0,
-                                                        "seconds": {"probes": time.monotonic() - tp}},
+                                                        "seconds": {"probes": time.monotonic() - tp},
+                                                        "tokens": (backend.report() or {}).get("tokens")},
                                                        indent=2, ensure_ascii=False) + "\n")
             manifest["baseline_probes"] = True
             write()
@@ -495,6 +496,11 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
                         "graded before the fix); the label becomes the grader's")
     rs.add_argument("--out", type=Path, default=DEFAULT_OUT)
     rs.add_argument("--scoring", default="scoring")
+    rg = sub.add_parser("regrade-missing", parents=[common], help="grade again each probe run a sitting left "
+                        "without a pass or fail (no JSON after the retry)")
+    rg.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    rg.add_argument("--instruments", type=Path, default=INSTRUMENTS)
+    rg.add_argument("--scoring", default="scoring")
     cg = sub.add_parser("compare-gradings", help="the grader's noise: each arm's recall from two sittings")
     cg.add_argument("--out", type=Path, default=DEFAULT_OUT)
     cg.add_argument("--instruments", type=Path, default=INSTRUMENTS)
@@ -543,6 +549,11 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
             raise SystemExit("the instruments do not verify; nothing runs:\n" + "\n".join(errs))
         from .combined import combine
         print(json.dumps({**combine(args.out, args.to, backend), "usage": backend.report()}))
+        return
+    if args.cmd == "regrade-missing":
+        from .score import regrade_missing
+        print(json.dumps({**regrade_missing(args.out, args.instruments, backend, args.scoring),
+                          "usage": backend.report()}, indent=2))
         return
     if args.cmd == "grade":
         errs = verify_instruments(args.instruments)
