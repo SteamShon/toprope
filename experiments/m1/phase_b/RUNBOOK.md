@@ -9,8 +9,8 @@ their computer. You run the harness there, push the results and open PRs into
 `umbrella/m1-phase-b`. Run every command from `experiments/m1`.
 
 ## Never
-- Open `instruments/change-key.yaml`, `instruments/binding.yaml`, anything in `drafts/`, or
-  `runs/phase-b/scoring/blind-labels.yaml`. Do not grep, cat or diff them either. `grade` and `score` open
+- Open `instruments/change-key.yaml`, `instruments/binding.yaml`, anything in `drafts/`,
+  `runs/phase-b/scoring/blind-labels.yaml`, or a run's `recall-questions.yaml`. Do not grep, cat or diff them either. `grade` and `score` open
   what they need.
 - Edit what an arm sees: `phase_b/prompts/`, `arms/`, `instruments/`. If something there looks
   wrong, stop and tell the researcher.
@@ -181,17 +181,15 @@ with these differences:
   uv run python -m phase_b grade --model MODEL --out runs/phase-b-recheck-combined --into scoring-2
   uv run python -m phase_b compare-gradings --out runs/phase-b-recheck-combined
   ```
-  Report `grader-noise.json`. **STOP** if `within_limit` is false: the researcher grades the
-  labels the two sittings disagree on, and that grade counts. Group them first, so one label
-  covers a finding however often it recurs:
+  Report `grader-noise.json`. **STOP** if `within_limit` is false: the researcher decides the
+  disagreements that can change recall (M1-recheck.md, criterion 3 as amended):
   ```bash
-  uv run python -m phase_b group-disagreements --out runs/phase-b-recheck-combined
+  uv run python -m phase_b recall-questions --out runs/phase-b-recheck-combined
   ```
-  Report its summary (groups, and those with `recall: true`). The researcher sets
-  `researcher_label` in `disagreements.yaml` on every recall group (others keep the first
-  sitting's label), then:
+  Report only the counts it prints. **Do not open `recall-questions.yaml`**: it holds the answer
+  key's entries. The researcher answers each question (`answer: yes` or `no`) in that file, then:
   ```bash
-  uv run python -m phase_b apply-disagreements --out runs/phase-b-recheck-combined
+  uv run python -m phase_b apply-recall-answers --out runs/phase-b-recheck-combined
   ```
   It writes `scoring/confirmed.yaml` with `status: proposed`; continue with `to-decide`.
 - Then step 5's `to-decide` and confirmation, and step 6's `score`, on

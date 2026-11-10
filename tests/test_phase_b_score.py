@@ -476,3 +476,48 @@ def test_the_two_sittings_disagreements_are_grouped_and_the_researchers_labels_a
     conf = yaml.safe_load((run / "scoring/confirmed.yaml").read_text())
     nl_flags = [f for c in conf["changes"] for f in c["flags"] if f["id"] in g["members"]]
     assert {f["label"] for f in nl_flags} == {"other-real"} and conf["status"] == "proposed"
+
+
+def test_only_the_disagreements_that_can_change_recall_are_asked_and_the_answers_give_it(tmp_path):
+    """M1-recheck.md, criterion 3 as amended: a run is asked about only when its recall depends on
+    the answer; answering every question gives recall exactly."""
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    three = lambda w: {1: [[F(w), F("actions.z")]] * 3, 3: [[F(w)]] * 3}   # noqa: E731
+    write_run(run, "nl", three("actions.a"), {1: 1, 2: 1, 3: 1}, runs=3)
+    write_run(run, "structured", three("actions.b"), {1: 1, 2: 1, 3: 1}, runs=3)
+    write_run(run, "toprope", {}, {1: 1, 2: 1, 3: 1}, runs=3)
+    first = {("nl", 1): ["seeded", "other-real"], ("structured", 1): ["seeded", "other-real"],
+             ("nl", 3): ["seeded"]}
+    second = {("nl", 1): ["other-real", "false-alarm"], ("structured", 1): ["seeded", "seeded"],
+              ("nl", 3): ["other-real"]}
+    runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m"],
+                backend=ApiBackend(FakeModel(grader(first, run)[0])))
+    runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m", "--into", "scoring-2"],
+                backend=ApiBackend(FakeModel(grader(second, run, "scoring-2")[0])))
+    got = score.recall_questions(run, inst)
+    # nl change 1: three runs depend on it; structured change 1 is caught in both sittings (its
+    # flag 1 differs, but cannot change recall); change 3 has no seeded problem.
+    assert got == {"questions": 3, "disputed_flags": 3, "runs_already_caught": 3}
+    doc = yaml.safe_load((run / score.QUESTIONS).read_text())
+    assert [q["seq"] for q in doc["questions"]] == [1, 1, 1]
+    assert not re.search(r"\b(nl|structured|toprope)\b", yaml.safe_dump(doc["questions"]))   # blind
+    assert doc["questions"][0]["seeded_problem"]["problem"] in ("conflict", "breakage")
+    with pytest.raises(SystemExit, match="no yes/no answer"):
+        score.apply_recall_answers(run)
+    for q, ans in zip(doc["questions"], ("yes", "no", "yes")):
+        q["answer"] = ans
+    (run / score.QUESTIONS).write_text(yaml.safe_dump(doc))
+    score.apply_recall_answers(run)
+    conf = run / "scoring/confirmed.yaml"
+    c = yaml.safe_load(conf.read_text())
+    c["status"] = "confirmed"
+    for ch in c["changes"]:
+        for f in ch["flags"]:
+            f["label"] = f["label"] or "false-alarm"
+    for ps in c["probes"].values():
+        for p in ps:
+            p["passed"] = True if p["passed"] is None else p["passed"]
+    conf.write_text(yaml.safe_dump(c))
+    m = score.score(run, inst)["metrics"]
+    assert m["nl"]["recall_spread"]["runs"][:3] == [0.5, 0.0, 0.5]          # change 1 caught in runs 1 and 3
+    assert m["structured"]["recall_spread"]["runs"][:3] == [0.5, 0.5, 0.5]
