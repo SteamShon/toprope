@@ -469,3 +469,129 @@ def test_score_reports_each_arms_recall_and_precision_from_both_sittings(tmp_pat
     assert out["by_sitting"]["toprope"]["recall"]["range"] == [1.0, 1.0]
     assert out["metrics"]["nl"]["recall"] == 0.5                       # the confirmed grades: the first sitting
 
+
+
+CAP = {"domain": "authoring", "where": "actions.confirm_element.preconditions.p", "problem": "a new path",
+       "check": "capability", "severity": "warning"}
+
+
+def test_a_capability_finding_on_the_edited_element_is_left_to_the_grader(tmp_path):
+    """The capability diff reports on the very action a change edits, so its `where` always meets
+    the binding: found in the M1 recheck, where 67 such flags were scripted `seeded`."""
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    write_run(run, "nl", {}, {1: 1, 2: 1, 3: 1})
+    write_run(run, "structured", {}, {1: 1, 2: 1, 3: 1})
+    write_run(run, "toprope", {1: [CAP, {**CAP, "check": "structural", "severity": "info"},
+                                   {**CAP, "check": "structural"}]}, {1: 1, 2: 1, 3: 1})
+    runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m"],
+                backend=ApiBackend(FakeModel(grader({("toprope", 1): ["false-alarm"] * 3}, run)[0])))
+    prop = yaml.safe_load((run / "scoring/proposed.yaml").read_text())
+    tp = flags_of(prop, run, "toprope", 1)
+    assert [f["script_label"] for f in tp] == [None, None, "seeded"]      # capability, info: not scripted
+    assert [f["label"] for f in tp] == ["false-alarm", "false-alarm", "seeded"]
+
+
+def test_rescript_takes_back_a_script_label_the_rule_no_longer_gives(tmp_path):
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    write_run(run, "nl", {}, {1: 1, 2: 1, 3: 1})
+    write_run(run, "structured", {}, {1: 1, 2: 1, 3: 1})
+    write_run(run, "toprope", {1: [CAP]}, {1: 1, 2: 1, 3: 1})
+    runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m"],
+                backend=ApiBackend(FakeModel(grader({("toprope", 1): ["false-alarm"]}, run)[0])))
+    path = run / "scoring/proposed.yaml"
+    prop = yaml.safe_load(path.read_text())
+    (f,) = flags_of(prop, run, "toprope", 1)
+    f["script_label"] = f["label"] = "seeded"                              # as graded before the fix
+    path.write_text(yaml.safe_dump(prop))
+    assert score.rescript(run)["script_labels_cleared"] == 1
+    (f,) = flags_of(yaml.safe_load(path.read_text()), run, "toprope", 1)
+    assert (f["script_label"], f["label"], f["script_cleared"]) == (None, "false-alarm", True)
+
+
+def test_a_disagreement_the_researcher_settled_is_not_asked_again(tmp_path):
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    three_arms(run)
+    labels = {**LABELS, ("toprope", 1): ["false-alarm"]}                   # the grader differs from the script
+    runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m"],
+                backend=ApiBackend(FakeModel(grader(labels, run)[0])))
+    assert score.to_decide(run)["count"] == 1
+    c = yaml.safe_load((run / "scoring/proposed.yaml").read_text())
+    for ch in c["changes"]:
+        for f in ch["flags"]:
+            if f.get("script_label") and f.get("grader_label") and f["script_label"] != f["grader_label"]:
+                f["label"], f["decided"] = "seeded", True
+    (run / "scoring/confirmed.yaml").write_text(yaml.safe_dump(c))
+    assert score.to_decide(run)["count"] == 0
+
+
+def test_rescript_gives_an_unlabelled_repeat_the_graders_label_of_the_same_finding(tmp_path):
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    write_run(run, "nl", {}, {1: 1, 2: 1, 3: 1}, runs=2)
+    write_run(run, "structured", {}, {1: 1, 2: 1, 3: 1}, runs=2)
+    write_run(run, "toprope", {1: [[CAP], [CAP]]}, {1: 1, 2: 1, 3: 1}, runs=2)
+    runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m"],
+                backend=ApiBackend(FakeModel(grader({("toprope", 1): ["false-alarm"]}, run)[0])))
+    path = run / "scoring/proposed.yaml"
+    prop = yaml.safe_load(path.read_text())
+    first, second = flags_of(prop, run, "toprope", 1)
+    for f in (first, second):
+        f["script_label"] = f["label"] = "seeded"                         # as graded before the fix
+    second["grader_label"] = None                                          # the grader skipped this one
+    path.write_text(yaml.safe_dump(prop))
+    assert score.rescript(run) == {"file": str(path), "script_labels_cleared": 2, "flags_without_label": 0}
+    assert [f["label"] for f in flags_of(yaml.safe_load(path.read_text()), run, "toprope", 1)] == ["false-alarm"] * 2
+
+
+def test_a_probe_run_left_without_a_grade_is_graded_once_more(tmp_path):
+    """M1-recheck.md, criterion 2: every grade from the grader; one probe run of the recheck had no
+    JSON even after the retry."""
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    three_arms(run)
+    runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m"],
+                backend=ApiBackend(FakeModel(grader(LABELS, run)[0])))
+    path = run / "scoring/proposed.yaml"
+    prop = yaml.safe_load(path.read_text())
+    row = next(p for p in prop["probes"]["nl"] if p["seq"] == 2 and p["probe"] == "P05")
+    row["passed"], row["why"] = None, ""
+    path.write_text(yaml.safe_dump(prop))
+    assert score.to_decide(run)["count"] == 1
+    out = score.regrade_missing(run, inst, ApiBackend(FakeModel(grader(LABELS, run)[0])))
+    assert (out["regraded"], out["still_without_a_grade"]) == (1, 0)
+    assert score.to_decide(run)["count"] == 0
+    row = next(p for p in yaml.safe_load(path.read_text())["probes"]["nl"] if p["seq"] == 2 and p["probe"] == "P05")
+    assert row["passed"] is False and row["regraded"]                       # the agent's answer said FAIL
+
+
+def test_the_recheck_closes_end_to_end_from_two_sittings_graded_before_the_fixes(tmp_path):
+    """The RUNBOOK's recheck steps after the two sittings, in order, on sittings that carry what the
+    real ones did: capability flags scripted seeded, one left unlabelled, one probe run without a
+    grade. Each step must leave the next nothing to stop on."""
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    write_run(run, "nl", {1: [[F("x")]] * 2}, {1: 1, 2: 1, 3: 1}, runs=2)
+    write_run(run, "structured", {1: [[F("x")]] * 2}, {1: 1, 2: 1, 3: 1}, runs=2)
+    write_run(run, "toprope", {1: [[CAP], [CAP]]}, {1: 1, 2: 1, 3: 1}, runs=2)
+    labels = {("nl", 1): ["seeded"], ("structured", 1): ["other-real"], ("toprope", 1): ["false-alarm"]}
+    for sitting in ("scoring", "scoring-2"):
+        runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m", "--into", sitting],
+                    backend=ApiBackend(FakeModel(grader(labels, run, sitting)[0])))
+        path = run / sitting / "proposed.yaml"
+        prop = yaml.safe_load(path.read_text())
+        tp = [f for c in prop["changes"] for f in c["flags"] if (f.get("flag") or {}).get("check") == "capability"]
+        for f in tp:
+            f["script_label"] = f["label"] = "seeded"                      # graded before #233
+        tp[-1]["grader_label"] = None
+        if sitting == "scoring":
+            prop["probes"]["nl"][-1]["passed"] = None
+        path.write_text(yaml.safe_dump(prop))
+    for sitting in ("scoring", "scoring-2"):
+        assert score.rescript(run, sitting)["flags_without_label"] == 0
+    score.compare_gradings(run, inst)
+    assert score.to_decide(run)["count"] == 1                                # the probe run with no grade
+    score.regrade_missing(run, inst, ApiBackend(FakeModel(grader(labels, run)[0])))
+    assert score.to_decide(run)["count"] == 0
+    c = yaml.safe_load((run / "scoring/proposed.yaml").read_text())
+    c["status"] = "confirmed"
+    (run / "scoring/confirmed.yaml").write_text(yaml.safe_dump(c))
+    out = score.score(run, inst)
+    assert out["metrics"]["toprope"]["recall"] == 0.0                        # no longer the script's tautology
+    assert out["by_sitting"]["nl"]["recall"]["range"] == [0.5, 0.5]

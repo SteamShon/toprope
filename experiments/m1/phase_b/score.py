@@ -130,6 +130,17 @@ def _owners(key: str) -> set[str]:
     return {f"{dom}/{parts[0]}"}
 
 
+# A check whose findings sit on the edited element by construction: the capability diff reports
+# who can now reach what through the very action the change edited, and an info finding is a
+# summary, not a problem. Matching their `where` to the binding says nothing, so the grader labels
+# them like any other flag (found in the M1 recheck: 67 such flags matched every time).
+NOT_SCRIPTED_CHECKS = {"capability"}
+
+
+def scriptable(finding: dict[str, Any]) -> bool:
+    return finding.get("check") not in NOT_SCRIPTED_CHECKS and finding.get("severity") != "info"
+
+
 def binding_match(finding: dict[str, Any], bound: list[str]) -> bool:
     """A Toprope finding touches the elements the change is bound to: the same element, or one
     of the same action or object."""
@@ -219,7 +230,7 @@ def grade_change(backend: Any, seq: int, req: dict[str, Any], recs: dict[str, di
             for i, f in enumerate(r.get("findings") or []):
                 fid = f"{letter}.{r['run']}.{i}"
                 lines.append(f"{fid}. {json.dumps(f, ensure_ascii=False)}")
-                script = "seeded" if arm == "toprope" and binding_match(f, bound) else None
+                script = "seeded" if arm == "toprope" and scriptable(f) and binding_match(f, bound) else None
                 flags.append({"id": fid, "run": r["run"], "index": i, "flag": f, "script_label": script})
         blocks.append("\n".join(lines))
     user = f"{_sealed_context(seq, req, key, binding)}\n\n" + "\n\n".join(blocks)
@@ -628,10 +639,69 @@ def compare_gradings(run: Path, instruments: Path, first: str = "scoring", secon
     return out
 
 
+def rescript(run: Path, scoring: str = "scoring") -> dict[str, Any]:
+    """Take back a script label from a flag `scriptable` now excludes, in a sitting graded before:
+    its label becomes the grader's. Needs no key; the sitting's file is rewritten in place."""
+    path = run / scoring / "proposed.yaml"
+    graded = yaml.safe_load(path.read_text())
+    n = 0
+    same: dict[tuple, str] = {}                          # the grader's label of a finding, by change and text
+    for c in graded["changes"]:
+        for f in c["flags"]:
+            fl = f.get("flag") or {}
+            if f.get("grader_label"):
+                same.setdefault((c["seq"], f["id"].split(".")[0], fl.get("check"), fl.get("where"), fl.get("problem")),
+                                f["grader_label"])
+    for c in graded["changes"]:
+        for f in c["flags"]:
+            fl = f.get("flag") or {}
+            if f.get("script_label") and not scriptable(fl):
+                # A grader that left it unlabelled gave the same finding of the same label elsewhere
+                # in this change (the compiler repeats it in every run): that label, else none.
+                label = f.get("grader_label") or same.get(
+                    (c["seq"], f["id"].split(".")[0], fl.get("check"), fl.get("where"), fl.get("problem")))
+                f["script_label"], f["label"], f["script_cleared"] = None, label, True
+                n += 1
+    head = "".join(line + "\n" for line in path.read_text().splitlines() if line.startswith("#"))
+    path.write_text(head + yaml.safe_dump(graded, sort_keys=False, allow_unicode=True, width=110))
+    left = sum(1 for c in graded["changes"] for f in c["flags"] if f.get("label") not in LABELS)
+    return {"file": str(path), "script_labels_cleared": n, "flags_without_label": left}
+
+
+def regrade_missing(run: Path, instruments: Path, backend: Any, scoring: str = "scoring") -> dict[str, Any]:
+    """Grade again, once, each probe run of a sitting the grader left without a pass or fail
+    (no JSON even after the retry), so every grade comes from the grader (M1-recheck.md,
+    criterion 2). A run that did not complete stays for the researcher."""
+    path = run / scoring / "proposed.yaml"
+    graded = yaml.safe_load(path.read_text())
+    probes = {p["id"]: p for p in yaml.safe_load((instruments / "probe-suite.yaml").read_text())["probes"]}
+    tr = run / scoring / "transcripts"
+    done, left = 0, 0
+    for arm, rows in graded["probes"].items():
+        for row in rows:
+            if isinstance(row.get("passed"), bool) or row.get("error"):
+                continue
+            rec = records(run, arm).get(row["seq"], {})
+            pr = next((x for x in probe_runs(rec) if x["run"] == row.get("run", 1)), None)
+            res = next((x for x in (pr or {}).get("results", []) if x["probe"] == row["probe"]), None)
+            if pr is None or res is None:
+                left += 1
+                continue
+            g = grade_probe(backend, probes[row["probe"]], run / arm / f"seq-{row['seq']:02d}" / pr["dir"], res,
+                            tr / f"{arm}-seq-{row['seq']:02d}-run-{row.get('run', 1)}-{row['probe']}-regrade.jsonl")
+            row.update({k: g[k] for k in ("passed", "why")}, regraded=True)
+            done += 1
+            left += not isinstance(g["passed"], bool)
+    head = "".join(line + "\n" for line in path.read_text().splitlines() if line.startswith("#"))
+    path.write_text(head + yaml.safe_dump(graded, sort_keys=False, allow_unicode=True, width=110))
+    return {"file": str(path), "regraded": done, "still_without_a_grade": left}
+
+
 def to_decide(run: Path) -> dict[str, Any]:
     """What the researcher must decide in the grades (ADR-0047 §3): flags where the script and the
     grader disagree, flags with no label, edits with no judgment, and probe runs with no result.
-    The rest is accepted as proposed. Reads `confirmed.yaml` if it exists, else `proposed.yaml`."""
+    The rest is accepted as proposed. Reads `confirmed.yaml` if it exists, else `proposed.yaml`.
+    A disagreement the researcher settled in `confirmed.yaml` carries `decided: true`."""
     path = run / "scoring/confirmed.yaml"
     if not path.exists():
         path = run / "scoring/proposed.yaml"
@@ -640,7 +710,8 @@ def to_decide(run: Path) -> dict[str, Any]:
     for c in g["changes"]:
         for f in c["flags"]:
             if f.get("label") not in LABELS or (f.get("script_label") and f.get("grader_label")
-                                                and f["script_label"] != f["grader_label"]):
+                                                and f["script_label"] != f["grader_label"]
+                                                and not f.get("decided")):
                 flags.append({"seq": c["seq"], "id": f["id"], "label": f.get("label"),
                               "script_label": f.get("script_label"), "grader_label": f.get("grader_label"),
                               "flag": f.get("flag"), "why": f.get("why")})
