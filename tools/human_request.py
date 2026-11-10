@@ -49,6 +49,16 @@ half wrote is undone first; a step whose action was taken but whose follow-up fa
 To go on, fix the cause and push a change to the request (the rest): its run takes only the steps
 that did not run, numbered as in the first request. Never re-run a red run: the workflow refuses
 it once the branch has moved on.
+
+Without GitHub (ADR-0053, 3): a person applies a request at their own terminal with
+`toprope-apply REQUEST`, which calls `apply` here. It shows `render`, asks for one confirmation
+(`yes`), runs `run` as the person whose git email `toprope.identity.yaml` lists (`channel:
+local`), and `record`s the run with `channel: local`, so F1 counts it as one approval. It refuses
+without a terminal, and for a caller who is not a person. A commit not recorded low risk is not
+taken past its preview on the same confirmation (ADR-0050, 3): `run` holds there, the request keeps
+deploy, the probes and verify, and the person applies it again after reading the preview.
+
+  python tools/human_request.py apply REQUEST [--identity toprope.identity.yaml] [--ship]
 """
 
 from __future__ import annotations
@@ -73,6 +83,10 @@ MADE = "$commit"                     # the commit an earlier commit_draft step o
 AGAIN = ("fix the cause, then push a change to the request (the workflow leaves the steps that did not run in it), "
          "and approve that run; do not re-run this run")   # the fix of a step that failed
 TLC_ENV = "TOPROPE_TLC_JAR"         # the kernel model-checks with it; approval needs it (ADR-0043)
+LOCAL_AGAIN = "fix the cause, then apply the request again (it now holds only the steps that did not run)"
+TAKEN = ("the step's action was taken, so the rest does not send it again: fix the cause and, if the step must "
+         "be taken again (e.g. an approval was refused), add it to the rest; ")
+CHANNELS = ("github", "local")      # how a request was approved: the workflow, or `apply` at a terminal
 
 
 def load(path: str | Path) -> dict:
@@ -86,9 +100,13 @@ def load(path: str | Path) -> dict:
 
 def check(req: object) -> list[str]:
     """Errors in a request; empty means it may be shown for approval."""
-    if not isinstance(req, dict) or set(req) - {"summary", "steps"}:
-        return ["a request has `summary` and `steps`, nothing else"]
+    if not isinstance(req, dict) or set(req) - {"summary", "steps", "risk"}:
+        return ["a request has `summary` and `steps` (and the `risk` the change check found), nothing else"]
     errors = []
+    risk = req.get("risk", {"level": "low", "reasons": []})
+    if not isinstance(risk, dict) or set(risk) != {"level", "reasons"} or not isinstance(risk["level"], str) \
+            or not isinstance(risk["reasons"], list) or not all(isinstance(r, str) for r in risk["reasons"]):
+        errors.append("risk: `level` and a list of `reasons`, as toprope-change writes it")
     if not isinstance(req.get("summary"), str) or not req["summary"].strip():
         errors.append("summary: say in one line what you approve")
     steps = req.get("steps")
@@ -136,8 +154,9 @@ def check(req: object) -> list[str]:
     return errors
 
 
-def render(req: dict) -> str:
-    """What the researcher reads on the run page before approving."""
+def render(req: dict, cwd: str | Path = ".") -> str:
+    """What the researcher reads on the run page before approving, and a person applying the
+    request at a terminal reads before confirming (`apply`)."""
     lines = [f"### Human request: {req['summary']}", "",
              "Approving runs these steps as you, in this order:", ""]
     for i, st in enumerate(req["steps"], 1):
@@ -160,12 +179,39 @@ def render(req: dict) -> str:
         lines += ["", "**One approval ships this change** (ADR-0050): the delivery steps run only if the "
                   "check in this request finds it low risk, and `verify` runs only if the probes passed; "
                   "approving verifies in advance on that condition."]
+    lines += risk_lines(req, cwd)
     for st in req["steps"]:                      # what a confirm step confirms, as one diff (B5)
         (kind, arg), = st.items()
         if kind == "run" and arg.get("action") in ("confirm_all_proposed", "confirm_element"):
             lines += ["", f"#### What `{arg['action']}` confirms", "", "```diff",
-                      review(arg.get("workspace") or f"toprope.{arg['member']}.workspace.yaml").rstrip(), "```"]
+                      review(arg.get("workspace") or f"toprope.{arg['member']}.workspace.yaml", cwd).rstrip(), "```"]
     return "\n".join(lines) + "\n"
+
+
+def risk_lines(req: dict, cwd: str | Path = ".") -> list[str]:
+    """The risk, and its reasons, that the person reads before approving (ADR-0050, 4): what the
+    change check found before the request was written, and what `check_commit` recorded on each
+    commit the request names. A commit the request makes has its risk recorded inside it."""
+    lines = []
+    if isinstance(req.get("risk"), dict):
+        r = req["risk"]
+        lines += ["", f"**Risk found by the change check before this request: {r['level']}**"
+                  + (": " + "; ".join(r["reasons"]) if r["reasons"] else "")
+                  + ". The `check_commit` step in this request records the risk that counts."]
+    named = []
+    for st in req["steps"]:
+        arg = st.get("run") or {}
+        c = arg.get("target") if arg.get("action") in ("check_commit", "approve_commit") else \
+            shipped_commit(arg, None) if arg.get("action") in SHIPS else None
+        if c and MADE not in c and c not in named:
+            named.append(c)
+    for c in named:
+        try:
+            row = recorded_risk_row(c, cwd)
+        except (OSError, ValueError):            # the page still shows the steps
+            row = None
+        lines += ["", f"**Risk recorded on `{c}`:** " + (row if row else "none recorded yet")]
+    return lines
 
 
 def review(workspace: str, cwd: str | Path = ".") -> str:
@@ -183,7 +229,7 @@ def commands(req: dict) -> list[list[str]]:
     return [command(st) for st in req["steps"]]
 
 
-def command(st: dict, made: str | None = None) -> list[str]:
+def command(st: dict, made: str | None = None, identity: str = "github") -> list[str]:
     tool = [sys.executable, str(ROOT / "experiments/tools/instruments.py")]
     (kind, arg), = st.items()
     if kind in ("freeze", "freeze-binding", "freeze-protocol"):
@@ -193,7 +239,7 @@ def command(st: dict, made: str | None = None) -> list[str]:
     target = arg["target"].replace(MADE, made) if made else arg["target"]
     cmd = ["toprope-run", "--composition", COMPOSITION, "--member", arg["member"],
            "--kernel-root", ".", "--workspace", arg.get("workspace") or f"toprope.{arg['member']}.workspace.yaml",
-           "--env", ".toprope/env", "--identity", "github", arg["action"], target]
+           "--env", ".toprope/env", "--identity", identity, arg["action"], target]
     for k, v in (arg.get("params") or {}).items():
         cmd += [f"--{k.replace('_', '-')}", v if isinstance(v, str) else json.dumps(v)]
     return cmd
@@ -249,15 +295,22 @@ def ship(commit: str, domain: str, summary: str | None = None) -> dict:
                         for a in ("preview", "deploy", "run_probes", "verify"))]}
 
 
-def recorded_risk(commit: str, cwd: str | Path = ".") -> str | None:
-    """The risk `check_commit` last recorded on a commit (ADR-0050), from any domain's checks."""
-    level = None
+def recorded_risk_row(commit: str, cwd: str | Path = ".") -> str | None:
+    """The risk `check_commit` last recorded on a commit (ADR-0050), from any domain's checks, with
+    its reasons: `low`, or `high: <reasons>`."""
+    found = None
     for path in sorted((Path(cwd) / ".toprope" / "commits").glob("*/checks.jsonl")):
         for line in path.read_text().splitlines():
             row = json.loads(line) if line.strip() else {}
             if row.get("commit") == commit and row.get("check") == "risk":
-                level = str(row.get("summary", "")).split(":", 1)[0].strip()
-    return level
+                found = str(row.get("summary", ""))
+    return found
+
+
+def recorded_risk(commit: str, cwd: str | Path = ".") -> str | None:
+    """The risk level `check_commit` last recorded on a commit (ADR-0050)."""
+    row = recorded_risk_row(commit, cwd)
+    return None if row is None else row.split(":", 1)[0].strip()
 
 
 REST = re.compile(r" \(the rest: steps? ([0-9, -]+) of (\d+)\)$")
@@ -356,15 +409,31 @@ def restore(cwd: str | Path, tree: str | None) -> None:
             f.write_bytes(data)
 
 
-def run(req: dict, approver: str, identity: str = "toprope.identity.yaml", cwd: str | Path = ".") -> list[dict]:
+HELD = ("deploy", "run_probes", "verify")   # what puts a commit in use, after its preview
+
+
+def run(req: dict, approver: str, identity: str = "toprope.identity.yaml", cwd: str | Path = ".",
+        channel: str = "github", token: str | None = None, outcome: dict | None = None) -> list[dict]:
     """Run every step as the approver; stop at the first that fails.
 
-    It prints what happened as JSON on stdout, also when a step fails: `as`, `steps` (how many
+    `channel` is how the request was approved. `github` (the workflow): `approver` is the GitHub
+    login that approved the run, and the steps run with `--identity github`. `local` (`apply`, at
+    a person's terminal): `approver` is the person's git email, the steps run with `--identity
+    git:<identity>`, and `token` is the confirmation `apply` took, so `toprope-run` does not ask
+    for it again on each person-only step. Locally, a commit not recorded low risk is held after
+    its preview: the run stops before its deploy, run_probes or verify, which wait for a second
+    confirmation, given after the person read the preview (ADR-0050, 3). The workflow refuses the
+    delivery steps of such a commit approved in the same request instead.
+
+    It prints what happened as JSON on stdout (into `outcome` instead, when given), also when a
+    step fails: `as`, `steps` (how many
     ran: the first `steps` of this request), `of`, `commit`, and on failure `failed` (`step`: its
     position in this request; `number`: its number in the first request, as `label` gives it; why;
     and `accepted` when its action was taken but what it set off failed, so it is one of the
     `steps` that ran), `label` (what happened, in the first
-    request's step numbers) and `rest` (the request that is left, see `rest`; null if none). Then
+    request's step numbers) and `rest` (the request that is left, see `rest`; null if none). A run
+    held after a preview has `held` (the step it stopped before, the commit and its risk), `label`
+    and `rest`, and returns. Then
     a failure exits non-zero, after the work of the steps before it is on disk, so the workflow
     commits that work (ADR-0050, 2: the commit stays approved) and the run still ends red.
 
@@ -376,27 +445,47 @@ def run(req: dict, approver: str, identity: str = "toprope.identity.yaml", cwd: 
     sys.path.insert(0, str(ROOT / "src"))
     from toprope.errors import fixed
     from toprope.identity.github import ENV, github_logins
-    person = github_logins(Path(cwd) / identity).get(approver.lower())
-    if person is None:
-        raise SystemExit(fixed(f"GitHub user {approver} approved, but is not a person with `github:` in {identity}",
-                               "add `github: <login>` to the approver's entry under `people` in the identity file, "
-                               "or have a listed person approve"))
-    env = {**os.environ, ENV: approver}
+    local = channel == "local"
+    if channel not in CHANNELS:
+        raise ValueError(fixed(f"channel {channel!r}", f"use one of {', '.join(CHANNELS)}"))
+    if local:
+        from toprope.adapters.cli.apply import APPLY_ENV
+        from toprope.identity.git import load_table
+        person = load_table(Path(cwd) / identity).get(approver)
+        if person is None or person.actor.kind != "person":
+            raise SystemExit(fixed(f"{approver} is not a person in {identity}",
+                                   "apply the request as a person listed under `people` there"))
+        env = {**os.environ, APPLY_ENV: token or ""}
+        ident = f"git:{identity}"
+    else:
+        person = github_logins(Path(cwd) / identity).get(approver.lower())
+        if person is None:
+            raise SystemExit(fixed(f"GitHub user {approver} approved, but is not a person with `github:` in {identity}",
+                                   "add `github: <login>` to the approver's entry under `people` in the identity file, "
+                                   "or have a listed person approve"))
+        env = {**os.environ, ENV: approver}
+        ident = "github"
     if any((st.get("run") or {}).get("action") == "approve_commit" for st in req["steps"]) \
             and not env.get(TLC_ENV):
         raise SystemExit(fixed(f"approve_commit needs TLC: set {TLC_ENV} to a TLC jar (the workflow does)",
                                "run the request through the `human-request` workflow, or set the variable to a TLC "
                                "jar"))
     _, nums, total = numbering(req)
-    done, made, approved = [], None, set()
+    done, made, approved, previewed = [], None, set(), set()
     tree = snapshot(cwd)
 
     def report(**more) -> None:
-        print(json.dumps({"approver": approver, "as": person.actor.id, "steps": len(done), "of": len(req["steps"]),
-                          **({"commit": made} if made else {}), **more}, indent=2))
+        out = {"approver": approver, "as": person.actor.id, "steps": len(done), "of": len(req["steps"]),
+               "channel": channel, **({"commit": made} if made else {}), **more}
+        if outcome is None:
+            print(json.dumps(out, indent=2))
+        else:
+            outcome.clear()
+            outcome.update(out)
 
     def stop(i: int, message: str, fix: str, attempt: dict | None = None, accepted: bool = False) -> None:
-        print(json.dumps(done + ([attempt] if attempt and not accepted else []), indent=2), file=sys.stderr)
+        if not local:                            # the workflow's log; a person reads the message below
+            print(json.dumps(done + ([attempt] if attempt and not accepted else []), indent=2), file=sys.stderr)
         if not accepted:
             restore(cwd, tree)
         what = f"step {nums[i - 1]} of {total} " + ("was taken, but what it set off failed" if accepted else "failed")
@@ -416,46 +505,64 @@ def run(req: dict, approver: str, identity: str = "toprope.identity.yaml", cwd: 
             if arg.get("action") == "approve_commit":
                 approved.add(made if arg["target"] == MADE else arg["target"])
             ships = shipped_commit(arg, made) if arg.get("action") in SHIPS else None
-            if ships and ships in approved and (risk := recorded_risk(ships, cwd)) != "low":
+            risk = recorded_risk(ships, cwd) if ships else None
+            if local and ships and risk != "low" and arg["action"] in HELD and (ships in approved or ships in previewed):
+                # ADR-0050, 3: the person reads the preview before the commit is put in use
+                held = f"held before step {nums[i - 1]} of {total}: {ships} is not low risk ({risk})"
+                if done:
+                    held += f"; {_spans(nums[:len(done)])} ran and {'its' if len(done) == 1 else 'their'} work is kept"
+                report(held={"step": i, "number": nums[i - 1], "commit": ships, "risk": risk},
+                       label=held, rest=rest(req, i, made))
+                return done
+            if not local and ships and ships in approved and risk != "low":
                 # ADR-0050: one approval ships only a low-risk change, as checked inside this request
                 stop(i, f"{ships} is not low risk ({risk}), so this approval does not ship it",
                      "read the preview, then approve a second request with the delivery steps (the workflow "
                      "leaves them in the request); do not re-run this run")
-            cmd = command(st, made)
+            cmd = command(st, made, ident)
             r = subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True, check=False)
         except SystemExit:
             raise
         except Exception as e:                  # noqa: BLE001 - reported like any failed step
+            if local:
+                stop(i, f"{type(e).__name__}: {e}", LOCAL_AGAIN)
             stop(i, f"{type(e).__name__}: {e}", AGAIN)
         attempt = {"step": st, "returncode": r.returncode, "stdout": r.stdout[-4000:], "stderr": r.stderr[-4000:]}
         if r.returncode != 0:                   # refused or broken: undone, and in the rest
-            stop(i, f"{' '.join(cmd[:6])} ...\n{r.stderr[-2000:].strip()}", AGAIN, attempt)
+            why = f"{' '.join(cmd[:6])} ...\n{r.stderr[-2000:].strip()}"
+            if local:
+                stop(i, why, LOCAL_AGAIN, attempt)
+            stop(i, why, AGAIN, attempt)
         done.append(attempt)
         if arg.get("action") == "commit_draft" and (c := _made(r.stdout)):
             made = c
             done[-1]["commit"] = c
+        if arg.get("action") == "preview" and ships:
+            previewed.add(ships)
         if unmet := (_unmet(r.stdout) if "run" in st else []):
-            stop(i, f"{' '.join(cmd[:6])} ...\n" + "; ".join(unmet),
-                 "the step's action was taken, so the rest does not send it again: fix the cause and, if the "
-                 "step must be taken again (e.g. an approval was refused), add it to the rest; push the rest "
-                 "and approve that run; do not re-run this run", attempt, accepted=True)
+            why = f"{' '.join(cmd[:6])} ...\n" + "; ".join(unmet)
+            if local:
+                stop(i, why, TAKEN + "then apply the request again", attempt, accepted=True)
+            stop(i, why, TAKEN + "push the rest and approve that run; do not re-run this run", attempt, accepted=True)
         tree = snapshot(cwd)
     report()
     return done
 
 
 def record(req: dict, approver: str, person: str, run_url: str, cwd: str | Path = ".",
-           outcome: dict | None = None, request: str | Path | None = None) -> dict:
+           outcome: dict | None = None, request: str | Path | None = None, channel: str = "github") -> dict:
     """Append the approved run, its approver and its steps to the approval-run log.
 
-    `outcome` is what `run` printed. If a step failed, the entry says how many steps ran and which
-    failed, and `request` is rewritten to the rest (`rest`), so the steps that ran are not taken
-    again; otherwise the workflow removes the request."""
+    `outcome` is what `run` printed. If a step failed, or a local run was held after a preview, the
+    entry says how many steps ran and which failed (or where it was held), and `request` is
+    rewritten to the rest (`rest`), so the steps that ran are not taken again; otherwise the
+    workflow (or `apply`) removes the request. `channel` is how it was approved: `github` (the
+    workflow) or `local` (`apply`, at the person's terminal); F1 counts either as one approval."""
     from datetime import datetime, timezone
     entry = {"run": run_url, "approver": approver, "as": person, "summary": req["summary"],
-             "steps": req["steps"], "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
-    if outcome and outcome.get("failed"):
-        entry |= {"ran": outcome["steps"], "failed": outcome["failed"]}
+             "steps": req["steps"], "channel": channel, "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+    if outcome and (outcome.get("failed") or outcome.get("held")):
+        entry |= {"ran": outcome["steps"], **{k: outcome[k] for k in ("failed", "held") if outcome.get(k)}}
         if request is not None and outcome.get("rest"):
             Path(cwd, request).write_text(yaml.safe_dump(outcome["rest"], sort_keys=False, allow_unicode=True))
         elif request is not None:               # the failed step was the last, and it was taken
@@ -467,9 +574,96 @@ def record(req: dict, approver: str, person: str, run_url: str, cwd: str | Path 
     return entry
 
 
+def with_delivery(req: dict) -> dict:
+    """The request with the delivery steps of the commit it makes (`apply --ship`): deliver, preview,
+    deploy, run the probes, verify. Applied locally, a commit not recorded low risk stops after its
+    preview, so a high-risk change takes two confirmations, the second after the preview was read."""
+    runs = [st["run"] for st in req["steps"] if "run" in st]
+    if any(a["action"] in SHIPS for a in runs):
+        return req
+    drafts = [a for a in runs if a["action"] == "commit_draft"]
+    if not drafts or not any(a["action"] == "approve_commit" and a["target"] == MADE for a in runs):
+        raise SystemExit(fixed("--ship adds the delivery of the commit the request makes and approves; this request "
+                               "makes none", "leave --ship out, or write the delivery request with "
+                               "`python tools/human_request.py ship`"))
+    return {**req, "steps": [*req["steps"], *ship(MADE, drafts[-1]["target"])["steps"]]}
+
+
+def apply(request: str | Path, identity: str = "toprope.identity.yaml", cwd: str | Path = ".",
+          with_ship: bool = False, ask=input) -> dict:
+    """A person applies a request at their own terminal (ADR-0053, 3): one confirmation, then the
+    steps as that person, recorded as one approval (`channel: local`).
+
+    It shows the request as the run page does (`render`), asks for `yes` once, runs it (`run`,
+    `channel: local`), records the run (`record`) and removes the request; after a failed step, or
+    a hold after a preview, the request keeps the steps that are left. It refuses without a
+    terminal, and for a caller whose git email the identity file does not list as a person. Returns
+    what `run` reported."""
+    import uuid
+
+    sys.path.insert(0, str(ROOT / "src"))
+    from toprope.adapters.cli.apply import confirmation
+    from toprope.identity.git import GitIdentity
+    if not sys.stdin.isatty():
+        raise SystemExit(fixed("applying a request needs a person at a terminal, and this process has none",
+                               "run `toprope-apply` yourself, on your terminal; or commit and push the request, "
+                               "and approve its run in GitHub (the `human-request` workflow)"))
+    try:
+        req = load(Path(cwd) / request)
+    except (OSError, ValueError, yaml.YAMLError) as e:
+        raise SystemExit(fixed(f"{request}: {e}", "give the path of a request file, such as "
+                               ".toprope/requests/<id>.yaml")) from None
+    try:
+        ident = GitIdentity(Path(cwd) / identity, root=cwd, once=True)
+    except (OSError, ValueError) as e:
+        raise SystemExit(fixed(f"identity file {identity}: {e}", "give --identity the repository's identity file")) from None
+    caller = ident.resolve()
+    if caller is None:
+        raise SystemExit(fixed(ident.explain(), "apply the request from a git identity listed under `people`"))
+    if caller.actor.kind != "person":
+        raise SystemExit(fixed(f"{caller.actor.id} is an agent: only a person applies a request (ADR-0041)",
+                               "ask the person to apply it on their own terminal, or push it and have them approve "
+                               "its run in GitHub (the `human-request` workflow)"))
+    if with_ship:
+        req = with_delivery(req)
+    if any((st.get("run") or {}).get("action") == "approve_commit" for st in req["steps"]) \
+            and not os.environ.get(TLC_ENV):
+        raise SystemExit(fixed(f"approve_commit needs TLC's check, and {TLC_ENV} is not set: nothing was run",
+                               f"set {TLC_ENV} to a TLC jar (tla2tools.jar, as the tla workflow pins it), then "
+                               "apply again"))
+    print(render(req, cwd), end="")
+    actions = [(st.get("run") or {}).get("action") for st in req["steps"]]
+    if "preview" in actions and set(HELD) & set(actions[actions.index("preview"):]):
+        print("\nIf the commit is not recorded low risk, this stops after its preview: read it, then apply "
+              "the request again for deploy, the probes and verify (ADR-0050, 3).")
+    email = ident.email()
+    answer = ask(f"\nTake these {len(req['steps'])} steps as {caller.actor.id}? Type `yes` to apply: ")
+    if answer.strip() != "yes":
+        raise SystemExit(fixed("not applied: nothing was run", "type `yes` to apply it"))
+    outcome: dict = {}
+    url = f"local:{uuid.uuid4().hex[:12]}"
+    with confirmation(caller.actor.id) as token:
+        try:
+            done = run(req, email, identity, cwd, channel="local", token=token, outcome=outcome)
+        except SystemExit:
+            if outcome.get("steps"):            # as the workflow: nothing is recorded if no step ran
+                record(req, email, caller.actor.id, url, cwd, outcome, request, channel="local")
+            raise
+    record(req, email, caller.actor.id, url, cwd, outcome, request, channel="local")
+    if outcome.get("held"):
+        preview = next((d["stdout"] for d in reversed(done) if (d["step"].get("run") or {}).get("action") == "preview"), "")
+        print(f"\n#### The preview\n\n{preview.strip()}\n" if preview else "")
+        print(f"{outcome['label']}. Read the preview; then `toprope-apply {request}` takes the steps left in it.")
+    else:
+        Path(cwd, request).unlink(missing_ok=True)
+        print(f"Applied: {len(done)} steps as {caller.actor.id}, recorded as {url} in {APPROVAL_RUNS}. "
+              "Commit the result with the logs it changed.")
+    return outcome
+
+
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=["check", "render", "run", "record", "change", "ship"])
+    ap.add_argument("cmd", choices=["check", "render", "run", "record", "change", "ship", "apply"])
     ap.add_argument("request")
     ap.add_argument("--approver", help="the GitHub login that approved the run (for run)")
     ap.add_argument("--identity", default="toprope.identity.yaml")
@@ -483,7 +677,12 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--summary", help="(for change, ship)")
     ap.add_argument("--commit", help="(for ship) the approved commit to ship")
     ap.add_argument("--domain", default="authoring", help="(for ship) the commit's domain")
+    ap.add_argument("--ship", action="store_true", help="(for apply) add the delivery of the commit the request "
+                                                         "makes; a commit not low risk stops after its preview")
     args = ap.parse_args(argv)
+    if args.cmd == "apply":
+        apply(args.request, args.identity, with_ship=args.ship)
+        return
     if args.cmd == "ship":
         if not args.commit:
             raise SystemExit(fixed("ship needs --commit, the approved commit",

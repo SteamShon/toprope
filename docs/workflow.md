@@ -31,7 +31,8 @@ example in its own container). As a guard against mistakes, an action only a per
 also asks you to confirm on your terminal, which an agent's ordinary shell cannot do.
 
 **From a cloud session (ADR-0039).** What only you may do (freeze an instrument, confirm,
-approve, deploy) can be done without your terminal: the agent commits a *human request*,
+approve, deploy) can be done without your terminal (on your own machine, `toprope-apply` takes the
+same request with one confirmation; see *A change in one command*): the agent commits a *human request*,
 `.toprope/requests/<id>.yaml`, listing the steps; the `human-request` workflow shows them on
 its run page and waits; you press **Approve and deploy** (web or the GitHub mobile app); the
 steps then run as you, the person `toprope.identity.yaml` lists with your `github:` login,
@@ -67,13 +68,39 @@ uv run toprope-change "Drafts name their declaration" --patch change.yaml
 ```
 
 It proposes each element, checks the working copy (on a scratch copy of the commit store), prints the diff a person will
-confirm, and writes one human request (`.toprope/requests/<id>.yaml`). Push it: the person's one
-approval in GitHub confirms, commits, checks and approves. If a check fails, nothing is
+confirm, and writes one human request (`.toprope/requests/<id>.yaml`). The person's one approval
+confirms, commits, checks and approves, by either route: push the request and approve its run in
+GitHub, or apply it at their own terminal (below). If a check fails, nothing is
 requested, and the message says which check and how to fix it. A low-risk change (ADR-0050:
 no widening, nothing removed, no invariant or rule changed, nothing about who takes a person-only
 step) ships on the same approval: deliver, preview, deploy, the probes and verify, which runs only
 if the probes pass. A high-risk change stops at approval; a second request ships it after the
 preview. The steps one by one follow.
+
+### Without GitHub: apply the request at your terminal (ADR-0053, 3)
+
+```
+uv run toprope-apply .toprope/requests/<id>.yaml           # one `yes`
+uv run toprope-apply --ship .toprope/requests/<id>.yaml    # a high-risk change: up to its preview
+```
+
+`toprope-apply` shows the request exactly as the workflow's run page does (every step, the risk
+and its reasons, the diff a confirm step confirms) and asks you to type `yes` once. It then runs
+the steps as you (your git email in `toprope.identity.yaml`, as `toprope-run` finds you), with the
+same runner as the workflow, records the run in `.toprope/approval-runs.jsonl` with `channel:
+local`, and removes the request; commit the result with the logs it changed. F1 counts it as one
+approval, as it counts an approved run in GitHub. Your one `yes` stands for each person-only
+step's own prompt: `toprope-run` accepts a token from the apply that asked you, for you only, and
+only while it runs. It refuses without a terminal (an agent's shell), and for a git email listed as
+an agent or not listed. An approval needs TLC's check here too: set `TOPROPE_TLC_JAR` to a TLC jar.
+
+A step that fails stops it, as in GitHub: the steps before it keep their work, the run is
+recorded with the failed step, and the request keeps the steps that are left; fix the cause and
+apply it again. A commit that is not recorded low risk is not put in use on the same `yes`
+(ADR-0050, 3): the run stops after its preview, prints it, and leaves deploy, the probes and
+verify in the request; apply it again once you have read the preview. With `--ship`, a request
+that approves the commit it makes also carries that commit's delivery, so a high-risk change takes
+two applies (approve and preview; then deploy and verify) and a low-risk one takes one.
 
 ## The self domains, end to end
 

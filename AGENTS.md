@@ -184,6 +184,7 @@ check starts enforcing a rule, and drop a rule from the text once its mistake ca
 | Where a domain says so, a commit's author does not approve it (ADR-0046) | the commit store (`approve`) |
 | Agents write only `proposed`; only a person confirms or approves | the kernel (`requires: human`, `_demote`) |
 | The researcher's own steps from a cloud session run after their approval | `human-request` workflow (ADR-0039) |
+| A request applied without GitHub is applied by a person at a terminal, with one confirmation | `toprope-apply` (refuses without a terminal, or for an agent's git email; a guard against mistakes, ADR-0053) |
 | Every error, refusal and reply message written in `src/toprope/` and `tools/human_request.py` names its fix, once (ADR-0053 §5, amending ADR-0049 §5); the scan is static, its blind spots are in `src/toprope/errors.py` | `checks` workflow (`tests/test_error_fixes.py`) |
 | Gold sets and sealed files are human-only | text only: review |
 | Real tests only; no skipped or weakened tests | text only: review |
