@@ -179,9 +179,15 @@ class CliBackend(Backend):
                         p.wait()
                         errfile.seek(0)
                         tail = errfile.read()[-1500:]
-                        transcript.write("refused", tools=sorted(got), mcp_servers=status, stderr=tail)
-                        raise BackendError(f"the tools of {[m[5:-2] for m in missing]} did not connect "
-                                           f"(servers: {json.dumps(status)}); stderr: {tail[-400:]}")
+                        names = [m[5:-2] for m in missing]
+                        logs = json.loads(tools.context or "{}").get("server_logs") or {}
+                        server_err = {n: Path(logs[n]).read_text()[-1500:] for n in names
+                                      if n in logs and Path(logs[n]).exists()}
+                        transcript.write("refused", tools=sorted(got), mcp_servers=status, stderr=tail,
+                                         server_stderr=server_err)
+                        raise BackendError(f"the tools of {names} did not connect (servers: {json.dumps(status)}); "
+                                           f"server stderr: {json.dumps({n: e[-600:] for n, e in server_err.items()})}"
+                                           f"; claude stderr: {tail[-300:]}")
                     transcript.write("init", tools=sorted(got), model=ev.get("model"), mcp_servers=status)
                 elif kind == "assistant":
                     turns += 1

@@ -208,10 +208,13 @@ with these differences:
   conversation now stops when they are missing. First check they connect here, then run only the
   probes before any change again, copy them into the combined run, and grade them again:
   ```bash
-  uv run python -m phase_b check-probe-tools --model MODEL --out runs/phase-b-recheck
+  uv run python -m phase_b check-probe-tools --model MODEL --out runs/phase-b-recheck \
+    --toolchain runs/phase-b-recheck/toprope/seq-00/probes/run-1/deployed-toolchain
   ```
   It must print `"connected": true`. If not, stop and report its `mcp_servers`, `error` and
-  `stderr`. Then:
+  `server_stderr` (each domain server's own stderr). A redo whose servers do not connect stops
+  each probe with the same, and the servers' stderr is kept beside each probe's transcript
+  (`P0N-servers/`). Then:
   ```bash
   uv run python -m phase_b arm toprope --model MODEL --out runs/phase-b-recheck --redo-baseline-probes
   rm -rf runs/phase-b-recheck-combined/toprope/seq-00
