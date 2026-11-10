@@ -1,0 +1,43 @@
+openapi: 3.0.3
+info: {title: Orders, version: "1"}
+paths:
+  /orders:
+    post:
+      operationId: createOrder
+      summary: Place an order.
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/NewOrder"}
+  /orders/{id}/refund:
+    post:
+      operationId: refundOrder
+      summary: Refund an order.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: {type: string}
+                amount: {type: number}
+  /orders/{id}:
+    get:
+      operationId: getOrder
+components:
+  schemas:
+    Order:
+      type: object
+      description: A customer order.
+      required: [status, total]
+      properties:
+        id: {type: string}
+        status: {type: string, enum: [paid, shipped, refunded]}
+        total: {type: number}
+        placed_at: {type: string, format: date-time}
+    NewOrder:
+      type: object
+      required: [total]
+      properties:
+        total: {type: number}

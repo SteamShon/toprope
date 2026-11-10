@@ -1,0 +1,8 @@
+{
+  "statuses": [{"name": "Open"}, {"name": "In Progress"}, {"name": "Done"}],
+  "transitions": [
+    {"name": "Start work", "from": ["Open"], "to": "In Progress"},
+    {"name": "Resolve", "from": ["In Progress"], "to": "Done"},
+    {"name": "Reopen", "from": ["Done"], "to": "Open"}
+  ]
+}

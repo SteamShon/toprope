@@ -45,6 +45,20 @@ Its subcommands are the domain's actions, one per action, plus `get`, `history`,
 | `--request` `REQUEST` | the request file to write (default: .toprope/requests/<id>.yaml) |
 | `--run-args` `RUN_ARGS` | options passed to every toprope-run step, e.g. "--identity static:ids.yaml" (default ``) |
 
+## `toprope-import`
+
+`toprope-import`: a proposed draft from a source a team already has (ADR-0049 A1, ADR-0051).
+
+| Argument | What |
+|---|---|
+| `KIND` | the source's format: an extractor (see --list) |
+| `SOURCE` | where the source is, as the reader takes it (a path, a URL) |
+| `--via` `VIA` | the reader that reaches the source (default: file) (default `file`) |
+| `--profile` `PROFILE` | a YAML file of the team's conventions |
+| `--domain` `DOMAIN` | the new domain's name (default `imported`) |
+| `--out` `OUT` | where to write the draft (default: <domain>.domain.yaml here) |
+| `--list` | the readers and extractors installed |
+
 ## `toprope-server`
 
 `toprope-server`: serve a declaration over MCP (stdio or streamable HTTP).
