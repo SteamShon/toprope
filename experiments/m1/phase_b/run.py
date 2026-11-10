@@ -13,6 +13,8 @@ opens the key, the binding or the blind labels, and never takes a role:
   uv run python -m phase_b grade --model M                        propose the grades (opens the key)
   uv run python -m phase_b grade --model M --into scoring-2       the second sitting (the M1 recheck)
   uv run python -m phase_b compare-gradings                       the grader's noise between the two
+  uv run python -m phase_b group-disagreements                    where they differ, grouped for the researcher
+  uv run python -m phase_b apply-disagreements                    the researcher's labels onto the first
   uv run python -m phase_b to-decide                              what the researcher must decide
   uv run python -m phase_b score                                  the metrics, from confirmed.yaml
 
@@ -493,6 +495,12 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     cg = sub.add_parser("compare-gradings", help="the grader's noise: each arm's recall from two sittings")
     cg.add_argument("--out", type=Path, default=DEFAULT_OUT)
     cg.add_argument("--instruments", type=Path, default=INSTRUMENTS)
+    gd = sub.add_parser("group-disagreements", help="the flags two sittings labelled differently, grouped for "
+                        "the researcher (disagreements.yaml)")
+    gd.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    ad = sub.add_parser("apply-disagreements", help="the researcher's labels from disagreements.yaml onto the "
+                        "first sitting (scoring/confirmed.yaml, status proposed)")
+    ad.add_argument("--out", type=Path, default=DEFAULT_OUT)
     sc = sub.add_parser("score", help="the metrics and pilot verdicts, from scoring/confirmed.yaml")
     sc.add_argument("--out", type=Path, default=DEFAULT_OUT)
     sc.add_argument("--instruments", type=Path, default=INSTRUMENTS)
@@ -500,6 +508,11 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
 
     if args.cmd == "freeze-prompts":
         print(json.dumps(freeze_prompts(args.instruments, args.reason), indent=2))
+        return
+    if args.cmd in ("group-disagreements", "apply-disagreements"):
+        from .score import apply_disagreements, group_disagreements
+        fn = group_disagreements if args.cmd == "group-disagreements" else apply_disagreements
+        print(json.dumps(fn(args.out), indent=2))
         return
     if args.cmd == "compare-gradings":
         from .score import compare_gradings

@@ -449,3 +449,30 @@ def test_two_sittings_of_the_grader_give_its_noise(tmp_path):
     assert out["first"]["nl"] == 0.5 and out["second"]["nl"] == 0.0
     assert out["difference"]["toprope"] == 0.0 and out["largest"] == 0.5 and out["within_limit"] is False
     assert json.loads((run / "grader-noise.json").read_text()) == out
+
+
+def test_the_two_sittings_disagreements_are_grouped_and_the_researchers_labels_applied(tmp_path):
+    """A finding both sittings saw, labelled differently, is one group however many runs repeat it;
+    the researcher labels the group once and it lands on every member (M1-recheck.md, criterion 3)."""
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    write_run(run, "nl", {1: [[F("actions.a"), F("actions.b")]] * 3}, {1: 1, 2: 1, 3: 1}, runs=3)
+    write_run(run, "structured", {}, {1: 1, 2: 1, 3: 1}, runs=3)
+    write_run(run, "toprope", {}, {1: 1, 2: 1, 3: 1}, runs=3)
+    runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m"],
+                backend=ApiBackend(FakeModel(grader({("nl", 1): ["seeded", "other-real"]}, run)[0])))
+    runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m", "--into", "scoring-2"],
+                backend=ApiBackend(FakeModel(grader({("nl", 1): ["other-real", "other-real"]}, run, "scoring-2")[0])))
+    summary = score.group_disagreements(run)
+    assert summary == {"flags": 3, "groups": 1, "recall_groups": 1, "recall_flags": 3}   # flag 0 in 3 runs
+    doc = yaml.safe_load((run / "disagreements.yaml").read_text())
+    (g,) = doc["groups"]
+    assert g["recall"] and g["first"] == {"seeded": 3} and g["second"] == {"other-real": 3}
+    assert "nl" not in yaml.safe_dump(g)                                   # blind: no arm named
+    with pytest.raises(SystemExit, match="no researcher_label"):
+        score.apply_disagreements(run)
+    g["researcher_label"] = "other-real"
+    (run / "disagreements.yaml").write_text(yaml.safe_dump(doc))
+    assert score.apply_disagreements(run)["applied"] == 3
+    conf = yaml.safe_load((run / "scoring/confirmed.yaml").read_text())
+    nl_flags = [f for c in conf["changes"] for f in c["flags"] if f["id"] in g["members"]]
+    assert {f["label"] for f in nl_flags} == {"other-real"} and conf["status"] == "proposed"
