@@ -27,8 +27,10 @@ was recorded, so `uv run python tools/usability_baseline.py --until 2026-11-09` 
 
 What has a time: a kernel command takes the time of the events it appended (`at` in its outcome
 in `idempotency.jsonl`); a command that appended none (a refusal) takes the time of the command
-before it in the same log. A failed effect, an approved human request (`approval-runs.jsonl`), a
+before it in the same log, and has no time if no command before it has one (it is then counted
+only when the window is open at both ends). A failed effect, an approved human request (`approval-runs.jsonl`), a
 failure before the gate (`.toprope/failures/`) and a commit (`log.jsonl`) carry their own `at`.
+A log line that does not parse stops the tool with its file, its line and the fix.
 
 - **Approved change**: a successful `approve_commit` by a person in the window, in any domain.
 - **Commands by a person or an agent, per approved change**: kernel commands in the window by an
@@ -39,30 +41,42 @@ failure before the gate (`.toprope/failures/`) and a commit (`log.jsonl`) carry 
 - **A person's touches, per approved change** (the target's measure): approved human requests in
   the window that take at least one `run` step, plus kernel commands by a person in the window
   that no approved request's run took, over approved changes. A run's commands are found from
-  its record: each `run` step is the latest successful command by the person the run acted as
-  (`as`), with the step's action and target (`$commit` stands for any commit), at or before the
-  record's `at` and after the record before it. Steps not found are reported
-  (`request_steps_not_found`); requests with only instrument steps (`freeze`, `amend`) are
-  reported apart and not counted, as they are not part of a change.
+  its record, over the whole log (not only the window): its `run` steps are matched in their
+  order, each to the earliest successful command not yet matched, by the person the run acted as
+  (`as`), with the step's action and target, after the step before it, at or before the record's
+  `at`, after the record before it, and no more than 20 minutes before the record (the `act`
+  job's timeout; the steps and `record` run in that one job). `$commit` is the commit the matched
+  `commit_draft` made: the target of the kernel's `record_commit` reply after it in the log. A run
+  is placed in the window at the time of its `approve_commit` command, so a change and the run
+  that approves it fall in the same window and an edge inside a run neither splits it nor counts
+  its steps as typed; a run that approves nothing is placed at its first command. Steps not found
+  are reported (`request_steps_not_found`); requests with only instrument steps (`freeze`,
+  `amend`) are reported apart and not counted, as they are not part of a change.
+- **Failed request runs.** A run that fails is not recorded in `approval-runs.jsonl` today, so its
+  steps that ran count as commands typed by the person, and the approval is not counted.
+  `possibly_failed_request_steps` reports how many of the commands outside a request have the
+  action and target of a step of a run recorded within 60 minutes after them; they stay counted.
+  Once `fix/request-keeps-work` lands, a failed run is recorded with `ran` and `failed`: it counts
+  as one approval, and only its first `ran` steps are looked for.
 - **Approvals per approved change, by risk**: for each approved change, the approved requests in
   the window whose found commands approve it (`approve_commit`) or ship it (`deliver`, `preview`,
   `deploy`, `run_probes`, `verify` on it), plus `approve_commit` commands on it a person typed
-  outside a request. Grouped by the risk `check_commit` last recorded on the commit
-  (`risk` in `checks.jsonl`, ADR-0050); `unknown` where none was recorded (every change before
+  outside a request. Grouped by the risk `check_commit` last recorded on the commit at or before
+  its approval (`risk` in `checks.jsonl`, ADR-0050; a later re-check does not change it); `unknown` where none was recorded (every change before
   ADR-0050). A high-risk change whose second approval falls after the window shows one.
 - **Refusals and failed effects, per command** (`refusals_per_command.refused_or_failed`, also
   `refused_or_failed_per_command`): refusals at the gate of commands by a person or an agent,
   plus `EffectFailed` events, over the same commands.
 - **Failures before the gate, per command attempted**: records under `.toprope/failures/` in the
   window, over those commands plus the failures (a failure never reached the kernel, so it is an
-  attempt the command log does not hold). `all_per_command_attempted` adds the two rates' numerators
-  over the same denominator.
+  attempt the command log does not hold). It is reported beside the refusal rate, never added to
+  it.
 
 **What "comparable" means.** A before/after comparison uses the same measure, computed the same
 way, on two windows that do not overlap. Refusals and failed effects per command are comparable
 between the baseline and any later window: both come from the gate's own logs. Failures before
-the gate were not recorded before D1b (#204), so the baseline has no such number and no
-`all_per_command_attempted` that could be compared; ADR-0049 (5)'s target for refusals applies to
+the gate were not recorded before D1b (#204), so the baseline has no such number and no sum of
+the two that could be compared; ADR-0049 (5)'s target for refusals applies to
 `refused_or_failed`, and failures before the gate are reported beside it, compared only between
 windows that both start after D1b. A person's touches and approvals by risk were not part of the
 recorded baseline; computed on the same logs and window they are 2.8 touches per approved change

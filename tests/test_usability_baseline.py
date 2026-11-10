@@ -154,17 +154,23 @@ def one_approval_run(commit, at, minute="10"):
     targets = ["authoring", "authoring", commit, commit, commit, t, t, t, t]
     cmds = [timed(PERSON, s["action"], tg, f"2026-11-10T{minute}:00:0{i}+00:00")
             for i, (s, tg) in enumerate(zip(steps, targets))]
+    cmds.insert(2, made(commit, f"2026-11-10T{minute}:00:01.5+00:00"))
     return steps, cmds
+
+
+def made(commit, at):
+    """The kernel's reply to a commit_draft: the commit it made (a `record_commit` by `external:`)."""
+    return timed("external:kernel", "record_commit", commit, at)
 
 
 def test_a_request_run_of_nine_steps_by_a_person_is_one_touch_and_one_approval(tmp_path):
     steps, cmds = one_approval_run("2-b", "2026-11-10T10:00:30+00:00")
     domain(tmp_path, "authoring",
            [timed(PERSON, "search", "docs", "2026-11-10T09:00:00+00:00"),     # typed by the person
-            timed(AGENT, "propose_element", "authoring", "2026-11-10T09:30:00+00:00"), *cmds[:5]],
+            timed(AGENT, "propose_element", "authoring", "2026-11-10T09:30:00+00:00"), *cmds[:6]],
            [event("X", PERSON, "person"), event("Y", AGENT, "agent")], ["2-b"], ["2-b"],
            checks=[risk("2-b", "low")])
-    domain(tmp_path, "delivery", cmds[5:], [event("X", PERSON, "person")], [], [])
+    domain(tmp_path, "delivery", cmds[6:], [event("X", PERSON, "person")], [], [])
     write(tmp_path / ".toprope/approval-runs.jsonl", [approval_run("2026-11-10T10:00:30+00:00", steps)])
     m = ub.measure(tmp_path)
     assert m["per_approved_change"]["commands_by_person"] == 10.0          # unchanged: kernel steps
@@ -186,13 +192,14 @@ def test_approvals_per_approved_change_are_split_by_risk(tmp_path):
     high_auth = [timed(PERSON, a, tg, f"2026-11-10T11:00:0{i}+00:00") for i, (a, tg) in enumerate(
         [("confirm_all_proposed", "authoring"), ("commit_draft", "authoring"), ("check_commit", "3-c"),
          ("approve_commit", "3-c")])]
+    high_auth.insert(2, made("3-c", "2026-11-10T11:00:01.5+00:00"))
     deliver = timed(PERSON, "deliver", "3-c", "2026-11-10T12:00:00+00:00")
     high_del = [timed(PERSON, a, t, f"2026-11-10T12:00:0{i + 1}+00:00")
                 for i, a in enumerate(("preview", "deploy", "run_probes", "verify"))]
-    domain(tmp_path, "authoring", [*low_cmds[:5], *high_auth, deliver],
+    domain(tmp_path, "authoring", [*low_cmds[:6], *high_auth, deliver],
            [event("X", PERSON, "person")], ["2-b", "3-c"], ["2-b", "3-c"],
            checks=[risk("2-b", "low"), risk("3-c", "high")])
-    domain(tmp_path, "delivery", [*low_cmds[5:], *high_del], [event("X", PERSON, "person")], [], [])
+    domain(tmp_path, "delivery", [*low_cmds[6:], *high_del], [event("X", PERSON, "person")], [], [])
     write(tmp_path / ".toprope/approval-runs.jsonl",
           [approval_run("2026-11-10T10:00:30+00:00", low_steps),
            approval_run("2026-11-10T11:00:30+00:00", approve),
@@ -203,7 +210,7 @@ def test_approvals_per_approved_change_are_split_by_risk(tmp_path):
         "high": {"changes": 1, "approvals": 2, "per_change": 2.0}}
     assert m["person_touches"] == {"approvals_of_human_requests": 3, "commands_outside_an_approved_request": 0,
                                    "request_steps_not_found": 0, "approval_runs_without_a_change_step": 0,
-                                   "per_approved_change": 1.5}
+                                   "possibly_failed_request_steps": 0, "per_approved_change": 1.5}
 
 
 def test_an_approval_typed_outside_a_request_counts_once_and_a_change_unchecked_for_risk_is_unknown(tmp_path):
@@ -274,5 +281,113 @@ def test_refusals_are_per_command_and_failures_before_the_gate_per_command_attem
     assert m["refused_or_failed_per_command"] == 0.5                       # (1 refusal + 1 effect) / 4
     assert m["refusals_per_command"] == {
         "commands": 4, "refused": 1, "effects_failed": 1, "refused_or_failed": 0.5,
-        "failed_before_the_gate": 2, "failed_before_the_gate_per_command_attempted": round(2 / 6, 3),
-        "all_per_command_attempted": round(4 / 6, 3)}
+        "failed_before_the_gate": 2, "failed_before_the_gate_per_command_attempted": round(2 / 6, 3)}
+    # Failures before the gate are reported beside the rate, never inside it: the baseline has none.
+
+
+# From the review of #237.
+
+def test_a_window_edge_inside_a_request_run_neither_splits_it_nor_counts_its_steps_as_typed(tmp_path):
+    steps, cmds = one_approval_run("2-b", "2026-11-10T10:00:30+00:00")
+    domain(tmp_path, "authoring", cmds[:6], [event("X", PERSON, "person")], ["2-b"], ["2-b"],
+           checks=[risk("2-b", "low", "2026-11-10T09:00:00+00:00")])
+    domain(tmp_path, "delivery", cmds[6:], [event("X", PERSON, "person")], [], [])
+    write(tmp_path / ".toprope/approval-runs.jsonl", [approval_run("2026-11-10T10:00:30+00:00", steps)])
+    # --until after the approval, before the run was recorded: the run and its change are inside.
+    m = ub.measure(tmp_path, until="2026-11-10T10:00:03.5+00:00")
+    assert m["approvals_in_window"] == 1
+    assert m["person_touches"]["approvals_of_human_requests"] == 1
+    assert m["person_touches"]["commands_outside_an_approved_request"] == 0
+    assert m["approvals_per_approved_change_by_risk"] == {"low": {"changes": 1, "approvals": 1, "per_change": 1.0}}
+    # --since after the approval: the rest of the run is not counted as typed by the person.
+    m = ub.measure(tmp_path, since="2026-11-10T10:00:03.5+00:00")
+    assert m["approvals_in_window"] == 0
+    assert m["person_touches"]["approvals_of_human_requests"] == 0
+    assert m["person_touches"]["commands_outside_an_approved_request"] == 0
+
+
+def test_the_risk_is_the_one_recorded_before_the_approval_not_a_later_one(tmp_path):
+    domain(tmp_path, "authoring", [timed(PERSON, "approve_commit", "1-a", "2026-11-10T10:00:00+00:00")],
+           [event("X", PERSON, "person")], ["1-a"], ["1-a"],
+           checks=[risk("1-a", "low", "2026-11-10T09:00:00+00:00"),
+                   risk("1-a", "high", "2026-11-10T11:00:00+00:00")])     # checked again after it
+    m = ub.measure(tmp_path)
+    assert set(m["approvals_per_approved_change_by_risk"]) == {"low"}
+
+
+def test_steps_of_a_run_that_failed_unrecorded_are_reported_and_a_failed_run_record_matches_what_ran(tmp_path):
+    steps, cmds = one_approval_run("2-b", "2026-11-10T10:00:30+00:00")
+    failed_try = [timed(PERSON, "confirm_all_proposed", "authoring", "2026-11-10T09:30:00+00:00"),
+                  timed(PERSON, "commit_draft", "authoring", "2026-11-10T09:30:01+00:00")]
+    domain(tmp_path, "authoring", [*failed_try, *cmds[:6]], [event("X", PERSON, "person")], ["2-b"], ["2-b"])
+    domain(tmp_path, "delivery", cmds[6:], [event("X", PERSON, "person")], [], [])
+    write(tmp_path / ".toprope/approval-runs.jsonl", [approval_run("2026-11-10T10:00:30+00:00", steps)])
+    t = ub.measure(tmp_path)["person_touches"]
+    assert t["commands_outside_an_approved_request"] == 2 and t["possibly_failed_request_steps"] == 2
+
+    # A failed run recorded with how far it got (fix/request-keeps-work): it is one approval, and
+    # only the steps that ran are looked for.
+    run = approval_run("2026-11-10T10:00:30+00:00", steps) | {"ran": 4, "failed": {"step": 5, "error": "x"}}
+    domain(tmp_path, "authoring", cmds[:5], [event("X", PERSON, "person")], ["2-b"], ["2-b"])
+    domain(tmp_path, "delivery", [], [event("X", PERSON, "person")], [], [])
+    write(tmp_path / ".toprope/approval-runs.jsonl", [run])
+    t = ub.measure(tmp_path)["person_touches"]
+    assert t["approvals_of_human_requests"] == 1 and t["request_steps_not_found"] == 0
+    assert t["commands_outside_an_approved_request"] == 0
+
+
+def test_commit_in_a_request_is_the_commit_its_commit_draft_made(tmp_path):
+    steps = [step("authoring", "commit_draft", "authoring"), step("authoring", "check_commit", "$commit"),
+             step("authoring", "approve_commit", "$commit")]
+    cmds = [timed(PERSON, "commit_draft", "authoring", "2026-11-10T10:00:00+00:00"),
+            made("3-c", "2026-11-10T10:00:00.5+00:00"),
+            timed(PERSON, "check_commit", "3-c", "2026-11-10T10:00:01+00:00"),
+            timed(PERSON, "approve_commit", "3-c", "2026-11-10T10:00:02+00:00"),
+            timed(PERSON, "approve_commit", "2-b", "2026-11-10T10:00:10+00:00")]   # typed, another commit
+    domain(tmp_path, "authoring", cmds, [event("X", PERSON, "person")], ["2-b", "3-c"], ["2-b", "3-c"])
+    run = approval_run("2026-11-10T10:00:30+00:00", steps)
+    commands = ub._commands(tmp_path, "authoring")[0]
+    [(_, took, missing)] = ub._match_runs([run], commands)
+    assert missing == 0 and [(c["action"], c["target"]) for c in took] == [
+        ("commit_draft", "authoring"), ("check_commit", "3-c"), ("approve_commit", "3-c")]
+
+
+def test_a_refusal_before_any_timed_command_has_no_time(tmp_path):
+    domain(tmp_path, "authoring",
+           [timed(AGENT, "propose_element", "authoring", "x", "rejected", "invariant-guard"),
+            timed(PERSON, "approve_commit", "1-a", "2026-11-10T10:00:00+00:00")],
+           [event("X", PERSON, "person"), event("Y", AGENT, "agent")], ["1-a"], ["1-a"])
+    assert ub.measure(tmp_path)["domains"]["authoring"]["refused"] == 1          # no window: counted
+    assert ub.measure(tmp_path, since="2026-11-10")["domains"]["authoring"]["refused"] == 0
+
+
+def test_a_thousand_changes_are_measured_in_seconds(tmp_path):
+    import time
+    auth, deliv, runs = [], [], []
+    for n in range(1000):
+        h, mi = divmod(n, 60)
+        steps, cmds = one_approval_run(f"{n}-x", "")
+        at = f"2026-11-{10 + h // 24:02d}T{h % 24:02d}:{mi:02d}:30+00:00"
+        cmds = [[{k: v.replace("2026-11-10T10:00", at[:16]) for k, v in r.items()} for r in c] for c in cmds]
+        auth += cmds[:6]
+        deliv += cmds[6:]
+        runs.append(approval_run(at, steps))
+    domain(tmp_path, "authoring", auth, [event("X", PERSON, "person")], [], [])
+    domain(tmp_path, "delivery", deliv, [event("X", PERSON, "person")], [], [])
+    write(tmp_path / ".toprope/approval-runs.jsonl", runs)
+    start = time.monotonic()
+    m = ub.measure(tmp_path)
+    assert m["person_touches"]["approvals_of_human_requests"] == 1000
+    assert m["person_touches"]["request_steps_not_found"] == 0
+    assert time.monotonic() - start < 5
+
+
+def test_a_malformed_log_line_names_the_file_the_line_and_the_fix(tmp_path):
+    import pytest
+    domain(tmp_path, "authoring", [timed(PERSON, "approve_commit", "1-a", "2026-11-10T10:00:00+00:00")],
+           [event("X", PERSON, "person")], [], [])
+    log = tmp_path / "domains/authoring/events/idempotency.jsonl"
+    log.write_text(log.read_text() + "{not json\n")
+    with pytest.raises(SystemExit) as e:
+        ub.measure(tmp_path)
+    assert "idempotency.jsonl:3" in str(e.value.code) and "Fix: " in str(e.value.code)

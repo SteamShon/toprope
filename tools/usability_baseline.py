@@ -40,6 +40,7 @@ import argparse
 import json
 import re
 import sys
+from bisect import bisect_left, bisect_right
 from collections import Counter
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -85,43 +86,89 @@ class Window:
         return {"since": self.since and self.since.isoformat(), "until": self.until and self.until.isoformat()}
 
 
-def _commands(root: Path, domain: str) -> tuple[list[dict], list[datetime | None]]:
-    """The domain's finished commands, in log order, each with its time; and the times of those
-    never finished."""
-    ev_dir = root / "domains" / domain / "events"
-    kinds = _actor_kinds(_jsonl(ev_dir / "events.jsonl"))
-    rows = []
-    for row in _jsonl(ev_dir / "idempotency.jsonl"):
-        outcome = None if row["state"] == "pending" else json.loads(row["state"])
-        t = next((w for e in (outcome or {}).get("events") or [] if (w := _when(e.get("at")))), None)
-        rows.append((row["key"], outcome, t))
-    first = next((t for _, _, t in rows if t is not None), None)
-    finished, pending, last = {}, {}, None
-    for key, outcome, t in rows:            # an untimed row takes the time before it (or the first)
-        last = t or last or first
-        if outcome is None:
-            pending.setdefault(key, last)
-        else:
-            actor_id, action, target = (json.loads(key) + [None, None, None])[:3]
-            finished[key] = {"domain": domain, "actor": actor_id, "kind": _kind(actor_id, kinds),
-                             "action": action, "target": target, "outcome": outcome, "t": last,
-                             "ok": outcome.get("status") == "ok"}
-    return list(finished.values()), [t for k, t in pending.items() if k not in finished]
+def _bad(path: Path, n: int, what: str) -> SystemExit:
+    return SystemExit(fixed(f"{path}:{n}: {what}",
+                            "repair or remove that line (`git log -p` on the file shows who wrote it), "
+                            "then measure again"))
 
 
 def _jsonl(path: Path) -> list[dict]:
+    """The rows of a JSON-lines log, each with its line number as `_line`."""
     if not path.exists():
         return []
-    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+    rows = []
+    for n, line in enumerate(path.read_text().splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except ValueError:
+            raise _bad(path, n, "not a line of JSON") from None
+        if not isinstance(row, dict):
+            raise _bad(path, n, "not a JSON object")
+        rows.append({**row, "_line": n})
+    return rows
+
+
+def _events(path: Path) -> list[dict]:
+    """The events of an event log, parsed once."""
+    out = []
+    for row in _jsonl(path):
+        try:
+            e = json.loads(row["event"])
+            if not isinstance(e, dict):
+                raise TypeError
+        except (KeyError, TypeError, ValueError):
+            raise _bad(path, row["_line"], "no event in it, or one that is not JSON") from None
+        out.append(e)
+    return out
 
 
 def _actor_kinds(events: list[dict]) -> dict[str, str]:
     kinds = {}
-    for row in events:
-        actor = json.loads(row["event"]).get("actor")
+    for e in events:
+        actor = e.get("actor")
         if actor:
             kinds[actor["id"]] = actor["kind"]
     return kinds
+
+
+def _commands(root: Path, domain: str, events: list[dict] | None = None) -> tuple[list[dict], list[datetime | None]]:
+    """The domain's finished commands, in log order, each with its time; and the times of those
+    never finished. A command's time is that of the events it appended; one that appended none (a
+    refusal) takes the time of the command before it in the log, and has none if no command
+    before it has one. A `commit_draft` carries the commit it `made`: the target of the kernel's
+    `record_commit` reply that follows it in the log."""
+    ev_dir = root / "domains" / domain / "events"
+    path = ev_dir / "idempotency.jsonl"
+    kinds = _actor_kinds(_events(ev_dir / "events.jsonl") if events is None else events)
+    finished, pending, last = {}, {}, None
+    drafts: list[dict] = []
+    for row in _jsonl(path):
+        try:
+            key = row["key"]
+            outcome = None if row["state"] == "pending" else json.loads(row["state"])
+            if outcome is not None and not isinstance(outcome, dict):
+                raise TypeError
+            t = next((w for e in (outcome or {}).get("events") or [] if (w := _when(e.get("at")))), None)
+            actor_id, action, target = (json.loads(key) + [None, None, None])[:3]
+        except (KeyError, TypeError, ValueError, AttributeError):
+            raise _bad(path, row["_line"], "not a command entry (`key`, and `state` pending or an outcome)") from None
+        last = t or last
+        if outcome is None:
+            pending.setdefault(key, last)
+            continue
+        c = {"domain": domain, "actor": actor_id, "kind": _kind(str(actor_id), kinds), "action": action,
+             "target": target, "outcome": outcome, "t": last, "ok": outcome.get("status") == "ok",
+             "seq": len(finished)}
+        finished.setdefault(key, c)
+        if c["ok"] and action == "commit_draft":
+            drafts.append(c)
+        elif c["ok"] and action == "record_commit" and c["kind"] == "system":
+            for d in drafts:
+                d["made"] = target
+            drafts = []
+    return list(finished.values()), [t for k, t in pending.items() if k not in finished]
 
 
 def _kind(actor_id: str, kinds: dict[str, str]) -> str:
@@ -136,11 +183,15 @@ def _check_failed(row: dict) -> bool:
             and not row.get("summary", "").startswith("skipped"))
 
 
-def measure_domain(root: Path, domain: str, window: Window | None = None) -> dict:
+def measure_domain(root: Path, domain: str, window: Window | None = None,
+                   parsed: tuple[list[dict], list[dict], list] | None = None) -> dict:
+    """`parsed`: the domain's (events, commands, unfinished), if already read."""
     window = window or Window()
     ev_dir = root / "domains" / domain / "events"
-    events = _jsonl(ev_dir / "events.jsonl")
-    commands, unfinished = _commands(root, domain)
+    if parsed is None:
+        events = _events(ev_dir / "events.jsonl")
+        parsed = (events, *_commands(root, domain, events))
+    events, commands, unfinished = parsed
     by_kind, refused_by_kind, refused_codes = Counter(), Counter(), Counter()
     approvals = 0
     for c in commands:
@@ -159,7 +210,6 @@ def measure_domain(root: Path, domain: str, window: Window | None = None) -> dic
     ends = Window(None, window.until)
     approved = {r["commit"] for r in _jsonl(store / "approvals.jsonl") if _when(r.get("at")) in ends}
     failed_checks = {r["commit"] for r in _jsonl(store / "checks.jsonl") if _check_failed(r)} & set(commits)
-    failed_effects = [e for r in events if (e := json.loads(r["event"]))["type"] == "EffectFailed"]
 
     return {
         "commands": sum(by_kind.values()),
@@ -168,7 +218,7 @@ def measure_domain(root: Path, domain: str, window: Window | None = None) -> dic
         "refused": sum(refused_by_kind.values()),
         "refused_by_actor": dict(refused_by_kind),
         "refused_codes": dict(refused_codes),
-        "effects_failed": sum(1 for e in failed_effects if _when(e.get("at")) in window),
+        "effects_failed": sum(1 for e in events if e.get("type") == "EffectFailed" and _when(e.get("at")) in window),
         "approvals_in_window": approvals,
         "commits": len(commits),
         "commits_never_approved": len([c for c in commits if c not in approved]),
@@ -180,42 +230,104 @@ def _ratio(a: int, b: int) -> float | None:
     return round(a / b, 3) if b else None
 
 
+# A request's steps all run inside the workflow's `act` job, which `record` ends; the job stops
+# after `timeout-minutes: 20` (.github/workflows/human-request.yml). So a run's commands are no
+# earlier than this before its record.
+RUN_SPAN = timedelta(minutes=20)
+# A person's command this long before a recorded run, with the action and target of one of its
+# steps, may be a step of an earlier run of the same request that failed and was not recorded.
+RETRY_SPAN = timedelta(minutes=60)
+SLACK = timedelta(seconds=1)              # a record's `at` is cut to the second
+
+
+def _run_steps(run: dict) -> list[dict]:
+    """The `run` steps of a recorded request that ran: all of them, or, for a run recorded as
+    failed (`ran`, `failed`), the ones before the failed step."""
+    steps = [st["run"] for st in run.get("steps") or [] if isinstance(st, dict) and isinstance(st.get("run"), dict)]
+    ran = run.get("ran")
+    if run.get("failed") and isinstance(ran, int):
+        n = sum(1 for st in (run.get("steps") or [])[:ran] if isinstance(st, dict) and "run" in st)
+        steps = steps[:n]
+    return steps
+
+
+def _target_matches(pattern: str, target: object, made: str | None) -> bool:
+    """A step's target against a command's: `$commit` is the commit the run's commit_draft made,
+    or, when there is none to bind it to, matches nothing."""
+    if MADE not in pattern:
+        return pattern == target
+    return made is not None and pattern.replace(MADE, made) == target
+
+
 def _match_runs(runs: list[dict], commands: list[dict]) -> list[tuple[dict, list[dict], int]]:
-    """Each approved request run with the kernel commands its `run` steps took, and how many of
-    its steps were not found. A step took the latest command, not yet matched, by the person the
-    run acted as, with the step's action and target (`$commit` stands for any commit), at or
-    before the run was recorded and after the run before it. Only commands that succeeded: a
-    recorded run is one whose every step did."""
-    by_time = sorted((c for c in commands if c["ok"] and c["kind"] == "person" and c["t"]),
-                     key=lambda c: c["t"])
+    """Each approved request run with the kernel commands its `run` steps took, in order, and how
+    many of its steps were not found. The steps are matched in their order: each takes the
+    earliest command not yet taken, by the person the run acted as, with the step's action and
+    target, after the step before it, no earlier than `RUN_SPAN` before the run's record or than
+    the record before it, and no later than the record. `$commit` is the commit the matched
+    commit_draft made. Only commands that succeeded: a step recorded as run succeeded."""
+    index: dict[tuple, list[dict]] = {}
+    for c in sorted((c for c in commands if c["ok"] and c["kind"] == "person" and c["t"]),
+                    key=lambda c: (c["t"], c["domain"], c["seq"])):
+        index.setdefault((c["actor"], c["action"]), []).append(c)
+    times = {k: [c["t"] for c in v] for k, v in index.items()}
     used: set[int] = set()
     out, before = [], None
     for run in sorted(runs, key=lambda r: _when(r.get("at")) or datetime.min.replace(tzinfo=UTC)):
         at = _when(run.get("at"))
-        steps = [st["run"] for st in run.get("steps") or [] if isinstance(st, dict) and "run" in st]
-        took = []
-        for st in reversed(steps):
-            target = re.escape(str(st.get("target"))).replace(re.escape(MADE), r"[^:]+")
-            found = [i for i, c in enumerate(by_time) if i not in used and at is not None
-                     and c["actor"] == run.get("as") and c["action"] == st.get("action")
-                     and re.fullmatch(target, str(c["target"]))
-                     and c["t"] <= at + timedelta(seconds=1) and (before is None or c["t"] > before)]
-            if found:
-                used.add(found[-1])
-                took.append(by_time[found[-1]])
+        steps = _run_steps(run)
+        took: list[dict] = []
+        if at is not None:
+            lower = max(x for x in (at - RUN_SPAN, before) if x is not None)
+            after, made = lower, None
+            for st in steps:
+                key = (run.get("as"), st.get("action"))
+                cands, ts = index.get(key, []), times.get(key, [])
+                pattern = str(st.get("target"))
+                found = None
+                for c in cands[bisect_right(ts, after) if not took else bisect_left(ts, after):]:
+                    if c["t"] > at + SLACK:
+                        break
+                    if id(c) not in used and _target_matches(pattern, c["target"], made):
+                        found = c
+                        break
+                if found is None:
+                    continue
+                used.add(id(found))
+                took.append(found)
+                after = found["t"]
+                if found["action"] == "commit_draft":
+                    made = found.get("made")
         out.append((run, took, len(steps) - len(took)))
         before = at or before
     return out
 
 
-def _risk(root: Path) -> dict[str, str]:
-    """The risk `check_commit` last recorded on each commit (ADR-0050), in any domain."""
-    level = {}
+def _run_time(run: dict, took: list[dict]) -> datetime | None:
+    """When a run counts: at its approval, so a change and the run that approves it fall in the
+    same window; a run that approves nothing, at its first command; one with none, at its record."""
+    approve = next((c["t"] for c in took if c["action"] == APPROVE), None)
+    return approve or (took[0]["t"] if took else _when(run.get("at")))
+
+
+def _risk_at(root: Path) -> dict[str, list[tuple[datetime | None, str]]]:
+    """Every risk `check_commit` recorded (ADR-0050), per commit, in any domain, in order."""
+    level: dict[str, list] = {}
     for path in sorted((root / ".toprope" / "commits").glob("*/checks.jsonl")):
         for r in _jsonl(path):
             if r.get("check") == "risk":
-                level[r["commit"]] = str(r.get("summary", "")).split(":", 1)[0].strip()
+                level.setdefault(r["commit"], []).append(
+                    (_when(r.get("at")), str(r.get("summary", "")).split(":", 1)[0].strip()))
     return level
+
+
+def _risk_when(levels: list[tuple[datetime | None, str]], t: datetime | None) -> str | None:
+    """The risk last recorded at or before `t` (a row without a time counts as before)."""
+    found = None
+    for at, level in sorted(levels, key=lambda x: x[0] or datetime.min.replace(tzinfo=UTC)):
+        if at is None or t is None or at <= t + SLACK:
+            found = level
+    return found
 
 
 def _changes_touched(took: list[dict]) -> set[str]:
@@ -229,13 +341,30 @@ def _changes_touched(took: list[dict]) -> set[str]:
     return out
 
 
+def _possibly_failed(c: dict, runs: list[dict]) -> bool:
+    """A command with the action and target of a step of a run recorded within RETRY_SPAN after it."""
+    for run in runs:
+        at = _when(run.get("at"))
+        if at is None or c["actor"] != run.get("as") or not (c["t"] < at <= c["t"] + RETRY_SPAN):
+            continue
+        for st in _run_steps(run):
+            pattern = re.escape(str(st.get("target"))).replace(re.escape(MADE), r"[^:]+")
+            if st.get("action") == c["action"] and re.fullmatch(pattern, str(c["target"])):
+                return True
+    return False
+
+
 def measure(root: Path, since: object = None, until: object = None) -> dict:
     root = Path(root)
     window = Window(since, until)
     base = root / "domains"
     domains = sorted(p.name for p in base.iterdir()
                      if (p / "events" / "idempotency.jsonl").exists()) if base.exists() else []
-    per = {d: measure_domain(root, d, window) for d in domains}
+    parsed = {}
+    for d in domains:
+        events = _events(base / d / "events" / "events.jsonl")
+        parsed[d] = (events, *_commands(root, d, events))
+    per = {d: measure_domain(root, d, window, parsed[d]) for d in domains}
 
     def total(f):
         return sum(f(m) for m in per.values())
@@ -263,30 +392,35 @@ def measure(root: Path, since: object = None, until: object = None) -> dict:
                          if first is not None and str(r.get("at", "")) >= first and _when(r.get("at")) in window)
 
     # Touches and approvals (ADR-0049, 5; ADR-0050): a request run is one approval by a person.
-    commands = [c for d in domains for c in _commands(root, d)[0]]
+    # Runs are matched over the whole log, then placed in the window by `_run_time`, so a window
+    # edge inside a run neither splits it nor counts its steps as typed by the person.
+    commands = [c for d in domains for c in parsed[d][1]]
     runs = _jsonl(root / APPROVAL_RUNS)
-    matched = [(r, took, missing) for r, took, missing in _match_runs(runs, commands) if _when(r.get("at")) in window]
+    every = _match_runs(runs, commands)
+    in_runs = {id(c) for _, took, _ in every for c in took}
+    matched = [(r, took, missing) for r, took, missing in every if _run_time(r, took) in window]
     change_runs = [(r, took, missing) for r, took, missing in matched
                    if any(isinstance(st, dict) and "run" in st for st in r.get("steps") or [])]
-    in_runs = {id(c) for _, took, _ in matched for c in took}
     outside = [c for c in commands if c["kind"] == "person" and c["t"] in window and id(c) not in in_runs]
     touches = len(change_runs) + len(outside)
 
-    approved_changes = {c["target"] for c in commands
-                        if c["ok"] and c["kind"] == "person" and c["action"] == APPROVE and c["t"] in window}
+    approved_at: dict[str, datetime | None] = {}
+    for c in commands:
+        if c["ok"] and c["kind"] == "person" and c["action"] == APPROVE and c["t"] in window:
+            approved_at.setdefault(c["target"], c["t"])
     approvals_of = Counter(c["target"] for c in outside if c["ok"] and c["action"] == APPROVE)
     for _, took, _ in change_runs:
         approvals_of.update(_changes_touched(took))
-    level = _risk(root)
+    levels = _risk_at(root)
     by_risk: dict[str, dict] = {}
-    for commit in sorted(approved_changes):
-        r = by_risk.setdefault(level.get(commit) or "unknown", {"changes": 0, "approvals": 0})
+    for commit in sorted(approved_at):
+        level = _risk_when(levels.get(commit, []), approved_at[commit]) or "unknown"
+        r = by_risk.setdefault(level, {"changes": 0, "approvals": 0})
         r["changes"] += 1
         r["approvals"] += approvals_of[commit]
     for r in by_risk.values():
         r["per_change"] = _ratio(r["approvals"], r["changes"])
 
-    attempted = taken + len(failures)
     return {
         "window": window.as_dict(),
         "domains": per,
@@ -301,6 +435,7 @@ def measure(root: Path, since: object = None, until: object = None) -> dict:
             "commands_outside_an_approved_request": len(outside),
             "request_steps_not_found": sum(missing for _, _, missing in change_runs),
             "approval_runs_without_a_change_step": len(matched) - len(change_runs),
+            "possibly_failed_request_steps": sum(1 for c in outside if c["ok"] and _possibly_failed(c, runs)),
             "per_approved_change": _ratio(touches, approvals),
         },
         "approvals_per_approved_change_by_risk": by_risk,
@@ -312,8 +447,7 @@ def measure(root: Path, since: object = None, until: object = None) -> dict:
             "effects_failed": effects,
             "refused_or_failed": _ratio(bad, taken),
             "failed_before_the_gate": len(failures),
-            "failed_before_the_gate_per_command_attempted": _ratio(len(failures), attempted),
-            "all_per_command_attempted": _ratio(bad + len(failures), attempted),
+            "failed_before_the_gate_per_command_attempted": _ratio(len(failures), taken + len(failures)),
         },
         "failed_before_the_gate": dict(by_kind),
         "failed_before_the_gate_without_a_fix": sum(1 for f in failures if not f.get("has_fix")),
@@ -357,12 +491,13 @@ def render(m: dict) -> str:
              f"({p['approvals_of_human_requests']} approved requests + "
              f"{p['commands_outside_an_approved_request']} commands outside one; "
              f"{p['request_steps_not_found']} request steps not found in the logs; "
-             f"{p['approval_runs_without_a_change_step']} approved requests without a change step, not counted).",
+             f"{p['approval_runs_without_a_change_step']} approved requests without a change step, not counted; "
+             f"{p['possibly_failed_request_steps']} of the commands outside may be steps of a request run that "
+             "failed, which is not recorded).",
              f"Approvals per approved change, by risk: {risk}.",
              f"Per command: refused or failed {q['refused_or_failed']} ({q['refused']} + {q['effects_failed']} "
              f"in {q['commands']}); failed before the gate {q['failed_before_the_gate_per_command_attempted']} "
-             f"per command attempted ({q['failed_before_the_gate']}); all three "
-             f"{q['all_per_command_attempted']} per command attempted."]
+             f"per command attempted ({q['failed_before_the_gate']}), reported beside the rate, not in it."]
     return "\n".join(rows)
 
 
