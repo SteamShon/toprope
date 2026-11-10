@@ -469,3 +469,56 @@ def test_score_reports_each_arms_recall_and_precision_from_both_sittings(tmp_pat
     assert out["by_sitting"]["toprope"]["recall"]["range"] == [1.0, 1.0]
     assert out["metrics"]["nl"]["recall"] == 0.5                       # the confirmed grades: the first sitting
 
+
+
+CAP = {"domain": "authoring", "where": "actions.confirm_element.preconditions.p", "problem": "a new path",
+       "check": "capability", "severity": "warning"}
+
+
+def test_a_capability_finding_on_the_edited_element_is_left_to_the_grader(tmp_path):
+    """The capability diff reports on the very action a change edits, so its `where` always meets
+    the binding: found in the M1 recheck, where 67 such flags were scripted `seeded`."""
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    write_run(run, "nl", {}, {1: 1, 2: 1, 3: 1})
+    write_run(run, "structured", {}, {1: 1, 2: 1, 3: 1})
+    write_run(run, "toprope", {1: [CAP, {**CAP, "check": "structural", "severity": "info"},
+                                   {**CAP, "check": "structural"}]}, {1: 1, 2: 1, 3: 1})
+    runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m"],
+                backend=ApiBackend(FakeModel(grader({("toprope", 1): ["false-alarm"] * 3}, run)[0])))
+    prop = yaml.safe_load((run / "scoring/proposed.yaml").read_text())
+    tp = flags_of(prop, run, "toprope", 1)
+    assert [f["script_label"] for f in tp] == [None, None, "seeded"]      # capability, info: not scripted
+    assert [f["label"] for f in tp] == ["false-alarm", "false-alarm", "seeded"]
+
+
+def test_rescript_takes_back_a_script_label_the_rule_no_longer_gives(tmp_path):
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    write_run(run, "nl", {}, {1: 1, 2: 1, 3: 1})
+    write_run(run, "structured", {}, {1: 1, 2: 1, 3: 1})
+    write_run(run, "toprope", {1: [CAP]}, {1: 1, 2: 1, 3: 1})
+    runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m"],
+                backend=ApiBackend(FakeModel(grader({("toprope", 1): ["false-alarm"]}, run)[0])))
+    path = run / "scoring/proposed.yaml"
+    prop = yaml.safe_load(path.read_text())
+    (f,) = flags_of(prop, run, "toprope", 1)
+    f["script_label"] = f["label"] = "seeded"                              # as graded before the fix
+    path.write_text(yaml.safe_dump(prop))
+    assert score.rescript(run)["script_labels_cleared"] == 1
+    (f,) = flags_of(yaml.safe_load(path.read_text()), run, "toprope", 1)
+    assert (f["script_label"], f["label"], f["script_cleared"]) == (None, "false-alarm", True)
+
+
+def test_a_disagreement_the_researcher_settled_is_not_asked_again(tmp_path):
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    three_arms(run)
+    labels = {**LABELS, ("toprope", 1): ["false-alarm"]}                   # the grader differs from the script
+    runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m"],
+                backend=ApiBackend(FakeModel(grader(labels, run)[0])))
+    assert score.to_decide(run)["count"] == 1
+    c = yaml.safe_load((run / "scoring/proposed.yaml").read_text())
+    for ch in c["changes"]:
+        for f in ch["flags"]:
+            if f.get("script_label") and f.get("grader_label") and f["script_label"] != f["grader_label"]:
+                f["label"], f["decided"] = "seeded", True
+    (run / "scoring/confirmed.yaml").write_text(yaml.safe_dump(c))
+    assert score.to_decide(run)["count"] == 0

@@ -13,6 +13,7 @@ opens the key, the binding or the blind labels, and never takes a role:
   uv run python -m phase_b grade --model M                        propose the grades (opens the key)
   uv run python -m phase_b grade --model M --into scoring-2       the second sitting (the M1 recheck)
   uv run python -m phase_b compare-gradings                       the grader's noise between the two
+  uv run python -m phase_b rescript --scoring S                   take back script labels the rule no longer gives
   uv run python -m phase_b to-decide                              what the researcher must decide
   uv run python -m phase_b score                                  the metrics, from confirmed.yaml
 
@@ -490,6 +491,10 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     g.add_argument("--instruments", type=Path, default=INSTRUMENTS)
     g.add_argument("--partial", action="store_true", help="grade an incomplete run (tests; never for the report)")
     g.add_argument("--into", default="scoring", help="the scoring directory: `scoring-2` for the second sitting")
+    rs = sub.add_parser("rescript", help="take back script labels the current rule no longer gives (a sitting "
+                        "graded before the fix); the label becomes the grader's")
+    rs.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    rs.add_argument("--scoring", default="scoring")
     cg = sub.add_parser("compare-gradings", help="the grader's noise: each arm's recall from two sittings")
     cg.add_argument("--out", type=Path, default=DEFAULT_OUT)
     cg.add_argument("--instruments", type=Path, default=INSTRUMENTS)
@@ -500,6 +505,10 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
 
     if args.cmd == "freeze-prompts":
         print(json.dumps(freeze_prompts(args.instruments, args.reason), indent=2))
+        return
+    if args.cmd == "rescript":
+        from .score import rescript
+        print(json.dumps(rescript(args.out, args.scoring), indent=2))
         return
     if args.cmd == "compare-gradings":
         from .score import compare_gradings
