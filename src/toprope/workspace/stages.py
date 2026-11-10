@@ -115,8 +115,14 @@ class Plan:
         from . import Question
         out: list[Question] = []
 
-        def q(kind: str, subject: str, text: str, decides: list[str], priority: float = 0) -> None:
-            out.append(Question(_qid(kind, subject), kind, text, decides, priority))
+        def q(kind: str, subject: str, text: str, decides: list[str], priority: float = 0,
+              skip: str | None = None) -> None:
+            from . import Choice
+            qid = _qid(kind, subject)
+            from . import choice_id
+            choices = [Choice(choice_id(qid, 1, [], skip), f"nothing, for any of them: skip the whole {skip} stage",
+                              [], False, "", skip)] if skip else []
+            out.append(Question(qid, kind, text, decides, priority, choices))
 
         for i in self.errors_in(stage):
             q("conflict", f"{i.code}@{i.where}", f"The draft has a conflict at {i.where}: {i.message}. "
@@ -177,7 +183,7 @@ class Plan:
         elif n == "invariants":
             for obj in sorted(d.transitions):
                 q("invariants", obj, f"What must always be true about a {obj}, in every stage, however it got "
-                  "there? (If nothing, say so.)", ["invariants"])
+                  "there? (If nothing, say so.)", ["invariants"], skip="invariants")
         elif n == "world":
             if not d.world.fixtures:
                 q("world", "fixtures", "Give realistic examples: at least one of each thing, with its key "
@@ -190,7 +196,7 @@ class Plan:
         elif n == "handoffs":
             q("handoffs", "all", "Does this domain hand its result to another domain? If so: which action "
               "triggers it, which domain and action receive it, and what it carries. (If not, say so.)",
-              ["handoffs"])
+              ["handoffs"], skip="handoffs")
         elif n == "review":
             proposed = self.ws._proposed(self.doc)
             if proposed:

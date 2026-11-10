@@ -124,8 +124,10 @@ the error is raised.
 | an answer quotes the owner's words | pass the owner's answer, in their words, as the answer text |
 | bad element path {…} | write the path as dot-separated names, such as `actions.approve.preconditions` |
 | cannot read the working copy: {…} | fix the declaration file so it parses, or restore it with `git checkout -- <file>`, then check out again |
+| decisions {…} are neither a list nor a choice | pass a list of {path, value}, or `choice:<id>` |
 | event_store: {…} | set `event_store:` in the workspace file to `sqlite:FILE`, `jsonl:DIR` or `memory` |
 | no branch {…}; branches: {…} | use one of the branches listed |
+| no choice {…} among the open questions: the question was answered, or its choices changed since they were shown | ask `next_questions` again, show the owner the choices now offered, and answer with one of those ids |
 | no chunk {…} | run `search` with words from the passage, and cite the `ref` it returns, or quote the words |
 | no chunk {…}, and no passage contains those words | run `search` with words from the passage, and cite the `ref` it returns or words it shows |
 | no deploy environment at {…} | pass `--env` the directory of a local deploy environment, or set `env:` in toprope.yaml |
