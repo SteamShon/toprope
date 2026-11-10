@@ -41,7 +41,7 @@ from typing import Any
 
 import yaml
 
-from ...errors import fixed
+from ...errors import MARK, fixed
 
 REQUESTS = ".toprope/requests"
 RUN = [sys.executable, "-c", "from toprope.adapters.cli import main; main()"]
@@ -215,9 +215,11 @@ def main(argv: list[str] | None = None) -> None:
                  str(origin), "--cites", str(it["cites"]), "--value", json.dumps(it["value"]))
         except StepFailed as e:
             left = f"; already proposed and still in the draft: {', '.join(proposed)}" if proposed else ""
-            raise SystemExit(fixed(f"{e.code}{left}", "fix that element and run the change again with the "
-                                   "elements not yet proposed, or restore the draft with `git checkout -- "
-                                   "<declaration>`")) from None
+            # the step's message names its own fix: keep one `Fix:`, the step's first
+            said, _, its_fix = str(e.code).partition(MARK)
+            first = f"{its_fix.strip().rstrip('.')}; then " if its_fix else "fix that element and "
+            raise SystemExit(fixed(f"{said.strip()}{left}", f"{first}run the change again with the elements not "
+                                   "yet proposed, or restore the draft with `git checkout -- <declaration>`")) from None
         proposed.append(str(it["path"]))
         print(f"proposed {it['path']}", file=sys.stderr)
     domain, failing, summary, (risk, reasons) = dry_check(kernel_root(a.kernel_root), a.workspace)

@@ -2,9 +2,11 @@
 
     raise AuthoringError(fixed(f"no source {sid!r}", "list the sources with `search_sources`"))
 
-`tests/test_error_fixes.py` scans the modules on the change loop's path and fails on an error
-raised with a message that does not go through `fixed`, and on a kernel service's `failure(…)`
-reply without one.
+`tests/test_error_fixes.py` scans every module of `src/toprope/` and `tools/human_request.py`, and
+fails on an error raised with a message that does not go through `fixed`, on a kernel service's
+`failure(…)` reply without one, on a command's refusal (`Outcome("denied" | "rejected", code,
+reason)`, the interpreter's `deny`/`_attempt`, a reason a gate function returns) without one, and on
+a message with two `Fix:` parts.
 
 What the scan cannot see: a message held in a variable (`raise E(msg)`), and the text of an error
 passed on from a module outside the scan (`f"identity file: {e}"`, where `e` came from YAML or the
@@ -19,24 +21,35 @@ from dataclasses import dataclass
 from pathlib import Path
 
 MARK = "Fix: "
-# The modules whose errors reach a person or an agent in the change loop.
-COVERED = (
-    "adapters/cli/__init__.py",
-    "adapters/cli/change.py",
-    "adapters/mcp/cli.py",
-    "commits/__init__.py",
-    "identity/git.py",
-    "kernel/services.py",
-    "workspace/__init__.py",
-)
+SRC = Path(__file__).resolve().parent
+ROOT = SRC.parents[1]                   # the repository, when the package runs from its checkout
+# Every module of the package, and the tool that runs a person's approved steps (ADR-0039).
+TOOLS = ("tools/human_request.py",)
+
+
+def covered(root: Path = ROOT) -> tuple[str, ...]:
+    """The scanned files, relative to `root`. No module is left out."""
+    mods = sorted(str(p.relative_to(root)) for p in (root / "src" / "toprope").rglob("*.py"))
+    return tuple(mods) + tuple(t for t in TOOLS if (root / t).is_file())
+
+
 # Exceptions whose message is shown as it is.
 SHOWN = {"SystemExit", "ValueError", "RuntimeError", "KeyError", "AuthoringError", "CommitError",
          "MergeConflict", "FetchError"}
-SRC = Path(__file__).resolve().parent
+# A command's refusal: the call, and the position of its reason. `Outcome` counts only when its
+# status is "denied" or "rejected".
+REFUSALS = {"Outcome": 2, "deny": 1, "_attempt": 3}
+# Functions whose returned text (`return "…"`, `return False, "…"`) is a refusal's reason.
+REASONS = {"actor_allowed", "invalid_params", "_moved_since", "no_action"}
+REASON_MODULES = ("src/toprope/semantics/refusals.py",)   # every function there returns a reason
 
 
 def fixed(message: str, fix: str) -> str:
-    """`message`, then what to do about it."""
+    """`message`, then what to do about it. A message that already names a fix (one passed on from
+    a step) keeps one `Fix:` part: its fix comes first, then `fix`."""
+    if MARK in message:
+        message, _, first = message.partition(MARK)
+        fix = f"{first.strip().rstrip('.;')}; then {fix}"
     message = message.rstrip().rstrip(":;,").rstrip()
     return f"{message}{'' if message.endswith(('.', '?', '!')) else '.'} {MARK}{fix}"
 
@@ -55,7 +68,11 @@ def _text(node: ast.AST) -> str | None:
     if isinstance(node, ast.Constant) and isinstance(node.value, str):
         return node.value
     if isinstance(node, ast.JoinedStr):
-        return "".join(v.value if isinstance(v, ast.Constant) else "{…}" for v in node.values)
+        return "".join(v.value if isinstance(v, ast.Constant)
+                       else v.value.value if (isinstance(v, ast.FormattedValue) and isinstance(v.value, ast.Constant)
+                                              and isinstance(v.value.value, str) and v.conversion == -1
+                                              and v.format_spec is None)
+                       else "{…}" for v in node.values)
     if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "format"
             and (fmt := _text(node.func.value)) is not None):
         return fmt
@@ -76,32 +93,81 @@ def _passes_on(arg: ast.AST, caught: set[str]) -> bool:
         for v in arg.values)
 
 
-def scan(src: Path = SRC, modules: tuple[str, ...] = COVERED) -> list[Raised]:
-    """Every `raise E("…")` in the covered modules, with its fix if it has one. A raise that
-    passes another error on (`str(e)`, or a message that includes it) or exits with a status is
-    not a message of its own."""
+def _call_name(call: ast.Call) -> str | None:
+    return call.func.id if isinstance(call.func, ast.Name) else getattr(call.func, "attr", None)
+
+
+def _message_of(node: ast.AST) -> tuple[ast.AST, str] | None:
+    """The message a node shows and what shows it, if it shows one."""
+    if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "failure" and node.args):
+        return node.args[0], "failure"                   # a kernel service's failed reply
+    if isinstance(node, ast.Call) and (name := _call_name(node)) in REFUSALS:
+        k = REFUSALS[name]
+        if len(node.args) <= k:
+            return None
+        if name == "Outcome" and not (isinstance(node.args[0], ast.Constant)
+                                      and node.args[0].value in ("denied", "rejected")):
+            return None
+        return node.args[k], name                        # a command's refusal
+    if isinstance(node, ast.Raise) and isinstance(node.exc, ast.Call):
+        name = _call_name(node.exc)
+        if name in SHOWN and node.exc.args:
+            return node.exc.args[0], name
+    return None
+
+
+def _returned(tree: ast.AST, every: bool = False) -> list[tuple[ast.Return, ast.AST]]:
+    """The reasons the gate functions return (every public function's, with `every`): `return "…"`
+    and `return False, "…"`."""
     out = []
-    for mod in modules:
+    for f in ast.walk(tree):
+        if isinstance(f, (ast.FunctionDef, ast.AsyncFunctionDef)) and (
+                f.name in REASONS or (every and not f.name.startswith("_"))):
+            for r in ast.walk(f):
+                if not isinstance(r, ast.Return) or r.value is None:
+                    continue
+                v = r.value
+                if isinstance(v, ast.Tuple) and len(v.elts) == 2:
+                    v = v.elts[1]
+                out.append((r, v))
+    return out
+
+
+class _Inline(ast.NodeTransformer):
+    """A module's string constants (`ASK = "…"`), read in place where a message uses them."""
+
+    def __init__(self, tree: ast.Module):
+        self.text: dict[str, str] = {}
+        for n in tree.body:                       # in order, so a constant may use one above it
+            if isinstance(n, ast.Assign) and len(n.targets) == 1 and isinstance(t := n.targets[0], ast.Name):
+                if (s := _text(self.visit(n.value))) is not None:
+                    self.text[t.id] = s
+
+    def visit_Name(self, node: ast.Name) -> ast.AST:
+        if isinstance(node.ctx, ast.Load) and node.id in self.text:
+            return ast.copy_location(ast.Constant(self.text[node.id]), node)
+        return node
+
+
+def scan(src: Path = ROOT, modules: tuple[str, ...] | None = None) -> list[Raised]:
+    """Every `raise E("…")`, service failure and command refusal in the scanned files, with its fix
+    if it has one. A raise that passes another error on (`str(e)`, or a message that includes it)
+    or exits with a status is not a message of its own."""
+    out = []
+    for mod in covered(src) if modules is None else modules:
         tree = ast.parse((src / mod).read_text())
+        tree = _Inline(tree).visit(tree)
         caught: dict[int, set[str]] = {}          # id(raise) -> names of the errors caught around it
         for h in ast.walk(tree):
             if isinstance(h, ast.ExceptHandler) and h.name:
                 for n in ast.walk(h):
-                    if isinstance(n, (ast.Raise, ast.Call)):
+                    if isinstance(n, (ast.Raise, ast.Call, ast.Return)):
                         caught.setdefault(id(n), set()).add(h.name)
-        for node in ast.walk(tree):
-            if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-                    and node.func.attr == "failure" and node.args):
-                call, name = node, "failure"              # a kernel service's failed reply
-            elif isinstance(node, ast.Raise) and isinstance(node.exc, ast.Call):
-                call = node.exc
-                func = call.func
-                name = func.id if isinstance(func, ast.Name) else getattr(func, "attr", None)
-                if name not in SHOWN or not call.args:
-                    continue
-            else:
-                continue
-            branches = [call.args[0]]
+        found = [(node, *m) for node in ast.walk(tree) if (m := _message_of(node)) is not None]
+        found += [(r, v, "refusal") for r, v in _returned(tree, mod in REASON_MODULES)]
+        for node, first, name in found:
+            branches = [first]
             while any(isinstance(b, ast.IfExp) for b in branches):   # either branch may be shown
                 branches = [x for b in branches for x in ((b.body, b.orelse) if isinstance(b, ast.IfExp) else (b,))]
             for arg in branches:
@@ -124,8 +190,8 @@ def catalog(raised: list[Raised] | None = None) -> str:
     raised = scan() if raised is None else raised
     lines = ["# Errors and their fixes", "",
              "Link: none (generated by `python -m toprope.errors --out docs/errors.md`; ADR-0049, D1).",
-             "Every error on the change loop's path, and what to do about it. `{…}` is filled in when",
-             "the error is raised.", ""]
+             "Every error, refusal and failed reply the kernel, the CLI and the request runner show, and what",
+             "to do about it. `{…}` is filled in when the error is raised.", ""]
     for mod in sorted({r.module for r in raised}):
         lines += [f"## `{mod}`", "", "| Error | Fix |", "|---|---|"]
         for r in sorted((r for r in raised if r.module == mod), key=lambda r: (r.message, r.line)):

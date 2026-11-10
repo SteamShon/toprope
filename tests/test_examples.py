@@ -7,6 +7,11 @@ from toprope.check import change_check
 from toprope.decl import load_domain
 from toprope.store import open_store
 
+# what a refusal only a person can resolve says to do (ADR-0039)
+ASK_A_PERSON = ("Fix: ask a person to take it: on their terminal, or from a cloud session through a human request "
+                "they approve in GitHub (`toprope-change` writes one for a change; `tools/human_request.py` for any "
+                "step)")
+
 EX = Path(__file__).resolve().parents[1] / "examples/refunds"
 
 
@@ -24,7 +29,8 @@ def test_a_refund_after_day_7_is_refused_with_the_declared_reason(capsys, tmp_pa
     out = run(capsys, f"sqlite:{tmp_path / 'e.db'}", "refund_order", "O-8")
     assert out["status"] == "denied"
     assert out["code"] == "within-window"
-    assert out["reason"] == "Refunds are allowed within 7 days of purchase."
+    assert out["reason"] == ("Refunds are allowed within 7 days of purchase. Fix: the action is allowed when "
+                             "`target.days_since_purchase <= 7`; change the object or the params first")
 
 
 def test_a_refund_within_the_window_runs(capsys, tmp_path):
@@ -68,7 +74,7 @@ def test_paid_media_walkthrough_gives_the_readme_output(capsys, tmp_path):
     out = pm(capsys, s, "t-bot", "propose_budget_change", "C-search", "--daily-budget", "1400", "--reason", "best CPA")
     assert out["status"] == "ok" and out["state"]["change"] == "proposed"
     out = pm(capsys, s, "t-bot", "approve_budget_change", "C-search")
-    assert out["status"] == "denied" and out["reason"] == "Only a person can approve_budget_change."
+    assert out["status"] == "denied" and out["reason"] == f"Only a person can approve_budget_change. {ASK_A_PERSON}"
     out = pm(capsys, s, "t-ana", "approve_budget_change", "C-search")
     assert out["status"] == "ok" and out["state"]["daily_budget"] == 1400
 
@@ -117,7 +123,7 @@ def test_paid_media_an_exception_allows_one_change_and_is_a_persons_decision(cap
     out = pm(capsys, s, "t-bot", "propose_budget_change", "C-holdout", "--daily-budget", "1200", "--reason", "x", seed=True)
     assert (out["status"], out["code"]) == ("denied", "not-a-holdout")
     out = pm(capsys, s, "t-bot", "grant_exception", "C-holdout")
-    assert out["status"] == "denied" and out["reason"] == "Only a person can grant_exception."
+    assert out["status"] == "denied" and out["reason"] == f"Only a person can grant_exception. {ASK_A_PERSON}"
     out = pm(capsys, s, "t-ana", "grant_exception", "C-holdout", "--rationale", "the test ended early")
     assert out["status"] == "ok" and out["state"]["exception_approved"] is True
     assert pm(capsys, s, "t-bot", "propose_budget_change", "C-holdout", "--daily-budget", "1200",

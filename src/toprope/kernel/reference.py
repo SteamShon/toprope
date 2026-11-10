@@ -12,6 +12,7 @@ import argparse
 import sys
 from collections.abc import Callable
 from pathlib import Path
+from ..errors import fixed
 
 
 def _commands() -> list[tuple[str, Callable[[], argparse.ArgumentParser], str]]:
@@ -40,8 +41,9 @@ def _actions(p: argparse.ArgumentParser) -> list[argparse.Action]:
     try:
         return list(p._actions)
     except AttributeError:
-        raise RuntimeError("argparse no longer has ArgumentParser._actions: update "
-                           "toprope.kernel.reference._actions") from None
+        raise RuntimeError(fixed("argparse no longer has ArgumentParser._actions: update "
+                                 "toprope.kernel.reference._actions",
+                                 "update `_actions` in toprope/kernel/reference.py for this Python's argparse")) from None
 
 
 def _sub_help(sp: argparse.Action) -> dict[str, str | None]:

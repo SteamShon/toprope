@@ -12,7 +12,9 @@ from datetime import datetime, timezone
 from typing import Any
 
 from ..decl.models import Domain
+from ..errors import fixed
 from ..identity import Caller, Identity
+from ..semantics.interpreter import NO_TARGET, no_action
 from ..semantics.model import ReferenceModel
 from ..types import Actor, Command, Event, Outcome
 from ..store import EventStore
@@ -43,18 +45,21 @@ class Execution:
         # Step 0 (command validation) before step 1 (identity), as in docs/semantics.md.
         spec = self.d.actions.get(action)
         if spec is None:
-            return Outcome("rejected", "unknown-action", f"No action {action}.")
+            return Outcome("rejected", "unknown-action", no_action(action))
         if target is None:
-            return Outcome("rejected", "invalid-command", "A target id is required.")
+            return Outcome("rejected", "invalid-command", NO_TARGET)
         if not idempotency_key:
             # Every command from outside the process carries a key (docs/semantics.md §1).
-            return Outcome("rejected", "invalid-command", "An idempotency key is required.")
+            return Outcome("rejected", "invalid-command", fixed("An idempotency key is required.",
+                                                                "give each command a key of its own, and the same "
+                                                                "key when you send it again"))
         bad = self._model.interp.invalid_params(spec, dict(params or {}))
         if bad:
             return Outcome("rejected", "invalid-command", bad)
         caller = self.identity.resolve(credentials)
         if caller is None:
-            return Outcome("rejected", "unauthenticated", "Unknown or missing credentials.")
+            return Outcome("rejected", "unauthenticated", fixed("Unknown or missing credentials.",
+                                                                "give a token or git identity the identity file lists"))
         cmd = Command(caller.actor, action, target, dict(params or {}), idempotency_key, self.clock(),
                       caller.on_behalf_of, caller.grant, thread_id, run_id)
         return self._after(self._model.execute(cmd))
@@ -91,7 +96,8 @@ class Execution:
         the services. A reply may call again; that is sent in the next round, up to `rounds`."""
         from ..handoff import Outbox
         if self.transport is None and self.services is None:
-            raise RuntimeError("no handoff transport or kernel services configured")
+            raise RuntimeError(fixed("no handoff transport or kernel services configured",
+                                     "give the execution a transport or kernel services before dispatching"))
         report: list[dict[str, Any]] = []
         self._dispatching = True
         try:
@@ -114,7 +120,7 @@ class Execution:
         from ..kernel import KERNEL
         spec = self.d.actions.get(action)
         if spec is None:
-            return Outcome("rejected", "unknown-action", f"No action {action}.")
+            return Outcome("rejected", "unknown-action", no_action(action))
         bad = self._model.interp.invalid_params(spec, dict(params))
         if bad:
             return Outcome("rejected", "invalid-command", bad)
@@ -143,9 +149,10 @@ class Execution:
             before = (project(domain[:i]) or {}).get(tr.field)
             after = (project(domain[:i + 1]) or {}).get(tr.field)
             if before != after:
-                return (f"Late reply: {target} was {then} when the kernel was called; "
-                        f"{(e.payload or {}).get('action')} moved it to {after} since. "
-                        "The reply is recorded, not applied.")
+                return fixed(f"Late reply: {target} was {then} when the kernel was called; "
+                             f"{(e.payload or {}).get('action')} moved it to {after} since. "
+                             "The reply is recorded, not applied.",
+                             f"take the action that calls the kernel again from {after}, if it still applies")
         return None
 
     def receive_handoff(self, handoff: str, action: str, target: str, params: dict[str, Any],
@@ -156,13 +163,14 @@ class Execution:
         transports call this; it never goes through credentials, so no caller can impersonate it."""
         spec = self.d.actions.get(action)
         if spec is None:
-            return Outcome("rejected", "unknown-action", f"No action {action}.")
+            return Outcome("rejected", "unknown-action", no_action(action))
         bad = self._model.interp.invalid_params(spec, dict(params or {}))
         if bad:
             return Outcome("rejected", "invalid-command", bad)
         actor = Actor(f"handoff:{handoff}", "system", ("system",))
         if self.accepts is not None and handoff not in self.accepts.get(action, set()):
-            reason = f"{handoff} is not wired to {action} in this composition."
+            reason = fixed(f"{handoff} is not wired to {action} in this composition.",
+                           f"wire the handoff to {action} in the composition, or send it to an action it is wired to")
             self.store.append_attempt(Event(
                 "DeniedAttempt", target, spec.object_type, kind="attempt", at=self.clock(), actor=actor.ref(),
                 domain_version=self.d.version, causation=handoff_id,

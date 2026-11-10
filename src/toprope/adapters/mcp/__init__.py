@@ -22,6 +22,7 @@ from ...decl.validate import RESERVED_PARAMS
 from ...exec import Execution
 from ...identity import Caller
 from ...types import Outcome
+from ...errors import fixed
 
 JSON_TYPE: dict[str, dict[str, Any]] = {
     "string": {"type": "string"}, "integer": {"type": "integer"}, "number": {"type": "number"},
@@ -108,7 +109,8 @@ def build_server(ex: Execution, credentials: Credentials, *, harness: dict[str, 
     for name, a in d.actions.items():
         clash = RESERVED_PARAMS & set(a.params)
         if clash:
-            raise ValueError(f"action {name}: param name(s) {sorted(clash)} are reserved tool arguments")
+            raise ValueError(fixed(f"action {name}: param name(s) {sorted(clash)} are reserved tool arguments",
+                                   "rename those params in the declaration"))
     title = d.purpose.problem if d.purpose else None
     server = MCPServer(name=f"toprope:{d.domain}", title=title,
                        instructions=("Tools generated from the Toprope declaration "

@@ -115,6 +115,16 @@ def test_a_refused_proposal_stops_before_any_request(repo, capsys):
     assert not (repo / ".toprope/requests").exists() or not list((repo / ".toprope/requests").glob("a-broken*"))
 
 
+def test_a_refused_citation_names_one_fix_the_steps_first(repo):
+    p = patch(repo, [{"path": f"invariants.{RULE['id']}", "value": RULE, "origin": "S-adr",
+                      "cites": "no-such-source:1"}])
+    with pytest.raises(SystemExit) as e:
+        main(["A rule", "--patch", p, "--run-args", "--identity static:ids.yaml"])
+    msg = str(e.value)
+    assert msg.count("Fix:") == 1, msg
+    assert "Fix: cite a ref of the form `<source>:<chunk>`" in msg and "; then run the change again" in msg
+
+
 def test_a_patch_without_what_it_cites_is_refused_with_the_fix(tmp_path):
     p = patch(tmp_path, [{"path": "objects.X", "value": {}}])
     with pytest.raises(SystemExit, match="element 1 of the patch has no cites. Fix: give each element"):

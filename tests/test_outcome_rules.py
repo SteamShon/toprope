@@ -39,7 +39,10 @@ def test_a_rule_on_an_outcome_holds_an_action_added_later():
     eng = Actor("eli", "person", ("eng",))
     assert decide(with_bypass(None), Command(eng, "approve_quickly", "E1", {})).status == "ok"   # the bypass
     out = decide(with_bypass(rule), Command(eng, "approve_quickly", "E1", {}))
-    assert (out.status, out.code, out.reason) == ("denied", RULE, "Only an approver approves an experiment.")
+    assert (out.status, out.code, out.reason) == ("denied", RULE, (
+        "Only an approver approves an experiment. Fix: this outcome is for approver; ask a person who holds that role "
+        "to take it: on their terminal, or from a cloud session through a human request they approve in GitHub "
+        "(`toprope-change` writes one for a change; `tools/human_request.py` for any step)"))
 
 
 def test_a_person_rule_refuses_an_agent_but_not_a_person():

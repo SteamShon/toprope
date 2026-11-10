@@ -185,6 +185,7 @@ check starts enforcing a rule, and drop a rule from the text once its mistake ca
 | Agents write only `proposed`; only a person confirms or approves | the kernel (`requires: human`, `_demote`) |
 | The researcher's own steps from a cloud session run after their approval | `human-request` workflow (ADR-0039) |
 | An error on the change loop's path names its fix (ADR-0049) | `checks` workflow (`tests/test_error_fixes.py`) |
+| Every error, refusal and failed reply names its fix, once (ADR-0049 §5) | `checks` workflow (`tests/test_error_fixes.py`, over `src/toprope/` and `tools/human_request.py`) |
 | Gold sets and sealed files are human-only | text only: review |
 | Real tests only; no skipped or weakened tests | text only: review |
 | No model identifiers in commits, PRs or code (run records excepted) | text only: review |

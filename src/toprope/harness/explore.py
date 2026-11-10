@@ -11,6 +11,7 @@ from hypothesis import HealthCheck, Phase, find, settings
 from hypothesis import strategies as st
 from hypothesis.errors import NoSuchExample
 
+from ..semantics import refusals
 from .surfaces import ModelSurface
 
 if TYPE_CHECKING:
@@ -49,7 +50,8 @@ def explore(h: Harness, *, examples: int = 200, depth: int = 5) -> dict[str, Any
                           "from": before, "path": [f"{m.role} {m.action}" for m in inst.path],
                           "outcome": o.get("code") or o.get("status")})
             if o.get("code") == "invariant-guard":
-                inv = next((v.id for v in d.invariants if v.reason == o.get("reason")), o.get("reason"))
+                inv = next((v.id for v in d.invariants if refusals.invariant(v.reason, v.check) == o.get("reason")),
+                           o.get("reason"))
                 return {"invariant": inv, "steps": steps}
             st_ = s.state(ids[i])
             broken = h.interp.violated_invariants(inst.obj, st_, s.lookup) if st_ else []

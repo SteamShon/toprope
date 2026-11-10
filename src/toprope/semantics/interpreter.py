@@ -17,7 +17,9 @@ from typing import Any
 
 from ..decl.models import Action, ActorRule, ByRole, Deny, Domain, Invariant, Target
 from ..expr import Env, EvalError, evaluate, parse, paths_read
+from ..errors import fixed
 from ..kernel import CATALOG
+from . import refusals
 from .types import Actor, Command, Event, Grant, Outcome
 
 # lookup(oid) -> (object type, state) or None
@@ -84,6 +86,14 @@ def _pascal(name: str) -> str:
 
 
 RESERVED_ID_PREFIXES = ("handoff:", "effect:")   # the outbox's resolution streams (ADR-0024, ADR-0028)
+UNKNOWN_ACTOR = fixed("Unknown actor.",
+                      "call with credentials the identity file lists (`whoami` shows who you are)")
+NO_TARGET = fixed("A target id is required.", "name the object to act on")
+
+
+def no_action(action: str) -> str:
+    return fixed(f"No action {action}.",
+                 "use an action the declaration lists under `actions` (`--help` lists them)")
 
 
 def _of_type(v: Any, t: str) -> bool:
@@ -170,21 +180,27 @@ class Interpreter:
         a = cmd.actor
         assert a is not None
         if action.requires == "human" and a.kind != "person":
-            return False, f"Only a person can {cmd.action}."
+            return False, refusals.by_person(cmd.action)
         if not any(self._rule_ok(r, a, view, cmd.params) for r in action.actor):
-            return False, f"{a.id} may not {cmd.action}."
+            return False, refusals.not_allowed(a.id, cmd.action, action.actor)
         if a.kind == "agent":
             p, g = cmd.on_behalf_of, cmd.grant
             if p is None or g is None:
-                return False, "An agent needs a principal and a grant."
+                return False, fixed("An agent needs a principal and a grant.",
+                                    "give the agent the person it works for and a grant (an `agents` entry "
+                                    "of the identity file)")
             if p.kind != "person":
-                return False, "An agent acts only on behalf of a person."
+                return False, fixed("An agent acts only on behalf of a person.",
+                                    "make the agent's principal a person in the identity file")
             if cmd.action not in g.actions or (g.targets is not None and cmd.target not in g.targets):
-                return False, f"Grant {g.id} does not cover {cmd.action} on {cmd.target}."
+                return False, fixed(f"Grant {g.id} does not cover {cmd.action} on {cmd.target}.",
+                                    "ask the person the agent works for to add it to the grant in the identity "
+                                    f"file, or {refusals.ASK_A_PERSON}")
             if g.expires_at is not None and (cmd.at or self.clock()) >= g.expires_at:
-                return False, f"Grant {g.id} has expired."
+                return False, fixed(f"Grant {g.id} has expired.",
+                                    "ask the person the agent works for to renew the grant in the identity file")
             if not any(self._rule_ok(r, p, view, cmd.params) for r in action.actor):
-                return False, f"Principal {p.id} may not {cmd.action}."
+                return False, refusals.principal_not_allowed(p.id, cmd.action, action.actor)
         return True, ""
 
     def cell(self, obj_type: str, state: str, action: str, actors: list[Actor]) -> str | Deny:
@@ -218,25 +234,30 @@ class Interpreter:
     def decide(self, cmd: Command, state: dict[str, Any] | None, lookup: Lookup) -> Decision:
         d, at = self.d, cmd.at or self.clock()
         if cmd.actor is None:
-            return Decision(Outcome("rejected", "unauthenticated", "Unknown actor."), (), ())
+            return Decision(Outcome("rejected", "unauthenticated", UNKNOWN_ACTOR), (), ())
         action = d.actions.get(cmd.action)
         if action is None:
-            return Decision(Outcome("rejected", "unknown-action", f"No action {cmd.action}."), (), ())
+            return Decision(Outcome("rejected", "unknown-action", no_action(cmd.action)), (), ())
         obj = action.object_type
         creating = action.creates is not None
         bad = self.invalid_params(action, cmd.params)                       # ADR-0021: input check
         if cmd.target is not None and cmd.target.startswith(RESERVED_ID_PREFIXES):
-            bad = f"Object ids may not start with {' or '.join(RESERVED_ID_PREFIXES)} (outbox records)."
+            bad = fixed(f"Object ids may not start with {' or '.join(RESERVED_ID_PREFIXES)} (outbox records).",
+                        "choose an id without that prefix")
         if cmd.target is None or bad:
-            why = "A target id is required." if cmd.target is None else bad
+            why = NO_TARGET if cmd.target is None else bad
             return Decision(Outcome("rejected", "invalid-command", why), (), ())
         if (creating and state is not None) or (not creating and state is None):
             # Existence is only revealed to actors whose role could act at all (ADR-0021).
             roles = {r.role if isinstance(r, ActorRule) else r for r in action.actor}
             principal = cmd.on_behalf_of if cmd.actor.kind == "agent" else None
             if not roles & set(cmd.actor.roles) or (principal is not None and not roles & set(principal.roles)):
-                return self._attempt(cmd, obj, "actor", f"{cmd.actor.id} may not {cmd.action}.", state)
-            code, why = ("exists", f"{cmd.target} already exists.") if creating else ("not-found", f"No {obj} {cmd.target}.")
+                return self._attempt(cmd, obj, "actor", refusals.not_allowed(cmd.actor.id, cmd.action, action.actor),
+                                     state)
+            code, why = (("exists", fixed(f"{cmd.target} already exists.", "choose a new id, or act on the "
+                                          "existing object with an action that does not create one")) if creating
+                         else ("not-found", fixed(f"No {obj} {cmd.target}.", f"check the id, or create the {obj} "
+                                                  "first")))
             return Decision(Outcome("rejected", code, why), (), ())
 
         meta = dict(at=at, actor=cmd.actor.ref(), domain_version=d.version,
@@ -261,12 +282,13 @@ class Interpreter:
         elif tr is not None:                                                                # step 5
             who = [cmd.actor] + ([cmd.on_behalf_of] if cmd.actor.kind == "agent" and cmd.on_behalf_of else [])
             c = self.cell(obj, current.get(tr.field), cmd.action, who)
+            frm_ = current.get(tr.field)
             if c == "n/a":
-                return deny("not-applicable", f"Not applicable when {current.get(tr.field)}.")
+                return deny("not-applicable", refusals.not_applicable(d, obj, frm_, cmd.action))
             if c == "undecided":
-                return deny("undecided", "Undecided.")
+                return deny("undecided", refusals.undecided(obj, frm_, cmd.action))
             if isinstance(c, Deny):
-                return deny("matrix", c.deny)
+                return deny("matrix", refusals.matrix_denied(d, obj, frm_, cmd.action, c.deny))
             next_state = c
         else:
             next_state = None
@@ -276,15 +298,16 @@ class Interpreter:
         principal = cmd.on_behalf_of if cmd.actor.kind == "agent" else None
         for rid, rule in covering(d, cmd.action, frm):
             if not meets(rule, cmd.actor.kind, cmd.actor.roles, principal.roles if principal else None):
-                return deny(rid, rule.reason)
+                return deny(rid, refusals.rule_unmet(rule.reason, rule.requires))
 
         for pre in action.preconditions:                                                    # step 6
             try:
                 passed = evaluate(self._expr(pre.check), self._env(view, cmd.actor, cmd.params, principal=self._principal(cmd))) is True
             except EvalError as e:
-                return deny(pre.id, f"{pre.reason} (could not evaluate: {e})")
+                return deny(pre.id, fixed(f"{pre.reason} (could not evaluate: {e})",
+                                          "give the params the check reads, or fix the check in the declaration"))
             if not passed:
-                return deny(pre.id, pre.reason)
+                return deny(pre.id, refusals.precondition(pre.reason, pre.check))
 
         new = copy.deepcopy(current)                                                        # step 9
         changes: dict[str, Any] = {}
@@ -303,17 +326,21 @@ class Interpreter:
             if eff.create is not None:
                 # Creating another object from an effect is not supported yet: fail closed.
                 return Decision(Outcome("rejected", "unsupported-effect",
-                                        f"create effects are not supported ({eff.create})", state), (), ())
+                                        fixed(f"create effects are not supported ({eff.create})",
+                                              "create the object with its own create action instead"), state), (), ())
             for key, value in (eff.set or {}).items():
                 if key.startswith("new.") and not creating:
                     return Decision(Outcome("rejected", "unsupported-effect",
-                                            f"{key}: `new.` is only valid in a create action", state), (), ())
+                                            fixed(f"{key}: `new.` is only valid in a create action",
+                                                  "set `target.` fields in this action"), state), (), ())
                 attr = key.split(".", 1)[1] if key.startswith(("target.", "new.")) else key
                 if isinstance(value, str):
                     try:
                         value = evaluate(self._expr(value), self._env(view, cmd.actor, cmd.params, principal=self._principal(cmd)))
                     except EvalError as e:
-                        return Decision(Outcome("rejected", "effect-error", f"{key}: {e}", state), (), ())
+                        return Decision(Outcome("rejected", "effect-error", fixed(
+                            f"{key}: {e}", "give the params the effect reads, or fix its expression in the "
+                            "declaration"), state), (), ())
                 if isinstance(value, datetime):
                     value = value.isoformat()
                 new[attr] = changes[attr] = value
@@ -321,7 +348,8 @@ class Interpreter:
         for inv in self.violated_invariants(obj, new, lookup, cmd.actor, cmd.params):        # step 10
             ev = Event("InvariantGuardTriggered", stream, obj, kind="attempt",
                        payload={"action": cmd.action, "invariant": inv.id, "reason": inv.reason}, **meta)
-            return Decision(Outcome("rejected", "invariant-guard", inv.reason, state), (), (ev,))
+            return Decision(Outcome("rejected", "invariant-guard", refusals.invariant(inv.reason, inv.check), state),
+                            (), (ev,))
 
         etype = action.event or (f"{obj}Created" if creating else f"{obj}{_pascal(cmd.action)}")
         # Events own deep copies, so no caller can mutate history (replay parity).
@@ -422,25 +450,27 @@ class Interpreter:
         py = {"string": str, "integer": int, "number": (int, float), "boolean": bool, "datetime": str}
         for name in params:
             if name not in action.params:
-                return f"Unknown param '{name}'."
+                return fixed(f"Unknown param '{name}'.",
+                             f"leave it out; the action takes {sorted(action.params) or 'no params'}")
         for name, spec in action.params.items():
             if name not in params or params[name] is None:
                 if not spec.optional:
-                    return f"Missing param '{name}'."
+                    return fixed(f"Missing param '{name}'.", f"give the param '{name}' a value")
                 continue
             vals = params[name] if spec.many else [params[name]]
             if spec.many and not isinstance(params[name], list):
-                return f"Param '{name}' must be a list."
+                return fixed(f"Param '{name}' must be a list.", "give a list, even of one value")
             for v in vals:
                 if (why := _unstorable(v)) is not None:
-                    return f"Param '{name}' {why}."
+                    return fixed(f"Param '{name}' {why}.", "give a value that can be stored")
                 if spec.enum is not None and v not in spec.enum:
-                    return f"Param '{name}' must be one of {spec.enum}."
+                    return fixed(f"Param '{name}' must be one of {spec.enum}.", "give one of those values")
                 if spec.type is not None and (not isinstance(v, py[spec.type]) or
                                               (spec.type in ("integer", "number") and isinstance(v, bool))):
-                    return f"Param '{name}' must be a {spec.type}."
+                    return fixed(f"Param '{name}' must be a {spec.type}.", f"give a value of type {spec.type}")
                 if spec.ref is not None and not isinstance(v, str):
-                    return f"Param '{name}' must be an id of {spec.ref}."
+                    return fixed(f"Param '{name}' must be an id of {spec.ref}.",
+                                 f"give the id of a {spec.ref}, as text")
         return None
 
     def allowed_actions(self, obj_type: str, state: dict[str, Any], actor: Actor, lookup: Lookup,
