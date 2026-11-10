@@ -51,14 +51,21 @@ the error is raised.
 | a step did not end as the story says | if you changed domain.yaml on purpose, update the step's `expect` in story.yaml; otherwise undo the change |
 | a step of story.yaml expects a refusal without saying which ({…} {…}) | give the step the `code` of the refusal it expects, so any other refusal (a wrong token, a missing grant) does not pass for it |
 | no --template | choose one of {…} |
+| no story.yaml in {…} | run toprope-set in a directory toprope-init wrote |
 | no template recorded in {…} | run --check in a directory toprope-init wrote |
 | no template {…} | use one of {…} (`toprope-init --list` describes them) |
 | no {…} in {…} | run toprope-try in a directory toprope-init wrote, or give --dir |
 | the story names {…}, which domain.yaml does not declare | rename the step's action in story.yaml, or put the action back |
+| {…} | use one of {…}, as name=value |
 | {…} cannot be read: {…} | fix the YAML at the line named |
 | {…} exists | choose another name, or remove that directory |
+| {…} is a whole number, not {…} | give e.g. {…}={…} |
 | {…} is not a domain name | use lowercase letters, digits and dashes, starting with a letter |
+| {…} is not a role of this domain | use one of {…} |
+| {…} must be positive, not {…} | give e.g. {…}={…} |
+| {…} names {…}, which domain.yaml no longer has | put that precondition back, or edit domain.yaml by hand |
 | {…}: {…} | fix those elements; docs/domain-schema.md describes them |
+| {…}: {…} has characters a setting may not hold | use letters, digits and spaces |
 | {…}: {…}: {…}{…} | fix that line; docs/domain-schema.md describes every field |
 
 ## `adapters/mcp/cli.py`

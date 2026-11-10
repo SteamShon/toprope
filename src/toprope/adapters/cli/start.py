@@ -4,6 +4,8 @@
     toprope-init my-approvals --template approval        # writes ./my-approvals/
     cd my-approvals && toprope-try                       # the template's story, step by step
     toprope-try --check                                  # after editing domain.yaml: what changed
+    toprope-set --list                                   # the template's settings and their values
+    toprope-set window_days=30                           # change a rule without editing YAML
 
 `toprope-init` writes a working domain: `domain.yaml` (the template's declaration, renamed),
 `tokens.yaml` (the people and the agent of its story), `story.yaml`, and a `toprope.yaml` so
@@ -169,6 +171,66 @@ def render(story: dict[str, Any], rows: list[dict[str, Any]]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def settings_of(where: Path) -> dict[str, dict[str, Any]]:
+    story = yaml.safe_load((where / "story.yaml").read_text()) or {}
+    return story.get("settings") or {}
+
+
+def _current(where: Path) -> dict[str, Any]:
+    f = where / ".settings.yaml"
+    return yaml.safe_load(f.read_text()) or {} if f.is_file() else {}
+
+
+def _value(name: str, spec: dict[str, Any], raw: str, roles: list[str]) -> Any:
+    kind = spec.get("type", "string")
+    if kind == "integer":
+        try:
+            v = int(raw)
+        except ValueError:
+            raise SystemExit(fixed(f"{name} is a whole number, not {raw!r}", f"give e.g. {name}={spec.get('default')}")) from None
+        if v <= 0:
+            raise SystemExit(fixed(f"{name} must be positive, not {v}", f"give e.g. {name}={spec.get('default')}"))
+        return v
+    if kind == "role":
+        if raw not in roles:
+            raise SystemExit(fixed(f"{raw!r} is not a role of this domain", f"use one of {', '.join(roles)}"))
+        return raw
+    if not re.fullmatch(r"[\w .:-]{1,80}", raw):
+        raise SystemExit(fixed(f"{name}: {raw!r} has characters a setting may not hold", "use letters, digits and spaces"))
+    return raw
+
+
+def apply_settings(where: Path, assignments: list[str]) -> list[str]:
+    """Set the template's settings in domain.yaml: each names one precondition and fills in its
+    check and reason. Returns what changed, in words. Nothing is written if any value is wrong."""
+    specs = settings_of(where)
+    decl_file = where / "domain.yaml"
+    from ...decl import load_yaml                       # YAML 1.1 would read the key `on:` as true
+    raw = load_yaml(decl_file.read_text())
+    roles = list(raw.get("roles") or [])
+    current, said = _current(where), []
+    for a in assignments:
+        name, eq, text = a.partition("=")
+        if not eq or name not in specs:
+            raise SystemExit(fixed(f"no setting {name!r}" if eq else f"{a!r} is not name=value",
+                                   f"use one of {', '.join(specs) or '(this template has none)'}, as name=value"))
+        spec = specs[name]
+        value = _value(name, spec, text.strip(), roles)
+        segs = spec["at"].split(".")                 # actions.<action>.preconditions.<id>
+        action = raw["actions"][segs[1]]
+        pre = next((p for p in action.get("preconditions") or [] if p.get("id") == segs[3]), None)
+        if pre is None:
+            raise SystemExit(fixed(f"{name} names {spec['at']}, which domain.yaml no longer has",
+                                   "put that precondition back, or edit domain.yaml by hand"))
+        pre["check"] = spec["check"].format(value=value)
+        pre["reason"] = spec["reason"].format(value=value)
+        said.append(f"{name}: {current.get(name, spec.get('default'))} -> {value} ({pre['reason']})")
+        current[name] = value
+    decl_file.write_text(yaml.safe_dump(raw, sort_keys=False, allow_unicode=True, width=100))
+    (where / ".settings.yaml").write_text(yaml.safe_dump(current, sort_keys=False))
+    return said
+
+
 def check(where: Path) -> str:
     from ...check import change_check
     from ...decl import Domain, load_yaml
@@ -192,6 +254,17 @@ def init_parser() -> argparse.ArgumentParser:
     ap.add_argument("--template", help="the template to start from (see --list)")
     ap.add_argument("--dir", default=".", help="where to write the domain's directory (default: here)")
     ap.add_argument("--list", action="store_true", help="list the templates")
+    ap.add_argument("--set", action="append", default=[], metavar="NAME=VALUE",
+                    help="a template setting (see `toprope-set --list` in the new directory)")
+    return ap
+
+
+def set_parser() -> argparse.ArgumentParser:
+    ap = argparse.ArgumentParser(prog="toprope-set", description=__doc__, allow_abbrev=False,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("assignments", nargs="*", metavar="NAME=VALUE", help="settings to change")
+    ap.add_argument("--dir", default=".", help="the domain's directory (default: here)")
+    ap.add_argument("--list", action="store_true", help="the settings, what each means, and its value")
     return ap
 
 
@@ -215,8 +288,45 @@ def init_main(argv: list[str] | None = None) -> None:
     if not a.template:
         raise SystemExit(fixed("no --template", f"choose one of {', '.join(templates())}"))
     out = init(a.name, a.template, Path(a.dir))
+    if a.set:
+        try:
+            for line in apply_settings(out, a.set):
+                print(line)
+        except SystemExit:
+            shutil.rmtree(out, ignore_errors=True)
+            raise
     print(f"wrote {out}/: domain.yaml, tokens.yaml, story.yaml, toprope.yaml\n\n"
           f"next:\n  cd {out}\n  toprope-try")
+
+
+def set_main(argv: list[str] | None = None) -> None:
+    a = set_parser().parse_args(argv)
+    where = Path(a.dir)
+    if not (where / "story.yaml").is_file():
+        raise SystemExit(fixed(f"no story.yaml in {where}", "run toprope-set in a directory toprope-init wrote"))
+    specs, current = settings_of(where), _current(where)
+    if a.list or not a.assignments:
+        if not specs:
+            print("this template has no settings; edit domain.yaml, then `toprope-try --check`")
+        for name, spec in specs.items():
+            print(f"{name} = {current.get(name, spec.get('default'))}    {spec.get('says', '')}")
+        return
+    before = (where / "domain.yaml").read_text()
+    try:
+        for line in apply_settings(where, a.assignments):
+            print(line)
+        load(where / "domain.yaml")
+    except SystemExit:
+        (where / "domain.yaml").write_text(before)
+        raise
+    print(check(where), end="")
+    ok, rows = play(where)
+    changed = [r for r in rows if not r["as_told"]]
+    for r in changed:
+        print(f"the story now ends differently: {r['who']} asks to {r['asks']} -> {r['result']}"
+              + (f" ({r['reason']})" if r["reason"] else ""))
+    if not changed:
+        print("the story still ends as told")
 
 
 def try_main(argv: list[str] | None = None) -> None:
@@ -233,4 +343,4 @@ def try_main(argv: list[str] | None = None) -> None:
                                "update the step's `expect` in story.yaml; otherwise undo the change"))
 
 
-__all__ = ["check", "init", "init_main", "init_parser", "play", "templates", "try_main", "try_parser"]
+__all__ = ["apply_settings", "check", "init", "set_main", "set_parser", "settings_of", "init_main", "init_parser", "play", "templates", "try_main", "try_parser"]

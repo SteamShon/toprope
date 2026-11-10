@@ -17,7 +17,7 @@ from pathlib import Path
 def _commands() -> list[tuple[str, Callable[[], argparse.ArgumentParser], str]]:
     from ..adapters.cli import _base_parser
     from ..adapters.cli.change import build_parser as change
-    from ..adapters.cli.start import init_parser, try_parser
+    from ..adapters.cli.start import init_parser, set_parser, try_parser
     from ..adapters.mcp.cli import build_parser as server
     from ..commits.cli import build_parser as commits
     from ..harness.cli import build_parser as harness
@@ -28,6 +28,7 @@ def _commands() -> list[tuple[str, Callable[[], argparse.ArgumentParser], str]]:
          "`whoami` and `guide`; each domain's guide lists them with who may take each."),
         ("toprope-init", init_parser, ""),
         ("toprope-try", try_parser, ""),
+        ("toprope-set", set_parser, ""),
         ("toprope-change", change, ""),
         ("toprope-server", server, ""),
         ("toprope-harness", harness, ""),

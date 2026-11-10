@@ -5,6 +5,14 @@ about: >
 next: >
   Try a step limit of 1000: change `<= 500` in domain.yaml, and see what the change check says
   with `toprope-try --check`.
+settings:
+  step_limit:
+    says: The most a daily budget may rise in one change.
+    type: integer
+    default: 500
+    at: actions.propose_budget_change.preconditions.step-limit
+    check: "params.daily_budget - target.daily_budget <= {value}"
+    reason: "Raise a daily budget by at most {value} at a time."
 steps:
   - {who: t-bot, as: the agent, action: propose_budget_change, target: C-holdout, params: {daily_budget: 1200, reason: best CPA}, says: "raise the holdout campaign to 1200", expect: denied, code: not-a-holdout}
   - {who: t-bot, as: the agent, action: propose_budget_change, target: C-search, params: {daily_budget: 2500, reason: best CPA}, says: "raise C-search from 1000 to 2500", expect: denied, code: step-limit}
