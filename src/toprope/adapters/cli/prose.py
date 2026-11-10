@@ -12,6 +12,8 @@ rule phrase it recognises becomes the `toprope-rule` command a person would type
 | "only a person", "agents cannot approve" | `person-only` |
 | "within 30 days" | `window` |
 
+A rule phrase with a negation ("never need finance", "cannot be approved within 3 days"), or one
+whose role it cannot be sure of, is asked as a question, never written as a rule.
 What it made from the sentence is `proposed` until the person confirms it (`toprope-rule
 confirm`); what it did not understand, it asks as questions, each with the command that answers it.
 """
@@ -35,8 +37,15 @@ NOT_ROLES = {"nobody", "one", "who", "that", "and", "or", "agent", "agents", "pe
 FILLER = NOT_ROLES | {"for", "with", "in", "on", "of", "by", "from", "them", "at", "into", "via", "as", "so", "but"}
 THRESHOLD = re.compile(
     r"\b(over|above|more than|greater than|exceeding|larger than|at least)\s+[$€£]?\s*(\d[\d,]*(?:\.\d+)?)\b"
-    r".*?\b(?:needs?|requires?|must (?:be approved by|have|get|go to))\s+(?:an?\s+|the\s+|one\s+|some\s+)?"
-    r"([a-z][a-z_-]*)")
+    r".*?\b(?:needs?|requires?|must|has to|have to|goes to|go to)\s+(.*)$")
+# Words between "needs" and the role: "needs to be approved by finance", "requires approval from a director".
+ROLE_FILLER = {"a", "an", "the", "one", "some", "to", "be", "get", "have", "go", "approved", "approval", "approver",
+               "approvers", "sign", "sign-off", "signoff", "signed", "off", "review", "reviewed", "reviewer", "ok",
+               "okay", "permission", "consent", "explicit", "extra", "another", "second", "additional", "their", "its",
+               "an", "go-ahead", "person", "someone", "somebody", "member", "members", "team"}
+# A rule phrase that says what does not happen is asked about, never turned into a rule: "never need
+# finance" and "cannot be approved within 3 days" mean the opposite of the rule the words would make.
+NEGATION = re.compile(r"\b(never|not|no|cannot|can't|don't|doesn't|isn't|aren't|won't|without|except|unless|nor)\b")
 SELF = re.compile(r"\b(nobody|no one|no-one|noone|no person|never)\b.*\b(own|themselves|they (?:submitted|filed|"
                   r"made|created|requested|wrote|proposed|raised))\b")
 PERSON = re.compile(r"\bonly (?:a |an )?(?:person|human|people|humans)\b|\b(?:agents?|bots?|ai)\b[^.]*?\b"
@@ -71,6 +80,20 @@ def choose_template(text: str) -> tuple[str, list[str]]:
         if len(hit) > len(matched) or (len(hit) == len(matched) and hit and name == "approval"):
             best, matched = name, hit
     return best, matched
+
+
+def role_in(tail: str) -> str | None:
+    """The role a "needs …" phrase names: the word after by, from or of, or else the first word
+    that is not a filler. None when there is none to be sure of."""
+    words = re.findall(r"[a-z][a-z_-]*", tail.lower())
+    for k, w in enumerate(words):
+        if w in ("by", "from", "of"):
+            rest = [x for x in words[k + 1:] if x not in ROLE_FILLER]
+            return rest[0] if rest and rest[0] not in FILLER else None
+    for w in words:
+        if w not in ROLE_FILLER:
+            return None if w in FILLER or w in ("by", "from", "of") else w
+    return None
 
 
 def _singular(w: str) -> str:
@@ -169,22 +192,32 @@ def _draft(out: Path, text: str, tname: str, matched: list[str], noun: str | Non
         low = clause.lower()
         before = len(rules)
         try:
-            if t := THRESHOLD.search(low):
+            neg = NEGATION.search(low)
+            t = THRESHOLD.search(low)
+            role = role_in(t.group(3)) if t else None
+            if t and neg:
+                questions.append(f'"{clause}": it says what does not happen ("{neg.group(1)}"), and I will not guess '
+                                 f'which way the rule goes. If it is a rule, add it with toprope-rule threshold '
+                                 f'--action ACTION --when "amount > {t.group(2)}" --needs ROLE')
+            elif t and role is None:
+                questions.append(f'"{clause}": who may still do it? Add it with toprope-rule threshold --action ACTION '
+                                 f'--when "amount > {t.group(2)}" --needs ROLE')
+            elif t:
                 op = ">=" if t.group(1) == "at least" else ">"
                 act = _verb(draft, obj, low) or _like(draft, obj, {"approve"})
                 nums = [k for k, p in draft.props(obj).items() if p.get("type") in ("integer", "number")]
                 if act is None:
                     questions.append(f'"{clause}": which action does it hold back? Add it with '
-                                     f'toprope-rule threshold --action ACTION --when "amount {op} {t.group(2)}" --needs {t.group(3)}')
+                                     f'toprope-rule threshold --action ACTION --when "amount {op} {t.group(2)}" --needs {role}')
                 elif len(nums) > 1:
                     questions.append(f'"{clause}": which number is it about ({", ".join(nums)})? Add it with '
-                                     f'toprope-rule threshold --action {act} --when "FIELD {op} {t.group(2)}" --needs {t.group(3)}')
+                                     f'toprope-rule threshold --action {act} --when "FIELD {op} {t.group(2)}" --needs {role}')
                 else:
                     if not nums:
                         by = _like(draft, obj, SUBMIT, act)
                         add_field(draft, "amount", "integer", obj, [by] if by else None, "0")
                         nums = ["amount"]
-                    rules.append((add_threshold(draft, act, f"{nums[0]} {op} {t.group(2)}", t.group(3), quote=clause), clause))
+                    rules.append((add_threshold(draft, act, f"{nums[0]} {op} {t.group(2)}", role, quote=clause), clause))
             if SELF.search(low):
                 act = _verb(draft, obj, low, skip={a for a in draft.raw["actions"] if a.split("_")[0] in SUBMIT}) \
                     or _like(draft, obj, {"approve"})
@@ -201,7 +234,11 @@ def _draft(out: Path, text: str, tname: str, matched: list[str], noun: str | Non
                                      "toprope-rule person-only --action ACTION")
                 else:
                     rules.append((add_person_only(draft, act, quote=clause), clause))
-            if w := WINDOW.search(low):
+            if (w := WINDOW.search(low)) and neg:
+                questions.append(f'"{clause}": it says what does not happen ("{neg.group(1)}"), and I will not guess '
+                                 "which way the time limit goes. If it is a rule, add it with toprope-rule window "
+                                 "--action ACTION --days N --since ACTION")
+            elif w:
                 days = int(w.group(1)) * (7 if w.group(2).startswith("week") else 1)
                 act = _verb(draft, obj, low) or _like(draft, obj, {"approve"})
                 if act is None:
@@ -268,4 +305,4 @@ def _has_owner(draft: Draft, obj: str, action: str) -> bool:
     return bool(_owner_fields(draft, obj, action, None))
 
 
-__all__ = ["choose_template", "start_from_prose"]
+__all__ = ["choose_template", "role_in", "start_from_prose"]

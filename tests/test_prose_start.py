@@ -32,7 +32,7 @@ def test_a_sentence_becomes_a_working_draft_with_its_rules_proposed(tmp_path, ca
     assert set(d.objects) == {"PurchaseOrder"} and "approve_purchase_order" in d.actions
     pres = {p.id: p for p in d.actions["approve_purchase_order"].preconditions}
     assert pres["amount-over-5000-needs-director"].check == \
-        "not (target.amount > 5000) or 'director' in actor.roles"
+        "'director' in actor.roles and 'director' in actor.principal.roles or not (target.amount > 5000)"
     assert pres["amount-over-5000-needs-director"].status.value == "proposed"
     assert pres["amount-over-5000-needs-director"].source.quote == "An order over 5,000 needs a director approver."
     assert pres["within-14-days"].status.value == "proposed"
@@ -80,3 +80,31 @@ def test_a_bad_name_is_refused_before_anything_is_written(tmp_path):
     with pytest.raises(SystemExit, match="'Ads Team' is not a domain name. Fix: give --name"):
         init_main([SENTENCE, "--name", "Ads Team", "--dir", str(tmp_path)])
     assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize("phrase, role", [
+    ("An order over 1,000 needs to be approved by finance.", "finance"),
+    ("An order over 1,000 requires approval from a director.", "director"),
+    ("An order over 1,000 needs sign-off of the cfo.", "cfo"),
+    ("An order over 1,000 needs a finance approver.", "finance"),
+])
+def test_the_role_is_the_one_named_not_a_function_word(tmp_path, capsys, phrase, role):
+    init_main([f"Staff submit orders; a manager approves them. {phrase}", "--name", "orders", "--dir", str(tmp_path)])
+    capsys.readouterr()
+    pres = load_domain(tmp_path / "orders" / "domain.yaml").actions["approve_order"].preconditions
+    assert pres[-1].id == f"amount-over-1000-needs-{role}"
+
+
+@pytest.mark.parametrize("phrase, asked", [
+    ("Orders over 5,000 never need finance.", '"never"'),
+    ("An order over 1,000 does not need a director.", '"not"'),
+    ("Orders cannot be approved within 3 days.", '"cannot"'),
+    ("An order over 1,000 needs approval.", "who may still do it?"),
+])
+def test_a_phrase_it_cannot_be_sure_of_is_asked_not_written(tmp_path, capsys, phrase, asked):
+    init_main([f"Staff submit orders; a manager approves them. {phrase}", "--name", "orders", "--dir", str(tmp_path)])
+    said = capsys.readouterr().out
+    assert "no new rule was drafted from your sentence" in said
+    assert f'"{phrase}": ' in said and asked in said
+    raw = (tmp_path / "orders" / "domain.yaml").read_text()
+    assert "needs-" not in raw.replace("prod-needs-security", "") and "within-" not in raw
