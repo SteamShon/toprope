@@ -119,7 +119,9 @@ class Plan:
               skip: str | None = None) -> None:
             from . import Choice
             qid = _qid(kind, subject)
-            choices = [Choice(f"{qid}/1", f"nothing: skip the {skip} stage", [], False, "", skip)] if skip else []
+            from . import choice_id
+            choices = [Choice(choice_id(qid, 1, [], skip), f"nothing, for any of them: skip the whole {skip} stage",
+                              [], False, "", skip)] if skip else []
             out.append(Question(qid, kind, text, decides, priority, choices))
 
         for i in self.errors_in(stage):

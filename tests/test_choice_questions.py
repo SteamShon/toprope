@@ -51,7 +51,7 @@ def test_an_optional_stage_offers_to_skip_it(ws):  # noqa: F811
 
 def test_a_choice_that_is_not_offered_is_refused_with_its_fix(ws):  # noqa: F811
     open_cells(ws)
-    with pytest.raises(AuthoringError, match="no choice 'nope/1' among the open questions. Fix:"):
+    with pytest.raises(AuthoringError, match="no choice 'nope/1' among the open questions.*Fix: ask `next_questions` again"):
         ws.answer("x", "yes", "choice:nope/1")
     with pytest.raises(AuthoringError, match="neither a list nor a choice"):
         ws.answer("x", "yes", "just do it")
@@ -73,3 +73,64 @@ def test_the_kernel_takes_a_choice_through_the_decisions_param(ws):  # noqa: F81
                  caller={"id": "ana", "kind": "person"})
     assert out["ok"], out
     assert ws.draft()["transitions"]["Order"]["matrix"]["shipped"]["ship"]["to"] == "shipped"
+
+
+def four_states(ws, ship_cells, reopen_cells=None):  # noqa: F811
+    doc = upto("invariants")
+    doc["objects"]["Order"]["properties"]["status"] = {"enum": ["open", "shipped", "held", "cancelled"]}
+    doc["transitions"]["Order"]["matrix"] = {
+        s: {"ship": ship_cells.get(s, "undecided"), "reopen": (reopen_cells or {}).get(s, "n/a")}
+        for s in ("open", "shipped", "held", "cancelled")}
+    doc["actions"]["ship"]["effects"] = [{"set": {"target.total": 1}}]
+    doc["actions"]["reopen"]["effects"] = [{"set": {"target.total": 0}}]
+    put(ws, doc)
+    return {q["id"]: q for q in ws.questions(limit=50)["questions"]}
+
+
+def rec_for(qs, path):
+    for q in qs.values():
+        for c in q.get("choices") or []:
+            if c.get("recommended"):
+                for d in c["decisions"]:
+                    if d["path"] == path:
+                        return d["value"]
+    raise AssertionError(path)
+
+
+def test_one_state_allowing_is_not_enough_to_recommend_allowing(ws):  # noqa: F811
+    qs = four_states(ws, {"open": "shipped", "shipped": {"deny": "Already."}, "held": {"deny": "Held."}})
+    assert rec_for(qs, "transitions.Order.matrix.cancelled.ship") == {"deny": "Not while an Order is cancelled."}
+
+
+def test_a_per_role_cell_in_the_column_means_refused_not_a_plain_move(ws):  # noqa: F811
+    qs = four_states(ws, {"open": "shipped", "shipped": {"deny": "x"}, "held": {"deny": "x"}, "cancelled": {"deny": "x"}},
+                     {"shipped": {"by_role": {"manager": "open"}}, "held": "open", "open": "n/a", "cancelled": "undecided"})
+    assert rec_for(qs, "transitions.Order.matrix.cancelled.reopen") == {"deny": "Not while an Order is cancelled."}
+
+
+def test_a_whole_column_recommends_refusals_a_person_confirms_never_n_a(ws):  # noqa: F811
+    qs = four_states(ws, {"open": "shipped"})
+    (col,) = [q for q in qs.values() if q["kind"] == "default"]
+    (rec,) = [c for c in col["choices"] if c.get("recommended")]
+    assert all("deny" in d["value"] for d in rec["decisions"])
+    ws.answer(col["id"], "Refuse it there.", f"choice:{rec['id']}")
+    assert set(ws._proposed(ws.draft())) >= {"transitions.Order.matrix.held.ship"}     # left for a person
+
+
+def test_a_choice_whose_decisions_changed_is_not_applied(ws):  # noqa: F811
+    row = open_cells(ws)
+    rec = next(c for c in row["choices"] if c.get("recommended"))
+    doc = ws.draft()
+    doc["transitions"]["Order"]["matrix"]["open"]["ship"] = {"deny": "Not any more."}   # the column changed
+    put(ws, doc)
+    with pytest.raises(AuthoringError, match="its choices changed since they were shown"):
+        ws.answer(row["id"], "Yes.", f"choice:{rec['id']}")
+
+
+def test_a_skip_is_logged_under_the_stage_it_skips(ws):  # noqa: F811
+    import json
+    put(ws, upto("invariants"))
+    q = ws.questions(limit=50)["questions"][0]
+    ws.answer(q["id"], "No such rule.", f"choice:{q['choices'][0]['id']}")
+    last = [json.loads(x) for x in ws.log_path.read_text().splitlines()][-1]
+    assert last["kind"] == "answer" and last["stage"] == "invariants"

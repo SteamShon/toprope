@@ -86,6 +86,13 @@ class Question:
         return out
 
 
+def choice_id(qid: str, n: int, decisions: list[dict[str, Any]], skip: str | None = None) -> str:
+    """A choice's id names what it decides: if the question's choices change before the answer
+    arrives, the old id no longer matches and nothing is applied (#219's review)."""
+    digest = hashlib.sha1(json.dumps([decisions, skip], sort_keys=True, default=str).encode()).hexdigest()[:8]
+    return f"{qid}/{n}-{digest}"
+
+
 def choice_share(questions: list[dict[str, Any]]) -> float:
     """The share of questions that offer choices with a recommended one (ADR-0049's target)."""
     if not questions:
@@ -158,12 +165,16 @@ def _target(cell: Any) -> str | None:
 
 
 def _recommend(tr: Any, state: str, action: str, obj: str) -> tuple[Any, str, str]:
-    """A recommended cell, its label and why (ADR-0049, B1): where the action already leads to
-    one state from every state it is allowed in, the same; otherwise refused, the safe default."""
-    leads = {_target(row.get(action)) for s, row in tr.matrix.items() if s != state} - {None}
-    if len(leads) == 1:
-        (to,) = leads
-        return to, f"moves it to {to}", f"from every other state it is allowed in, it moves it to {to}"
+    """A recommended cell, its label and why (ADR-0049, B1). Allowing is recommended only when
+    every other state has decided the action, each as a plain move to the same state: no refusal,
+    no `n/a`, no per-role cell anywhere in its column (#219's review). Otherwise refused, the safe
+    default."""
+    others = [row.get(action, UNDECIDED) for s, row in tr.matrix.items() if s != state]
+    plain = [c for c in others if isinstance(c, str) and c not in ("n/a", UNDECIDED)] + \
+        [c.to for c in others if type(c).__name__ == "Target"]
+    if others and len(plain) == len(others) and len(set(plain)) == 1:
+        to = plain[0]
+        return to, f"moves it to {to}", f"from every other state, it moves it to {to}, for every role"
     return ({"deny": f"Not while {_a(obj)} is {state}."}, "refused",
             "refusing is the safe default (fail-closed): a reviewed change can open it later")
 
@@ -473,9 +484,10 @@ class Workspace:
                     for c in q.choices:
                         if c.id == choice_id:
                             return q, c
-        raise AuthoringError(fixed(f"no choice {choice_id!r} among the open questions",
-                                   "pick a choice id `next_questions` returned now; an answered question's "
-                                   "choices are gone"))
+        raise AuthoringError(fixed(f"no choice {choice_id!r} among the open questions: the question was "
+                                   "answered, or its choices changed since they were shown",
+                                   "ask `next_questions` again, show the owner the choices now offered, and "
+                                   "answer with one of those ids"))
 
     def answer(self, question_id: str, answer: str, decisions: list[dict[str, Any]] | str,
                question: str | None = None) -> dict[str, Any]:
@@ -485,6 +497,7 @@ class Workspace:
         skips a stage skips it, with the owner's words as the reason."""
         if not answer.strip():
             raise AuthoringError(fixed("an answer quotes the owner's words", "pass the owner's answer, in their words, as the answer text"))
+        stage_now = self._current_stage()            # before the answer moves the interview on
         if isinstance(decisions, str):
             if not decisions.startswith("choice:"):
                 raise AuthoringError(fixed(f"decisions {decisions[:40]!r} are neither a list nor a choice",
@@ -493,6 +506,7 @@ class Workspace:
             question = question or q.text
             if c.skip:
                 self.skip_stage(c.skip, answer)
+                stage_now = c.skip
             decisions = c.decisions
         text = question or self._all_questions().get(question_id)
         if text is None:
@@ -507,7 +521,7 @@ class Workspace:
             _set(doc, segs, self._with_provenance(segs, dec.get("value"), src))
             _demote_enclosing(doc, segs, src)
         issues = self._write(doc) if decisions else []
-        stage = question_id.split(":")[1] if question_id.startswith("bundle:") else self._current_stage()
+        stage = question_id.split(":")[1] if question_id.startswith("bundle:") else stage_now
         self._append(self.log_path, {"at": _now(), "kind": "answer", "stage": stage, "question_id": question_id,
                                      "question": text, "answer": answer,
                                      "decisions": [d["path"] for d in decisions]})
@@ -721,7 +735,7 @@ class Workspace:
               choices: list[tuple[str, list[dict[str, Any]], bool, str]] = ()) -> None:
             qid = hashlib.sha1(f"{kind}:{subject}".encode()).hexdigest()[:10]
             qs.append(Question(qid, kind, text, decides, priority,
-                               [Choice(f"{qid}/{i}", label, dec, rec, why)
+                               [Choice(choice_id(qid, i, dec), label, dec, rec, why)
                                 for i, (label, dec, rec, why) in enumerate(choices, 1)]))
 
         for obj, tr in d.transitions.items():
@@ -736,11 +750,12 @@ class Workspace:
                     deny = [{"path": p_, "value": {"deny": f"Not while {_a(obj)} is {s}."}} for p_, s in zip(paths, undecided)]
                     na = [{"path": p_, "value": "n/a"} for p_ in paths]
                     choices = [
-                        (f"only where it is already allowed ({', '.join(allowed)}); not applicable in "
-                         f"{', '.join(undecided)}", na, bool(allowed),
-                         "the action is already settled where it applies; elsewhere the question does not arise"),
-                        (f"refused in {', '.join(undecided)}, with a reason", deny, not allowed,
-                         "refusing is the safe default (fail-closed): a reviewed change can open it later"),
+                        (f"refused in {', '.join(undecided)}, with a reason", deny, True,
+                         "refusing is the safe default (fail-closed), and each refusal is proposed for a "
+                         "person to confirm; a reviewed change can open it later"),
+                        (f"not applicable in {', '.join(undecided)}"
+                         + (f" (it applies only in {', '.join(allowed)})" if allowed else "")
+                         + "; n/a cells are not listed for confirmation", na, False, ""),
                     ]
                     q("default", f"{obj}.{name}", f"In which states can someone '{verb}' "
                       f"at all? Everywhere else it will be not applicable.", paths,
