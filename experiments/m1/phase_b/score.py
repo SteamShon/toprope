@@ -724,3 +724,98 @@ def apply_disagreements(run: Path, first: str = "scoring") -> dict[str, Any]:
                       "# (apply-disagreements). Finish `to-decide`, then set `status: confirmed`.\n"
                       + yaml.safe_dump(graded, sort_keys=False, allow_unicode=True, width=110))
     return {"applied": applied, "written": str(target)}
+
+
+# -- only the disagreements that can change recall (M1-recheck.md, criterion 3 as amended) -------------
+
+QUESTIONS = "recall-questions.yaml"
+
+
+def recall_questions(run: Path, instruments: Path, first: str = "scoring",
+                     second: str = "scoring-2") -> dict[str, Any]:
+    """The questions whose answer can change recall, and nothing else. A run of an arm catches a
+    change's seeded problem when one of its flags is labelled seeded (`arm_metrics`), so:
+    - a change with no seeded problem is not asked about;
+    - a run where both sittings already call one flag seeded has caught it, whatever else differs;
+    - otherwise, a run where the sittings disagree on whether a flag is seeded is one question:
+      "does any of these findings catch the seeded problem?" (yes or no).
+    Answering every question gives the recall that labelling every disagreement would. Writes
+    QUESTIONS for the researcher (the key's entry, the disputed findings and both sittings'
+    reasons; no arm named) and returns counts only: the key is opened here, inside the harness."""
+    key, binding = load_sealed(instruments)
+    a, b = _sitting(run, first), _sitting(run, second)
+    seeded = set(_seeded(key, binding))
+    reqs = {}
+    try:
+        reqs = {r["seq"]: r for r in yaml.safe_load((instruments / "change-requests.yaml").read_text())["requests"]}
+    except (OSError, KeyError, TypeError):
+        pass
+    cells = sorted({k[:3] for k in a})
+    questions, untouched = [], 0
+    for (seq, arm, r) in cells:
+        if seq not in seeded:
+            continue
+        keys = [k for k in a if k[:3] == (seq, arm, r) and k in b]
+        if any(a[k].get("label") == "seeded" and b[k].get("label") == "seeded" for k in keys):
+            untouched += 1
+            continue
+        disputed = [k for k in keys if (a[k].get("label") == "seeded") != (b[k].get("label") == "seeded")]
+        if not disputed:
+            continue
+        k_ = key.get(seq, {})
+        questions.append({
+            "seq": seq, "run": r,
+            "change": (reqs.get(seq) or {}).get("intent"),
+            "seeded_problem": {x: k_.get(x) for x in ("problem", "type", "against")},
+            "findings": [{"member": a[k]["id"], "problem": (a[k].get("flag") or {}).get("problem"),
+                          "where": (a[k].get("flag") or {}).get("where"),
+                          **({"check": a[k]["flag"]["check"]} if "check" in (a[k].get("flag") or {}) else {}),
+                          "first": a[k].get("label"), "second": b[k].get("label"),
+                          "why_first": a[k].get("why", ""), "why_second": b[k].get("why", "")}
+                         for k in disputed],
+            "answer": None})
+    for n, q in enumerate(questions, 1):
+        q["question"] = f"Q{n:03d}"
+    doc = {"summary": {"questions": len(questions),
+                       "disputed_flags": sum(len(q["findings"]) for q in questions)},
+           "questions": [{"question": q.pop("question"), **q} for q in questions]}
+    (run / QUESTIONS).write_text(
+        "# Holds the answer key's entries: for the researcher only (never an agent session).\n"
+        "# For each question: does ANY of these findings catch the seeded problem? answer: yes | no.\n"
+        "# Only runs whose recall depends on the answer are asked (M1-recheck.md, criterion 3).\n"
+        + yaml.safe_dump(doc, sort_keys=False, allow_unicode=True, width=110))
+    return {**doc["summary"], "runs_already_caught": untouched}
+
+
+def apply_recall_answers(run: Path, first: str = "scoring") -> dict[str, Any]:
+    """The researcher's answers onto the first sitting, as `scoring/confirmed.yaml` with
+    `status: proposed`. Yes: the disputed findings either sitting called seeded become seeded. No:
+    none is seeded; each keeps the first sitting's label, or `other-real` where that was seeded.
+    Every other flag keeps the first sitting's label. An unanswered question is refused."""
+    doc = yaml.safe_load((run / QUESTIONS).read_text())
+    open_ = [q["question"] for q in doc["questions"] if q.get("answer") not in ("yes", "no", True, False)]
+    if open_:
+        raise SystemExit(f"{len(open_)} question(s) have no yes/no answer: {open_[:10]}")
+    target = run / first / "confirmed.yaml"
+    if target.exists():
+        raise SystemExit(f"{target} exists: apply onto a fresh copy only")
+    chosen: dict[str, str] = {}
+    for q in doc["questions"]:
+        yes = q["answer"] in ("yes", True)
+        for f in q["findings"]:
+            if yes and "seeded" in (f["first"], f["second"]):
+                chosen[f["member"]] = "seeded"
+            elif not yes:
+                chosen[f["member"]] = f["first"] if f["first"] != "seeded" else "other-real"
+    graded = yaml.safe_load((run / first / "proposed.yaml").read_text())
+    applied = 0
+    for c in graded["changes"]:
+        for f in c["flags"]:
+            if f["id"] in chosen and f.get("label") != chosen[f["id"]]:
+                f["label"], f["label_source"] = chosen[f["id"]], "researcher (recall question)"
+                applied += 1
+    graded["status"] = "proposed"
+    target.write_text("# The first sitting's grades with the researcher's answers to the recall questions\n"
+                      "# (apply-recall-answers). Finish `to-decide`, then set `status: confirmed`.\n"
+                      + yaml.safe_dump(graded, sort_keys=False, allow_unicode=True, width=110))
+    return {"answered": len(doc["questions"]), "labels_changed": applied, "written": str(target)}

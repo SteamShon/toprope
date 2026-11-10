@@ -46,10 +46,23 @@ change list someone else writes.
    this umbrella.
 3. **The grader's noise, measured.** The combined run is graded twice, in separate sittings. Each
    arm's recall differs by at most 0.1 between the two. Both gradings are reported; if the
-   difference is larger, the researcher grades the disagreeing labels and that grade counts.
+   difference is larger, the researcher decides **each disagreement that can change recall** and
+   that decision counts (amended 2026-11-10, below). The rest keep the first sitting's label;
+   precision, a reference only, is reported from both sittings.
 
 **Reported for reference only** (not a criterion): recall, grouped precision and found-after-deploy
 per arm, next to M1's.
+
+## Amendments
+
+- **2026-11-10, criterion 3** (the researcher: "엄격함을 안 줄이면서 사용자가 할 일을 줄이고
+  싶어", then "진행해줘"). The two sittings differed by 0.18 of recall on 328 flags. A run of an
+  arm catches a change's seeded problem when one of its flags is labelled seeded, so only some
+  disagreements can change recall: none on a change with no seeded problem, none in a run where
+  both sittings already call a flag seeded. `recall-questions` asks the researcher one yes/no
+  question per remaining run ("does any of these findings catch the seeded problem?"); answering
+  them all gives the recall that labelling every disagreement would. No sampling, no new grading.
+  Changing how the grader works is left to M2's preregistration.
 
 ## Order
 
