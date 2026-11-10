@@ -108,3 +108,19 @@ def test_an_approval_run_is_evidence_once_the_human_request_workflow_recorded_it
     (k.root / ".toprope" / "approval-runs.jsonl").write_text(json.dumps({"run": url, "approver": "SteamShon"}) + "\n")
     assert cite(k, c, "approval-run", url)["strength"] == "approved"
     assert not cite(k, c, "approval-run", url + "3")["ok"]
+
+
+def test_a_run_that_failed_before_its_approval_is_not_approval_evidence(kernel):
+    """A failed run is recorded too (with `ran` and `failed`); it approved nothing if it failed at or
+    before its approve_commit step."""
+    k, c = kernel
+    steps = [{"run": {"member": "authoring", "action": a, "target": "$commit"}}
+             for a in ("check_commit", "approve_commit", "deploy")]
+    rows = {"https://github.com/o/r/actions/runs/1": {"ran": 1, "failed": {"step": 2, "error": "TLC refused"}},
+            "https://github.com/o/r/actions/runs/2": {"ran": 2, "failed": {"step": 3, "error": "deploy failed"}}}
+    (k.root / ".toprope").mkdir(exist_ok=True)
+    (k.root / ".toprope" / "approval-runs.jsonl").write_text(
+        "".join(json.dumps({"run": u, "steps": steps, **r}) + "\n" for u, r in rows.items()))
+    refused = cite(k, c, "approval-run", "https://github.com/o/r/actions/runs/1")
+    assert not refused["ok"] and "approved nothing" in json.dumps(refused) and "Fix: " in json.dumps(refused)
+    assert cite(k, c, "approval-run", "https://github.com/o/r/actions/runs/2")["strength"] == "approved"

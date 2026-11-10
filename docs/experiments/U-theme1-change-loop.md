@@ -56,8 +56,12 @@ A log line that does not parse stops the tool with its file, its line and the fi
   steps that ran count as commands typed by the person, and the approval is not counted.
   `possibly_failed_request_steps` reports how many of the commands outside a request have the
   action and target of a step of a run recorded within 60 minutes after them; they stay counted.
-  Once `fix/request-keeps-work` lands, a failed run is recorded with `ran` and `failed`: it counts
-  as one approval, and only its first `ran` steps are looked for.
+  A failed run is recorded with `ran` and `failed`: it counts as one approval, and its first `ran`
+  steps are looked for (a step whose action was taken but whose follow-up failed is among them),
+  then the step it stopped at (`failed.step`, its position in the run's own `steps`; a rest of an
+  earlier request has its own steps), matched to a command that did not succeed, so a refusal the
+  run met is not counted as typed by the person. Not finding it is not a missing step: the step
+  may have failed before the gate.
 - **Approvals per approved change, by risk**: for each approved change, the approved requests in
   the window whose found commands approve it (`approve_commit`) or ship it (`deliver`, `preview`,
   `deploy`, `run_probes`, `verify` on it), plus `approve_commit` commands on it a person typed

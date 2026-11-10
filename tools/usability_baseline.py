@@ -251,6 +251,19 @@ def _run_steps(run: dict) -> list[dict]:
     return steps
 
 
+def _failed_step(run: dict) -> dict | None:
+    """The `run` step a run recorded as failed stopped at, when it was refused or broke (its
+    command did not succeed). A step whose action was taken but whose follow-up failed
+    (`accepted`) is among the `ran` steps instead. `failed.step` is its position in `steps`."""
+    failed = run.get("failed") or {}
+    at = failed.get("step")
+    steps = run.get("steps") or []
+    if failed.get("accepted") or not isinstance(at, int) or not 1 <= at <= len(steps):
+        return None
+    st = steps[at - 1]
+    return st["run"] if isinstance(st, dict) and isinstance(st.get("run"), dict) else None
+
+
 def _target_matches(pattern: str, target: object, made: str | None) -> bool:
     """A step's target against a command's: `$commit` is the commit the run's commit_draft made,
     or, when there is none to bind it to, matches nothing."""
@@ -265,9 +278,11 @@ def _match_runs(runs: list[dict], commands: list[dict]) -> list[tuple[dict, list
     earliest command not yet taken, by the person the run acted as, with the step's action and
     target, after the step before it, no earlier than `RUN_SPAN` before the run's record or than
     the record before it, and no later than the record. `$commit` is the commit the matched
-    commit_draft made. Only commands that succeeded: a step recorded as run succeeded."""
+    commit_draft made. Only commands that succeeded: a step recorded as run succeeded; but the
+    step a run recorded as failed stopped at is matched to a command that did not succeed, since
+    the run took it, not the person by hand."""
     index: dict[tuple, list[dict]] = {}
-    for c in sorted((c for c in commands if c["ok"] and c["kind"] == "person" and c["t"]),
+    for c in sorted((c for c in commands if c["kind"] == "person" and c["t"]),
                     key=lambda c: (c["t"], c["domain"], c["seq"])):
         index.setdefault((c["actor"], c["action"]), []).append(c)
     times = {k: [c["t"] for c in v] for k, v in index.items()}
@@ -275,7 +290,8 @@ def _match_runs(runs: list[dict], commands: list[dict]) -> list[tuple[dict, list
     out, before = [], None
     for run in sorted(runs, key=lambda r: _when(r.get("at")) or datetime.min.replace(tzinfo=UTC)):
         at = _when(run.get("at"))
-        steps = _run_steps(run)
+        last = _failed_step(run)
+        steps = [*_run_steps(run), *([last] if last else [])]
         took: list[dict] = []
         if at is not None:
             lower = max(x for x in (at - RUN_SPAN, before) if x is not None)
@@ -284,11 +300,12 @@ def _match_runs(runs: list[dict], commands: list[dict]) -> list[tuple[dict, list
                 key = (run.get("as"), st.get("action"))
                 cands, ts = index.get(key, []), times.get(key, [])
                 pattern = str(st.get("target"))
+                ok = st is not last                     # the failed step's command did not succeed
                 found = None
                 for c in cands[bisect_right(ts, after) if not took else bisect_left(ts, after):]:
                     if c["t"] > at + SLACK:
                         break
-                    if id(c) not in used and _target_matches(pattern, c["target"], made):
+                    if id(c) not in used and c["ok"] == ok and _target_matches(pattern, c["target"], made):
                         found = c
                         break
                 if found is None:
@@ -298,7 +315,8 @@ def _match_runs(runs: list[dict], commands: list[dict]) -> list[tuple[dict, list
                 after = found["t"]
                 if found["action"] == "commit_draft":
                     made = found.get("made")
-        out.append((run, took, len(steps) - len(took)))
+        # a failed step not found took no command at the gate (a failure before it, D1b): not missing
+        out.append((run, took, len(steps) - (1 if last else 0) - sum(1 for c in took if c["ok"])))
         before = at or before
     return out
 
@@ -306,7 +324,7 @@ def _match_runs(runs: list[dict], commands: list[dict]) -> list[tuple[dict, list
 def _run_time(run: dict, took: list[dict]) -> datetime | None:
     """When a run counts: at its approval, so a change and the run that approves it fall in the
     same window; a run that approves nothing, at its first command; one with none, at its record."""
-    approve = next((c["t"] for c in took if c["action"] == APPROVE), None)
+    approve = next((c["t"] for c in took if c["action"] == APPROVE and c["ok"]), None)
     return approve or (took[0]["t"] if took else _when(run.get("at")))
 
 
@@ -334,6 +352,8 @@ def _changes_touched(took: list[dict]) -> set[str]:
     """The commits a run approved or shipped."""
     out = set()
     for c in took:
+        if not c["ok"]:
+            continue
         if c["action"] == APPROVE:
             out.add(c["target"])
         elif c["action"] in SHIPS and (ships := shipped_commit({"action": c["action"], "target": c["target"]}, None)):

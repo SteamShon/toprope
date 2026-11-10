@@ -391,3 +391,43 @@ def test_a_malformed_log_line_names_the_file_the_line_and_the_fix(tmp_path):
     with pytest.raises(SystemExit) as e:
         ub.measure(tmp_path)
     assert "idempotency.jsonl:3" in str(e.value.code) and "Fix: " in str(e.value.code)
+
+
+def test_f1_reads_a_failed_run_as_human_request_py_records_it(tmp_path):
+    """The record's `ran` is the first steps of its `steps`, counting a step whose action was taken
+    but whose follow-up failed; a rest keeps its own `steps` (resolved targets), and `failed.step`
+    is the position there, while `failed.number` is the first request's number."""
+    import human_request as hr
+    req = {"summary": "s", "steps": [{"run": s} for s in one_approval_run("2-b", "x")[0]]}
+    # The commit was made, but a handoff it set off failed: `run` reports two steps as run.
+    accepted = {"steps": 2, "failed": {"step": 2, "number": 2, "error": "handoff", "accepted": True},
+                "rest": hr.rest(req, 3, "2-b")}
+    row = hr.record(req, "ana", PERSON, "https://example.com/runs/1", cwd=tmp_path, outcome=accepted)
+    cmds = [timed(PERSON, "confirm_all_proposed", "authoring", "2026-11-10T10:00:00+00:00"),
+            timed(PERSON, "commit_draft", "authoring", "2026-11-10T10:00:01+00:00"),
+            made("2-b", "2026-11-10T10:00:01.5+00:00")]
+    domain(tmp_path, "authoring", cmds, [event("X", PERSON, "person")], ["2-b"], [])
+    write(tmp_path / ".toprope/approval-runs.jsonl", [row | {"at": "2026-11-10T10:00:30+00:00"}])
+    t = ub.measure(tmp_path)["person_touches"]
+    assert (t["request_steps_not_found"], t["commands_outside_an_approved_request"]) == (0, 0)
+
+    # Its rest (steps 3-9) ran check, approve and deliver, then preview (the first request's step 6)
+    # was refused: the record names position 4 there, number 6, and three steps that ran.
+    rest = accepted["rest"]
+    assert hr.numbering(rest)[1] == [3, 4, 5, 6, 7, 8, 9]
+    failed = {"steps": 3, "failed": {"step": 4, "number": 6, "error": "refused"}, "rest": hr.rest(rest, 4, "2-b")}
+    row2 = hr.record(rest, "ana", PERSON, "https://example.com/runs/2", cwd=tmp_path, outcome=failed)
+    assert row2["ran"] == 3 and row2["steps"] == rest["steps"]
+    cmds2 = [timed(PERSON, "check_commit", "2-b", "2026-11-10T11:00:00+00:00"),
+             timed(PERSON, "approve_commit", "2-b", "2026-11-10T11:00:01+00:00"),
+             timed(PERSON, "deliver", "2-b", "2026-11-10T11:00:02+00:00")]
+    domain(tmp_path, "authoring", [*cmds, *cmds2], [event("X", PERSON, "person")], ["2-b"], ["2-b"])
+    handoff = timed("handoff:authoring.deliver", "request_delivery", "authoring:2-b:local", "2026-11-10T11:00:02.5+00:00")
+    refused = timed(PERSON, "preview", "authoring:2-b:local", "2026-11-10T11:00:03+00:00", status="rejected",
+                    code="denied")                       # no events: it takes the time of the command before
+    domain(tmp_path, "delivery", [handoff, refused], [event("X", PERSON, "person")], [], [])
+    write(tmp_path / ".toprope/approval-runs.jsonl", [row | {"at": "2026-11-10T10:00:30+00:00"},
+                                                      row2 | {"at": "2026-11-10T11:00:30+00:00"}])
+    t = ub.measure(tmp_path)["person_touches"]
+    assert (t["approvals_of_human_requests"], t["request_steps_not_found"]) == (2, 0)
+    assert t["commands_outside_an_approved_request"] == 0

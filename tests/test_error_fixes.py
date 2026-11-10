@@ -130,6 +130,15 @@ def test_the_scan_finds_a_deploy_refusal_and_a_reply_without_a_fix(tmp_path):
         ("DeployRefused", "commit {…} has no approval", None), ("reply", "No object {…}.", None)]
 
 
+def test_the_scan_reads_a_fix_a_caller_passes_to_a_function_that_raises(tmp_path):
+    r = scan_text(tmp_path, ('def run(x):\n'
+                             '    def stop(i, message, fix):\n'
+                             '        raise SystemExit(fixed(f"step {i}: {message}", fix))\n'
+                             '    stop(1, "no commit", "commit the draft first")\n'
+                             '    stop(2, f"{x} failed", x)\n'))
+    assert sorted((r0.message, r0.fix) for r0 in r) == [("no commit", "commit the draft first"), ("{…} failed", "{…}")]
+
+
 def test_the_scan_reads_a_fix_held_in_a_module_constant(tmp_path):
     r = scan_text(tmp_path, ('VIA = "on a terminal"\nASK = f"ask a person: {VIA}"\n'
                              'def f(a):\n    raise ValueError(fixed(f"only a person can {a}", ASK))\n'))

@@ -188,6 +188,23 @@ class _Inline(ast.NodeTransformer):
         return node
 
 
+def _passers(tree: ast.AST) -> dict[str, tuple[int, int, ast.AST]]:
+    """Functions such as `stop(i, message, fix)` that raise `fixed(… message …, fix)` with their
+    parameters: name -> (position of the message, position of the fix, the function)."""
+    out = {}
+    for f in ast.walk(tree):
+        if not isinstance(f, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        params = [a.arg for a in f.args.args]
+        for c in ast.walk(f):
+            if (isinstance(c, ast.Call) and isinstance(c.func, ast.Name) and c.func.id == "fixed"
+                    and len(c.args) == 2 and isinstance(c.args[1], ast.Name) and c.args[1].id in params):
+                used = [n.id for n in ast.walk(c.args[0]) if isinstance(n, ast.Name) and n.id in params]
+                if used:
+                    out[f.name] = (params.index(used[-1]), params.index(c.args[1].id), f)   # the last: the message itself
+    return out
+
+
 def scan(src: Path = ROOT, modules: tuple[str, ...] | None = None) -> list[Raised]:
     """Every `raise E("…")`, service failure and command refusal in the scanned files, with its fix
     if it has one. A raise that passes another error on (`str(e)`, or a message that includes it)
@@ -202,7 +219,14 @@ def scan(src: Path = ROOT, modules: tuple[str, ...] | None = None) -> list[Raise
                 for n in ast.walk(h):
                     if isinstance(n, (ast.Raise, ast.Call, ast.Return, ast.Dict)):
                         caught.setdefault(id(n), set()).add(h.name)
-        found = [(node, *m) for node in ast.walk(tree) if (m := _message_of(node)) is not None]
+        passed = _passers(tree)                    # functions that raise with a fix their caller gives
+        inside = {id(n) for f in passed.values() for n in ast.walk(f[2])}
+        found = [(node, *m) for node in ast.walk(tree)
+                 if id(node) not in inside and (m := _message_of(node)) is not None]
+        for node in ast.walk(tree):                # their calls carry the message and its fix
+            if isinstance(node, ast.Call) and (p := passed.get(_call_name(node) or "")) and len(node.args) > p[1]:
+                out.append(Raised(mod, node.lineno, _call_name(node), _text(node.args[p[0]]) or "{…}",
+                                  _text(node.args[p[1]]) or "{…}"))
         found += [(r, v, "refusal") for r, v in _returned(tree, mod in REASON_MODULES)]
         found += [(r, v, "reply") for r, v in _replies(tree)]
         for node, first, name in found:

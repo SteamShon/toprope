@@ -240,6 +240,7 @@ to do about it. `{…}` is filled in when the error is raised.
 | no kernel service {…} | use a service the kernel's catalog lists (src/toprope/kernel/__init__.py) |
 | no source {…} | use a source id listed in the workspace file's `sources:` |
 | nothing to confirm: no paths given, or nothing is proposed | propose elements first, or name the paths to confirm |
+| the human request run {…} failed at step {…}, at or before its approve_commit step, so it approved nothing | cite the run of the request that approved the commit (the rest of this one, once it ran) |
 | {…} has no passing TLC check ({…}) | run `check_commit` here, where TLC is configured (TOPROPE_TLC_JAR), then approve |
 | {…} is not deployed here: no events to cite | deploy it here first, or cite another kind of evidence |
 | {…} is outside the kernel's root | give a path inside the repository the kernel runs on (`--kernel-root`) |
@@ -372,13 +373,15 @@ to do about it. `{…}` is filled in when the error is raised.
 
 | Error | Fix |
 |---|---|
+| $commit, but no commit_draft step before it made a commit | put a commit_draft step before it, or name the commit |
 | GitHub user {…} approved, but is not a person with `github:` in {…} | add `github: <login>` to the approver's entry under `people` in the identity file, or have a listed person approve |
 | approve_commit needs TLC: set TOPROPE_TLC_JAR to a TLC jar (the workflow does) | run the request through the `human-request` workflow, or set the variable to a TLC jar |
 | change needs --draft | give --draft with the draft whose change to take through |
 | record needs --approver, --as and --run-url | give --approver, --as and --run-url (the workflow does) |
 | run needs --approver | give --approver with the GitHub login that approved the run (the workflow does) |
 | ship needs --commit, the approved commit | give --commit with the approved commit's id |
-| step {…} failed: {…} ... {…} | fix what the step's message says, then push the request again for a new approval |
-| step {…}: $commit, but no commit_draft step before it made a commit | put a commit_draft step before the step that names $commit (`human_request.py change` writes them in order) |
-| step {…}: {…} is not low risk ({…}), so this approval does not ship it | read the preview, then approve a second request with the delivery steps (`human_request.py ship` writes it) |
 | {…} | edit the request into the format at the top of tools/human_request.py, then push it again |
+| {…} ... {…} | fix the cause, then push a change to the request (the workflow leaves the steps that did not run in it), and approve that run; do not re-run this run |
+| {…} ... {…} | the step's action was taken, so the rest does not send it again: fix the cause and, if the step must be taken again (e.g. an approval was refused), add it to the rest; push the rest and approve that run; do not re-run this run |
+| {…} is not low risk ({…}), so this approval does not ship it | read the preview, then approve a second request with the delivery steps (the workflow leaves them in the request); do not re-run this run |
+| {…}: {…} | fix the cause, then push a change to the request (the workflow leaves the steps that did not run in it), and approve that run; do not re-run this run |
