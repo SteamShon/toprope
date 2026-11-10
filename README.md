@@ -45,24 +45,40 @@ through review, with a record of why.
 
 ## Try it
 
-Start a domain from a template and watch its rules refuse an agent, in two commands
-([`docs/tutorial.md`](docs/tutorial.md) takes you from here to a connected agent in 15 minutes):
+You need [`uv`](https://docs.astral.sh/uv/) and a clone of this repository:
 
 ```bash
-export TOPROPE="$(pwd)"                              # this repository
-uv run toprope-init my-access --template approval --dir /tmp    # also: budget, refunds, release
-cd /tmp/my-access && uv run --project "$TOPROPE" toprope-try
+git clone https://github.com/SteamShon/toprope.git && cd toprope && uv sync
+```
+
+Start a domain from a template, add a rule of your own by command, and see the gate enforce it.
+No YAML is written by hand ([`docs/tutorial.md`](docs/tutorial.md) goes on to a connected agent):
+
+```bash
+export TOPROPE="$(pwd)"                              # the clone; every command runs through uv from it
+uv run --project "$TOPROPE" toprope-init my-access --template approval --dir /tmp  # or budget, experiment, refunds, release
+cd /tmp/my-access && uv run --project "$TOPROPE" toprope-try                        # the template's rules refuse an agent
+uv run --project "$TOPROPE" toprope-add field amount --set-by submit_request --default 0
+uv run --project "$TOPROPE" toprope-rule threshold --action approve_request --when "amount > 1000" --needs finance
+uv run --project "$TOPROPE" toprope-try                                              # the story shows your rule refusing
+uv run --project "$TOPROPE" toprope-run submit_request R-wiki --amount 1500 --token t-mia
+uv run --project "$TOPROPE" toprope-run approve_request R-wiki --token t-max || echo "refused by your rule"
 ```
 ```
 ...
-the agent       asks to approve it
-                -> denied: Only a person can approve_request.
-max (manager)   asks to approve it
-                -> denied: Access to prod is approved by security.
+max (manager)   asks to approve request one with amount 1001
+                -> denied: When amount > 1000, only finance may approve request.
+kim (finance)   asks to approve request one with amount 1001
+                -> done
+...
+refused by your rule
 ```
 
-Change a rule without writing YAML (`toprope-set prod_approver=manager`), and you see what the
-change touches before anything ships.
+Your workflow is not a template? Start from a sentence: `toprope-init "Staff submit orders; a lead
+approves them. An order over 5,000 needs a director."` picks the closest template, drafts the rules
+it recognises (you confirm them with `toprope-rule confirm`) and asks about the rest. Other rule
+kinds: `no-self-approval`, `person-only`, `window` (`toprope-rule --help`); `toprope-rename` fits
+the template's names to yours.
 
 ### A worked example
 

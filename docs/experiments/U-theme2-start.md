@@ -23,8 +23,12 @@ Measured with F2's script ([`U-f2-first-rule.md`](U-f2-first-rule.md)):
 | 3 | E1: the README and docs lead with the first step (init, try, connect an agent), the rest one link away | no |
 | 4 | E2: a 15-minute tutorial that runs as a test, so it never goes stale | no |
 
+| 5 | F2's named path (ADR-0053), after the integrated review of 2026-11-10: an own rule added by command (`toprope-rule`, `toprope-add`, `toprope-rename`), `toprope-try --reset` and `--accept`, a prose start (`toprope-init "<a sentence>"`), the experiment template that row 1 named and #214 left out, and the README's install step and first-rule path | no |
+
 None of these run the self domains' loop.
 
 ## Done when
 Every row is done, the tutorial runs in CI, and F2's script can be finished with no YAML
-written by hand (to be measured by an operator the researcher finds).
+written by hand on ADR-0053's named path (README → `toprope-init` → an own rule by command →
+`toprope-try` → `toprope-run`; `tests/test_first_rule_path.py` walks it on a workflow of its own),
+to be measured by an operator the researcher finds.

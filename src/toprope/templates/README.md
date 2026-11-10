@@ -5,7 +5,10 @@ Link: none (content, ADR-0049 A3). These are declarations of everyday workflows 
 
 - `domain.yaml`: the declaration;
 - `tokens.yaml`: the people and the agent of its story (static identities, for trying it);
-- `story.yaml`: the steps `toprope-try` plays, each with who asks, what, and how it should end.
+- `story.yaml`: the steps `toprope-try` plays, each with who asks, what, and how it should end;
+  its `settings` (the values `toprope-set` changes) and its `keywords` (the words by which
+  `toprope-init "<a sentence>"` picks it). Keywords are everyday words of the workflow, not of any
+  one task given to an operator.
 
 **They are content, not the kernel.** No kernel code reads them or depends on them: the kernel
 compiles and enforces any declaration the same way. Changing a template is a change of example
