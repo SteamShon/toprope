@@ -90,9 +90,12 @@ the steps as you (your git email in `toprope.identity.yaml`, as `toprope-run` fi
 same runner as the workflow, records the run in `.toprope/approval-runs.jsonl` with `channel:
 local`, and removes the request; commit the result with the logs it changed. F1 counts it as one
 approval, as it counts an approved run in GitHub. Your one `yes` stands for each person-only
-step's own prompt: `toprope-run` accepts a token from the apply that asked you, for you only, and
-only while it runs. It refuses without a terminal (an agent's shell), and for a git email listed as
-an agent or not listed. An approval needs TLC's check here too: set `TOPROPE_TLC_JAR` to a TLC jar.
+step's own prompt: `toprope-run` accepts it only at a terminal (the steps inherit yours) and only
+from the apply that asked you, for you, while it runs; a token that does not check out is refused,
+never prompted for. Like the prompt, this is a guard against mistakes, not a security boundary.
+`toprope-apply` refuses without a terminal (an agent's shell), and for a git email listed as an
+agent or not listed. Ctrl-C (or SIGTERM) stops it like a failed step: what ran is recorded and the
+rest stays in the request. An approval needs TLC's check here too: set `TOPROPE_TLC_JAR` to a TLC jar.
 
 A step that fails stops it, as in GitHub: the steps before it keep their work, the run is
 recorded with the failed step, and the request keeps the steps that are left; fix the cause and

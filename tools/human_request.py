@@ -154,9 +154,10 @@ def check(req: object) -> list[str]:
     return errors
 
 
-def render(req: dict, cwd: str | Path = ".") -> str:
+def render(req: dict, cwd: str | Path = ".", channel: str = "github") -> str:
     """What the researcher reads on the run page before approving, and a person applying the
-    request at a terminal reads before confirming (`apply`)."""
+    request at a terminal reads before confirming (`apply`, `channel` local: there a commit not low
+    risk is held after its preview instead of refused at its delivery)."""
     lines = [f"### Human request: {req['summary']}", "",
              "Approving runs these steps as you, in this order:", ""]
     for i, st in enumerate(req["steps"], 1):
@@ -176,9 +177,16 @@ def render(req: dict, cwd: str | Path = ".") -> str:
                 if (st.get("run") or {}).get("action") == "approve_commit"}
     if any((st.get("run") or {}).get("action") in SHIPS
            and shipped_commit(st["run"], None) in approves for st in req["steps"]):
-        lines += ["", "**One approval ships this change** (ADR-0050): the delivery steps run only if the "
-                  "check in this request finds it low risk, and `verify` runs only if the probes passed; "
-                  "approving verifies in advance on that condition."]
+        if channel == "local":
+            lines += ["", "**One confirmation ships this change if it is low risk** (ADR-0050): deliver and "
+                      "preview run in any case; if the check in this request records the commit as not low risk, "
+                      "the run is held after the preview, and deploy, the probes and verify wait for a second "
+                      "apply. `verify` runs only if the probes passed; confirming verifies in advance on that "
+                      "condition."]
+        else:
+            lines += ["", "**One approval ships this change** (ADR-0050): the delivery steps run only if the "
+                      "check in this request finds it low risk, and `verify` runs only if the probes passed; "
+                      "approving verifies in advance on that condition."]
     lines += risk_lines(req, cwd)
     for st in req["steps"]:                      # what a confirm step confirms, as one diff (B5)
         (kind, arg), = st.items()
@@ -195,9 +203,14 @@ def risk_lines(req: dict, cwd: str | Path = ".") -> list[str]:
     lines = []
     if isinstance(req.get("risk"), dict):
         r = req["risk"]
-        lines += ["", f"**Risk found by the change check before this request: {r['level']}**"
+        lines += ["", f"**Risk written in the request: {r['level']}**"
                   + (": " + "; ".join(r["reasons"]) if r["reasons"] else "")
-                  + ". The `check_commit` step in this request records the risk that counts."]
+                  + ". Written by whoever wrote the request (the change check's view), not the kernel's record: "
+                  "the `check_commit` step in this request records the risk that counts."]
+    if any(MADE in str((st.get("run") or {}).get("target")) for st in req["steps"]
+           if (st.get("run") or {}).get("action") in SHIPS):
+        lines += ["", "**The commit this request makes has no recorded risk yet.** Its `check_commit` step "
+                  "records it; the delivery depends on what that check records."]
     named = []
     for st in req["steps"]:
         arg = st.get("run") or {}
@@ -496,55 +509,62 @@ def run(req: dict, approver: str, identity: str = "toprope.identity.yaml", cwd: 
                label=what, rest=rest(req, i + 1 if accepted else i, made))
         raise SystemExit(fixed(f"{what}: {message}", fix))
 
-    for i, st in enumerate(req["steps"], 1):
-        arg = st.get("run") or {}
-        try:
-            if MADE in str(arg.get("target")) and made is None:
-                stop(i, f"{MADE}, but no commit_draft step before it made a commit",
-                     "put a commit_draft step before it, or name the commit")
-            if arg.get("action") == "approve_commit":
-                approved.add(made if arg["target"] == MADE else arg["target"])
-            ships = shipped_commit(arg, made) if arg.get("action") in SHIPS else None
-            risk = recorded_risk(ships, cwd) if ships else None
-            if local and ships and risk != "low" and arg["action"] in HELD and (ships in approved or ships in previewed):
-                # ADR-0050, 3: the person reads the preview before the commit is put in use
-                held = f"held before step {nums[i - 1]} of {total}: {ships} is not low risk ({risk})"
-                if done:
-                    held += f"; {_spans(nums[:len(done)])} ran and {'its' if len(done) == 1 else 'their'} work is kept"
-                report(held={"step": i, "number": nums[i - 1], "commit": ships, "risk": risk},
-                       label=held, rest=rest(req, i, made))
-                return done
-            if not local and ships and ships in approved and risk != "low":
-                # ADR-0050: one approval ships only a low-risk change, as checked inside this request
-                stop(i, f"{ships} is not low risk ({risk}), so this approval does not ship it",
-                     "read the preview, then approve a second request with the delivery steps (the workflow "
-                     "leaves them in the request); do not re-run this run")
-            cmd = command(st, made, ident)
-            r = subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True, check=False)
-        except SystemExit:
-            raise
-        except Exception as e:                  # noqa: BLE001 - reported like any failed step
-            if local:
-                stop(i, f"{type(e).__name__}: {e}", LOCAL_AGAIN)
-            stop(i, f"{type(e).__name__}: {e}", AGAIN)
-        attempt = {"step": st, "returncode": r.returncode, "stdout": r.stdout[-4000:], "stderr": r.stderr[-4000:]}
-        if r.returncode != 0:                   # refused or broken: undone, and in the rest
-            why = f"{' '.join(cmd[:6])} ...\n{r.stderr[-2000:].strip()}"
-            if local:
-                stop(i, why, LOCAL_AGAIN, attempt)
-            stop(i, why, AGAIN, attempt)
-        done.append(attempt)
-        if arg.get("action") == "commit_draft" and (c := _made(r.stdout)):
-            made = c
-            done[-1]["commit"] = c
-        if arg.get("action") == "preview" and ships:
-            previewed.add(ships)
-        if unmet := (_unmet(r.stdout) if "run" in st else []):
-            why = f"{' '.join(cmd[:6])} ...\n" + "; ".join(unmet)
-            if local:
-                stop(i, why, TAKEN + "then apply the request again", attempt, accepted=True)
-            stop(i, why, TAKEN + "push the rest and approve that run; do not re-run this run", attempt, accepted=True)
-        tree = snapshot(cwd)
+    i = 0
+    try:                                        # Ctrl-C stops it like a failed step: work kept, rest left
+        for i, st in enumerate(req["steps"], 1):
+            arg = st.get("run") or {}
+            try:
+                if MADE in str(arg.get("target")) and made is None:
+                    stop(i, f"{MADE}, but no commit_draft step before it made a commit",
+                         "put a commit_draft step before it, or name the commit")
+                if arg.get("action") == "approve_commit":
+                    approved.add(made if arg["target"] == MADE else arg["target"])
+                ships = shipped_commit(arg, made) if arg.get("action") in SHIPS else None
+                risk = recorded_risk(ships, cwd) if ships else None
+                if local and ships and risk != "low" and arg["action"] in HELD and (ships in approved or ships in previewed):
+                    # ADR-0050, 3: the person reads the preview before the commit is put in use
+                    held = f"held before step {nums[i - 1]} of {total}: {ships} is not low risk ({risk})"
+                    if done:
+                        held += f"; {_spans(nums[:len(done)])} ran and {'its' if len(done) == 1 else 'their'} work is kept"
+                    report(held={"step": i, "number": nums[i - 1], "commit": ships, "risk": risk},
+                           label=held, rest=rest(req, i, made))
+                    return done
+                if not local and ships and ships in approved and risk != "low":
+                    # ADR-0050: one approval ships only a low-risk change, as checked inside this request
+                    stop(i, f"{ships} is not low risk ({risk}), so this approval does not ship it",
+                         "read the preview, then approve a second request with the delivery steps (the workflow "
+                         "leaves them in the request); do not re-run this run")
+                cmd = command(st, made, ident)
+                r = subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True, check=False)
+            except SystemExit:
+                raise
+            except Exception as e:                  # noqa: BLE001 - reported like any failed step
+                if local:
+                    stop(i, f"{type(e).__name__}: {e}", LOCAL_AGAIN)
+                stop(i, f"{type(e).__name__}: {e}", AGAIN)
+            attempt = {"step": st, "returncode": r.returncode, "stdout": r.stdout[-4000:], "stderr": r.stderr[-4000:]}
+            if r.returncode != 0:                   # refused or broken: undone, and in the rest
+                why = f"{' '.join(cmd[:6])} ...\n{r.stderr[-2000:].strip()}"
+                if local:
+                    stop(i, why, LOCAL_AGAIN, attempt)
+                stop(i, why, AGAIN, attempt)
+            done.append(attempt)
+            if arg.get("action") == "commit_draft" and (c := _made(r.stdout)):
+                made = c
+                done[-1]["commit"] = c
+            if arg.get("action") == "preview" and ships:
+                previewed.add(ships)
+            if unmet := (_unmet(r.stdout) if "run" in st else []):
+                why = f"{' '.join(cmd[:6])} ...\n" + "; ".join(unmet)
+                if local:
+                    stop(i, why, TAKEN + "then apply the request again", attempt, accepted=True)
+                stop(i, why, TAKEN + "push the rest and approve that run; do not re-run this run", attempt, accepted=True)
+            tree = snapshot(cwd)
+    except KeyboardInterrupt:
+        taken = 0 < i <= len(done)              # the step had run when the interrupt came
+        if local:
+            stop(max(i, 1), "interrupted (Ctrl-C)", LOCAL_AGAIN, accepted=taken)
+        stop(max(i, 1), "interrupted (Ctrl-C)", AGAIN, accepted=taken)
     report()
     return done
 
@@ -631,11 +651,12 @@ def apply(request: str | Path, identity: str = "toprope.identity.yaml", cwd: str
         raise SystemExit(fixed(f"approve_commit needs TLC's check, and {TLC_ENV} is not set: nothing was run",
                                f"set {TLC_ENV} to a TLC jar (tla2tools.jar, as the tla workflow pins it), then "
                                "apply again"))
-    print(render(req, cwd), end="")
+    print(render(req, cwd, "local"), end="")
     actions = [(st.get("run") or {}).get("action") for st in req["steps"]]
     if "preview" in actions and set(HELD) & set(actions[actions.index("preview"):]):
-        print("\nIf the commit is not recorded low risk, this stops after its preview: read it, then apply "
-              "the request again for deploy, the probes and verify (ADR-0050, 3).")
+        print("\nIf the commit is not recorded low risk (a commit this request makes has no recorded risk until "
+              "its check runs), this stops after its preview: read it, then apply the request again for deploy, "
+              "the probes and verify (ADR-0050, 3).")
     email = ident.email()
     answer = ask(f"\nTake these {len(req['steps'])} steps as {caller.actor.id}? Type `yes` to apply: ")
     if answer.strip() != "yes":
@@ -645,7 +666,7 @@ def apply(request: str | Path, identity: str = "toprope.identity.yaml", cwd: str
     with confirmation(caller.actor.id) as token:
         try:
             done = run(req, email, identity, cwd, channel="local", token=token, outcome=outcome)
-        except SystemExit:
+        except BaseException:                   # a failed step, Ctrl-C, SIGTERM: record what ran
             if outcome.get("steps"):            # as the workflow: nothing is recorded if no step ran
                 record(req, email, caller.actor.id, url, cwd, outcome, request, channel="local")
             raise

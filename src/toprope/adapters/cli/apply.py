@@ -16,10 +16,14 @@ its preview, and you apply the request again once you have read it (ADR-0050, 3)
 the delivery steps to a request that approves the commit it makes, so a high-risk change takes
 two confirmations in all.
 
-The one confirmation stands for each person-only step's own terminal prompt: `toprope-apply`
-gives its steps a token that `toprope-run` accepts in place of asking again, only from the process
-that took the confirmation, and only for the person who gave it. Like that prompt, it guards
-against mistakes; it is not a security boundary (a process can fake a terminal).
+The one confirmation stands for each person-only step's own terminal prompt, and the guard is
+never weaker than that prompt: `toprope-run` skips its prompt only when its standard input is a
+terminal (the steps inherit the apply's) and the token `toprope-apply` gives its steps names a
+record, in a directory only you can write, of the same person and of `toprope-run`'s parent
+process. Without a terminal it refuses, token or not; with a token that does not check out it
+refuses too, rather than ask. What this guarantees is what the prompt guaranteed: a process with
+no terminal (an agent's ordinary shell, a script) cannot take a person-only step as you. It is not
+a security boundary: a process of yours that fakes a terminal can also write such a record.
 
 Run it from the repository root: the request runner is the repository's `tools/human_request.py`.
 """
@@ -32,6 +36,8 @@ import importlib.util
 import json
 import os
 import secrets
+import signal
+import stat
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -57,28 +63,65 @@ def _file(token: str) -> Path:
     return _dir() / f"{hashlib.sha256(token.encode()).hexdigest()}.json"
 
 
+def _private(path: Path, kind: int) -> bool:
+    """`path` is of `kind` (a directory or a file, not a link), owned by this user, and no one else
+    may read or write it."""
+    try:
+        st = os.lstat(path)
+    except OSError:
+        return False
+    owner = st.st_uid == os.getuid() if hasattr(os, "getuid") else True
+    return stat.S_IFMT(st.st_mode) == kind and owner and not st.st_mode & 0o077
+
+
 @contextmanager
 def confirmation(person: str) -> Iterator[str]:
     """A token for the steps of one confirmed apply: it names the person who confirmed and the
-    process that asked them, and it is gone when the apply ends. Kept outside the repository."""
+    process that asked them, and it is gone when the apply ends (also on SIGTERM). Kept outside the
+    repository, in a directory only this user may use; a directory someone else owns, or opened
+    to others, is refused."""
     token = secrets.token_hex(16)
-    _dir().mkdir(mode=0o700, parents=True, exist_ok=True)
+    d = _dir()
+    try:
+        d.mkdir(mode=0o700, parents=True, exist_ok=True)
+    except OSError as e:
+        raise SystemExit(fixed(f"cannot make {d}: {e.strerror}", "make it yours with mode 0700, or set TMPDIR "
+                               "to a directory of your own")) from None
+    if not _private(d, stat.S_IFDIR):
+        raise SystemExit(fixed(f"{d} is not a directory only you own and use (mode 0700)",
+                               f"remove it, or set TMPDIR to a directory of your own, then apply again"))
     f = _file(token)
-    f.write_text(json.dumps({"as": person, "pid": os.getpid()}))
+    fd = os.open(f, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    with os.fdopen(fd, "w") as out:
+        out.write(json.dumps({"as": person, "pid": os.getpid()}))
+    def interrupted(signum: int, frame: Any) -> None:
+        raise KeyboardInterrupt         # stopped like Ctrl-C: what ran is recorded, the rest is left
+
+    installed, before = False, None
+    try:
+        before, installed = signal.signal(signal.SIGTERM, interrupted), True
+    except ValueError:                  # not the main thread: SIGTERM keeps its handler
+        pass
     try:
         yield token
     finally:
         f.unlink(missing_ok=True)
+        if installed:
+            signal.signal(signal.SIGTERM, before if before is not None else signal.SIG_DFL)
 
 
 def confirmed_by_apply(caller: Any) -> bool:
-    """Whether this command is a step of an apply the caller confirmed: the token in APPLY_ENV is
-    one a running `toprope-apply` took from this same person, and that process is this one's parent."""
+    """Whether the token in APPLY_ENV names a record, in this user's private directory, of a
+    confirmation `toprope-apply` took from this same person, and that apply is this process's
+    parent. The caller (`toprope-run`) also requires a terminal: see the module's docstring."""
     token = os.environ.get(APPLY_ENV)
     if not token or getattr(caller.actor, "kind", None) != "person":
         return False
+    f = _file(token)
+    if not (_private(_dir(), stat.S_IFDIR) and _private(f, stat.S_IFREG)):
+        return False
     try:
-        rec = json.loads(_file(token).read_text())
+        rec = json.loads(f.read_text())
     except (OSError, ValueError):
         return False
     return rec.get("as") == caller.actor.id and rec.get("pid") == os.getppid()

@@ -19,6 +19,7 @@ to do about it. `{…}` is filled in when the error is raised.
 | {…} is an action of {…} | give --member |
 | {…} reads one member | give --member, one of {…} |
 | {…} requires a person | run it yourself on a terminal, or through a human request (tools/human_request.py): approved in GitHub, or applied with `toprope-apply` |
+| {…} requires a person, and the apply's confirmation did not reach this step (no terminal, or {…} names no confirmation of {…} by this command's parent) | run `toprope-apply` yourself on your terminal; or unset {…} and run the step yourself |
 | {…}: `{…}` must be a single value | give one value, such as a path |
 | {…}: cannot read it ({…}) | give --config FILE, or --no-config |
 | {…}: expected a mapping such as `composition: x.composition.yaml` | fix the file, or give --no-config |
@@ -31,8 +32,10 @@ to do about it. `{…}` is filled in when the error is raised.
 
 | Error | Fix |
 |---|---|
+| cannot make {…}: {…} | make it yours with mode 0700, or set TMPDIR to a directory of your own |
 | no tools/human_request.py here: toprope-apply runs this repository's human requests | run it from the repository root |
 | {…} cannot be loaded | run it from the repository root |
+| {…} is not a directory only you own and use (mode 0700) | remove it, or set TMPDIR to a directory of your own, then apply again |
 
 ## `src/toprope/adapters/cli/change.py`
 
@@ -389,6 +392,8 @@ to do about it. `{…}` is filled in when the error is raised.
 | change needs --draft | give --draft with the draft whose change to take through |
 | channel {…} | use one of {…} |
 | identity file {…}: {…} | give --identity the repository's identity file |
+| interrupted (Ctrl-C) | fix the cause, then apply the request again (it now holds only the steps that did not run) |
+| interrupted (Ctrl-C) | fix the cause, then push a change to the request (the workflow leaves the steps that did not run in it), and approve that run; do not re-run this run |
 | not applied: nothing was run | type `yes` to apply it |
 | record needs --approver, --as and --run-url | give --approver, --as and --run-url (the workflow does) |
 | run needs --approver | give --approver with the GitHub login that approved the run (the workflow does) |

@@ -269,11 +269,16 @@ def _confirm_on_terminal(identity: Identity, caller: Caller, action: str, target
     terminal: a process without one (an agent's ordinary shell, a script) cannot take it as you.
     It is a guard against mistakes, not a security boundary: a process can fake a terminal."""
     from ...identity.git import GitIdentity
-    from .apply import confirmed_by_apply
+    from .apply import APPLY_ENV, confirmed_by_apply
     if not isinstance(identity, GitIdentity) or caller.actor.kind != "person":
         return
-    if confirmed_by_apply(caller):               # a step of a request the person confirmed once
-        return
+    if os.environ.get(APPLY_ENV):                # a step of a request the person confirmed once
+        if sys.stdin.isatty() and confirmed_by_apply(caller):   # never weaker than the prompt below
+            return
+        raise SystemExit(fixed(f"{action} requires a person, and the apply's confirmation did not reach this step "
+                               f"(no terminal, or {APPLY_ENV} names no confirmation of {caller.actor.id} by this "
+                               "command's parent)", f"run `toprope-apply` yourself on your terminal; or unset "
+                               f"{APPLY_ENV} and run the step yourself"))
     if not sys.stdin.isatty():
         raise SystemExit(fixed(f"{action} requires a person", "run it yourself on a terminal, or through a human "
                                 "request (tools/human_request.py): approved in GitHub, or applied with `toprope-apply`"))

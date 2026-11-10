@@ -98,6 +98,31 @@ def answers(*said):
     return ask
 
 
+def forge(person, pid):
+    """What a process with no terminal could write: the record of an apply, naming `pid` as it."""
+    import secrets
+    token = secrets.token_hex(16)
+    cli_apply._dir().mkdir(mode=0o700, exist_ok=True)
+    fd = os.open(cli_apply._file(token), os.O_CREAT | os.O_WRONLY, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(json.dumps({"as": person, "pid": pid}))
+    return token
+
+
+class on_a_terminal:
+    """Standard input is a terminal (a pseudo-terminal) for the processes started meanwhile."""
+
+    def __enter__(self):
+        self.master, self.slave = os.openpty()
+        self.saved = os.dup(0)
+        os.dup2(self.slave, 0)
+
+    def __exit__(self, *exc):
+        os.dup2(self.saved, 0)
+        for fd in (self.saved, self.slave, self.master):
+            os.close(fd)
+
+
 def runs(root):
     return [json.loads(x) for x in (root / hr.APPROVAL_RUNS).read_text().splitlines()]
 
@@ -111,7 +136,8 @@ def test_a_low_risk_request_runs_every_step_on_one_confirmation(repo, monkeypatc
     out = hr.apply(REQUEST, cwd=repo, ask=ask)
     assert len(ask.asked) == 1 and ANA in ask.asked[0]                 # one confirmation
     shown = capsys.readouterr().out
-    assert shown.startswith(hr.render(nine_steps(), repo))              # what the run page shows
+    assert shown.startswith(hr.render(nine_steps(), repo, "local"))     # what the run page shows, locally worded
+    assert "the run is held after the preview" in shown and "has no recorded risk yet" in shown
     assert kernel.actions() == ["confirm_all_proposed", "commit_draft", "check_commit", "approve_commit",
                                 "deliver", "preview", "deploy", "run_probes", "verify"]
     assert all(c[c.index("--identity") + 1] == "git:toprope.identity.yaml" for c in kernel.cmds)
@@ -279,8 +305,15 @@ def test_a_person_only_step_runs_under_the_one_confirmation_and_not_without_it(t
     by_hand = hr.command(req["steps"][1], identity="git:toprope.identity.yaml")
     r = subprocess.run(by_hand, cwd=tmp_path, capture_output=True, text=True, stdin=subprocess.DEVNULL)
     assert r.returncode != 0 and "requires a person" in r.stderr     # no terminal, no apply: refused
+    # The review's reproduction: a script with no terminal forges the record of an apply, naming
+    # itself as the parent, and passes the token. Refused: the token never stands in for a terminal.
+    token = forge(ANA, os.getpid())
+    r = subprocess.run(by_hand, cwd=tmp_path, capture_output=True, text=True, stdin=subprocess.DEVNULL,
+                       env={**os.environ, cli_apply.APPLY_ENV: token})
+    assert r.returncode != 0 and "the apply's confirmation did not reach this step" in r.stderr, r.stderr
     monkeypatch.setattr(sys, "stdin", Terminal())
-    out = hr.apply(REQUEST, cwd=tmp_path, ask=answers("yes"))
+    with on_a_terminal():                                           # the steps inherit the apply's terminal
+        out = hr.apply(REQUEST, cwd=tmp_path, ask=answers("yes"))
     assert out["steps"] == 2 and "failed" not in out
     decl = yaml.safe_load((tmp_path / "domains/authoring/authoring.domain.yaml").read_text())
     (added,) = [i for i in decl["invariants"] if i["id"] == rule["id"]]
@@ -301,3 +334,69 @@ def test_the_command_runs_the_repository_s_runner(repo, monkeypatch):
 
 def test_the_repository_runner_loads(monkeypatch):
     assert callable(cli_apply.runner(ROOT).apply)
+
+
+def test_a_forged_token_without_a_terminal_is_refused_and_a_bad_one_never_prompts(monkeypatch):
+    """#244's review: any process could write a token record naming itself; the token alone passed
+    `toprope-run`'s person prompt with no terminal. A token that does not check out must refuse,
+    not prompt (the prompt would go to a captured stdout while input() waits)."""
+    from toprope.adapters.cli import _confirm_on_terminal
+    from toprope.identity import Caller
+    from toprope.identity.git import GitIdentity
+    from toprope.types import Actor
+    ana = Caller(Actor(ANA, "person", ()))
+    ident = GitIdentity.__new__(GitIdentity)
+    token = forge(ANA, os.getppid())                       # names this process's parent, as a step's would
+    monkeypatch.setenv(cli_apply.APPLY_ENV, token)
+    monkeypatch.setattr("builtins.input", lambda *a: pytest.fail("prompted"))
+    monkeypatch.setattr(sys, "stdin", Terminal(tty=False))
+    with pytest.raises(SystemExit, match="the apply's confirmation did not reach this step.*Fix: "):
+        _confirm_on_terminal(ident, ana, "confirm_all_proposed", "authoring")
+    monkeypatch.setattr(sys, "stdin", Terminal(tty=True))
+    _confirm_on_terminal(ident, ana, "confirm_all_proposed", "authoring")   # a terminal and the record: taken
+    monkeypatch.setenv(cli_apply.APPLY_ENV, forge(ANA, os.getpid()))        # not this process's parent
+    with pytest.raises(SystemExit, match="did not reach this step"):
+        _confirm_on_terminal(ident, ana, "confirm_all_proposed", "authoring")
+
+
+def test_ctrl_c_mid_apply_records_what_ran_and_leaves_the_rest(repo, monkeypatch):
+    kernel = Kernel()
+
+    def run(cmd, **kw):
+        if cmd[0] != "git" and cmd[cmd.index("--identity") + 2] == "preview":
+            raise KeyboardInterrupt
+        return kernel(cmd, **kw)
+    monkeypatch.setattr(hr.subprocess, "run", run)
+    risk(repo, "7-c0ffee", "low")
+    write_request(repo, nine_steps())
+    with pytest.raises(SystemExit) as e:
+        hr.apply(REQUEST, cwd=repo, ask=answers("yes"))
+    assert e.value.code not in (0, None) and "interrupted (Ctrl-C)" in str(e.value.code)
+    (row,) = runs(repo)
+    assert (row["ran"], row["failed"]["step"], row["channel"]) == (5, 6, "local")
+    assert [s["run"]["action"] for s in hr.load(repo / REQUEST)["steps"]] == ["preview", "deploy", "run_probes",
+                                                                             "verify"]
+
+
+def test_the_token_lives_in_a_private_directory_and_goes_on_sigterm(tmp_path, monkeypatch):
+    import signal
+    monkeypatch.setattr(cli_apply.tempfile, "gettempdir", lambda: str(tmp_path))
+    with cli_apply.confirmation(ANA) as token:
+        f = cli_apply._file(token)
+        assert oct(f.stat().st_mode & 0o777) == "0o600" and oct(cli_apply._dir().stat().st_mode & 0o777) == "0o700"
+        with pytest.raises(KeyboardInterrupt):                # SIGTERM stops it like Ctrl-C
+            os.kill(os.getpid(), signal.SIGTERM)
+            import time
+            time.sleep(5)
+    assert not f.exists()
+    cli_apply._dir().chmod(0o755)                              # opened to others: refused
+    with pytest.raises(SystemExit, match="not a directory only you own and use.*Fix: "):
+        with cli_apply.confirmation(ANA):
+            pass
+    cli_apply._dir().chmod(0o700)
+    token = forge(ANA, os.getppid())
+    cli_apply._file(token).chmod(0o644)                        # a record others could have written
+    monkeypatch.setenv(cli_apply.APPLY_ENV, token)
+    from toprope.identity import Caller
+    from toprope.types import Actor
+    assert not cli_apply.confirmed_by_apply(Caller(Actor(ANA, "person", ())))
