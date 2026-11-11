@@ -1,0 +1,20 @@
+{
+  "first": {
+    "nl": 0.66,
+    "structured": 0.88,
+    "toprope": 1.0
+  },
+  "second": {
+    "nl": 0.68,
+    "structured": 0.88,
+    "toprope": 1.0
+  },
+  "difference": {
+    "nl": 0.02,
+    "structured": 0.0,
+    "toprope": 0.0
+  },
+  "largest": 0.02,
+  "limit": 0.05,
+  "within_limit": true
+}
