@@ -344,5 +344,5 @@ open-ended creative work, and tasks whose success cannot be defined. Without a t
 matrix and invariants, the harness has nothing to check.
 
 The research stays narrow even though the positioning is broad. The first domains are
-Toprope itself and an experiment lifecycle. Only ⑥ is specific to work between people.
+Toprope itself and the researcher's own paper trading (ADR-0054). Only ⑥ is specific to work between people.
 Claims ① to ⑤ are about any declared domain.

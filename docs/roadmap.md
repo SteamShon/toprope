@@ -145,37 +145,38 @@ Done when the toy domain runs as usable software through the shell and the green
 gates one GitHub effect, survives a state rename with stranded objects through a tested
 migration, and its harness passes on every surface.
 
-## M2: Dogfood domain (① ② judged, ③, 3–4 weeks)
+## M2: Dogfood domain (① ③ judged, ② observed, 3–4 weeks)
 
 Use the self-compiled authoring tool from M1, not the hand-built kernel, to model a
-second, everyday domain. The candidate is the experiment lifecycle (hypothesis → design →
-approval → launch → readout → ship/kill), sourced from an OSS experimentation platform
-plus the researcher as owner. **② is judged here (ADR-0030)** and needs, as an entry
-criterion, a domain expert who is not Toprope's builder; without one, ② stays untested. The
-held-out protocol built for M1 (`experiments/m1/interview-guide.md`, sealed validation,
+second, everyday domain: the researcher's own stock investing, on a paper-trading account
+(ADR-0054). The researcher is expert, owner and user; a person who is not Toprope's builder
+seeds the problems and keeps the key. **② is observed here, not judged**: it needs a domain
+expert who is not Toprope's builder (ADR-0030), so it stays untested until such a domain runs.
+The held-out protocol built for M1 (`experiments/m1/interview-guide.md`, sealed validation,
 fact keys, kernel-fact exclusion) is the starting point. M2's estimate is redone in its spec
 PR, and M3 may use M2's gold only after M2's verdict is frozen.
 
 Phase B (the change sequence vs. a natural-language skill and a structured spec) runs on this
-domain and gives **the first ① verdict (ADR-0034)**, on change requests from the expert who
-is not Toprope's builder. M1's verdict rules are the starting point; who seeds the problems
-and writes the key is decided in M2's spec PR.
+domain and gives **the first ① verdict (ADR-0034)**, on the researcher's change requests with
+problems seeded, and the key kept, by a person who is not Toprope's builder (ADR-0054); the
+builder's requests are reported as a limit. M1's verdict rules are the starting point.
 
 Questions:
 - Is the second domain cheaper than the first?
 - Did the generated tool hold up, or did it need hand fixes?
 
 **③ works as built (H-Factory).** The researcher actually uses the generated software for
-the experiment lifecycle (greenfield), together with one brownfield effect through the
-GitHub adapter, for at least two weeks. Live changes during this period go through the
+their investing (greenfield), together with one brownfield effect through the broker's
+paper-trading API (an order, and its result read back), trading or checking every trading day
+for at least two weeks (ADR-0054). Live changes during this period go through the
 in-flight check and migration plans (ADR-0018). Only harness-passing builds are used. Every defect
 is logged with its class:
 - state-permission: an action allowed or denied differently from the declaration
 - UX, performance, external API
 - hand edits needed to generated code.
 
-Exit: verdicts on H-Iterate and H-Fidelity outside the self domain, which is the stronger
-test because the self domain is one the researcher designed, and on H-Factory. ③ is
+Exit: a verdict on H-Iterate outside the self domain, an observation on H-Fidelity (expert =
+builder, ADR-0054), and a verdict on H-Factory. ③ is
 supported if harness-passing builds have zero state-permission defects and need no hand
 edits. It is weakened if either fails. These thresholds are a draft, to be frozen by the
 researcher before M2.

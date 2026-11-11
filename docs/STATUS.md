@@ -18,7 +18,7 @@ Legend: ✅ done · 🟡 in part · ⬜ not started
 | M1 self-compile | ① ⑥ pilot, no verdict | ✅ | closed after the recheck ([`M1-report.md`](experiments/M1-report.md)): Toprope with its LLM review leads on recall (first run 0.84 against 0.64 NL; recheck 0.94–1.0 against 0.44–0.62, biased and a reference only); the grader's noise (0.18) moves to M2's grader redesign; six probes carried to M2's probe design; ⑥ inconclusive |
 | U usability before M2 (ADR-0049) | none (enabler) | 🟡 | the four themes' code is in `develop` (#201, #213, #218, #224); F1 baseline recorded; the targets are not measured yet. Left: F2 on ADR-0053's path, run by a newcomer the researcher finds; F1 measured again from theme 1's merge; ADR-0051 §4–5 (a Sources domain), proposed, for the researcher |
 | M0b surfaces and effects | none (enabler) | ⬜ | |
-| M2 dogfood | ① ② ③ | ⬜ | the first ① and ② verdicts |
+| M2 dogfood | ① ③, ② observed | ⬜ | the researcher's own paper trading (ADR-0054): the first ① and ③ verdicts; ② only observed, its expert being the builder |
 | M3 shared language | ④ | ⬜ | |
 | M4 evolution | ⑤ | ⬜ | |
 | M5 handoff and release | ⑥ (partial) | ⬜ | |
@@ -421,9 +421,11 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    are approved, three of them low risk ([`U-f1-remeasure.md`](experiments/U-f1-remeasure.md):
    `tools/usability_baseline.py --since-commit 3c041cbd --record …`); then the researcher decides ADR-0051 §4–5 (a source's
    lifecycle as a Sources domain, its readers and extractors as that domain's kernel services).
-3. M2's spec, from the draft (`docs/experiments/M2-design.md`): the researcher decides each point,
-   freezes the verdict rules, and finds the domain expert who is not the builder; the expert
-   writes the change list, seeds it and keeps the key.
+3. M2's spec, from the draft (`docs/experiments/M2-design.md`), on the researcher's paper trading
+   (ADR-0054): the researcher decides each point and ADR-0054's open questions (the paper-trading
+   API, how the tool reaches it, who places an approved order), freezes the verdict rules, and
+   finds the seeder, who is not the builder or F2's newcomer; the researcher writes the change
+   list, the seeder seeds it and keeps the key.
 4. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
 5. When a domain is shared by several people or agents (M2, or a hosted server): its event
    log moves from git to a database (`--store postgres:DSN` for a composition, one schema per

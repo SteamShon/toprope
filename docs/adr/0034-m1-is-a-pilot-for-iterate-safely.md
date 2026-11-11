@@ -6,6 +6,9 @@
   human-only rule), `docs/experiments/M1-self-compile.md`, the roadmap and README milestone
   table, `docs/milestones/M0a.md` (sub-PR 8's gate)
 
+> Amended by ADR-0054: M2's change requests come from the researcher; the problems are seeded,
+> and the key kept, by a person who is not Toprope's builder. ① keeps its verdict, with that limit.
+
 ## Context
 ADR-0030 moved ② out of M1. Its reason was that the builder's answers are not independent
 evidence about a domain the builder designed. The same reason applies to ①, M1's remaining

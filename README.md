@@ -236,7 +236,7 @@ between people get faster ([`docs/charter.md`](docs/charter.md#3-the-claim-chain
 | Link | Hypothesis | Verdict in | Status |
 |---|---|---|---|
 | ① iterate safely | H-Iterate | M1 (self), M2 (dogfood) | untested |
-| ② model is right | H-Fidelity | M2 (an application domain whose expert is not Toprope's builder; ADR-0030) | untested |
+| ② model is right | H-Fidelity | a domain whose expert is not Toprope's builder (ADR-0030); M2 observes it only, its expert being the builder (ADR-0054) | untested |
 | ③ works as built | H-Factory | M2 (dogfood use) | untested |
 | ④ shared language | H-Shared | M3 | untested |
 | ⑤ evolves | H-Evolve | M4 | untested |
@@ -259,7 +259,7 @@ changes only in a PR that reports a preregistered experiment verdict.
 | MCP | Model Context Protocol, how agents such as Claude Code call tools |
 | ADR | an architecture decision record, in [`docs/adr/`](docs/adr/) |
 | ①–⑥ | the claims above |
-| M0a … M5 | milestones: M0a the core (done), M1 Toprope on its own workflows (now), M0b UI and adapters to existing systems, M2 a real domain with an outside expert ("dogfood"), M3–M5 the later claims ([`docs/roadmap.md`](docs/roadmap.md)) |
+| M0a … M5 | milestones: M0a the core (done), M1 Toprope on its own workflows (now), M0b UI and adapters to existing systems, M2 a real domain the researcher uses, with an outside seeder ("dogfood", ADR-0054), M3–M5 the later claims ([`docs/roadmap.md`](docs/roadmap.md)) |
 
 ## Read next
 
