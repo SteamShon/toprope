@@ -607,3 +607,184 @@ def test_probes_run_again_are_graded_again(tmp_path):
     rows = yaml.safe_load((run / "scoring/proposed.yaml").read_text())["probes"]
     assert all(r.get("regraded") for r in rows["toprope"] if r["seq"] == 0)
     assert not any(r.get("regraded") for r in rows["nl"])
+
+
+# -- M2's grader: the checklist, by majority (M2-grader.md, decided 2026-11-10) --------------------
+
+def test_the_checklist_label_follows_its_rule_and_the_majority_needs_more_than_half():
+    from phase_b.score import checklist_label, majority
+    yes = {"names": True, "conflict": False, "outcome": True, "real": True}         # rule B: outcome counts
+    assert checklist_label(yes, True) == "seeded"
+    assert checklist_label(yes, False) == "other-real"                              # no seeded problem
+    assert checklist_label({**yes, "names": False, "real": False}, True) == "false-alarm"
+    assert majority([True, False, True]) is True and majority([True, None, False]) is None
+    assert majority(["partial", "implements", "partial"]) == "partial"
+
+
+def test_a_missing_answer_leaves_a_flag_unlabelled_only_when_it_could_change_the_label():
+    from phase_b.score import checklist_label
+    yes = {"names": True, "conflict": False, "outcome": True, "real": True}
+    assert checklist_label({**yes, "real": None}, True) == "seeded"                 # `real` cannot undo it
+    assert checklist_label({**yes, "conflict": None}, True) == "seeded"             # outcome already holds
+    assert checklist_label({**yes, "outcome": None, "conflict": False}, True) is None
+    assert checklist_label({**yes, "names": None}, True) is None
+    assert checklist_label({**yes, "names": False, "outcome": None}, True) == "other-real"
+    assert checklist_label({"names": None, "conflict": None, "outcome": None, "real": False}, False) == "false-alarm"
+    assert checklist_label({**yes, "names": False, "real": None}, True) is None
+
+
+def test_the_checklist_grader_asks_k_times_once_per_distinct_flag_and_takes_the_majority(tmp_path):
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    write_run(run, "nl", {1: [[F("x")], [F("x")], [F("x")]]}, {1: 1, 2: 1, 3: 1}, runs=3)
+    write_run(run, "structured", {}, {1: 1, 2: 1, 3: 1}, runs=3)
+    write_run(run, "toprope", {1: [[CAP]] * 3}, {1: 1, 2: 1, 3: 1}, runs=3)
+    asked = []
+
+    def script(system, messages, tools):
+        user = messages[0]["content"]
+        if "grade one run of a probe" in system:
+            return json.dumps({"passed": True, "why": "w"})
+        asked.append(user)
+        n = sum(1 for u in asked if u.split(":")[0] == user.split(":")[0])       # this change's n-th answer
+        ids = re.findall(r"^([ABC]\.u\d+)\. ", user, re.MULTILINE)
+        names = n != 2                                                           # one dissent of three
+        flags = [{"id": i, "names": names, "conflict": names, "outcome": False, "real": True, "why": "w"}
+                 for i in ids]
+        return json.dumps({"flags": flags, "edits": [{"label": x, "fidelity": "implements", "why": "w"}
+                                                     for x in "ABC"]})
+    runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m", "--grader", "checklist"],
+                backend=ApiBackend(FakeModel(script)))
+    change1 = [u for u in asked if u.startswith("Change request 1:")]
+    assert len(change1) == 3                                                     # k = 3
+    assert all(len(re.findall(r"^[ABC]\.u\d+\. ", u, re.MULTILINE)) == 2 for u in change1)   # 6 flags, 2 distinct
+    prop = yaml.safe_load((run / "scoring/proposed.yaml").read_text())
+    for arm in ("nl", "toprope"):
+        fs = flags_of(prop, run, arm, 1)
+        assert len(fs) == 3 and len({f["item"] for f in fs}) == 1
+        assert all(f["grader_label"] == "seeded" and len(f["votes"]) == 3 for f in fs)
+    assert {e["fidelity"] for c in prop["changes"] for e in c["edits"].values()} == {"implements"}
+
+
+def checklist_script(asked: list[str], omit_first: bool = False):
+    """A grader that answers every checklist item true, recording each change's prompts; with
+    `omit_first`, its first answer leaves out `real`."""
+    def script(system, messages, tools):
+        user = messages[0]["content"]
+        if "grade one run of a probe" in system:
+            asked.append("PROBE")
+            return json.dumps({"passed": True, "why": "w"})
+        asked.append(user)
+        ids = re.findall(r"^([ABC]\.u\d+)\. ", user, re.MULTILINE)
+        first = omit_first and len([u for u in asked if u != "PROBE"]) == 1
+        flags = [{"id": i, "names": True, "conflict": True, "outcome": False, "why": "w",
+                  **({} if first else {"real": True})} for i in ids]
+        return json.dumps({"flags": flags, "edits": [{"label": x, "fidelity": "implements", "why": "w"}
+                                                     for x in "ABC"]})
+    return script
+
+
+def many_flags(run: Path) -> None:
+    for arm in ("nl", "structured", "toprope"):
+        write_run(run, arm, {1: [F(f"{arm}-{n}") for n in range(4)]}, {1: 1, 2: 1, 3: 1})
+
+
+def test_each_checklist_answer_sees_the_flags_in_its_own_order(tmp_path):
+    """Revision 1: the k answers of one sitting must not be k copies of one prompt."""
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    many_flags(run)
+    asked: list[str] = []
+    score.grade(run, inst, ApiBackend(FakeModel(checklist_script(asked))), runner.change_requests(inst),
+                seed=7, grader="checklist")
+    change1 = [u for u in asked if u.startswith("Change request 1:")]
+    orders = [tuple(re.findall(r"^([ABC]\.u\d+|=== [ABC] ===)", u, re.MULTILINE)) for u in change1]
+    assert len(orders) == 3 and len(set(orders)) == 3
+    assert all(sorted(o) == sorted(orders[0]) for o in orders)                 # the same items, reordered
+    prop = yaml.safe_load((run / "scoring/proposed.yaml").read_text())
+    assert all(f["grader_label"] == "seeded" for c in prop["changes"] if c["seq"] == 1 for f in c["flags"])
+
+
+def test_a_checklist_answer_with_an_item_missing_is_asked_once_more(tmp_path):
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    many_flags(run)
+    asked: list[str] = []
+    score.grade(run, inst, ApiBackend(FakeModel(checklist_script(asked, omit_first=True))),
+                runner.change_requests(inst), seed=7, grader="checklist")
+    first_change = [u for u in asked if u != "PROBE" and u.startswith(asked[0].split(":")[0] + ":")]
+    assert len(first_change) == 4                                              # k = 3, and once more
+    prop = yaml.safe_load((run / "scoring/proposed.yaml").read_text())
+    c = next(c for c in prop["changes"] if c["grader"]["asked_again"])
+    assert c["grader"]["asked_again"] == 1
+    assert all(f["grader_label"] is not None for f in c["flags"])
+
+
+def test_a_changes_only_sitting_grades_no_probe_and_cannot_be_scored(tmp_path):
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    many_flags(run)
+    asked: list[str] = []
+    runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m", "--grader", "checklist",
+                 "--changes-only"], backend=ApiBackend(FakeModel(checklist_script(asked))))
+    assert "PROBE" not in asked and asked
+    assert confirmed(run)["changes_only"] is True
+    with pytest.raises(SystemExit, match="changes-only"):
+        score.score(run, inst)
+
+
+def test_a_flag_left_without_a_label_gets_at_most_two_more_answers(tmp_path):
+    """A tie on `real` (true, false, missing) is not left for a person: more answers decide it."""
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    write_run(run, "nl", {3: [F("x")]}, {1: 1, 2: 1, 3: 1})                    # change 3: no seeded problem
+    write_run(run, "structured", {}, {1: 1, 2: 1, 3: 1})
+    write_run(run, "toprope", {}, {1: 1, 2: 1, 3: 1})
+    real = iter([True, False, None, None, None, False])   # T, F, missing (asked again: missing); then missing, F
+
+    def script(system, messages, tools):
+        user = messages[0]["content"]
+        if "grade one run of a probe" in system:
+            return json.dumps({"passed": True, "why": "w"})
+        ids = re.findall(r"^([ABC]\.u\d+)\. ", user, re.MULTILINE)
+        if not user.startswith("Change request 3:") or not ids:
+            return json.dumps({"flags": [], "edits": []})
+        r = next(real)
+        return json.dumps({"flags": [{"id": i, "names": False, "conflict": False, "outcome": False, "why": "w",
+                                      **({} if r is None else {"real": r})} for i in ids], "edits": []})
+    score.grade(run, inst, ApiBackend(FakeModel(script)), runner.change_requests(inst), seed=1,
+                grader="checklist", changes_only=True)
+    c = next(c for c in yaml.safe_load((run / "scoring/proposed.yaml").read_text())["changes"] if c["seq"] == 3)
+    assert c["grader"]["extra_votes"] == 2
+    assert [f["label"] for f in c["flags"]] == ["false-alarm"]                 # 2 of the 3 answers cast
+    assert len(c["flags"][0]["votes"]) == 5
+
+
+def test_relabel_applies_the_current_rule_to_a_sittings_answers_without_grading_again(tmp_path, capsys):
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    many_flags(run)
+    asked: list[str] = []
+    runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m", "--grader", "checklist",
+                 "--changes-only"], backend=ApiBackend(FakeModel(checklist_script(asked))))
+    path = run / "scoring/proposed.yaml"
+    prop = yaml.safe_load(path.read_text())
+    for c in prop["changes"]:                                  # as an earlier rule left them: no label
+        for f in c["flags"]:
+            f["answers"]["real"], f["grader_label"], f["label"] = None, None, None
+    path.write_text("# header\n" + yaml.safe_dump(prop))
+    before = len(asked)
+    runner.main(["relabel", "--out", str(run), "--instruments", str(inst), "--scoring", "scoring"])
+    assert len(asked) == before                                # the grader is not asked again
+    assert '"relabelled": ' in capsys.readouterr().out
+    prop = yaml.safe_load(path.read_text())
+    by_seq = {c["seq"]: c["flags"] for c in prop["changes"]}
+    assert all(f["label"] == "seeded" and f["relabelled"] == {"from": None} for f in by_seq[1])
+    assert path.read_text().startswith("# header")
+
+
+def test_two_checklist_sittings_are_compared_against_their_own_limit(tmp_path):
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    three_arms(run)
+    for sitting in ("scoring-checklist-1", "scoring-checklist-2"):
+        runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m", "--into", sitting],
+                    backend=ApiBackend(FakeModel(grader(LABELS, run, sitting)[0])))
+    runner.main(["compare-gradings", "--out", str(run), "--instruments", str(inst),
+                 "--first", "scoring-checklist-1", "--second", "scoring-checklist-2", "--limit", "0.05"])
+    out = json.loads((run / "grader-noise.scoring-checklist-1.scoring-checklist-2.json").read_text())
+    assert out["limit"] == 0.05 and out["within_limit"] is True
+    assert not (run / "grader-noise.json").exists()                        # M1's own measurement untouched
