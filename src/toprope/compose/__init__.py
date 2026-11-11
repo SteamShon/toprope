@@ -27,6 +27,7 @@ from pydantic import Field, ValidationError
 
 from ..decl import Domain, Issue, check_handoffs, load_yaml, validate_domain
 from ..decl.models import Ident, Strict
+from ..errors import fixed
 
 FORMAT = "toprope.world-map.composed/1"
 
@@ -201,7 +202,8 @@ def how_to_reach_across(cmap: dict[str, Any], domain: str, obj: str, from_state:
             s["domain"] = domain
         return out
     if _depth > len(members):
-        return {"reachable": False, "reason": "no wiring leads there"}
+        return {"reachable": False, "reason": fixed("no wiring leads there",
+                                                    "wire a handoff toward that domain in the composition")}
     best = None
     for w in cmap["wires"]:
         if w["from"]["domain"] != domain:
@@ -236,7 +238,9 @@ def how_to_reach_across(cmap: dict[str, Any], domain: str, obj: str, from_state:
                 if best is None or len(steps) < len(best):
                     best = steps
     if best is None:
-        return {"reachable": False, "reason": f"No declared path from {domain}.{obj} to {to_domain}.{to_obj} {target_state}."}
+        return {"reachable": False, "reason": fixed(
+            f"No declared path from {domain}.{obj} to {to_domain}.{to_obj} {target_state}.",
+            "declare the missing transition or handoff, or aim for a state the map shows as reachable")}
     return {"reachable": True, "steps": best}
 
 

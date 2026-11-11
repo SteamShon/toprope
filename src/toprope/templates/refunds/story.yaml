@@ -1,0 +1,17 @@
+title: A refund window
+keywords: [refund, order, purchase, return, customer, support]   # toprope-init "<a sentence>" picks the template whose words it uses most
+about: Support may refund a paid order within 7 days of purchase.
+next: >
+  Try a 30-day window with `toprope-set window_days=30`, and see what the change touches.
+settings:
+  window_days:
+    says: How many days after purchase a refund is allowed.
+    type: integer
+    default: 7
+    at: actions.refund_order.preconditions.within-window
+    check: "target.days_since_purchase <= {value}"
+    reason: "Refunds are allowed within {value} days of purchase."
+steps:
+  - {who: t-sam, as: sam (support), action: refund_order, target: O-8, says: "refund an order from day 8", expect: denied, code: within-window}
+  - {who: t-sam, as: sam (support), action: refund_order, target: O-3, says: "refund an order from day 3", expect: ok}
+  - {who: t-sam, as: sam (support), action: refund_order, target: O-3, says: "refund it again", expect: denied, code: matrix}

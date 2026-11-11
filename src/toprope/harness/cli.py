@@ -106,6 +106,11 @@ def main(argv: list[str] | None = None) -> None:
     levels = tuple(x.strip() for x in args.levels.split(",") if x.strip())
     report = run_harness(d, levels=levels, explore_examples=args.examples, explore_depth=args.depth)
     print(report.summary())
+    unready = [i for i in validate_domain(d) if i.code == "unassigned-actor"]
+    if unready:                    # it passes, but tests nothing anyone may do yet (an imported draft)
+        print(f"not ready: {len(unready)} of {len(d.actions)} action(s) no one may take yet")
+        for i in unready:
+            print(f"  warning [{i.code}] {i.where}: {i.message}")
     if args.json:
         with open(args.json, "w") as f:
             json.dump(report.to_json(), f, indent=2, default=str)

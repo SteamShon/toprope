@@ -25,6 +25,272 @@ Its subcommands are the domain's actions, one per action, plus `get`, `history`,
 | `--seed` | load the declaration's example fixtures first |
 | `--key` `KEY` | idempotency key (default: a new one); reuse it to retry safely |
 | `--working-copy` | with --composition and --kernel-root: run each member from its working-copy file, not from its deployed commit (ADR-0045) |
+| `--config` `CONFIG` | the options file (default: toprope.yaml in the current directory, if any) |
+| `--no-config` | ignore toprope.yaml |
+| `--failures` `FAILURES` | a directory where a command that fails before the gate is recorded, one file per failure (ADR-0049, D1b) |
+| `--person-route` `PERSON_ROUTE` | how a person takes a step an agent is refused here, added to such refusals' fix (for the self domains: the human request, ADR-0039) |
+
+## `toprope-init`
+
+Start a domain from a template and see its rules work (ADR-0049, A3 and A4; ADR-0053, F2).
+
+| Argument | What |
+|---|---|
+| `NAME` | the new domain's name, and its directory; or a sentence that describes your workflow and its rules (then the name is --name, or taken from the template) |
+| `PROSE` | a sentence that describes your workflow and its rules |
+| `--name` `AS_NAME` | the domain's name, when the first argument is a sentence |
+| `--template` `TEMPLATE` | the template to start from (see --list) |
+| `--dir` `DIR` | where to write the domain's directory (default: here) (default `.`) |
+| `--list` | list the templates |
+| `--set` `NAME=VALUE` | a template setting (see `toprope-set --list` in the new directory) (default `[]`) |
+
+## `toprope-try`
+
+Start a domain from a template and see its rules work (ADR-0049, A3 and A4; ADR-0053, F2).
+
+| Argument | What |
+|---|---|
+| `--dir` `DIR` | the domain's directory (default: here) (default `.`) |
+| `--check` | compare domain.yaml with its template |
+| `--json` | the steps as JSON |
+| `--accept` | make each step's expectation in story.yaml what happens now, and show what changed |
+| `--reset` | start the domain's store (the one toprope-run uses) again from domain.yaml's examples; the old file is kept |
+| `--yes` | with --accept: also accept steps that showed a rule refusing and now pass |
+
+## `toprope-set`
+
+Start a domain from a template and see its rules work (ADR-0049, A3 and A4; ADR-0053, F2).
+
+| Argument | What |
+|---|---|
+| `NAME=VALUE` | settings to change |
+| `--dir` `DIR` | the domain's directory (default: here) (default `.`) |
+| `--list` | the settings, what each means, and its value |
+
+## `toprope-rule`
+
+Add your own rules, roles, people and fields to a domain by command, with no YAML (ADR-0053, F2).
+
+| Argument | What |
+|---|---|
+| `--dir` `DIR` | the domain's directory (default: here) (default `.`) |
+
+### `toprope-rule list`
+
+The domain's rules, with the id each is removed or confirmed by.
+
+
+### `toprope-rule threshold`
+
+Above (or below) a value, an action needs a role.
+
+| Argument | What |
+|---|---|
+| `--action` `ACTION` | the action the rule holds back, e.g. approve_request (required) |
+| `--when` `'FIELD OP VALUE'` | when the rule applies, e.g. "amount > 1000" (required) |
+| `--needs` `ROLE` | the role that may still take the action then (required) |
+| `--id` `ID` | the rule's id (refusals carry it as their code) |
+| `--reason` `REASON` | the reason a refusal gives (default: written from the rule) |
+
+### `toprope-rule no-self-approval`
+
+Whoever made it theirs (submitted, created) may not take the action.
+
+| Argument | What |
+|---|---|
+| `--action` `ACTION` | the action, e.g. approve_request (required) |
+| `--by` `BY` | the action that makes it someone's (found if one records who took it) |
+| `--id` `ID` | the rule's id (refusals carry it as their code) |
+| `--reason` `REASON` | the reason a refusal gives (default: written from the rule) |
+
+### `toprope-rule person-only`
+
+Only a person may take the action; an agent is refused.
+
+| Argument | What |
+|---|---|
+| `--action` `ACTION` | (required) |
+
+### `toprope-rule window`
+
+The action is allowed only within a number of days.
+
+| Argument | What |
+|---|---|
+| `--action` `ACTION` | (required) |
+| `--days` `DAYS` | (required) |
+| `--field` `FIELD` | a date field, or a field that counts days, to measure from |
+| `--since` `ACTION` | count from when this action was taken (recorded from now on) |
+| `--id` `ID` | the rule's id (refusals carry it as their code) |
+| `--reason` `REASON` | the reason a refusal gives (default: written from the rule) |
+
+### `toprope-rule remove`
+
+Remove a rule by its id (see list).
+
+| Argument | What |
+|---|---|
+| `ID` |  |
+
+### `toprope-rule confirm`
+
+Make drafted (`proposed`) rules yours; with no id, all of them.
+
+| Argument | What |
+|---|---|
+| `IDS` |  |
+
+## `toprope-add`
+
+Add your own rules, roles, people and fields to a domain by command, with no YAML (ADR-0053, F2).
+
+| Argument | What |
+|---|---|
+| `--dir` `DIR` | the domain's directory (default: here) (default `.`) |
+
+### `toprope-add role`
+
+A role.
+
+| Argument | What |
+|---|---|
+| `NAME` |  |
+| `--may` `ACTION,...` | actions the role may take (default ``) |
+
+### `toprope-add person`
+
+A person, with a token in tokens.yaml to act as them.
+
+| Argument | What |
+|---|---|
+| `NAME` |  |
+| `--roles` `ROLE,...` | (required) |
+
+### `toprope-add agent`
+
+An agent acting for a person, with a token and a grant.
+
+| Argument | What |
+|---|---|
+| `NAME` |  |
+| `--for` `PERSON` | (required) |
+| `--may` `ACTION,...` | the actions its grant allows (required) |
+| `--roles` `ROLE,...` | its roles (default: the person's) |
+
+### `toprope-add field`
+
+A field of an object, optionally given when an action is taken.
+
+| Argument | What |
+|---|---|
+| `NAME` |  |
+| `--type` `TYPE` | one of integer, number, string, boolean, datetime (default: integer) (default `integer`) |
+| `--choices` `A,B,...` | instead of --type: one of these words |
+| `--on` `OBJECT` | the object (default: the action's, or the only one) |
+| `--set-by` `ACTION,...` | actions that take it as a param and record it |
+| `--default` `DEFAULT` | its value in the examples already there |
+
+## `toprope-rename`
+
+Add your own rules, roles, people and fields to a domain by command, with no YAML (ADR-0053, F2).
+
+| Argument | What |
+|---|---|
+| `OLD` | an object, action, role or field as domain.yaml names it |
+| `NEW` | its new name |
+| `--kind` `{object,action,role,field}` | when the name is used twice |
+| `--dir` `DIR` | the domain's directory (default: here) (default `.`) |
+
+## `toprope-remove`
+
+Add your own rules, roles, people and fields to a domain by command, with no YAML (ADR-0053, F2).
+
+| Argument | What |
+|---|---|
+| `--dir` `DIR` | the domain's directory (default: here) (default `.`) |
+
+### `toprope-remove field`
+
+A field no rule, effect or state reads (its values leave the examples).
+
+| Argument | What |
+|---|---|
+| `NAME` |  |
+| `--on` `OBJECT` | the object, when several have the field |
+
+### `toprope-remove role`
+
+A role no rule, cell or person holds (it leaves the actions' actor lists).
+
+| Argument | What |
+|---|---|
+| `NAME` |  |
+
+### `toprope-remove person`
+
+A person or an agent from tokens.yaml, with the story steps they act in.
+
+| Argument | What |
+|---|---|
+| `NAME` |  |
+
+## `toprope-change`
+
+`toprope-change`: one command takes a change from an agent's proposals to one request for a person (ADR-0049, C1).
+
+| Argument | What |
+|---|---|
+| `INTENT` | what the change is for, in a sentence; the request's summary |
+| `--patch` `PATCH` | a YAML list of {path, value, cites, origin} (required) |
+| `--draft` `DRAFT` | the draft the change is made in (default: authoring) (default `authoring`) |
+| `--member` `MEMBER` | the member whose actions these are (default `authoring`) |
+| `--origin` `ORIGIN` | the Source object an element came from, when it names none |
+| `--workspace` `WORKSPACE` | the draft's workspace, if not the one in toprope.yaml |
+| `--kernel-root` `KERNEL_ROOT` | where the commit store is (default: `kernel_root:` in toprope.yaml, or here) |
+| `--request` `REQUEST` | the request file to write (default: .toprope/requests/<id>.yaml) |
+| `--run-args` `RUN_ARGS` | options passed to every toprope-run step, e.g. "--identity static:ids.yaml" (default ``) |
+
+## `toprope-apply`
+
+`toprope-apply`: a person applies a human request at their own terminal, with one confirmation (ADR-0053, 3; ADR-0039 without GitHub).
+
+| Argument | What |
+|---|---|
+| `REQUEST` | the request file, .toprope/requests/<id>.yaml |
+| `--identity` `IDENTITY` | the identity file your git email is looked up in (default `toprope.identity.yaml`) |
+| `--ship` | also deliver, preview, deploy, probe and verify the commit the request approves; a commit not recorded low risk stops after its preview |
+
+## `toprope-interview`
+
+`toprope-interview`: the interview, in your terminal, on your own domain (ADR-0053 §2).
+
+The interview's route for a newcomer: docs/interview.md.
+
+| Argument | What |
+|---|---|
+| `DIR` | the domain's directory (default: here); it holds domain.yaml, or the interview starts one |
+| `--answers` `ANSWERS` | read the answers from this file, one per line, instead of the terminal |
+| `--share` | print ADR-0053's choice measure from the interview log and stop |
+
+## `toprope-import`
+
+`toprope-import`: a proposed draft from a source a team already has (ADR-0049 A1, ADR-0051).
+
+| Argument | What |
+|---|---|
+| `KIND` | the source's format: an extractor (see --list) |
+| `SOURCE` | where the source is, as the reader takes it (a path, a URL, a command) |
+| `--via` `VIA` | the reader that reaches the source (default: mcp for mcp, else file) |
+| `--profile` `PROFILE` | a YAML file of the team's conventions |
+| `--domain` `DOMAIN` | the new domain's name (default `imported`) |
+| `--out` `OUT` | where to write a new draft (default: <domain>.domain.yaml here) |
+| `--into` `INTO` | an existing draft to join this source to; its elements are never overwritten |
+| `--patch` `PATCH` | write the elements as a patch for `toprope-change --patch`, and register the source in the workspace, instead of writing a draft |
+| `--workspace` `WORKSPACE` | with --patch: the workspace file (default: `workspace:` in toprope.yaml); a new one is made for --domain |
+| `--source-id` `SOURCE_ID` | with --patch: the source's id in the workspace (default: <domain>-<kind>) |
+| `--binding-out` `BINDING_OUT` | write the draft binding a server's tools give (mcp), for toprope-proxy |
+| `--questions` `QUESTIONS` | also write the conflicts and questions as YAML records, for an agent to work from |
+| `--list` | the readers and extractors installed |
 
 ## `toprope-server`
 
@@ -48,6 +314,21 @@ Its subcommands are the domain's actions, one per action, plus `get`, `history`,
 | `--no-seed` | do not load the declaration's example fixtures (never loaded into a composition member's own event log) |
 | `--harness-report` `HARNESS_REPORT` | harness report JSON (toprope-harness --json) shown in the world map |
 | `--working-copy` | with --composition and --kernel-root: run each member from its working-copy file, not from its deployed commit (ADR-0045) |
+
+## `toprope-proxy`
+
+`toprope-proxy`: a declaration's rules in front of an existing MCP server (ADR-0052).
+
+| Argument | What |
+|---|---|
+| `--domain` `DOMAIN` | the declaration whose rules gate the calls (required) |
+| `--binding` `BINDING` | the binding: the upstream server and which tool is which action (required) |
+| `--identity` `IDENTITY` | static:FILE (token -> caller), jwt or git, as for toprope-server |
+| `--store` `STORE` | sqlite:FILE or jsonl:DIR: the gate's record, shared with a lock by every proxy on it |
+| `--audit` `AUDIT` | append every call, gated or read, to this JSONL file |
+| `--no-seed` | do not load the declaration's example fixtures |
+| `--check` | check that the binding, the server's tools and the declaration agree, as at start, and exit |
+| `--confirm-binding` | as a person: check the binding as at start, then record that you confirmed it as it is (who, when, its hash) |
 
 ## `toprope-harness`
 

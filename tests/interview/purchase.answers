@@ -1,0 +1,32 @@
+# purpose
+Purchases are approved in chat, and large ones slip through without a director.
+purchases approved by the right person, up
+Every purchase is approved by the right person. Large ones go to a director.
+# people and things
+staff: raise and submit purchase requests; team lead: approves or rejects purchase requests; director: approves large purchases
+Purchase request: something the team wants to buy | amount: number, items: integer
+# an example, then the actions in your words
+PR-4: amount 1800, items 3
+raise_purchase: Raise a purchase request -> new Purchase request; submit_purchase: Submit the request -> Purchase request; approve_purchase: Approve the request -> Purchase request; reject_purchase: Reject the request -> Purchase request
+# who may (four actions), the limit, who must not: the recommended choices
+ 
+ 
+ 
+ 
+ 
+ 
+# stages, then each action's column and the outcome rule: recommended
+status: draft, submitted, approved, rejected; starts draft
+ 
+ 
+ 
+ 
+# invariants: nothing beyond the stages
+nothing
+# world
+staff: sam; team lead: tia; director: dora
+staff raise_purchase P-1 amount=3000 items=2 -> draft; staff submit_purchase P-1 -> submitted; team_lead approve_purchase P-1 -> refused limit-amount; director approve_purchase P-1 -> approved
+# handoffs: none
+none
+# review: confirm
+yes
