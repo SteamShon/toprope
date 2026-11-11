@@ -6,7 +6,7 @@ this page); plans live in [`roadmap.md`](roadmap.md) and the milestone and exper
 Every PR into `develop` or an `umbrella/*` branch fixes any line here it makes untrue, or says
 why not; each release trims it ([`AGENTS.md`](../AGENTS.md), "Progress").
 
-Updated: 2026-11-10 · Cleaned for release: `v0.1.0`
+Updated: 2026-11-11 · Cleaned for release: `v0.1.0`
 
 Legend: ✅ done · 🟡 in part · ⬜ not started
 
@@ -15,8 +15,8 @@ Legend: ✅ done · 🟡 in part · ⬜ not started
 | Milestone | Link | Status | Note |
 |---|---|---|---|
 | M0a thin slice | none (enabler) | ✅ | released as `v0.1.0` (#65); the tag is not pushed yet |
-| M1 self-compile | ① ⑥ pilot, no verdict | ✅ | reported ([`M1-report.md`](experiments/M1-report.md)): with its LLM review Toprope's recall is 0.84 against 0.64 for the NL skill (at the noise floor) and level with the structured spec; the compiler alone weakens ①; ⑥ inconclusive; self-compile not shown (probes) |
-| U usability before M2 (ADR-0049) | none (enabler) | 🟡 | F1 baseline recorded; F2's script written, its run waits for an operator; theme 1 started |
+| M1 self-compile | ① ⑥ pilot, no verdict | ✅ | closed after the recheck ([`M1-report.md`](experiments/M1-report.md)): Toprope with its LLM review leads on recall (first run 0.84 against 0.64 NL; recheck 0.94–1.0 against 0.44–0.62, biased and a reference only); the grader's noise (0.18) moves to M2's grader redesign; six probes carried to M2's probe design; ⑥ inconclusive |
+| U usability before M2 (ADR-0049) | none (enabler) | 🟡 | the four themes' code is in `develop` (#201, #213, #218, #224); F1 baseline recorded; the targets are not measured yet. Left: F2 on ADR-0053's path, run by a newcomer the researcher finds; F1 measured again from theme 1's merge; ADR-0051 §4–5 (a Sources domain), proposed, for the researcher |
 | M0b surfaces and effects | none (enabler) | ⬜ | |
 | M2 dogfood | ① ② ③ | ⬜ | the first ① and ② verdicts |
 | M3 shared language | ④ | ⬜ | |
@@ -320,12 +320,35 @@ From [`M1-report.md`](experiments/M1-report.md), *What M2 takes from this*.
 |---|---|---|
 | ADR-0048: outcome rules, and a capability diff in the change check | ✅ | #176 |
 | The capability diff (a check over two declarations; no schema change): the change check's `capability` | ✅ | #177 |
-| Outcome rules: schema, validator, interpreter, harness, TLA+ export (`requires: human` or roles; the generated guide and the self domains' adoption follow) | 🟡 | |
-| Grouped findings in the change report (`groups`: one per check, severity and message, with a count) | 🟡 | |
-| The natural-language check: `CommandChecker` (`TOPROPE_NL_COMMAND`) gives an LLM the changed elements, the capability diff, the rules and the declaration (ADR-0009) | 🟡 | |
-| An editor that proposes a patch: the Toprope arm's editor gets `propose_patch` (several elements, in order, stopping at the first refused) and `check_draft` (the draft validated before a commit) | 🟡 | |
-| Probes that pass before any change: why they fail at `seq: 0` ([`probe-baseline-findings.md`](../experiments/m1/probe-baseline-findings.md)): criteria the right behaviour fails (P05, P07), unequal worlds (the Toprope agent's grant lacks `deliver`/`deploy`), strict readings; proposals wait for the researcher (the suite is an instrument) | 🟡 | |
-| M2's design, a draft for the researcher ([`M2-design.md`](experiments/M2-design.md)): the full Toprope check against a structured spec reviewed by an LLM, the same edit checked both ways, grouped precision, the grader's noise, probes gated before any change, draft verdict rules | 🟡 | |
+| Outcome rules: schema, validator, interpreter, harness, TLA+ export (`requires: human` or roles; the generated guide and the self domains' adoption follow, in the M1 recheck) | ✅ | #179 |
+| Grouped findings in the change report (`groups`: one per check, severity and message, with a count) | ✅ | #180 |
+| The natural-language check: `CommandChecker` (`TOPROPE_NL_COMMAND`) gives an LLM the changed elements, the capability diff, the rules and the declaration (ADR-0009) | ✅ | #181 |
+| An editor that proposes a patch: the Toprope arm's editor gets `propose_patch` (several elements, in order, stopping at the first refused) and `check_draft` (the draft validated before a commit) | ✅ | #182 |
+| Probes that pass before any change: why they fail at `seq: 0` ([`probe-baseline-findings.md`](../experiments/m1/probe-baseline-findings.md)): criteria the right behaviour fails (P05, P07), unequal worlds (the Toprope agent's grant lacks `deliver`/`deploy`), strict readings; adopted by the researcher, in the M1 recheck | ✅ | #183 |
+| M2's design, a draft for the researcher ([`M2-design.md`](experiments/M2-design.md)): the full Toprope check against a structured spec reviewed by an LLM, the same edit checked both ways, grouped precision, the grader's noise, probes gated before any change, draft verdict rules | ✅ | #184 |
+
+## M1 recheck (umbrella `umbrella/m1-recheck`, link: ① ⑥)
+
+Preregistered in [`M1-recheck.md`](experiments/M1-recheck.md): the improved Toprope rerun on M1's
+change list, to close M1 before M2. Reference numbers only (ADR-0048 §6); M1 closes on the probe
+gate, a clean pipeline and the grader's measured noise.
+
+| Item | Status | PR |
+|---|---|---|
+| Preregistration: what changes, what stays, the exit criteria | ✅ | #187 |
+| #179's leftovers: the `check` form of `requires` (validator, interpreter, harness, TLA+ guard; the schema generated with rules), `rule-agent:` harness cases with an agent for the role's person, rules in the generated guide, the invariants stage asks for rules | ✅ | |
+| Mechanical promotion (`python -m toprope.decl.rules suggest`: an outcome every non-system action reaches only with `requires: human` gets that rule; the self domains get 5 and 5, and pass their checks with them); the Phase B log keeps one header under a lock and `phase_b status` leaves out runs moved aside | ✅ | |
+| Authoring's `record_questions` keeps the bundle's questions: `stage_questions` also returns them as one string (`text`), and `Draft.questions` holds it; proposed in the loop with the rules; approved in `authoring@11-4961f900bb4663e1` | ✅ | #192 |
+| The probes: each probe agent's grant adds what its task asks (`TASK_ACTIONS`; a person-only action stays refused); the gate in the scorer (`probe_gate`; `found_after_deploy_ungated` kept); the grader reads a probe's `examples`; the amended suite (P05, P07 judged on what the agent did and what its tools show; examples for P01, P04, P08), amended by the researcher's approved request (`FROZEN.json`, version 2) | ✅ | #191 |
+| The grader's second sitting (`grade --into scoring-2`) and its noise (`compare-gradings`, `grader-noise.json`); the recheck's steps in the RUNBOOK | ✅ | #198 |
+| Criterion 3 met by measuring the grader's noise (0.18 of recall, over the 0.1 limit; amended again 2026-11-10): nobody adjudicates; `score` reports each arm's recall and precision from both sittings with their range (`by_sitting`); the adjudication commands (#217, #227) removed | ✅ | |
+| The self domains adopt the promoted rules (Authoring 5, Delivery 5): confirmed, approved, deployed and verified as `authoring@11-4961f900bb4663e1` and `delivery@6-c2678fc294429d48` (approval run 42605372607; three runs before it found and fixed TLC's state space, #195, and unseen proposed rules, #199) | ✅ | #192 |
+| No experiment words in what an arm sees: `Draft.questions` and `record_questions` cited the recheck's own doc (`docs/experiments/M1-recheck.md`), which the arms' materials would show; re-cited to ADR-0025 and ADR-0037 through the loop, approved as `authoring@12-acf2a5f6e362166c` | ✅ | #205 |
+| The baseline moves to `authoring@12-acf2a5f6e362166c` and `delivery@6-c2678fc294429d48` (`phase_b/baseline.py`); the structured and Toprope arms' materials rebuilt; the NL skill removed, to be rendered again | ✅ | |
+| Harness fixes found closing the recheck: the script no longer scripts capability or info findings as `seeded` (their `where` is the edited element by construction; 67 and 70 flags in the two sittings), `rescript` takes those labels back from graded sittings (an unlabelled repeat takes the grader's label of the same finding); `to-decide` stops asking about a disagreement marked `decided`; `regrade-missing` grades once more a probe run left without a grade; the probes before any change record their tokens; an end-to-end test runs the recheck's closing steps | ✅ | |
+| Every Toprope probe of the recheck ran without its domain servers' tools (they did not connect; nothing stopped it): a conversation whose servers gave no tool now stops as an error, with their status and stderr; servers get longer to connect (`MCP_TIMEOUT`); `check-probe-tools` checks them; `arm --redo-baseline-probes` and `regrade-missing --redo` run and grade the probes before any change again. Toprope's found-after-deploy is not measured in the recheck | ✅ | |
+| Phase B rerun (local session, RUNBOOK's recheck section): the NL skill rendered from authoring@12 and delivery@6, accepted by the researcher; three arms and the combined arm run, graded twice, script labels taken back (`rescript`) and one probe run graded again (`regrade-missing`); confirmed and scored. Criterion 3: the two sittings differ by up to 0.18 of recall (limit 0.1), measured; Toprope's probes before any change run again with the domain servers connected (#234, #243, #245) and graded again; criterion 1: P01, P02, P04, P06, P07 and P08 fail the probe gate | 🟡 | #212 |
+| The recheck report ([`M1-report.md`](experiments/M1-report.md), *The recheck*): criterion 1 met by its rule (P03, P05 pass the gate; six probes carried to M2 with their causes), 2 met (faults fixed and recorded; #96 dropped: no push token in this public repository, the researcher's decision), 3 met by measuring the noise (0.18, over the limit); M1 closed | ✅ | |
 
 ## Usability before M2 (ADR-0049, link: none)
 
@@ -347,13 +370,35 @@ theme 1 records those (D1), it is measured again before it is compared (ADR-0049
 | Theme 1, the change loop (umbrella #201, plan: [`U-theme1-change-loop.md`](experiments/U-theme1-change-loop.md)): B4 citations from a query, C1 `toprope change`, C3 `toprope.yaml`, B5 one diff to confirm, D1 a fix in every error, C2 approvals by risk (its own ADR first) | ✅ (code); F1 measured again after a change runs through the new loop, which waits for `umbrella/m1-recheck` | #201 |
 | … C3: `toprope.yaml` gives `toprope-run` its options, and the member is found from the action, so a self-domain command is `toprope-run <action> <target>` | ✅ | #202 |
 | … D1a: every error message written in the loop's modules (CLI, MCP CLI, kernel services, workspace, commits, git identity), and every kernel service failure reply, names its fix; a test scans for one that does not; the catalog is [`errors.md`](errors.md). Not covered: a message held in a variable, and the text of an error passed on from another module (YAML, the OS, the composition loader) | ✅ | #203 |
+| … D1c (ADR-0053 §5): the scan covers every module of `src/toprope/` and `tools/human_request.py`, and a command's refusals too (`Outcome("denied" \| "rejected", …)`, the interpreter's `deny`, the reasons its gates return), deploy refusals (`DeployRefused`) and replies' `error`/`reason` texts; every one names its fix, and a message with two `Fix:` parts fails it; `fixed` merges a passed-on message's fixes into one and is idempotent. The interpreter's gate refusals (`semantics/refusals.py`) keep their `code`s; one only a person can resolve says to ask a person with the role, and adds how only where the deployment gives a route and the caller is not a person (`person_route:` in `toprope.yaml`: the self domains' human request, ADR-0039); a `by_role` cell's refusal names the roles it applies for; a declared reason (precondition, rule, matrix deny, invariant) is kept exactly, with a generic fix after it. The harness and the TLA replay expect the same texts. The scan is static: its blind spots are in `errors.py` | ✅ | #239 |
 | … D1b: a command that fails before the gate is recorded, one file each under `.toprope/failures/` (no token kept); `tools/usability_baseline.py` counts them, per change approved since the first was recorded. Commit the files with your change, like the event logs | ✅ | #204 |
 | … B4: a citation may quote the passage (`docs: "every experiment needs an approver"`) instead of naming its chunk; whole words in exactly one passage resolve to its ref, which is what is recorded, with the passage's own words as the quote (in an interview line, only the owner's answer is quoted); words in several passages are refused with the candidates; a local-only source is never searched for words. Applies to proposing an element and to `cite_evidence` | ✅ | #206 |
 | … B5: a person confirms from one diff: `toprope-run review` lists every proposed element against the approved `main` (new or changed, before and after, its source and quote); confirming on the terminal shows it first, and a human request's run page shows what its confirm step confirms | ✅ | #207 |
 | … C1: `toprope-change "<intent>" --patch FILE` proposes the patch's elements, checks the working copy on a scratch copy of the commit store (no commit is added), prints the diff to confirm and writes one human request whose one approval confirms, commits, checks and approves; a failing check stops it before any request | ✅ | #208 |
 | … C2: ADR-0050 (accepted): one approval covers a low-risk change from confirm to verify (verify on the condition that the probes pass), two for a high-risk one; risk computed by `check_commit`; any change to who may take a person-only step is high. `check_commit` records `risk` with its reasons; `toprope-change` writes the one-approval request for low risk; a request's delivery steps run only on a commit checked low risk inside it | ✅ | #209, #210 |
-| Theme 2, getting started: A4 `init` and `try`, A3 templates, E1 docs, E2 a tutorial | ⬜ | |
-| Theme 3, interview and feedback: B1 choice questions, B2 examples first, B3 a live map, D2 impact as decisions, D3 counterexamples as stories | ⬜ | |
+| … A request whose later step fails (preview, probes, the risk gate) keeps the work of the steps before it: `human_request.py run` prints how far it got and exits non-zero, `record --done` notes the failed step in the run's entry and rewrites the request to the steps that are left, and the workflow commits and pushes that on failure too, then ends red; the rest runs without taking a step twice (a step whose action was taken but whose follow-up failed counts as run; what a failed step half wrote is undone; a re-run of a red run is refused). A run that failed at or before its `approve_commit` is not `approval-run` evidence. The records of a failed step's attempt (`.toprope/failures/`, refusals in the event logs) are kept; F1 matches a failed run's refused step to the run, not to the person. Found in review of the umbrella (2026-11-10) | ✅ | #238 |
+| … ADR-0053 (accepted, "추천대로"): ADR-0049's targets restated so they can be measured, after the integrated review (2026-11-10): F2 on one named path with a prose start, the choice target counted on questions that become enforced elements, F1 as touches and approvals per change by risk, refusals per command, every error named with its fix | ✅ | #236 |
+| … F1 measures the targets name (integrated review, 2026-11-10): `tools/usability_baseline.py` adds a person's touches per approved change (an approved human request counts once, not its kernel steps), approvals per approved change by risk, refusals and failed effects per command with failures before the gate per command attempted, and `--since`/`--until`; the recorded baseline numbers are unchanged; definitions in [`U-theme1-change-loop.md`](experiments/U-theme1-change-loop.md) ("How F1 is computed"). A request run that fails is not recorded yet, so its steps count as typed by the person (reported as `possibly_failed_request_steps`) | ✅ | #237 |
+| … ADR-0053 §3, one approval without GitHub: `toprope-apply REQUEST` shows the request as the run page does (the steps, the risk and its reasons, the diff to confirm), asks a person at a terminal for one `yes`, runs the steps as that person (git identity) through the workflow's own runner, records the run with `channel: local` and removes the request; it refuses without a terminal and for an agent's or an unlisted git email. Person-only steps take the one `yes` instead of a prompt each: `toprope-run` accepts the apply's token only at a terminal, from that apply's own process, for that person, from a private (0700) directory, and refuses a token that does not check out rather than prompt (#244's review). Ctrl-C or SIGTERM records what ran and leaves the rest. A commit not low risk stops after its preview, and the request keeps deploy, the probes and verify for a second apply (`--ship` adds the delivery to a request that approves its commit). A failed step keeps the work before it and leaves the rest (#238). F1 counts a local apply as one approval and one touch, and reports runs by channel. `toprope-change` names both routes | ✅ | #244 |
+| Theme 2, getting started (umbrella #213, stacked on #201; plan: [`U-theme2-start.md`](experiments/U-theme2-start.md)): A4 `init` and `try`, A3 templates, E1 docs, E2 a tutorial; then F2's named path (ADR-0053): an own rule by command, the store kept in step, a prose start | ✅ (code); F2 measured on ADR-0053's path by an operator the researcher finds | #213 |
+| … A3 + A4: templates (approval, budget, refunds, release), each with a story; `toprope-init <name> --template T` writes a working domain and its `toprope.yaml` (`domain`, `store`, `identity` keys); `toprope-try` plays the story with each refusal's reason and fails if a step ends otherwise; `--check` diffs the domain with its template; `--token` and `--identity` may follow the action unless it has a param of that name | ✅ | #214 |
+| … Settings: a template names the values its rules turn on (a refund window, a step limit, the role that approves prod); `toprope-set name=value` (or `toprope-init --set`) rewrites the rule and its reason, checks the value, shows the change check and which story steps now end differently; no YAML by hand | ✅ | #215 |
+| … E1 + E2: the README's *Try it* leads with `toprope-init` and `toprope-try`; [`tutorial.md`](tutorial.md) goes from a template to a connected agent in 15 minutes, and `tests/test_tutorial.py` runs every command on it | ✅ | #216 |
+| … F2's path, an own rule by command (ADR-0053; integrated review 2026-11-10, a): `toprope-rule threshold \| no-self-approval \| person-only \| window` adds a precondition the kernel enforces (or `requires: human`), adding the role, a person to try it and a story step that shows the rule refusing; `list`, `remove`, `confirm`. `toprope-add role \| person \| agent \| field` and `toprope-rename` (object, action, role, field, followed into tokens and the story). Each checks the declaration, the harness and the story and writes nothing if one fails; what it writes is `proposed` until a person confirms it at a terminal (see the review row below) | ✅ | #241 |
+| … The store in step with the declaration (review b): `toprope-try --reset` starts the domain's store again from the examples and keeps the old file; a command that changes the examples reseeds a store nothing was done in, and otherwise says how; `toprope-run` does the same for a hand edit, and a `not-found` or `could not evaluate` refusal carries a `fix` | ✅ | #241 |
+| … `toprope-try --accept` (review c): the story's `expect` values become today's outcomes, each change shown; a step that cannot run is refused with its fix. Every command that changes the rules says which steps now end differently and names `--accept` | ✅ | #241 |
+| … Prose start (ADR-0053, decided 1): `toprope-init "<a sentence>"` picks the template by its `keywords`, renames its object and actions to the sentence's noun, and turns "over N needs ROLE", "nobody approves their own", "only a person", "within N days" into the rule commands, `proposed` with the sentence quoted; the rest it asks as questions with the command that answers each. Deterministic, no model | ✅ | #241 |
+| … The experiment template (review d; ADR-0049 A3 listed it, #214 left it out): proposed → running → stopped → shipped, a running experiment cannot be edited, a traffic limit and the role that ships as settings, with a story | ✅ | #241 |
+| … README (review e, f): an install step, `uv run --project "$TOPROPE"` on every command, the first-rule path (init → rule → try → run) in 8 lines, tested; `init` prints the next command as it can be typed; story wording; the tutorial adds an own rule (§5) | ✅ | #241 |
+| … Adversarial review of #241 (2026-11-10): a prose phrase with a negation, or with no role it can be sure of, becomes a question, and the role is the word after by/from/of; a threshold checks the role of the agent and of the person it acts for (`actor.principal.roles`), checks the role first, and refuses a missing amount with how to give it; `toprope-add agent --roles` stays within its person's; every rule/add/rename/remove command writes `proposed` unless the person confirms at a terminal, `toprope-rule confirm` and removing a confirmed rule need a terminal (a local guard, not authentication); no-self-approval refuses an object with no recorded maker; renaming a field follows its param and settings; `--accept` asks `--yes` for a step that showed a rule; `remove` takes back the rule's example objects and tokens and stale `next:` text; `toprope-remove field \| role \| person` for a template's leftovers | ✅ | #241 |
+| Theme 3, interview and feedback (umbrella #218, stacked on #201; plan: [`U-theme3-interview.md`](experiments/U-theme3-interview.md)): B1 choice questions, B2 examples first, B3 a live map, D2 impact as decisions, D3 counterexamples as stories; then the interview on a newcomer's path (ADR-0053 §2) | ✅ (code); the 80% target measured in F2's run (generic dry runs give 8 of 8 and 10 of 10, the stated limit enforced); Authoring's kernel replies widened after M1 | #218 |
+| … B1: transition questions offer choices with their decisions, one recommended with its reason (a plain move only where every other state moves it the same way for every role, else refused: fail-closed; never n/a, which a person would not confirm); a choice id names what it decides, so a changed choice is refused; optional stages offer to skip; answering by `choice:<id>` applies them, citing the owner's words, also through the kernel's `record_answer`; `choice_share` measures the target | ✅ | #219 |
+| … B2: examples first: right after the cast, the actions stage first asks for one real case of each thing with facts (made-up personal data), before any rule; an answered example (`world.fixtures` with one object) must fit the draft (its object, facts, enum values, no personal data or secret) and joins the others, replacing one with the same id, and the answer log keeps it; transition questions repeat only its numbers and choices (`like O-7: total 42`) | ✅ | #220 |
+| … D2: the change check also states its impact as decisions in the domain's words (a rule's reason and its check before and after, who may take an action, its inputs and effects, what a state now does, outcome and approval rules; any other enforced change is stated plainly; only the glossary, examples, scenarios and purpose are left out, and counted): `ChangeReport.decisions`, and the end of the review a person confirms from | ✅ | #221 |
+| … D3: the harness tells its minimal flow, its cases the last-resort guard stopped (grouped) and its inductive breaks as stories in the domain's words (each thing and its stage as the flow reaches it, who asks to do what in the action's own words or by name, refused or failed or let through, missing facts first, the reason of the rule that would no longer hold): `Report.stories`, printed as `in your words:` | ✅ | #222 |
+| … B3: a live map while answering: `Workspace.live_map()` shows every stage and every action of each thing: where it leads, refused, n/a, still open (`?`, also a missing cell or stage row) or only proposed (`*`; n/a carries no mark in schema v1), each role of a per-role cell; the world map's state diagrams on request; every reply of `questions()` and every answer carries it. Through the kernel, Authoring's `stage_questions` still replies with question texts only: showing choices and the map there means widening Authoring's own declaration, after M1's recheck | ✅ | #223 |
+| … The interview on a newcomer's path (the integrated review of 2026-11-10; ADR-0053 §2): `toprope-interview [DIR]` runs on any directory with a `domain.yaml` (and a `sources/` folder), in the terminal (numbered choices, Enter = recommended) or from `--answers`; writes only `proposed` and confirms only on a typed `yes` ([`interview.md`](interview.md)). Choices where rules are decided: an action named in open words waits for its actor, chosen among the roles (recommended from the glossary's description of each role and the action's); for actions that let a thing go ahead, who must not (only a person, not whoever made it) and a limit on each number (a number the sources state, else the example's value, refused above it); a column moves to the stage named after the action; cells the stop rule skips are asked as one choice; an outcome rule per thing. Each recommendation cites the passage, answer or example, or says nothing points to one. The map shows roles → things → actions from the cast on. Decisions and stories use glossary terms and action descriptions; a first commit lists every rule. The column question no longer says "not applicable" while recommending refusal. Outcome rules carry provenance (a person confirms them). `toprope-interview --share` measures the target from the log. After review (#242): numbers read as written (`1,000`), a passage naming the thing or the action counts, a limit is recommended only where the owner's words state one (else "no limit", the default), the person may type `over N, only ROLE` or `from A to B`, a refused answer is asked again, columns start from the step before the decision (`paid` is `pay`'s), "not whoever made it" fails closed and compares person with person, the guard is asked once, rule ids carry the thing, and the measure counts declined, refused and abandoned questions | ✅ | #242 |
+| … Invariants and outcome rules, joined with M1's recheck (the researcher's decision 1c, 2026-11-11): the outcome-rule question is asked in every domain, the interview's drafts or not (a template's, a self domain's through Authoring), in transitions, so skipping invariants never drops it; the recheck's open `rules` question is gone; the invariants stage asks one choice for every thing, "none" recommended, done when answered or skipped (a rule does not fill it); a change's decisions say each outcome rule once | ✅ | |
 | Theme 4, import and wrap (umbrella #224, stacked on #201; plan: [`U-theme4-import.md`](experiments/U-theme4-import.md)): A1 from `AGENTS.md`, skills, OpenAPI, enums, tickets; A2 an MCP proxy (its own ADR first). Every planned item is done in the umbrella; it merges into `develop` after theme 1, once M1's recheck is in | 🟡 | #224 |
 | … A1a + ADR-0051 (1–3 accepted): external sources through two ports, a Reader (`file`, `http`) and an Extractor (`openapi`, `sql`, `workflow`), plugged in from outside through the entry-point groups `toprope.readers` and `toprope.extractors`; a team's conventions in a profile (YAML); `toprope-import <extractor> <source> --via <reader> --profile p.yaml` writes a proposed draft citing every element's place and lists what the source cannot say ([`examples/import/`](../examples/import/)). ADR-0051 4–5 (a *Sources* self domain with drift proposals) proposed, after M1 | ✅ | #225 |
 | … the first outside extractor, [`examples/plugins/toprope-ossie`](../examples/plugins/toprope-ossie/): reads an Apache Ossie ontology (what NVIDIA Auto Ontology and the Ossie converters export) into proposed things, facts, enums, links and stages, and asks what Ossie cannot say (actions, who acts, derived facts, constraints); found through its own entry point, no change to Toprope | ✅ | #226 |
@@ -368,20 +413,23 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 
 ## Next
 
-1. ADR-0049: the F2 baseline run (an operator the researcher finds), and theme 1 (the change loop). M2's spec waits for the
-   program.
-2. M2's spec, from the draft (`docs/experiments/M2-design.md`): the researcher decides each point,
+1. M2's grader, as decided (`docs/experiments/M2-grader.md`, 2026-11-10): the checklist, the
+   majority of three, rule B and the noise gate, validated on M1's combined run for consistency
+   only.
+2. ADR-0049, now that the four themes' code is in `develop`: F2 on ADR-0053's named path, run by a
+   newcomer the researcher finds; F1 measured again on the changes since theme 1's merge
+   (`tools/usability_baseline.py --since`); then the researcher decides ADR-0051 §4–5 (a source's
+   lifecycle as a Sources domain, its readers and extractors as that domain's kernel services).
+3. M2's spec, from the draft (`docs/experiments/M2-design.md`): the researcher decides each point,
    freezes the verdict rules, and finds the domain expert who is not the builder; the expert
-   writes the change list, seeds it and keeps the key. The probe proposals
-   (`experiments/m1/probe-baseline-findings.md`) are the researcher's to adopt. The self domains
-   adopt outcome rules through their own reviewed changes (ADR-0048 §5).
-3. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
-4. When a domain is shared by several people or agents (M2, or a hosted server): its event
+   writes the change list, seeds it and keeps the key.
+4. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
+5. When a domain is shared by several people or agents (M2, or a hosted server): its event
    log moves from git to a database (`--store postgres:DSN` for a composition, one schema per
    member), through a new ADR superseding decision 29A for that case; an export to git can
    keep the audit trail (decided 2026-11-06). Until then the self domains keep their logs in
    git (`domains/<domain>/events/`).
-5. ADR-0041's follow-up work (decided 2026-11-06), the third on in
+6. ADR-0041's follow-up work (decided 2026-11-06), the third on in
    `umbrella/adr-0041-follow-ups` (#114). Done: approval refuses commits with proposed
    elements, and the change check records how many are left (#110); every decision action takes
    an optional `rationale` (#111); a check can read `actor.principal` (#113);
@@ -389,7 +437,7 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    permissions it ran under (#116); a commit may cite its evidence (#117, #118: free strings
    on `commit`, Authoring commit `5-c8fd1b8fc98be17c`), replaced by typed evidence that must
    resolve, cited with `cite_evidence` (#124, in the pstack umbrella).
-6. ADR-0042's follow-up work (accepted 2026-11-07): done: `domain_version` with the deployment
+7. ADR-0042's follow-up work (accepted 2026-11-07): done: `domain_version` with the deployment
    log gives the rule in force when an event was decided, documented, the self domains too
    (ADR-0045, #150); read visibility defined in the schema (`read`, refused until M0b); in M0b,
    deadlines with timers, read visibility enforced by the query and MCP read tools, an observed
@@ -399,11 +447,11 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    (recommendation, evidence, rules and version applied, the person's decision and reason, the
    action, the outcome). A source kind for process mining (event logs of existing systems) is a
    candidate for the authoring interview's sources, with the adapters (M0b).
-7. ADR-0043's follow-ups: make `tla` a required check on `develop` (maintainer). Creation
+8. ADR-0043's follow-ups: make `tla` a required check on `develop` (maintainer). Creation
    (#155), link paths to what no action changes (#156) and time, frozen at the harness's clock
    (#157), are modeled; no declaration in the repository leaves anything out.
 
-8. Before M2's Phase B: a probe's starting state written as conditions on objects (for example
+9. Before M2's Phase B: a probe's starting state written as conditions on objects (for example
    a Commit with `checks_passed` true and `approved` false), and generated from the declarations
    by searching their actions for a way to reach it, instead of a hand-written setup per probe.
    This needs a format change to the probe suite (an ADR). M1 keeps the hand-written setups in
@@ -415,6 +463,7 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 Each item names the PR it came from and the review date. The PR that resolves an item deletes
 it; each release's cleanup PR handles items older than one release.
 
+- Examples (`world.fixtures`) carry no provenance in schema v1, so an example an agent adds from an answer is never confirmed by a person; the answer log keeps it. A schema change (provenance on fixtures, and the review listing them) needs an ADR (#220, 2026-11-10)
 - `toprope-proxy` (#240, review 2026-11-10): a binding's confirmation is a record in the binding file
   (who, when, the hash of what it binds), so it fails on any change, but an agent that can write
   the file can also write a record; a signature, or the record in a log only a person's action
@@ -424,8 +473,7 @@ it; each release's cleanup PR handles items older than one release.
   cannot be enforced") become questions. A sentence parser, or a model behind the same port, could
   do better; the interview covers the gap until then.
 - `toprope-proxy` (#235, review 2026-11-10): the store lock has no timeout, so a hung upstream holds
-  every proxy on the store; `proposed_elements` misses outcome rules here (fixed in the M1 recheck,
-  #199, so it closes when that merges).
+  every proxy on the store.
 - `toprope-proxy` (#230, review 2026-11-10): an upstream reached by URL (streamable HTTP) is not
   tested yet. Upstream tools are registered in one process-wide table, so `validate_domain` in a
   process that runs a proxy also knows them. The proxy serves over stdio only, with a static
@@ -434,22 +482,6 @@ it; each release's cleanup PR handles items older than one release.
   and keeps a stage field optional if the source does; the interview asks which stage comes first,
   but the draft does not mark the guess. Auto Ontology's certification does not reach the draft
   (its Ossie export drops it; a reader for its REST API could carry it).
-- The `human-request` workflow pushes its result with the workflow token, so no `pull_request`
-  check runs on that head, and the ruleset does not accept the `status` run the workflow
-  dispatches; the PR needs one more commit before it can merge. A push token that triggers
-  workflows (a GitHub App or a fine-grained token, set up by the maintainer) would remove the
-  step (#96, 2026-11-06)
-- Authoring's `record_questions` sets the stage and the bundle but not `params.questions`, so the
-  generated tools never show the bundle's questions (`next_questions` returns only the bundle id).
-  Found building probe P04's starting state (#103, 2026-11-06). Not fixed in M1: the self domains
-  are the experiment's baseline
-
-- The Phase B harness: `phase-b-runs.tsv` has a second header where two arms created it at once; `phase_b
-  status` lists the superseded `*.stale-1` folders too (#166, #170, 2026-11-08)
-
-- Outcome rules (#179): the `check`-expression form of `requires`, an agent actor in the harness
-  world (a `human` rule is tested at the interpreter for now), rules in the generated guide, and the
-  interview stage that asks for them (ADR-0048 §4) are not done yet (#179, 2026-11-09)
 
 ## Open questions
 

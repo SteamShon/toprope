@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any
 
 from ..store import ConcurrencyError
 from ..types import Event, Outcome
+from ..errors import fixed
 
 if TYPE_CHECKING:
     from ..exec import Execution
@@ -206,8 +207,11 @@ class Outbox:
         pl = p.event.payload
         svc = service(pl["service"])
         if svc is None:      # an upstream tool, but no proxy registered it: stays pending
-            return {"id": p.id, "result": "pending", "reason": f"no service {pl['service']} in this process"}
-        result = (svc.failure(f"mapping-error: {pl['error']}") if pl.get("error")
+            return {"id": p.id, "result": "pending",
+                    "reason": fixed(f"no service {pl['service']} in this process",
+                                    "run it where `toprope-proxy` registers that upstream tool")}
+        result = (svc.failure(fixed(f"mapping-error: {pl['error']}", "fix the call's `with` mapping in the declaration"))
+                  if pl.get("error")
                   else services.call(pl["service"], pl["inputs"], caller=p.event.actor))
         reply = self.ex.d.actions[pl["reply"]]
         params = {k: result[k] for k in reply.params if k in result}

@@ -1,5 +1,7 @@
-"""What every arm starts from (ADR-0040 §3, re-baselined 2026-11-07): the approved self domains
-`authoring@9` and `delivery@1`.
+"""What every arm starts from (ADR-0040 §3): the approved self domains `authoring@12` and
+`delivery@6`, re-baselined for the M1 recheck on 2026-11-09: the self domains with their promoted
+outcome rules and Authoring's bundle questions, approved by the researcher (#192, #205). M1 as
+first run started from `authoring@9` and `delivery@1` (below, and the comment under BASELINE_REVS).
 
 The repository's self domains move on (they run their deployed commit, ADR-0045), so the harness
 never reads them from the working tree. It reads each domain from a repository revision at which
@@ -24,9 +26,11 @@ from pathlib import Path
 
 # domain → (its baseline commit, a repository revision at which that commit was its `main`)
 BASELINE_REVS = {
-    "authoring": ("9-b4ec65433222f096", "4fcf912b054ab13ace3362cc9bc01e8a0b6b879c"),
-    "delivery": ("1-584aaeea5e686ee8", "b13f19370027869479ffb781e5cf62304ae7d106"),
+    "authoring": ("12-acf2a5f6e362166c", "afba98ab582a0e7c781c089bc3cbc931c2de33ae"),
+    "delivery": ("6-c2678fc294429d48", "afba98ab582a0e7c781c089bc3cbc931c2de33ae"),
 }
+# M1 as first run and reported (M1-report.md): authoring@9-b4ec65433222f096 at 4fcf912b05,
+# delivery@1-584aaeea5e686ee8 at b13f193700.
 BASELINE = {d: c for d, (c, _) in BASELINE_REVS.items()}
 SHARED = ("domains/toprope-self.composition.yaml", "toprope.identity.yaml")
 

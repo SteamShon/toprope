@@ -27,6 +27,9 @@ actions:
       daily_budget: {type: integer}
       reason: {type: string}
     preconditions:
+      - id: positive-budget
+        check: params.daily_budget > 0
+        reason: A daily budget is a positive amount.
       - id: step-limit
         check: params.daily_budget - target.daily_budget <= 500
         reason: Raise a daily budget by at most 500 at a time.
@@ -57,6 +60,8 @@ actions:
     actor: [media_lead]
     target: Campaign
     requires: human
+    effects:
+      - set: {target.exception_approved: false}
     records_decision: true
 
 transitions:

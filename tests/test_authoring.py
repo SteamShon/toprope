@@ -209,7 +209,7 @@ def test_questions_come_in_stage_bundles_starting_with_purpose(ws):
     rows = ws.questions(limit=50, stage="transitions")["questions"]
     row = next(q for q in rows if q["kind"] == "row")
     assert row["decides"] == ["transitions.Experiment.matrix.ended.launch_experiment"]
-    assert "Once a Experiment is ended" in row["text"]
+    assert "Once an Experiment is ended" in row["text"]
 
 
 def test_attempts_raise_priority_and_drive_the_stop_rule(ws):

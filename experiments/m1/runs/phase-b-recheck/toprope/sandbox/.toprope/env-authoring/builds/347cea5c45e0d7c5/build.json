@@ -1,0 +1,9 @@
+{
+  "id": "347cea5c45e0d7c5",
+  "domain": "authoring",
+  "version": 15,
+  "declaration_sha256": "347cea5c45e0d7c5589218a24aefc1a202a928c2cb8f45ef60ea0d9eeebfdf69",
+  "toolchain": "45dcf59bceae89ec388152ff75a63cf206f20fa3691e317920b7ef01a913ed51",
+  "harness_ok": true,
+  "created_at": "2026-11-09T16:28:08+00:00"
+}

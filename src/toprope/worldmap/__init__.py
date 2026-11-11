@@ -17,6 +17,7 @@ from typing import Any
 
 from ..decl.models import Action, ActorRule, ByRole, Deny, Domain, Target
 from ..expr import parse, paths_read
+from ..errors import fixed
 
 FORMAT = "toprope.world-map/1"
 NEW = "(new)"   # the pseudo-state a create action starts from
@@ -189,7 +190,8 @@ def how_to_reach(world_map: dict[str, Any], obj: str, from_state: str | None, ta
                 cur = s
             best = {"reachable": True, "steps": list(reversed(steps))}
             break
-    return best or {"reachable": False, "reason": f"No declared transition leads from {start} to {target_state}."}
+    return best or {"reachable": False, "reason": fixed(f"No declared transition leads from {start} to {target_state}.",
+                                                        "declare the missing transition, or aim for a reachable state")}
 
 
 # -- docs view -------------------------------------------------------------------------------

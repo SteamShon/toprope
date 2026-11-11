@@ -1,0 +1,12 @@
+{
+  "id": "a633be96681466da",
+  "domain": "authoring",
+  "version": 18,
+  "declaration_sha256": "a633be96681466dab15a5cb3925f0bdade080b6c0c13abae3a2f29d8c952b93b",
+  "toolchain": "45dcf59bceae89ec388152ff75a63cf206f20fa3691e317920b7ef01a913ed51",
+  "harness_ok": true,
+  "created_at": "2026-11-09T16:42:01+00:00",
+  "commit": "18-144f59c25fbf3ceb",
+  "seq": 18,
+  "commit_domain": "authoring"
+}

@@ -1,0 +1,6 @@
+t-bot: {id: bot, kind: agent, roles: [member],
+        on_behalf_of: {id: mia, roles: [member]},
+        grant: {id: g1, actions: [submit_request]}}
+t-mia: {id: mia, roles: [member]}
+t-max: {id: max, roles: [member, manager]}
+t-sec: {id: sec, roles: [security]}

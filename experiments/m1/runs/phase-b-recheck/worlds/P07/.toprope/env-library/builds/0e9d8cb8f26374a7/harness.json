@@ -1,0 +1,51 @@
+{
+  "ok": true,
+  "levels": [
+    "model",
+    "execution"
+  ],
+  "findings": [],
+  "coverage": {
+    "edges": {
+      "Book.lent.lend": "verified",
+      "Book.lent.take_back": "verified",
+      "Book.shelved.lend": "verified",
+      "Book.shelved.take_back": "verified"
+    },
+    "cells": {
+      "decided": 4,
+      "covered": {
+        "model": 4,
+        "execution": 4
+      },
+      "undecided": [],
+      "gaps": []
+    },
+    "preconditions": {
+      "cases": 0,
+      "gaps": []
+    },
+    "creates": 0,
+    "invariants": {
+      "total": 0,
+      "exercised": 0
+    },
+    "flows": {
+      "total": 0,
+      "passed": {
+        "model": 0,
+        "execution": 0
+      }
+    },
+    "races": 0,
+    "unreachable": {},
+    "mechanical": {
+      "cells": 4,
+      "samples": 12,
+      "no_sample": [],
+      "unreachable_from_creation": {}
+    }
+  },
+  "minimal_flows": [],
+  "warnings": []
+}

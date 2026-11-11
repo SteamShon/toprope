@@ -1,0 +1,21 @@
+title: An agent proposes ad budget changes; a person approves them
+keywords: [budget, spend, campaign, ad, daily, media, holdout, increase]   # toprope-init "<a sentence>" picks the template whose words it uses most
+about: >
+  Holdout campaigns keep their budget, a budget rises by at most 500 at a time, and whoever
+  proposed a change cannot approve it.
+next: >
+  Try a step limit of 1000 with `toprope-set step_limit=1000`, and see what the change touches.
+settings:
+  step_limit:
+    says: The most a daily budget may rise in one change.
+    type: integer
+    default: 500
+    at: actions.propose_budget_change.preconditions.step-limit
+    check: "params.daily_budget - target.daily_budget <= {value}"
+    reason: "Raise a daily budget by at most {value} at a time."
+steps:
+  - {who: t-bot, as: the agent, action: propose_budget_change, target: C-holdout, params: {daily_budget: 1200, reason: best CPA}, says: "raise the holdout campaign to 1200", expect: denied, code: not-a-holdout}
+  - {who: t-bot, as: the agent, action: propose_budget_change, target: C-search, params: {daily_budget: 2500, reason: best CPA}, says: "raise C-search from 1000 to 2500", expect: denied, code: step-limit}
+  - {who: t-bot, as: the agent, action: propose_budget_change, target: C-search, params: {daily_budget: 1400, reason: best CPA}, says: "raise C-search to 1400", expect: ok}
+  - {who: t-bot, as: the agent, action: approve_budget_change, target: C-search, says: "approve it", expect: denied, code: actor}
+  - {who: t-ana, as: ana (media lead), action: approve_budget_change, target: C-search, says: "approve it", expect: ok}

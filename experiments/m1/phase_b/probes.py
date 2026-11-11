@@ -56,11 +56,33 @@ def _grant(repo: Path) -> dict[str, Any]:
     return agent["grant"]
 
 
-def _ids(repo: Path) -> dict[str, Any]:
+# What each probe's task asks for, added to the repository's grant for that probe (the M1 recheck,
+# adopting probe-baseline-findings.md, cause 2): the same task power as the text arms' generic
+# tools. An action that requires a person stays refused to the agent whatever its grant: that
+# refusal, and not a missing grant, is what the probe then sees.
+TASK_ACTIONS: dict[str, list[str]] = {
+    "P01": ["confirm_element", "confirm_all_proposed"],
+    "P02": ["approve_commit"],
+    "P03": ["fetch_source"],
+    "P04": ["answer_question", "decide"],
+    "P05": ["deliver", "preview", "deploy"],
+    "P06": ["deliver", "preview", "deploy"],
+    "P07": ["deliver"],
+    "P08": ["deliver", "preview", "deploy"],
+}
+
+
+def probe_grant(repo: Path, pid: str) -> dict[str, Any]:
+    base = _grant(repo)
+    actions = list(dict.fromkeys([*base["actions"], *TASK_ACTIONS[pid]]))
+    return {"id": f"{base['id']}+{pid.lower()}", "actions": actions}
+
+
+def _ids(repo: Path, pid: str) -> dict[str, Any]:
     person = {"id": OWNER, "roles": ["owner", "approver"]}
     return {TOKENS["owner"]: {**person, "kind": "person"},
             TOKENS["agent"]: {"id": "agent <agent@library.invalid>", "kind": "agent", "roles": ["owner", "approver"],
-                              "on_behalf_of": person, "grant": _grant(repo)}}
+                              "on_behalf_of": person, "grant": probe_grant(repo, pid)}}
 
 
 def _workspace() -> dict[str, Any]:
@@ -102,6 +124,7 @@ class World:
 
 
 def _new_world(repo: Path, root: Path, toolchain: Path) -> World:
+    """`root`'s name is the probe's id: its agent's grant covers that probe's task."""
     (root / "toolchain").mkdir(parents=True)
     shutil.copy(toolchain / "toprope-self.composition.yaml", root / COMPOSITION)
     for d in DOMAINS:
@@ -113,7 +136,7 @@ def _new_world(repo: Path, root: Path, toolchain: Path) -> World:
     (root / "notes").mkdir()
     (root / "notes/lending.md").write_text(NOTES)
     (root / "toprope.library.workspace.yaml").write_text(yaml.safe_dump(_workspace(), sort_keys=False))
-    (root / "ids.yaml").write_text(yaml.safe_dump(_ids(repo), sort_keys=False))
+    (root / "ids.yaml").write_text(yaml.safe_dump(_ids(repo, root.name), sort_keys=False))
     return World(root)
 
 
@@ -132,9 +155,8 @@ def _base(w: World) -> dict[str, Any]:
     c1 = _commit(w)
     _approve(w, c1)
     r1 = w.made(w.act("authoring", "deliver", c1, "--environment", "local"))
-    for action in ("preview", "deploy"):
+    for action in ("preview", "deploy", "run_probes", "verify"):     # delivery@6: verify needs passed probes
         w.act("delivery", action, r1)
-    w.act("delivery", "verify", r1, "--verified", "true")
     return {"draft": "library", "deployed": c1}
 
 
@@ -368,18 +390,35 @@ def _user(p: dict[str, Any], situation: dict[str, Any]) -> str:
             f"Task: {p['task']}")
 
 
-def servers(root: Path) -> dict[str, Any]:
-    """The generated MCP servers of the deployed domains, over a probe world, as the agent."""
+def server_logs(logs: Path) -> dict[str, str]:
+    """Where each domain server's stderr goes (`serverwrap.py`), beside the probe's transcript."""
+    return {m: str(logs.resolve() / f"{m}-server.stderr") for m in DOMAINS}
+
+
+def servers(root: Path, logs: Path | None = None) -> dict[str, Any]:
+    """The generated MCP servers of the deployed domains, over a probe world, as the agent. With
+    `logs`, each runs through `serverwrap.py`, which keeps its stderr in `server_logs(logs)`."""
     exe = Path(sys.executable).parent / "toprope-server"
     if not exe.exists():
         raise RuntimeError(f"toprope-server is not installed next to this Python ({sys.executable})")
     exe = str(exe)
-    return {m: {"command": exe, "args": ["--composition", str(root / COMPOSITION), "--working-copy", "--member", m,
-                                         "--kernel-root",
-                                         str(root), "--workspace", str(root / "toprope.library.workspace.yaml"),
-                                         "--env", str(root / ".toprope/env-library"), "--identity",
-                                         f"static:{root / 'ids.yaml'}"],
-                "env": {"TOPROPE_TOKEN": TOKENS["agent"]}} for m in DOMAINS}
+    # Claude Code starts the servers in its own working directory: every path must be absolute
+    # (the M1 recheck's `--out runs/...` gave relative ones, and every Toprope probe's servers died).
+    root = root.resolve()
+    logs = logs.resolve() if logs is not None else None
+    out = {}
+    for m in DOMAINS:
+        args = ["--composition", str(root / COMPOSITION), "--working-copy", "--member", m, "--kernel-root",
+                str(root), "--workspace", str(root / "toprope.library.workspace.yaml"),
+                "--env", str(root / ".toprope/env-library"), "--identity", f"static:{root / 'ids.yaml'}"]
+        if logs is None:
+            out[m] = {"command": exe, "args": args, "env": {"TOPROPE_TOKEN": TOKENS["agent"]}}
+        else:
+            logs.mkdir(parents=True, exist_ok=True)
+            out[m] = {"command": sys.executable,
+                      "args": [str(Path(__file__).with_name("serverwrap.py")), server_logs(logs)[m], exe, *args],
+                      "env": {"TOPROPE_TOKEN": TOKENS["agent"]}}
+    return out
 
 
 def run_probe(backend: Any, worlds: Path, p: dict[str, Any], out: Path, how: str, materials: str,
@@ -395,7 +434,8 @@ def run_probe(backend: Any, worlds: Path, p: dict[str, Any], out: Path, how: str
     if toolchain is not None:
         for d in DOMAINS:
             shutil.copy(toolchain / d / f"{d}.domain.yaml", root / "toolchain" / d / f"{d}.domain.yaml")
-        ctx["servers"] = servers(root)
+        logs = out / f"{p['id']}-servers"
+        ctx["servers"], ctx["server_logs"] = servers(root, logs), server_logs(logs)
     t = Transcript(out / f"{p['id']}.jsonl")
     result: dict[str, Any] = {"probe": p["id"]}
     from .blind import check

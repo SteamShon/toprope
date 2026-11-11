@@ -43,6 +43,7 @@ from ..semantics.interpreter import Interpreter
 from ..semantics.model import project
 from ..semantics.types import Actor, Command, Event, Grant
 from ..store import EventStore, MemoryEventStore
+from ..errors import fixed
 
 EPOCH = datetime.min.replace(tzinfo=timezone.utc)   # for events without a time
 CHECKS = ("structural", "semantic", "scenarios", "harness", "tla", "log_replay", "in_flight", "capability", "nl")
@@ -86,6 +87,7 @@ class ChangeReport:
     timings: dict[str, Any] = field(default_factory=dict)
     selection_misses: list[str] | None = None   # with a full run: tests the cache wrongly passed
     risk: tuple[str, list[str]] | None = None   # ADR-0050: set by check_commit
+    decisions: list[dict[str, str]] = field(default_factory=list)   # ADR-0049, D2: in the domain's words
 
     @property
     def sound(self) -> bool:
@@ -130,6 +132,7 @@ class ChangeReport:
         return {"domain": self.domain, "ok": self.ok, "errors": self.errors, "warnings": self.warnings,
                 "groups": self.groups(),
                 "summary": self.summary(), "diff": self.diff, "impact": self.impact, "timings": self.timings,
+                "decisions": self.decisions,
                 **({"selection_misses": self.selection_misses} if self.selection_misses is not None else {}),
                 "checks": {n: {"ok": c.ok, "ran": c.ran, "summary": c.summary(), "note": c.note,
                                "problems": [asdict(p) for p in c.problems]} for n, c in self.checks.items()}}
@@ -165,7 +168,8 @@ def change_check(new: Domain, old: Domain | None = None, *, events: EventStore |
     baseline = old if old is not None and not any(i.severity == "error" for i in old_issues) else None
     misses = impact = None
     if full and cache is None:
-        raise ValueError("a full run compares with the result cache: it needs one")
+        raise ValueError(fixed("a full run compares with the result cache: it needs one",
+                               "give the check a result cache, or run it without `full`"))
     if structurally_ok:
         from ..harness.run import Harness
         ids = {sc.id for sc in new.scenarios}
@@ -210,6 +214,8 @@ def change_check(new: Domain, old: Domain | None = None, *, events: EventStore |
     checks["nl"] = _nl(new, old, nl, diff["to_review"])
     report = ChangeReport(new.domain, diff, {n: checks[n] for n in CHECKS})
     report.impact = impact
+    from .decisions import decisions as decisions_of
+    report.decisions = decisions_of(new, old)
     report.timings = {**timings, "impact": impact["seconds"] if impact else None}
     report.selection_misses = misses
     return report

@@ -1,0 +1,82 @@
+domain: experiment
+version: 1
+glossary:
+  variant: "The changed version an experiment tests against the current one."
+roles: [engineer, analyst]
+
+objects:
+  Experiment:
+    description: An A/B test of one change.
+    properties:
+      name: {type: string}
+      traffic_percent: {type: integer}
+      status: {enum: [proposed, running, stopped, shipped]}
+
+actions:
+  edit_experiment:
+    description: Change how much traffic the variant gets.
+    actor: [engineer, analyst]
+    target: Experiment
+    params:
+      traffic_percent: {type: integer}
+    preconditions:
+      - id: traffic-limit
+        check: params.traffic_percent > 0 and params.traffic_percent <= 50
+        reason: A variant gets between 1% and 50% of the traffic.
+    effects:
+      - set: {target.traffic_percent: params.traffic_percent}
+  start_experiment:
+    description: Start sending traffic to the variant.
+    actor: [engineer]
+    target: Experiment
+  stop_experiment:
+    description: Stop the experiment and keep its results.
+    actor: [engineer, analyst]
+    target: Experiment
+  ship_experiment:
+    description: Ship the variant to everyone.
+    actor: [engineer, analyst]
+    target: Experiment
+    requires: human
+    preconditions:
+      - id: ship-needs-analyst
+        check: "'analyst' in actor.roles"
+        reason: Shipping a variant needs analyst, who has read its results.
+    records_decision: true
+
+transitions:
+  Experiment:
+    field: status
+    initial: proposed
+    matrix:
+      proposed:
+        edit_experiment: proposed
+        start_experiment: running
+        stop_experiment: {deny: "The experiment has not started."}
+        ship_experiment: {deny: "Run the experiment before shipping it."}
+      running:
+        edit_experiment: {deny: "A running experiment cannot be edited; stop it first."}
+        start_experiment: {deny: "The experiment is already running."}
+        stop_experiment: stopped
+        ship_experiment: {deny: "Stop the experiment before shipping it."}
+      stopped:
+        edit_experiment: {deny: "A stopped experiment keeps its setup; propose a new one."}
+        start_experiment: {deny: "A stopped experiment does not restart; propose a new one."}
+        stop_experiment: {deny: "The experiment is already stopped."}
+        ship_experiment: shipped
+      shipped:
+        edit_experiment: {deny: "The variant has shipped."}
+        start_experiment: {deny: "The variant has shipped."}
+        stop_experiment: {deny: "The variant has shipped."}
+        ship_experiment: {deny: "The variant has shipped."}
+
+invariants:
+  - id: traffic-is-a-share
+    on: Experiment
+    check: target.traffic_percent >= 0 and target.traffic_percent <= 100
+    reason: A variant's traffic is a share of all traffic.
+
+world:
+  fixtures:
+    - Experiment: {id: X-checkout, name: "One-page checkout", traffic_percent: 10, status: proposed}
+    - Experiment: {id: X-search, name: "Search ranking v2", traffic_percent: 20, status: stopped}
