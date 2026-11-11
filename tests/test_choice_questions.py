@@ -44,9 +44,13 @@ def test_an_optional_stage_offers_to_skip_it(ws):  # noqa: F811
     b = ws.questions(limit=50)
     assert b["stage"] == "invariants"
     (skip,) = b["questions"][0]["choices"]
-    assert skip["skip"] == "invariants" and not skip.get("recommended")      # nothing is assumed
+    assert skip["skip"] == "invariants" and skip["recommended"]       # "none" recommended (1c, decided)
     ws.answer(b["questions"][0]["id"], "There is no such rule here.", f"choice:{skip['id']}")
-    assert ws.questions(limit=50)["stage"] != "invariants"
+    assert ws.questions(limit=50)["stage"] == "world"
+    put(ws, upto("handoffs"))
+    (h,) = ws.questions(limit=50)["questions"]
+    (skip,) = h["choices"]
+    assert skip["skip"] == "handoffs" and not skip.get("recommended")         # nothing is assumed
 
 
 def test_a_choice_that_is_not_offered_is_refused_with_its_fix(ws):  # noqa: F811

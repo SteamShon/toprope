@@ -26,6 +26,8 @@ FULL = {
     "transitions": {"Order": {"field": "status", "initial": "open", "matrix": {
         "open": {"ship": "shipped", "reopen": "n/a"},
         "shipped": {"ship": {"deny": "Already shipped."}, "reopen": "open"}}}},
+    # the outcome rule the transitions stage asks for, in every domain (1c)
+    "rules": {"only-clerks-ship": {"on": "Order.shipped", "requires": {"roles": ["clerk"]}, "reason": "Only a clerk ships."}},
     "invariants": [{"id": "has-total", "on": "Order", "check": "exists(target.total)", "reason": "Every order has a total."}],
     "world": {"fixtures": [{"Customer": {"id": "C1"}}, {"Order": {"id": "O1", "status": "open", "total": 10, "customer": "C1"}}],
               "actors": {"clerk": ["kim"], "manager": ["lee"]}},
@@ -54,7 +56,7 @@ def upto(stage: str) -> dict:
     """FULL, with every part from `stage` on removed."""
     doc = copy.deepcopy(FULL)
     drop = {"purpose": ["purpose"], "cast": ["roles", "objects", "links"], "actions": ["actions"],
-            "transitions": ["transitions"], "invariants": ["invariants"], "world": ["world", "scenarios"],
+            "transitions": ["transitions", "rules"], "invariants": ["invariants"], "world": ["world", "scenarios"],
             "review": ["glossary"]}
     for st in ORDER[ORDER.index(stage):]:
         for k in drop.get(st, []):
@@ -266,16 +268,26 @@ def test_the_kernel_serves_stages_and_skips_an_optional_one(ws):
 
 
 
-def test_the_invariants_stage_asks_for_outcome_rules_and_a_rule_fills_it(ws):
+def test_the_invariants_stage_asks_one_choice_with_none_recommended_and_a_rule_does_not_fill_it(ws):
+    # 1c, as the researcher decided: one question for every thing, "none" recommended; the outcome
+    # rule is asked in transitions, so m1-recheck's open `rules` question here is gone, and a rule
+    # (FULL has one) does not answer it
     put(ws, upto("invariants"))
     b = ws.questions(limit=50)
     assert b["stage"] == "invariants"
-    assert any(q["kind"] == "rules" and q["decides"] == ["rules"] and "whatever the action" in q["text"]
-               for q in b["questions"])
-    doc = upto("invariants")
-    doc["rules"] = {"only-clerks-ship": {"on": "Order.shipped", "requires": {"roles": ["clerk"]},
-                                         "reason": "Only a clerk ships.", "status": "proposed"}}
-    put(ws, doc)
-    assert current(ws) == "world"
+    (q,) = b["questions"]
+    assert q["kind"] == "invariants" and q["decides"] == ["invariants"]
+    (none,) = q["choices"]
+    assert none["recommended"] and none["why"] and none["skip"] == "invariants"
     p = {s["stage"]: s for s in ws.progress()["stages"]}["invariants"]
-    assert p["rules"] == 1
+    assert p["rules"] == 1 and p["status"] == "current"
+    ws.answer(q["id"], "None.", f"choice:{none['id']}")
+    assert current(ws) == "world"
+    assert not [x for s in ("transitions", "invariants") for x in ws.questions(stage=s, limit=50)["questions"]]
+
+
+def test_an_invariant_answered_in_words_completes_the_stage(ws):
+    put(ws, upto("invariants"))
+    (q,) = ws.questions(limit=50)["questions"]
+    ws.answer(q["id"], "Every order has a total.", [{"path": "invariants", "value": FULL["invariants"]}])
+    assert current(ws) == "world"

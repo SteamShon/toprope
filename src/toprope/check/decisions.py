@@ -104,6 +104,8 @@ def decisions(new: Domain, old: Domain | None) -> list[dict[str, str]]:
         if b == a:
             continue
         kind, _, name = key.partition(":")
+        if kind == "rule":                                    # outcome rules are said below, once
+            continue
         n = len(out)
         if kind in NOT_ENFORCED:
             continue
