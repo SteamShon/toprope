@@ -8,6 +8,7 @@ from typing import Any, Literal
 
 from ..types import Event, Outcome
 from .codec import event_from_json, event_to_json, outcome_from_json, outcome_to_json
+from ..errors import fixed
 
 
 class ConcurrencyError(Exception):
@@ -110,4 +111,5 @@ def open_store(spec: str) -> EventStore:
     if kind == "postgres":
         from .postgres import PostgresEventStore
         return PostgresEventStore(arg)
-    raise ValueError(f"unknown store {spec!r}: use memory, sqlite:PATH, postgres:DSN or jsonl:DIR")
+    raise ValueError(fixed(f"unknown store {spec!r}: use memory, sqlite:PATH, postgres:DSN or jsonl:DIR",
+                           "give --store as memory, sqlite:PATH, postgres:DSN or jsonl:DIR"))

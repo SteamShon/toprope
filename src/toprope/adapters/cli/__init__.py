@@ -52,7 +52,7 @@ CONFIG = "toprope.yaml"
 CONFIG_KEYS = {"domain": "--domain", "store": "--store",
                "composition": "--composition", "member": "--member", "kernel_root": "--kernel-root",
                "workspace": "--workspace", "env": "--env", "store_dir": "--store-dir",
-               "identity": "--identity", "failures": "--failures"}
+               "identity": "--identity", "failures": "--failures", "person_route": "--person-route"}
 
 
 _USAGE: list[str] = []          # the last usage error argparse reported, for the failure record
@@ -94,6 +94,8 @@ def _base_parser(add_help: bool) -> argparse.ArgumentParser:
     ap.add_argument("--no-config", action="store_true", help=f"ignore {CONFIG}")
     ap.add_argument("--failures", help="a directory where a command that fails before the gate is recorded, "
                     "one file per failure (ADR-0049, D1b)")
+    ap.add_argument("--person-route", help="how a person takes a step an agent is refused here, added to such "
+                    "refusals' fix (for the self domains: the human request, ADR-0039)")
     return ap
 
 
@@ -287,11 +289,19 @@ def _confirm_on_terminal(identity: Identity, caller: Caller, action: str, target
     terminal: a process without one (an agent's ordinary shell, a script) cannot take it as you.
     It is a guard against mistakes, not a security boundary: a process can fake a terminal."""
     from ...identity.git import GitIdentity
+    from .apply import APPLY_ENV, confirmed_by_apply
     if not isinstance(identity, GitIdentity) or caller.actor.kind != "person":
         return
+    if os.environ.get(APPLY_ENV):                # a step of a request the person confirmed once
+        if sys.stdin.isatty() and confirmed_by_apply(caller):   # never weaker than the prompt below
+            return
+        raise SystemExit(fixed(f"{action} requires a person, and the apply's confirmation did not reach this step "
+                               f"(no terminal, or {APPLY_ENV} names no confirmation of {caller.actor.id} by this "
+                               "command's parent)", f"run `toprope-apply` yourself on your terminal; or unset "
+                               f"{APPLY_ENV} and run the step yourself"))
     if not sys.stdin.isatty():
         raise SystemExit(fixed(f"{action} requires a person", "run it yourself on a terminal, or through a human "
-                                "request (tools/human_request.py)"))
+                                "request (tools/human_request.py): approved in GitHub, or applied with `toprope-apply`"))
     if preface is not None:                      # built only now, for a person who will read it
         print(preface() if callable(preface) else preface)
     if input(f"{action} {target} as {caller.actor.id}? [y/N] ").strip().lower() != "y":
@@ -304,11 +314,13 @@ def _execution(args: Any, d: Domain) -> Execution:
     services = _kernel(args)
     if args.composition:
         args.no_seed = not args.seed
-        return _member(args, identity, services)
-    _keep_in_step(args, d)
-    ex = Execution(d, open_store(args.store or "memory"), identity, services=services)
-    if args.seed:
-        ex.seed_world()
+        ex = _member(args, identity, services)
+    else:
+        _keep_in_step(args, d)
+        ex = Execution(d, open_store(args.store or "memory"), identity, services=services)
+        if args.seed:
+            ex.seed_world()
+    ex.person_route = args.person_route
     return ex
 
 

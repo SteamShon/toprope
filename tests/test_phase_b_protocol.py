@@ -177,3 +177,16 @@ def test_starting_states_with_only_leftover_caches_are_built_again(tmp_path, mon
     monkeypatch.setattr(runner, "build_worlds", lambda *a: calls.append(a))
     runner.probe_worlds(out)
     assert calls == []                                                     # complete: built once
+
+
+def test_the_log_has_one_header_however_it_was_created(tmp_path):
+    p = tmp_path / "runs" / "phase-b-runs.tsv"
+    p.parent.mkdir()
+    p.touch()                                                  # another arm created it a moment ago
+    log = RunLog(p)
+    log.append("nl", 1, 1, "review", None, "ok")
+    assert p.read_text().splitlines()[0] == "\t".join(COLUMNS)
+    with p.open("a") as f:                                     # a header written twice before the lock
+        f.write("\t".join(COLUMNS) + "\n")
+    log.append("toprope", 1, 1, "review", None, "ok")
+    assert [r["arm"] for r in log.rows()] == ["nl", "toprope"]

@@ -12,10 +12,12 @@ import argparse
 import sys
 from collections.abc import Callable
 from pathlib import Path
+from ..errors import fixed
 
 
 def _commands() -> list[tuple[str, Callable[[], argparse.ArgumentParser], str]]:
     from ..adapters.cli import _base_parser
+    from ..adapters.cli.apply import build_parser as apply
     from ..adapters.cli.change import build_parser as change
     from ..adapters.cli.rule import add_parser, remove_parser, rename_parser, rule_parser
     from ..adapters.cli.start import init_parser, set_parser, try_parser
@@ -35,6 +37,7 @@ def _commands() -> list[tuple[str, Callable[[], argparse.ArgumentParser], str]]:
         ("toprope-rename", rename_parser, ""),
         ("toprope-remove", remove_parser, ""),
         ("toprope-change", change, ""),
+        ("toprope-apply", apply, ""),
         ("toprope-server", server, ""),
         ("toprope-harness", harness, ""),
         ("toprope-worldmap", worldmap, ""),
@@ -49,8 +52,9 @@ def _actions(p: argparse.ArgumentParser) -> list[argparse.Action]:
     try:
         return list(p._actions)
     except AttributeError:
-        raise RuntimeError("argparse no longer has ArgumentParser._actions: update "
-                           "toprope.kernel.reference._actions") from None
+        raise RuntimeError(fixed("argparse no longer has ArgumentParser._actions: update "
+                                 "toprope.kernel.reference._actions",
+                                 "update `_actions` in toprope/kernel/reference.py for this Python's argparse")) from None
 
 
 def _sub_help(sp: argparse.Action) -> dict[str, str | None]:

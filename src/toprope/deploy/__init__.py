@@ -34,6 +34,7 @@ from pathlib import Path
 from typing import Any
 
 from ..decl import Domain, load_yaml, validate_domain
+from ..errors import fixed
 from ..types import Actor
 
 PACKAGE = Path(__file__).resolve().parents[1]
@@ -157,19 +158,24 @@ class LocalEnvironment:
             try:
                 main = commits.main(domain)
                 if not commits.is_approved(domain, c.id) or main is None or not commits.is_ancestor(domain, c.id, main.id):
-                    raise DeployRefused("unapproved", f"commit {c.id} has no approval on main")
+                    raise DeployRefused("unapproved", fixed(f"commit {c.id} has no approval on main",
+                                                                "approve the commit (`approve_commit`) after its check passes"))
                 if main.id != c.id:
-                    raise DeployRefused("superseded", f"commit {c.id} is superseded by approved {main.id}")
+                    raise DeployRefused("superseded", fixed(f"commit {c.id} is superseded by approved {main.id}",
+                                                               f"deploy {main.id}, the approved commit on main"))
                 from ..decl.provenance import proposed_elements
                 left = proposed_elements(commits.declaration(domain, c.id)) if hasattr(commits, "declaration") else []
                 if left:                                   # ADR-0041: a backstop for older approvals
-                    raise DeployRefused("proposed", f"commit {c.id} holds {len(left)} proposed element(s)")
+                    raise DeployRefused("proposed", fixed(f"commit {c.id} holds {len(left)} proposed element(s)",
+                                                             "have a person confirm them, commit and approve again"))
                 cur = self.current()
                 if cur and cur.get("commit_domain") == domain and commits.is_ancestor(domain, c.id, cur.get("commit", "")):
-                    raise DeployRefused("downgrade", f"{cur.get('commit')} is deployed; {c.id} is not newer "
-                                                     "(rollback comes in M2)")
+                    raise DeployRefused("downgrade", fixed(f"{cur.get('commit')} is deployed; {c.id} is not newer "
+                                                           "(rollback comes in M2)",
+                                                           "deploy a commit newer than the deployed one"))
                 if build_id is None:
-                    raise DeployRefused("no-build", f"commit {c.id} has not been previewed")
+                    raise DeployRefused("no-build", fixed(f"commit {c.id} has not been previewed",
+                                                             "preview it first (Delivery's `preview`)"))
             except DeployRefused as e:
                 self._log({"at": _now(), "commit": c.id, "result": "refused", "rule": e.rule,
                            "reason": e.reason, "approver": approver.ref()})
@@ -235,20 +241,26 @@ class LocalEnvironment:
     def _floor(self, build_id: str, approver: Actor) -> Build:
         build = self.build(build_id)
         if build is None:
-            raise DeployRefused("no-build", f"no build {build_id}; run preview first")
+            raise DeployRefused("no-build", fixed(f"no build {build_id}", "preview the commit first (Delivery's `preview`)"))
         decl = (self.root / "builds" / build_id / "domain.yaml").read_bytes()
         if _sha(decl) != build.declaration_sha256:
-            raise DeployRefused("tainted", "the build's declaration changed after preview")
+            raise DeployRefused("tainted", fixed("the build's declaration changed after preview",
+                                              "preview the commit again"))
         if build.toolchain != toolchain_hash():
-            raise DeployRefused("tainted", "the toolchain changed since the harness ran; preview again")
+            raise DeployRefused("tainted", fixed("the toolchain changed since the harness ran",
+                                              "preview the commit again"))
         if not build.harness_ok:
-            raise DeployRefused("harness", "the harness did not pass for this build")
+            raise DeployRefused("harness", fixed("the harness did not pass for this build",
+                                              "fix what the harness found, commit, approve and preview again"))
         if approver.kind != "person":
-            raise DeployRefused("approver", "a person approves a deploy, never an agent or the system")
+            raise DeployRefused("approver", fixed("a person approves a deploy, never an agent or the system",
+                                              "ask a person to deploy it"))
         stranded = self.stranded(Domain.model_validate(load_yaml(decl.decode())))
         if stranded:
-            raise DeployRefused("stranded", f"{len(stranded)} object(s) would be stranded: "
-                                + ", ".join(stranded[:5]) + " (migration plans come in M0b)")
+            raise DeployRefused("stranded", fixed(
+                f"{len(stranded)} object(s) would be stranded: " + ", ".join(stranded[:5])
+                + " (migration plans come in M0b)",
+                "keep the states and types those objects are in, or finish them before the change"))
         return build
 
     def stranded(self, d: Domain) -> list[str]:
@@ -288,7 +300,8 @@ class LocalEnvironment:
     def server_args(self) -> list[str]:
         cur = self.current()
         if cur is None:
-            raise DeployRefused("no-deploy", "nothing is deployed in this environment")
+            raise DeployRefused("no-deploy", fixed("nothing is deployed in this environment",
+                                                "deploy an approved commit first (Delivery's `deploy`)"))
         return ["--domain", cur["declaration"], "--store", f"sqlite:{self.store_path}"]
 
     def _log(self, entry: dict[str, Any]) -> None:
