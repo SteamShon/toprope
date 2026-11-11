@@ -415,10 +415,10 @@ M2 runs, with no person adjudicating grades after the results.
 | Item | Status | PR |
 |---|---|---|
 | The checklist grader: `grade --grader checklist`, four yes/no items per distinct flag (rule B in item `outcome`), each answered k=3 times and decided by majority, the label by a fixed rule; `compare-gradings --first --second --limit` | ✅ | #248 |
-| The validation run on M1's combined run: two checklist sittings, noise within 0.05 (local session). First run: the sittings differ by up to 0.1 of recall (nl 0.1, structured 0.08, toprope 0.06), over the limit; the grader is revised and checked again (at most twice) | 🟡 | #252 |
+| The validation run on M1's combined run: two checklist sittings, noise within 0.05 (local session). First run: the sittings differ by up to 0.1 of recall (nl 0.1, structured 0.08, toprope 0.06), over the limit; after revision 1, up to 0.02 (nl 0.66 and 0.68; structured and toprope equal), within it | ✅ | #252, #257 |
 | Rule B's invented examples reviewed and accepted by the researcher (2026-11-10) | ✅ | |
 | Revision 1 of the grader (1 of 2): each of the k answers in its own random order, an incomplete answer asked once more, `grade --changes-only` for the check; then the validation run again (local session): the sittings differ by up to 0.02 of recall (nl 0.02, structured 0, toprope 0), within 0.05 | ✅ | #253, #257 |
-| Flags left without a label after revision 1: the label waits only for an answer that could change it; an undecided flag gets at most two more answers; `relabel` applies the rule to a sitting's recorded answers (noise unchanged, 0.02) | ✅ | |
+| Flags left without a label after revision 1: the label waits only for an answer that could change it; an undecided flag gets at most two more answers; `relabel` applies the rule to a sitting's recorded answers (noise unchanged, 0.02) | ✅ |#259 |
 | The grader frozen with M2's instruments, after the validation run | ⬜ | |
 | Validity, not only consistency: the grader's agreement with the domain expert's own labels on a sample of M2's pilot flags, and which model grades (`M2-grader.md`: the expert sample adopted 2026-11-11, its size and minimum set in M2's preregistration; the model decided there on the pilot's cost) | 🟡 | |
 
@@ -428,9 +428,10 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 
 ## Next
 
-1. M2's grader, as decided (`docs/experiments/M2-grader.md`, 2026-11-10): the checklist, the
-   majority of three, rule B and the noise gate, validated on M1's combined run for consistency
-   only.
+1. M2's grader is validated on M1's combined run for consistency (noise 0.02 of recall after
+   revision 1, within 0.05; #253, #257, #259). It is frozen with M2's instruments in M2's
+   preregistration, which also sets the expert sample's size and minimum agreement and the
+   grader's model; its final noise check is on M2's pilot (`docs/experiments/M2-grader.md`).
 2. ADR-0049, now that the four themes' code is in `develop`: F2 on ADR-0053's named path, run by a
    newcomer the researcher finds; F1 measured again on the changes since theme 1's merge, once five
    are approved, three of them low risk ([`U-f1-remeasure.md`](experiments/U-f1-remeasure.md):
