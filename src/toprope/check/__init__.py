@@ -43,6 +43,7 @@ from ..semantics.interpreter import Interpreter
 from ..semantics.model import project
 from ..semantics.types import Actor, Command, Event, Grant
 from ..store import EventStore, MemoryEventStore
+from ..errors import fixed
 
 EPOCH = datetime.min.replace(tzinfo=timezone.utc)   # for events without a time
 CHECKS = ("structural", "semantic", "scenarios", "harness", "tla", "log_replay", "in_flight", "capability", "nl")
@@ -85,6 +86,7 @@ class ChangeReport:
     impact: dict[str, Any] | None = None       # the impact report (ADR-0013), computed first
     timings: dict[str, Any] = field(default_factory=dict)
     selection_misses: list[str] | None = None   # with a full run: tests the cache wrongly passed
+    risk: tuple[str, list[str]] | None = None   # ADR-0050: set by check_commit
 
     @property
     def sound(self) -> bool:
@@ -164,7 +166,8 @@ def change_check(new: Domain, old: Domain | None = None, *, events: EventStore |
     baseline = old if old is not None and not any(i.severity == "error" for i in old_issues) else None
     misses = impact = None
     if full and cache is None:
-        raise ValueError("a full run compares with the result cache: it needs one")
+        raise ValueError(fixed("a full run compares with the result cache: it needs one",
+                               "give the check a result cache, or run it without `full`"))
     if structurally_ok:
         from ..harness.run import Harness
         ids = {sc.id for sc in new.scenarios}
@@ -234,6 +237,12 @@ def check_commit(commits: Any, domain: str, commit_id: str, base: str | None = "
     report.diff["from"], report.diff["to"] = base, c.id
     rows = [(name, res.ok if res.ran else None, res.summary()) for name, res in report.checks.items()]
     rows.append(("change-check", report.ok, report.summary()))
+    from .risk import assess, summary as risk_summary
+    from .risk import warnings_of
+    level, reasons = assess(report, commits.domain(domain, c.id), old,
+                            base_warnings=warnings_of(commits.check_status(domain, base)) if base else None)
+    report.risk = (level, reasons)
+    rows.append(("risk", level == "low", risk_summary(level, reasons)))     # ADR-0050
     from ..decl.provenance import proposed_elements
     left = proposed_elements(commits.declaration(domain, c.id))
     rows.append(("confirmed", not left, f"{len(left)} proposed element(s)"

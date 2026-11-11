@@ -40,7 +40,7 @@ def test_a_rule_on_an_outcome_holds_an_action_added_later():
     eng = Actor("eli", "person", ("eng",))
     assert decide(with_bypass(None), Command(eng, "approve_quickly", "E1", {})).status == "ok"   # the bypass
     out = decide(with_bypass(rule), Command(eng, "approve_quickly", "E1", {}))
-    assert (out.status, out.code, out.reason) == ("denied", RULE, "Only an approver approves an experiment.")
+    assert (out.status, out.code, out.reason) == ("denied", RULE, "Only an approver approves an experiment. Fix: ask a person with the role approver to take it")
 
 
 def test_a_person_rule_refuses_an_agent_but_not_a_person():
@@ -86,6 +86,13 @@ def test_a_check_rule_is_evaluated_on_the_actor():
     out = decide(d, Command(Actor("eli", "person", ("eng",)), "approve_quickly", "E1", {}))
     assert (out.status, out.code) == ("denied", RULE)
     assert decide(d, Command(Actor("eve", "person", ("eng",)), "approve_quickly", "E1", {})).status == "ok"
+
+
+def test_a_check_rule_refusal_names_the_check_not_a_role():
+    # merge of the refusal fixes (ADR-0053 §5) with the check form (#189): a check rule has no roles
+    out = decide(with_bypass(NOT_ELI), Command(Actor("eli", "person", ("eng",)), "approve_quickly", "E1", {}))
+    assert out.reason.startswith("Eli does not approve experiments.")
+    assert 'actor.id != "eli"' in out.reason and "no role yet" not in out.reason
 
 
 def test_the_validator_reads_a_check_rule():

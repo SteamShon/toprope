@@ -9,6 +9,8 @@ __pycache__/
 !.toprope/commits/
 !.toprope/requests/
 !.toprope/approval-runs.jsonl
+# Commands that failed before the gate, one file each (ADR-0049, D1b): usage data for F1.
+!.toprope/failures/
 .toprope/commits/**/.lock
 .toprope/commits/**/.obj-*
 .toprope/commits/**/.refs-*
