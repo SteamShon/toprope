@@ -16,7 +16,7 @@ Legend: ✅ done · 🟡 in part · ⬜ not started
 |---|---|---|---|
 | M0a thin slice | none (enabler) | ✅ | released as `v0.1.0` (#65); the tag is not pushed yet |
 | M1 self-compile | ① ⑥ pilot, no verdict | ✅ | closed after the recheck ([`M1-report.md`](experiments/M1-report.md)): Toprope with its LLM review leads on recall (first run 0.84 against 0.64 NL; recheck 0.94–1.0 against 0.44–0.62, biased and a reference only); the grader's noise (0.18) moves to M2's grader redesign; six probes carried to M2's probe design; ⑥ inconclusive |
-| U usability before M2 (ADR-0049) | none (enabler) | 🟡 | F1 baseline recorded; F2's script written, its run waits for an operator; themes 1–4 in `develop` (code); F1 and F2 measured again next |
+| U usability before M2 (ADR-0049) | none (enabler) | 🟡 | the four themes' code is in `develop` (#201, #213, #218, #224); F1 baseline recorded; the targets are not measured yet. Left: F2 on ADR-0053's path, run by a newcomer the researcher finds; F1 measured again from theme 1's merge; ADR-0051 §4–5 (a Sources domain), proposed, for the researcher |
 | M0b surfaces and effects | none (enabler) | ⬜ | |
 | M2 dogfood | ① ② ③ | ⬜ | the first ① and ② verdicts |
 | M3 shared language | ④ | ⬜ | |
@@ -416,7 +416,10 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 1. M2's grader, as decided (`docs/experiments/M2-grader.md`, 2026-11-10): the checklist, the
    majority of three, rule B and the noise gate, validated on M1's combined run for consistency
    only.
-2. ADR-0049: the F2 baseline run (an operator the researcher finds), and theme 1 (the change loop).
+2. ADR-0049, now that the four themes' code is in `develop`: F2 on ADR-0053's named path, run by a
+   newcomer the researcher finds; F1 measured again on the changes since theme 1's merge
+   (`tools/usability_baseline.py --since`); then the researcher decides ADR-0051 §4–5 (a source's
+   lifecycle as a Sources domain, its readers and extractors as that domain's kernel services).
 3. M2's spec, from the draft (`docs/experiments/M2-design.md`): the researcher decides each point,
    freezes the verdict rules, and finds the domain expert who is not the builder; the expert
    writes the change list, seeds it and keeps the key.
