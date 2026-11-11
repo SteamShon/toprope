@@ -1,5 +1,7 @@
 """F1, friction in the self domains' change loop, measured from their logs (ADR-0049)."""
 import json
+
+import pytest
 import sys
 from pathlib import Path
 
@@ -491,3 +493,32 @@ def test_a_run_held_after_its_preview_counts_the_steps_it_ran(tmp_path):
     assert m["person_touches"]["commands_outside_an_approved_request"] == 0
     assert m["approvals_per_approved_change_by_risk"] == {"high": {"changes": 1, "approvals": 2, "per_change": 2.0}}
     assert m["approval_runs_by_channel"] == {"local": 2}
+
+
+def _git_commit_at(root, when):
+    import os
+    import subprocess
+    env = {**os.environ, "GIT_AUTHOR_DATE": when, "GIT_COMMITTER_DATE": when, "GIT_AUTHOR_NAME": "t",
+           "GIT_AUTHOR_EMAIL": "t@example.com", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.com"}
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    subprocess.run(["git", "-C", str(root), "commit", "-q", "--allow-empty", "-m", "merge theme 1"], check=True, env=env)
+    return subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+
+
+def test_a_window_can_start_at_the_merge_that_changed_the_loop_and_the_measure_is_recorded(tmp_path, capsys):
+    domain(tmp_path, "authoring",
+           [timed(PERSON, "approve_commit", "1-a", "2026-11-06T10:00:00+00:00"),
+            timed(PERSON, "approve_commit", "2-b", "2026-11-12T10:00:00+00:00")],
+           [event("X", PERSON, "person")], ["1-a", "2-b"], [])
+    head = _git_commit_at(tmp_path, "2026-11-11T02:45:09+00:00")
+    rec = tmp_path / "experiments/usability/f1.json"
+    assert ub.main(["--root", str(tmp_path), "--since-commit", "HEAD", "--json", "--record", str(rec)]) == 0
+    out = json.loads(capsys.readouterr().out.split("\n\nRecorded in")[0])
+    assert out["approvals_in_window"] == 1                                     # only the one after the merge
+    saved = json.loads(rec.read_text())
+    assert saved["head"] == head and saved["since_commit"] == "HEAD"
+    assert saved["measures"]["window"]["since"] == "2026-11-11T02:45:09+00:00"
+    with pytest.raises(SystemExit, match="exists. Fix: give --record a new file"):
+        ub.main(["--root", str(tmp_path), "--since-commit", "HEAD", "--record", str(rec)])
+    with pytest.raises(SystemExit, match="is not a commit in .*Fix: give a commit or tag"):
+        ub.main(["--root", str(tmp_path), "--since-commit", "no-such-ref"])

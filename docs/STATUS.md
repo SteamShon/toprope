@@ -417,8 +417,9 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    majority of three, rule B and the noise gate, validated on M1's combined run for consistency
    only.
 2. ADR-0049, now that the four themes' code is in `develop`: F2 on ADR-0053's named path, run by a
-   newcomer the researcher finds; F1 measured again on the changes since theme 1's merge
-   (`tools/usability_baseline.py --since`); then the researcher decides ADR-0051 §4–5 (a source's
+   newcomer the researcher finds; F1 measured again on the changes since theme 1's merge, once five
+   are approved, three of them low risk ([`U-f1-remeasure.md`](experiments/U-f1-remeasure.md):
+   `tools/usability_baseline.py --since-commit 3c041cbd --record …`); then the researcher decides ADR-0051 §4–5 (a source's
    lifecycle as a Sources domain, its readers and extractors as that domain's kernel services).
 3. M2's spec, from the draft (`docs/experiments/M2-design.md`): the researcher decides each point,
    freezes the verdict rules, and finds the domain expert who is not the builder; the expert
