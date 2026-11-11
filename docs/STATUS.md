@@ -383,8 +383,9 @@ M2 runs, with no person adjudicating grades after the results.
 | The validation run on M1's combined run: two checklist sittings, noise within 0.05 (local session). First run: the sittings differ by up to 0.1 of recall (nl 0.1, structured 0.08, toprope 0.06), over the limit; the grader is revised and checked again (at most twice) | 🟡 | #252 |
 | Rule B's invented examples reviewed and accepted by the researcher (2026-11-10) | ✅ | |
 | Revision 1 of the grader (1 of 2): each of the k answers in its own random order, an incomplete answer asked once more, `grade --changes-only` for the check; then the validation run again (local session): the sittings differ by up to 0.02 of recall (nl 0.02, structured 0, toprope 0), within 0.05 | ✅ | #253, #257 |
+| Flags left without a label after revision 1: the label waits only for an answer that could change it; an undecided flag gets at most two more answers; `relabel` applies the rule to a sitting's recorded answers (noise unchanged, 0.02) | ✅ | |
 | The grader frozen with M2's instruments, after the validation run | ⬜ | |
-| Validity, not only consistency: the grader's agreement with the domain expert's own labels on a sample of M2's pilot flags, and which model grades (proposed in `M2-grader.md`; the researcher decides before M2 runs) | ⬜ | |
+| Validity, not only consistency: the grader's agreement with the domain expert's own labels on a sample of M2's pilot flags, and which model grades (`M2-grader.md`: the expert sample adopted 2026-11-11, its size and minimum set in M2's preregistration; the model decided there on the pilot's cost) | 🟡 | |
 
 ## M0b, M2 to M5
 

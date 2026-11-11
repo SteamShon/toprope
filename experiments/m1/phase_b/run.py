@@ -543,6 +543,11 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     g.add_argument("--k", type=int, default=3, help="answers per checklist item, decided by majority (M2: 3)")
     g.add_argument("--changes-only", action="store_true",
                    help="grade the changes, not the probes: a check of the grader's noise, which `score` refuses")
+    rl = sub.add_parser("relabel", parents=[], help="apply the current checklist rule to a checklist sitting's "
+                        "answers, without grading again")
+    rl.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    rl.add_argument("--instruments", type=Path, default=INSTRUMENTS)
+    rl.add_argument("--scoring", required=True)
     rs = sub.add_parser("rescript", help="take back script labels the current rule no longer gives (a sitting "
                         "graded before the fix); the label becomes the grader's")
     rs.add_argument("--out", type=Path, default=DEFAULT_OUT)
@@ -576,6 +581,10 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
 
     if args.cmd == "freeze-prompts":
         print(json.dumps(freeze_prompts(args.instruments, args.reason), indent=2))
+        return
+    if args.cmd == "relabel":
+        from .score import relabel
+        print(json.dumps(relabel(args.out, args.instruments, args.scoring), indent=2))
         return
     if args.cmd == "rescript":
         from .score import rescript
