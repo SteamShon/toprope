@@ -133,7 +133,7 @@ def review_hash(content: Any) -> str:
 def review_contents(d: Domain) -> dict[str, Any]:
     """Every reviewable element of a declaration, key → what it says. The interface's elements,
     plus what an owner confirms but other layers do not compile against: roles, each object's
-    stage field and initial stage, handoffs, scenarios, fixtures and purpose."""
+    stage field and initial stage, handoffs, outcome rules, scenarios, fixtures and purpose."""
     dump = lambda m: m.model_dump(mode="json", by_alias=True, exclude_none=True)  # noqa: E731
     out: dict[str, Any] = {k: e.content for k, e in interface(d).items()}
     for r in d.roles:
@@ -142,6 +142,8 @@ def review_contents(d: Domain) -> dict[str, Any]:
         out[f"stages:{obj}"] = {"field": tr.field, "initial": tr.initial}
     for name, h in d.handoffs.items():
         out[f"handoff:{name}"] = dump(h)
+    for rid, r in d.rules.items():
+        out[f"rule:{rid}"] = dump(r)
     for sc in d.scenarios:
         out[f"scenario:{sc.id}"] = dump(sc)
     for fx in d.world.fixtures:

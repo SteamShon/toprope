@@ -31,7 +31,7 @@ def test_accept_does_not_record_a_step_that_cannot_run(tmp_path):
     decl.write_text(decl.read_text().replace("id: O-8,", "id: O-9,"))
     before = (out / "story.yaml").read_text()
     with pytest.raises(SystemExit, match=r"these steps cannot run on domain.yaml as it is: step 1 \(refund_order O-8\): "
-                                         r"No Order O-8. Fix: undo the hand edit"):
+                                         r"No Order O-8. Fix: .*undo the hand edit"):
         try_main(["--dir", str(out), "--accept"])
     assert (out / "story.yaml").read_text() == before
 

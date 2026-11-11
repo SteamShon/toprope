@@ -57,7 +57,7 @@ CATALOG: dict[str, Service] = {s.name: s for s in (
     Service("search_sources", "Search the workspace's sources (redacted; local-only never served).",
             {"query": "string"}, {"refs": "strings"}),
     Service("stage_questions", "The current stage of the working copy and its bundle of questions.", {},
-            {"stage": "string", "bundle": "string", "questions": "strings"}),
+            {"stage": "string", "bundle": "string", "questions": "strings", "text": "string"}),
     Service("propose_element", "Write a drafted element into the working copy, citing a source chunk; "
             "always `proposed`. `value` is JSON.", {"path": "string", "value": "string", "source": "string"},
             {"issues": "integer", "summary": "string"}),

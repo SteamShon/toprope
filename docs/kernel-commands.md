@@ -28,6 +28,7 @@ Its subcommands are the domain's actions, one per action, plus `get`, `history`,
 | `--config` `CONFIG` | the options file (default: toprope.yaml in the current directory, if any) |
 | `--no-config` | ignore toprope.yaml |
 | `--failures` `FAILURES` | a directory where a command that fails before the gate is recorded, one file per failure (ADR-0049, D1b) |
+| `--person-route` `PERSON_ROUTE` | how a person takes a step an agent is refused here, added to such refusals' fix (for the self domains: the human request, ADR-0039) |
 
 ## `toprope-init`
 
@@ -248,6 +249,16 @@ A person or an agent from tokens.yaml, with the story steps they act in.
 | `--kernel-root` `KERNEL_ROOT` | where the commit store is (default: `kernel_root:` in toprope.yaml, or here) |
 | `--request` `REQUEST` | the request file to write (default: .toprope/requests/<id>.yaml) |
 | `--run-args` `RUN_ARGS` | options passed to every toprope-run step, e.g. "--identity static:ids.yaml" (default ``) |
+
+## `toprope-apply`
+
+`toprope-apply`: a person applies a human request at their own terminal, with one confirmation (ADR-0053, 3; ADR-0039 without GitHub).
+
+| Argument | What |
+|---|---|
+| `REQUEST` | the request file, .toprope/requests/<id>.yaml |
+| `--identity` `IDENTITY` | the identity file your git email is looked up in (default `toprope.identity.yaml`) |
+| `--ship` | also deliver, preview, deploy, probe and verify the commit the request approves; a commit not recorded low risk stops after its preview |
 
 ## `toprope-server`
 

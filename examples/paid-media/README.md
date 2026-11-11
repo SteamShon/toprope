@@ -37,7 +37,7 @@ $R --token t-ana approve_budget_change C-search
 | the agent (`bot`) | raise the holdout campaign to 1200 | denied: *Holdout campaigns keep their budget; changing it would break the test. A media lead can grant a one-time exception.* |
 | the agent | raise `C-search` from 1000 to 2500 | denied: *Raise a daily budget by at most 500 at a time.* |
 | the agent | raise `C-search` to 1400 | proposed |
-| the agent | approve it | denied: *Only a person can approve_budget_change.* |
+| the agent | approve it | denied: *Only a person can approve_budget_change. Fix: ask a person to take it* |
 | `ana` (media lead) | approve it | approved: the daily budget is 1400 |
 
 A person who proposes a change and then tries to approve it gets *Whoever proposed a change, or
@@ -70,7 +70,7 @@ $R --token t-ana approve_budget_change C-holdout
 
 | Who | Asks | Result |
 |---|---|---|
-| the agent | grant an exception | denied: *Only a person can grant_exception.* |
+| the agent | grant an exception | denied: *Only a person can grant_exception. Fix: ask a person to take it* |
 | `ana` | grant an exception, with a rationale | granted; recorded as a decision with the rationale |
 | the agent | raise the holdout campaign to 1200 | proposed |
 | `ana` | approve it | approved: the daily budget is 1200, and the exception is used up |

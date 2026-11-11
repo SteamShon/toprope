@@ -244,6 +244,41 @@ def test_a_cli_conversation_with_other_tools_stops_the_run(tmp_path, monkeypatch
         CliBackend("m").converse("r", "m", None, Transcript(tmp_path / "t.jsonl"))
 
 
+def test_a_conversation_whose_domain_servers_did_not_connect_stops(tmp_path, monkeypatch, fake_claude):
+    """The M1 recheck's Toprope probes all ran with only the harness's own tools: the domain
+    servers failed to connect, and nothing stopped them. Now the conversation stops, as an error."""
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    spec = ToolSpec("files", str(ws), json.dumps({"servers": {"authoring": {"command": "x", "args": []}}}))
+    monkeypatch.setenv("FAKE_CLAUDE_TOOLS", "mcp__phase_b__read_file")
+    with pytest.raises(BackendError, match="authoring.*did not connect"):
+        CliBackend("m").converse("r", "m", spec, Transcript(tmp_path / "t.jsonl"))
+    assert json.loads((tmp_path / "t.jsonl").read_text().splitlines()[-1])["kind"] == "refused"
+    monkeypatch.setenv("FAKE_CLAUDE_TOOLS", "mcp__phase_b__read_file,mcp__authoring__get_object")
+    assert CliBackend("m").converse("r", "m", spec, Transcript(tmp_path / "t2.jsonl")) == "the answer"
+
+
+def test_a_server_that_dies_at_start_leaves_its_stderr_on_record(tmp_path, monkeypatch, fake_claude):
+    """The recheck's redo: the servers failed under Claude Code with nothing on record but
+    "failed". serverwrap keeps a server's stderr in a file, and the stopped conversation says it."""
+    import subprocess
+    dying = tmp_path / "dying-server"
+    dying.write_text(f"#!{sys.executable}\nimport sys\nsys.stderr.write('no such table: events\\n')\nsys.exit(1)\n")
+    dying.chmod(0o755)
+    log = tmp_path / "logs" / "authoring-server.stderr"
+    log.parent.mkdir()
+    wrap = ROOT / "experiments/m1/phase_b/serverwrap.py"
+    assert subprocess.run([sys.executable, str(wrap), str(log), str(dying), "--x"]).returncode == 1
+    assert log.read_text() == "no such table: events\n"
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    spec = ToolSpec("files", str(ws), json.dumps({"servers": {"authoring": {"command": "x", "args": []}},
+                                                 "server_logs": {"authoring": str(log)}}))
+    monkeypatch.setenv("FAKE_CLAUDE_TOOLS", "mcp__phase_b__read_file")
+    with pytest.raises(BackendError, match="no such table: events"):
+        CliBackend("m").converse("r", "m", spec, Transcript(tmp_path / "t.jsonl"))
+
+
 @pytest.mark.parametrize("mode", ["limit-stderr", "limit-result"])
 def test_the_usage_limit_is_recognised(tmp_path, monkeypatch, fake_claude, mode):
     monkeypatch.setenv("FAKE_CLAUDE_MODE", mode)
@@ -343,6 +378,16 @@ def test_status_shows_how_far_each_arm_got(tmp_path, capsys):
     runner.main(["status", "--out", str(tmp_path / "run")])
     (row,) = json.loads(capsys.readouterr().out)
     assert row["arm"] == "nl" and row["done"] == 2 and row["of"] == 20 and row["last_stopped"] is None
+
+
+def test_status_leaves_out_a_run_moved_aside(tmp_path, capsys):
+    inst = instruments(tmp_path)
+    runner.main(arm_args(tmp_path, inst, "nl", "--seqs", "1"), backend=api()[0])
+    capsys.readouterr()
+    import shutil
+    shutil.copytree(tmp_path / "run/nl", tmp_path / "run/nl.stale-1")
+    runner.main(["status", "--out", str(tmp_path / "run")])
+    assert [r["arm"] for r in json.loads(capsys.readouterr().out)] == ["nl"]
 
 
 def test_the_seq_option_names_existing_requests():

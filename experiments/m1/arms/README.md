@@ -2,17 +2,22 @@
 
 Link: ① iterate safely, ⑥ (pilot, ADR-0034). How they are used: [ADR-0040](../../../docs/adr/0040-m1-phase-b-execution-protocol.md).
 
-Every arm starts from the same approved self-domain commits, `authoring@9-b4ec65433222f096` and
-`delivery@1-584aaeea5e686ee8` (the binding names the same). The harness reads them from the
-repository revisions in [`phase_b/baseline.py`](../phase_b/baseline.py), never from the working tree,
-whose self domains move on. The first baseline, `authoring@4`, was replaced on 2026-11-07 (the
-researcher's decision): today's harness finds an invariant break in it, which the deploy floor
-refuses.
+Every arm starts from the same approved self-domain commits. For the M1 recheck
+([`M1-recheck.md`](../../../docs/experiments/M1-recheck.md)) they are `authoring@12-acf2a5f6e362166c`
+and `delivery@6-c2678fc294429d48`: the self domains with their promoted outcome rules and Authoring's
+bundle questions (#192, #205). M1 as first run started from `authoring@9-b4ec65433222f096` and
+`delivery@1-584aaeea5e686ee8`; its materials are in git history. The harness reads the baseline from
+the repository revisions in [`phase_b/baseline.py`](../phase_b/baseline.py), never from the working
+tree, whose self domains move on.
 
-`nl/` is not here yet: the skill rendered from `authoring@4` was removed, and the researcher renders
-it again (`python -m phase_b render --model M`) and reviews it. `nl.rendered-from` records the hash
-of the declarations it was rendered from; the NL arm refuses to run when it does not match
-`structured/`.
+`nl/` is not here yet: the researcher renders it again from `structured/`
+(`python -m phase_b render --model M`) and reviews it. `nl.rendered-from` records the hash of the
+declarations it was rendered from; the NL arm refuses to run when it does not match `structured/`.
+
+What an agent sees has no experiment word but `M1` in the composition's comment, the interview logs
+and `ids.yaml`, as before. In the Toprope sandbox, Authoring's append-only event log and its commit
+`11-4961f900bb4663e1` (an ancestor of `@12`) still hold a source reference to the recheck's own doc,
+which `@12` re-cites; neither is shown to an agent.
 
 | Directory | Arm | Made by |
 |---|---|---|

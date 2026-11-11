@@ -29,9 +29,14 @@ jobs:
       - run: uv sync
       - name: TLC, pinned
         run: |
-          curl -sSLo "$RUNNER_TEMP/tla2tools.jar" \
-            "https://github.com/tlaplus/tlaplus/releases/download/$TLC_VERSION/tla2tools.jar"
-          echo "$TLC_SHA256  $RUNNER_TEMP/tla2tools.jar" | sha256sum -c -
+          # The download sometimes returns a partial or wrong file: retry until the hash matches.
+          for i in 1 2 3 4 5; do
+            curl -fsSL --retry 3 --retry-all-errors -o "$RUNNER_TEMP/tla2tools.jar" \
+              "https://github.com/tlaplus/tlaplus/releases/download/$TLC_VERSION/tla2tools.jar" \
+              && echo "$TLC_SHA256  $RUNNER_TEMP/tla2tools.jar" | sha256sum -c - && break
+            if [ "$i" = 5 ]; then exit 1; fi
+            sleep $((i * 10))
+          done
       - name: Model-check the declarations
         run: |
           uv run python tools/tla_check.py --jar "$RUNNER_TEMP/tla2tools.jar" --out tla-out \
