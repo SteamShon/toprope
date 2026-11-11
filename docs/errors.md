@@ -298,6 +298,7 @@ to do about it. `{…}` is filled in when the error is raised.
 | {…} | {…} applies when the {…} is {…} for {…}: ask a person with that role to take it |
 | {…} | {…} applies when the {…} is {…}; move the {…} there first, or take an action that `allowed` (CLI) or `allowed_actions` (MCP) lists for it |
 | {…} | ask a person to take it{…} |
+| {…} | the action is allowed when `{…}` holds; change the object or the params first |
 | {…} | ask a person with {…} to take it{…} |
 | {…} | the action is allowed when {…} holds; change the object or the params first |
 | {…} | the result must keep {…} true; change the params or the object first |

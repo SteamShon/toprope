@@ -115,6 +115,9 @@ def rule_unmet(reason: str, requires: Any, kind: str = "person", route: str | No
     """An outcome rule (ADR-0048) the actor does not meet, in the domain's words."""
     if requires == "human":
         return fixed(reason, f"ask a person to take it{_via(route, kind)}", verbatim=True)
+    if getattr(requires, "check", None) is not None:          # a `check` rule (ADR-0048 §1)
+        return fixed(reason, f"the action is allowed when `{requires.check}` holds; change the object or "
+                             "the params first", verbatim=True)
     roles = list(getattr(requires, "roles", ()) or ())
     return fixed(reason, f"ask a person with {_roles(roles)} to take it{_via(route, kind)}", verbatim=True)
 

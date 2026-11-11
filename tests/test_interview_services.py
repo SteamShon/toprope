@@ -33,6 +33,7 @@ def test_search_propose_answer_confirm_and_skip_through_the_kernel(tmp_path):
     assert not bad["ok"]                                                    # no real chunk: refused
     q = k.call("stage_questions", {})
     assert q["ok"] and q["stage"] and q["questions"]
+    assert q["text"] == "\n".join(f"- {t}" for t in q["questions"])    # one string a declaration can keep
     a = k.call("record_answer", {"question": "Who launches?", "answer": "Engineers do.",
                                  "decisions": json.dumps([{"path": "actions.launch_experiment", "value": raw}])})
     assert a["ok"] and a["ref"].endswith("#L1")                             # the first line of the log

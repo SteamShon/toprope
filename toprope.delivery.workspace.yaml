@@ -14,7 +14,7 @@ sources:
     path: docs
     globs: ["handoffs-and-deploy.md", "change-check.md", "harness.md", "server.md", "commits.md",
             "experiments/M1-self-domains-scope.md",
-            "adr/0018-*", "adr/0022-*", "adr/0024-*", "adr/0026-*", "adr/0028-*", "adr/0029-*", "adr/0033-*"]
+            "adr/0018-*", "adr/0022-*", "adr/0024-*", "adr/0026-*", "adr/0028-*", "adr/0029-*", "adr/0033-*", "adr/0048-*"]
   - id: interview
     kind: interview-log
     path: domains/delivery/interview.jsonl

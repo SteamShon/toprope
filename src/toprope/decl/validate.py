@@ -9,7 +9,16 @@ import re
 from dataclasses import dataclass
 
 from ..expr import ParseError, Path, parse, paths_read
-from .models import RESERVED_ACTORS, ActorRule, ByRole, Deny, Domain, Target
+from .models import (
+    RESERVED_ACTORS,
+    ActorRule,
+    ByRole,
+    Deny,
+    Domain,
+    RuleCheck,
+    RuleRoles,
+    Target,
+)
 
 RESERVED_CELLS = {"n/a", "undecided"}
 ROOTS = {"target", "actor", "params", "new"}
@@ -94,12 +103,16 @@ def _rules(d: Domain) -> list[Issue]:
         if part not in states and part not in props:
             out.append(Issue("unknown-path", where, f"{obj} has no state or property '{part}'"))
             continue
-        if not isinstance(r.requires, str):
+        froms = list(tr.matrix) if tr else [None]
+        covered = [a for a in d.actions if any(r.on in reaches(d, a, f) for f in froms + [None])]
+        if isinstance(r.requires, RuleRoles):
             for role in r.requires.roles:
                 if d.roles and role not in d.roles:
                     out.append(Issue("unknown-role", where, f"unknown role '{role}'"))
-        froms = list(tr.matrix) if tr else [None]
-        if not any(r.on in reaches(d, a, f) for a in d.actions for f in froms + [None]):
+        elif isinstance(r.requires, RuleCheck):      # read with the params of every action it covers
+            params = {p for a in covered for p in d.actions[a].params}
+            out += _check_expr(d, r.requires.check, f"{where}.requires.check", obj, params)
+        if not covered:
             out.append(Issue("rule-covers-nothing", where, f"no action reaches {r.on}", "warning"))
     return out
 

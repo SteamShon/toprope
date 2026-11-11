@@ -1,0 +1,69 @@
+domain: library
+version: 1
+purpose:
+  problem: Members borrow the library's books, and nobody can tell who has which.
+  success_metric:
+    name: share of lent books with a known borrower
+    direction: up
+  announcement: Every lent book now has a borrower on record.
+roles:
+- librarian
+objects:
+  Book:
+    description: A book the library lends.
+    properties:
+      title:
+        type: string
+      stage:
+        enum:
+        - shelved
+        - lent
+      borrower:
+        type: string
+        optional: true
+actions:
+  lend:
+    description: Lend a shelved book to a member.
+    actor:
+    - librarian
+    target: Book
+    params:
+      borrower:
+        type: string
+    effects:
+    - set:
+        target.borrower: params.borrower
+  take_back:
+    description: Take a lent book back.
+    actor:
+    - librarian
+    target: Book
+    effects: []
+  renew:
+    description: Renew a lent book once.
+    actor:
+    - librarian
+    target: Book
+    effects: []
+    source:
+      kind: interview
+      ref: interview:library/interview.jsonl#L1
+    status: confirmed
+transitions:
+  Book:
+    field: stage
+    matrix:
+      shelved:
+        lend: lent
+        take_back:
+          deny: The book is on the shelf.
+      lent:
+        lend:
+          deny: The book is lent already.
+        take_back: shelved
+world:
+  fixtures:
+  - Book:
+      id: B1
+      title: A first book
+      stage: shelved

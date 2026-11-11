@@ -153,6 +153,47 @@ def test_the_generated_servers_open_a_probe_world(worlds, tmp_path):
     assert refused.structured_content["code"] == "actor"
 
 
+def test_each_probe_agent_may_take_what_its_task_asks_and_a_person_still_decides(worlds, tmp_path):
+    """The M1 recheck (probe-baseline-findings.md, cause 2): P07's agent may hand the commit over,
+    and P06's agent is refused a deploy because it requires a person, not for want of a grant."""
+    from mcp import ClientSession
+    from mcp.client.stdio import StdioServerParameters, stdio_client
+
+    async def call(pid, member, tool, args):
+        root = tmp_path / pid
+        shutil.copytree(worlds[0] / pid, root)
+        cfg = servers(root)[member]
+        params = StdioServerParameters(command=cfg["command"], args=cfg["args"], env={**os.environ, **cfg["env"]})
+        async with stdio_client(params) as (r, w), ClientSession(r, w) as s:
+            await s.initialize()
+            return (await s.call_tool(tool, {**args, "idempotency_key": "k1"})).structured_content
+
+    handed = asyncio.run(call("P07", "authoring", "deliver",
+                              {"target_id": worlds[1]["P07"]["approved"], "environment": "local"}))
+    assert handed["status"] == "ok", handed
+    request = asyncio.run(call("P08", "delivery", "deploy", {"target_id": worlds[1]["P08"]["request"]}))
+    assert (request["status"], request["code"]) == ("denied", "actor"), request
+    assert "grant" not in (request.get("reason") or "").lower()
+
+
+def test_a_server_run_through_the_wrapper_still_serves_and_keeps_its_stderr(worlds, tmp_path):
+    from mcp import ClientSession
+    from mcp.client.stdio import StdioServerParameters, stdio_client
+
+    from phase_b.probes import server_logs
+    root = tmp_path / "w"
+    shutil.copytree(worlds[0] / "P07", root)
+    cfg = servers(root, tmp_path / "logs")["delivery"]
+
+    async def go():
+        params = StdioServerParameters(command=cfg["command"], args=cfg["args"], env={**os.environ, **cfg["env"]})
+        async with stdio_client(params) as (r, w), ClientSession(r, w) as s:
+            await s.initialize()
+            return {t.name for t in (await s.list_tools()).tools}
+    assert "deploy" in asyncio.run(go())
+    assert Path(server_logs(tmp_path / "logs")["delivery"]).exists()
+
+
 FAKE = r'''#!{python}
 import json, os, sys
 args = sys.argv[1:]
@@ -234,6 +275,7 @@ def test_a_run_probes_after_every_change(worlds, tmp_path):
     assert [len(list((out / "nl/seq-01/probes" / f"run-{k}").glob("P0*.jsonl"))) for k in (1, 2, 3)] == [8, 8, 8]
     before = json.loads((out / "nl/seq-00/record.json").read_text())             # the probes before any change
     assert all([p["probe"] for p in r["results"]] == PROBES for r in before["probes"])
+    assert set(before["tokens"]) >= {"input", "output"}                         # what the probes before any change cost
     man = json.loads((out / "nl/manifest.json").read_text())
     assert man["probes"] and man["sessions"][-1]["probes"] == man["probes"]
     assert man["sessions"][-1]["jobs"] == 4                                  # probes four at a time by default
@@ -320,3 +362,13 @@ def test_token_counts_add_up_when_conversations_run_at_once(tmp_path, monkeypatc
     for th in threads:
         th.join()
     assert b.report()["tokens"]["input"] == 8 * 50
+
+
+def test_the_servers_are_given_absolute_paths_whatever_the_run_was_given(tmp_path, monkeypatch):
+    """The recheck ran with `--out runs/phase-b-recheck`: the servers got relative paths, Claude Code
+    started them in its own directory, and every Toprope probe's servers died before writing a line."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "rel" / "P07").mkdir(parents=True)
+    cfg = servers(Path("rel/P07"), Path("rel/logs"))["authoring"]
+    paths = [a for a in cfg["args"] if "/" in a]
+    assert paths and all(Path(a.split("static:")[-1]).is_absolute() for a in paths), paths
