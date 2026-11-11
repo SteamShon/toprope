@@ -21,6 +21,7 @@ def _commands() -> list[tuple[str, Callable[[], argparse.ArgumentParser], str]]:
     from ..adapters.cli.change import build_parser as change
     from ..adapters.cli.rule import add_parser, remove_parser, rename_parser, rule_parser
     from ..adapters.cli.start import init_parser, set_parser, try_parser
+    from ..adapters.cli.interview import build_parser as interview
     from ..adapters.mcp.cli import build_parser as server
     from ..commits.cli import build_parser as commits
     from ..harness.cli import build_parser as harness
@@ -38,6 +39,7 @@ def _commands() -> list[tuple[str, Callable[[], argparse.ArgumentParser], str]]:
         ("toprope-remove", remove_parser, ""),
         ("toprope-change", change, ""),
         ("toprope-apply", apply, ""),
+        ("toprope-interview", interview, "The interview's route for a newcomer: docs/interview.md."),
         ("toprope-server", server, ""),
         ("toprope-harness", harness, ""),
         ("toprope-worldmap", worldmap, ""),

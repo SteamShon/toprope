@@ -18,7 +18,7 @@ import copy
 import hashlib
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -28,6 +28,7 @@ from pydantic import ValidationError
 
 from ..decl import Domain, load_yaml, validate_domain
 from ..sources import (
+    redact,
     DEFAULT_EXCLUDE,
     ELEMENT_KIND,
     SNAPSHOTS,
@@ -50,16 +51,93 @@ class AuthoringError(ValueError):
 
 
 @dataclass
+class Choice:
+    """A ready answer to a question (ADR-0049, B1): the decisions it makes, and whether it is the
+    one recommended, with why. Choosing it still records the owner's words."""
+    id: str
+    label: str
+    decisions: list[dict[str, Any]]
+    recommended: bool = False
+    why: str = ""
+    skip: str | None = None          # a stage this choice skips, instead of deciding elements
+
+    def as_dict(self) -> dict[str, Any]:
+        out = {"id": self.id, "label": self.label, "decisions": self.decisions}
+        if self.recommended:
+            out |= {"recommended": True, "why": self.why}
+        if self.skip:
+            out["skip"] = self.skip
+        return out
+
+
+@dataclass
 class Question:
     id: str
     kind: str          # purpose | default | row | conflict | confirm
     text: str
     decides: list[str]  # element paths the answer would settle
     priority: float
+    choices: list[Choice] = field(default_factory=list)
+    subject: str = ""          # what it asks about (an action, a role): kept in the answer log
 
     def as_dict(self) -> dict[str, Any]:
-        return {"id": self.id, "kind": self.kind, "text": self.text, "decides": self.decides,
-                "priority": self.priority}
+        out = {"id": self.id, "kind": self.kind, "text": self.text, "decides": self.decides,
+               "priority": self.priority}
+        if self.choices:
+            out["choices"] = [c.as_dict() for c in self.choices]
+        return out
+
+
+def choice_id(qid: str, n: int, decisions: list[dict[str, Any]], skip: str | None = None) -> str:
+    """A choice's id names what it decides: if the question's choices change before the answer
+    arrives, the old id no longer matches and nothing is applied (#219's review)."""
+    digest = hashlib.sha1(json.dumps([decisions, skip], sort_keys=True, default=str).encode()).hexdigest()[:8]
+    return f"{qid}/{n}-{digest}"
+
+
+def choice_share(questions: list[dict[str, Any]]) -> float:
+    """The share of questions that offer choices with a recommended one (ADR-0049's target)."""
+    if not questions:
+        return 0.0
+    offered = sum(1 for q in questions if any(c.get("recommended") for c in q.get("choices") or []))
+    return offered / len(questions)
+
+
+def enforced(path: str) -> bool:
+    """Whether an answer's decision becomes an enforced element (ADR-0053 §2): an action (its
+    actor), its actor or `requires`, a precondition, an outcome rule, an invariant, a matrix cell.
+    Purpose, wording, examples, the glossary and scenarios are not counted."""
+    segs = path.split(".")
+    if segs[0] == "actions" and len(segs) >= 2:
+        return len(segs) == 2 or segs[2] in ("actor", "requires", "preconditions")
+    if segs[0] in ("rules", "invariants"):
+        return True
+    return segs[0] == "transitions" and len(segs) == 5 and segs[2] == "matrix"
+
+
+RULE_KINDS = {"actor", "guard", "limit", "rule", "default", "row", "rest"}   # their answer is a rule, or none
+
+
+def interview_share(entries: list[dict[str, Any]]) -> dict[str, Any]:
+    """ADR-0053's choice target, from an interview log. The denominator is every question whose
+    answer became an enforced element or could have (one that decides rules, answered "none"), plus
+    every refused or abandoned attempt at one (#242's review: a person who could not give the answer
+    they meant must lower the share, not vanish from it). `share` is the answers that offered a
+    recommended choice, over that denominator; `by_choice` and `recommended` say how they were given."""
+    rows = [e for e in entries if e.get("kind") == "answer" and (any(enforced(p) for p in e.get("decisions") or [])
+                                                                  or e.get("qkind") in RULE_KINDS)]
+    tried = [e for e in entries if e.get("kind") in ("refused-answer", "abandoned")
+             and (e.get("qkind") in RULE_KINDS or e.get("offered"))]
+    n = len(rows) + len(tried)
+    offered = sum(1 for e in rows if e.get("offered"))
+    return {"questions": n, "enforced_questions": sum(1 for e in rows if any(enforced(p) for p in e.get("decisions") or [])),
+            "declined": sum(1 for e in rows if not e.get("decisions")),
+            "refused": sum(1 for e in tried if e["kind"] == "refused-answer"),
+            "abandoned": sum(1 for e in tried if e["kind"] == "abandoned"),
+            "offered": offered, "share": offered / n if n else 0.0,
+            "by_choice": sum(1 for e in rows if e.get("choice")),
+            "recommended": sum(1 for e in rows if e.get("recommended")),
+            "open": [e.get("question") for e in rows if not e.get("offered")]}
 
 
 
@@ -112,6 +190,127 @@ def _answer_of(text: str) -> str | None:
         if line.startswith("answer: "):
             return line[len("answer: "):]
     return None
+
+
+CARD = re.compile(r"(?<!\d)(?:\d[ -]?){13,19}(?!\d)")
+
+
+def _add_fixture(doc: dict, fixture: Any) -> None:
+    """Add one example (`{Object: {id: ..., ...}}`), replacing an example with the same id. It
+    must fit the draft: a declared object, its own facts, an allowed value for each enum, and no
+    personal data or secret, since a real case is asked for (#220's review)."""
+    if not (isinstance(fixture, dict) and len(fixture) == 1 and isinstance(next(iter(fixture.values())), dict)):
+        raise AuthoringError(fixed("an example is one object, such as `{Order: {id: O-7, ...}}`",
+                                   "give one example per decision, as one object with an `id` and its facts"))
+    (obj, data), = fixture.items()
+    spec = (doc.get("objects") or {}).get(obj)
+    if not isinstance(spec, dict):
+        raise AuthoringError(fixed(f"no object {obj!r} in the draft", f"use one of {', '.join(doc.get('objects') or {})}"))
+    if not isinstance(data.get("id"), (str, int)) or isinstance(data.get("id"), bool) or data.get("id") == "":
+        raise AuthoringError(fixed(f"the {obj} example has no id", "give it an `id`, such as O-7"))
+    props = spec.get("properties") or {}
+    links = {n for n, ln in (doc.get("links") or {}).items() if isinstance(ln, dict) and ln.get("from") == obj}
+    unknown = sorted(set(data) - set(props) - links - {"id"})
+    if unknown:
+        raise AuthoringError(fixed(f"{obj} has no fact {', '.join(unknown)}",
+                                   f"use its facts: {', '.join(props) or '(none yet)'}; or add the fact first"))
+    for k, v in data.items():
+        enum = (props.get(k) or {}).get("enum") if isinstance(props.get(k), dict) else None
+        if enum and v not in enum:
+            raise AuthoringError(fixed(f"{obj}.{k} is {v!r}, not one of {', '.join(map(str, enum))}",
+                                       f"use one of {', '.join(map(str, enum))}"))
+        if isinstance(v, str) and (redact(v)[1] or CARD.search(v)):
+            raise AuthoringError(fixed(f"{obj}.{k} looks like personal data or a secret",
+                                       "use a made-up value with the same shape; examples are kept in git"))
+    fixtures = doc.setdefault("world", {}).setdefault("fixtures", [])
+    clash = [next(iter(f)) for f in fixtures if isinstance(f, dict) and f and next(iter(f)) != obj
+             and (next(iter(f.values())) or {}).get("id") == data["id"]]
+    if clash:
+        raise AuthoringError(fixed(f"id {data['id']!r} is already {_a(clash[0])} example", "give the example its own id"))
+    fixtures[:] = [f for f in fixtures if not (isinstance(f, dict) and (f.get(obj) or {}).get("id") == data["id"])]
+    fixtures.append({obj: data})
+
+
+def _like(d: Domain, obj: str, field_: str, state: str) -> str:
+    """`(like O1: total 10)`: a real example in that state, when the owner gave one (B2). Only
+    numbers, yes/no and enum facts are shown: free text may hold what nobody should repeat."""
+    props = d.objects[obj].properties if obj in d.objects else {}
+
+    def shown(k: str) -> bool:
+        p_ = props.get(k)
+        return p_ is not None and (getattr(p_, "enum", None) or getattr(p_, "type", None) in ("number", "integer", "boolean"))
+    for f in d.world.fixtures:
+        data = f.get(obj) if isinstance(f, dict) else None
+        if isinstance(data, dict) and data.get(field_) == state:
+            facts = ", ".join(f"{k} {v}" for k, v in data.items() if k not in ("id", field_) and shown(k))
+            return f" (like {data.get('id')}" + (f": {facts})" if facts else ")")
+    return ""
+
+
+def _a(word: str) -> str:
+    return f"{'an' if word[:1].lower() in 'aeiou' else 'a'} {word}"
+
+
+def _check_named(name: str, value: dict[str, Any], doc: dict[str, Any]) -> None:
+    """An action named without its actor: it needs a description and the thing it acts on."""
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_-]*", name):
+        raise AuthoringError(fixed(f"{name!r} is not an action name", "use letters, digits and `_`, such as `approve_leave`"))
+    if not isinstance(value.get("description"), str) or not value["description"].strip():
+        raise AuthoringError(fixed(f"the action {name} has no description", "say what it does, in a few words"))
+    objects = doc.get("objects") or {}
+    on = value.get("target") or value.get("creates")
+    if on not in objects:
+        raise AuthoringError(fixed(f"the action {name} acts on {on!r}, which is not a thing in the draft",
+                                   f"name one of {', '.join(objects) or '(none yet: answer the cast first)'}"))
+
+
+def _target(cell: Any) -> str | None:
+    """The state a matrix cell moves to, or None if it does not allow the action."""
+    if isinstance(cell, str):
+        return None if cell in ("n/a", UNDECIDED) else cell
+    return getattr(cell, "to", None)
+
+
+def _recommend(tr: Any, state: str, action: str, obj: str) -> tuple[Any, str, str]:
+    """A recommended cell, its label and why (ADR-0049, B1). Allowing is recommended only when
+    every other state has decided the action, each as a plain move to the same state: no refusal,
+    no `n/a`, no per-role cell anywhere in its column (#219's review). Otherwise refused, the safe
+    default."""
+    others = [row.get(action, UNDECIDED) for s, row in tr.matrix.items() if s != state]
+    plain = [c for c in others if isinstance(c, str) and c not in ("n/a", UNDECIDED)] + \
+        [c.to for c in others if type(c).__name__ == "Target"]
+    if others and len(plain) == len(others) and len(set(plain)) == 1:
+        to = plain[0]
+        return to, f"moves it to {to}", f"from every other state, it moves it to {to}, for every role"
+    return ({"deny": f"Not while {_a(obj)} is {state}."}, "refused",
+            "refusing is the safe default (fail-closed): a reviewed change can open it later")
+
+
+def _moves(d: Domain, obj: str, tr: Any, name: str, a: Any, undecided: list[str]) -> list[tuple[str, str, str, bool, str]]:
+    """Moves to offer for a whole column (ADR-0053 §2): to the stage named after the action's verb
+    (`approved` for “Approve the request”, `paid` for “Pay the order”), from every undecided stage.
+    Recommended from the last stage the owner listed before it that is not the outcome of a rival
+    decision (`rejected` for an approval, `approved` for a refusal): `submitted`, named after the
+    step that leads to the decision, stays a candidate. Empty when no stage is named after the verb."""
+    from .ruling import ALLOWING, REFUSING, stem, verbs
+    states = list(tr.matrix)
+    mine = verbs(name, a)
+    to = next((s for s in states if stem(s) in mine), None)
+    if to is None:
+        return []
+    kind = mine & ALLOWING and ALLOWING or mine & REFUSING and REFUSING or set()
+    rival = ALLOWING if kind is REFUSING else REFUSING if kind is ALLOWING else set()
+    rivals = {stem(s) for s in states for n, x in d.actions.items()
+              if n != name and x.target == obj and stem(s) in verbs(n, x) and verbs(n, x) & rival}
+    before = [s for s in states[:states.index(to)] if stem(s) not in rivals]
+    best = before[-1] if before else None
+    out = []
+    for frm in [s for s in undecided if s != to]:
+        rec = frm == best
+        out.append((f"from {frm} it moves it to {to}; refused in every other open stage", frm, to, rec,
+                    f"the stage {to!r} is named after “{a.description.rstrip('.')}”, and {frm} is the last stage you "
+                    "listed before it that is not another decision's outcome" if rec else ""))
+    return out
 
 
 def _get(doc: Any, segs: list[str]) -> Any:
@@ -409,30 +608,146 @@ class Workspace:
                                          "source": src.get("ref")})
         return {"path": path, "status": "proposed", "marked": marked, "issues": issues}
 
-    def answer(self, question_id: str, answer: str, decisions: list[dict[str, Any]],
+    def choice(self, choice_id: str) -> tuple[Question, Choice]:
+        """A choice by its id (`<question id>/<n>`), from the questions of every stage."""
+        from .stages import STAGES
+        plan = self._plan()
+        if plan.d is not None:
+            for st in STAGES:
+                for q in plan.bundle(st):
+                    for c in q.choices:
+                        if c.id == choice_id:
+                            return q, c
+        raise AuthoringError(fixed(f"no choice {choice_id!r} among the open questions: the question was "
+                                   "answered, or its choices changed since they were shown",
+                                   "ask `next_questions` again, show the owner the choices now offered, and "
+                                   "answer with one of those ids"))
+
+    def answer(self, question_id: str, answer: str, decisions: list[dict[str, Any]] | str,
                question: str | None = None) -> dict[str, Any]:
         """Record the owner's answer (their words) and apply its decisions as proposed
-        elements citing the answer. Confirmation is a separate, human-only step."""
+        elements citing the answer. Confirmation is a separate, human-only step. `decisions` may
+        be `"choice:<id>"`: the decisions of a choice the question offered (B1); a choice that
+        skips a stage skips it, with the owner's words as the reason."""
         if not answer.strip():
             raise AuthoringError(fixed("an answer quotes the owner's words", "pass the owner's answer, in their words, as the answer text"))
+        stage_now = self._current_stage()            # before the answer moves the interview on
+        chosen: Choice | None = None
+        if isinstance(decisions, str):
+            if not decisions.startswith("choice:"):
+                raise AuthoringError(fixed(f"decisions {decisions[:40]!r} are neither a list nor a choice",
+                                           "pass a list of {path, value}, or `choice:<id>`"))
+            q, c = self.choice(decisions[len("choice:"):])
+            question = question or q.text
+            if c.skip:
+                self.skip_stage(c.skip, answer)
+                stage_now = c.skip
+            decisions, chosen = c.decisions, c
+        else:
+            q = self._find_question(question_id)
         text = question or self._all_questions().get(question_id)
         if text is None:
             raise AuthoringError(fixed(f"unknown question {question_id!r}: pass its text", "pass the question's text with the answer, or use an id `next_questions` returned"))
         doc = self.draft()
+        examples: list[Any] = []                     # kept in the log: an example has no provenance
+        named: dict[str, Any] = {}                   # actions whose actor is still to be chosen
         n = self._lines(self.log_path) + 1
         ref = f"{self._log_source_id()}:{self.log_path.relative_to(self.root).as_posix()}#L{n}"
         for dec in decisions:
             segs = element_path(dec["path"])
+            value = dec.get("value")
+            if (len(segs) == 2 and segs[0] == "actions" and isinstance(value, dict) and "actor" not in value
+                    and _get(doc, segs) is None):
+                _check_named(segs[1], value, doc)    # named in the owner's words; its actor is a choice (ADR-0053)
+                named[segs[1]] = value
+                continue
+            if segs == ["world", "fixtures"]:
+                _add_fixture(doc, dec.get("value"))      # one real example joins the others (B2)
+                examples.append(dec.get("value"))
+                continue
             _no_provenance_path(segs)
             src = {"kind": "interview", "ref": ref, "quote": answer}
             _set(doc, segs, self._with_provenance(segs, dec.get("value"), src))
             _demote_enclosing(doc, segs, src)
-        issues = self._write(doc) if decisions else []
-        stage = question_id.split(":")[1] if question_id.startswith("bundle:") else self._current_stage()
+        applied = [d["path"] for d in decisions if d["path"] not in {f"actions.{k}" for k in named}]
+        issues = self._write(doc) if applied else []
+        stage = question_id.split(":")[1] if question_id.startswith("bundle:") else stage_now
+        offered = q is not None and any(c.recommended for c in q.choices)
         self._append(self.log_path, {"at": _now(), "kind": "answer", "stage": stage, "question_id": question_id,
-                                     "question": text, "answer": answer,
-                                     "decisions": [d["path"] for d in decisions]})
-        return {"ref": ref, "applied": [d["path"] for d in decisions], "issues": issues}
+                                     "question": text, "answer": answer, "decisions": applied,
+                                     # what ADR-0053's choice target counts (`interview_share`)
+                                     "offered": offered, "choice": chosen.id if chosen else None,
+                                     "qkind": q.kind if q is not None else None,
+                                     "recommended": bool(chosen and chosen.recommended),
+                                     **({"asked": f"{q.kind}:{q.subject}"} if q is not None and q.subject else {}),
+                                     **({"named": named} if named else {}),
+                                     **({"examples": examples} if examples else {})})
+        return {"ref": ref, "applied": applied, "issues": issues, "named": sorted(named),
+                "map": self.live_map()["text"]}
+
+    def note_attempt(self, kind: str, q: Question, error: str = "") -> None:
+        """An answer the interview refused, or a question left when the person stopped: logged so the
+        choice measure counts it (`interview_share`). The typed words are not kept as an answer."""
+        self._append(self.log_path, {"at": _now(), "kind": kind, "question_id": q.id, "qkind": q.kind,
+                                     "offered": any(c.recommended for c in q.choices),
+                                     **({"error": error} if error else {})})
+
+    def limit_answer(self, q: Question, text: str) -> list[dict[str, Any]]:
+        """A limit as the person states it at a limit question: `over 1,000`, `over 1,000, only finance`,
+        `amount over 1000 only finance`. Only the facts the question is about, and declared roles."""
+        from .ruling import number
+        plan = self._plan({})
+        d = plan.d
+        action, _, prop = q.subject.partition(".")
+        m = re.fullmatch(r"(?:(?P<fact>[A-Za-z_ ]+?)\s+)?(?:over|above|more than)\s+(?P<n>\d[\d.,]*\d|\d)"
+                         r"(?:\s*,?\s*only\s+(?:the\s+|a\s+|an\s+)?(?P<role>[A-Za-z_ -]+?))?\s*\.?", text.strip(),
+                         re.IGNORECASE)
+        if not m or d is None or action not in d.actions:
+            raise AuthoringError(fixed(f"{text!r} is not a limit", "type `over N`, or `over N, only ROLE`; or a choice's number"))
+        props = [prop] if prop else [p for p, s_ in d.objects[d.actions[action].target].properties.items()
+                                     if s_.type in ("number", "integer")]
+        if m.group("fact"):
+            from ..decl.words import normal, term
+            want = normal(m.group("fact"))
+            props = [p for p in props if want in (normal(p), normal(term(d, p)))]
+        if len(props) != 1:
+            raise AuthoringError(fixed("which number is limited is not clear", "name the fact first, such as "
+                                       f"`{(props or ['amount'])[0]} over 1000`"))
+        v = number(m.group("n"))
+        if v is None:
+            raise AuthoringError(fixed(f"{m.group('n')!r} is not a clear number", "write it as 1000 or 1,000"))
+        role = None
+        if m.group("role"):
+            from ..decl.words import normal
+            role = next((r for r in d.roles if normal(r) == normal(m.group("role"))
+                         or normal(d.glossary.get(r, "")) == normal(m.group("role"))), None)
+            if role is None:
+                raise AuthoringError(fixed(f"{m.group('role')!r} is not a role", f"use one of {', '.join(d.roles)}"))
+        return plan.limit_decisions(action, props[0], v, role)
+
+    def _find_question(self, question_id: str) -> Question | None:
+        from .stages import STAGES
+        plan = self._plan({})
+        if plan.d is None:
+            return None
+        for st in STAGES:
+            for q in plan.bundle(st):
+                if q.id == question_id:
+                    return q
+        return None
+
+    def _named(self, log: list[dict[str, Any]] | None = None) -> tuple[dict[str, Any], dict[str, str]]:
+        """Actions the owner named (their words), and the role each was named under, if any."""
+        named: dict[str, Any] = {}
+        roles: dict[str, str] = {}
+        for e in log if log is not None else self._read(self.log_path):
+            if e.get("kind") == "answer" and e.get("named"):
+                for k, v in e["named"].items():
+                    named[k] = v
+                    asked = e.get("asked") or ""
+                    if asked.startswith("actions:role:"):
+                        roles[k] = asked[len("actions:role:"):]
+        return named, roles
 
     def _log_source_id(self) -> str:
         rel = self.log_path.relative_to(self.root).as_posix()
@@ -519,6 +834,102 @@ class Workspace:
                         "main": main.id if main else None})
         return out
 
+    def live_map(self, d: Domain | None = None, mermaid: bool = False) -> dict[str, Any]:
+        """The draft as a map while the owner answers (ADR-0049, B3): per thing with stages, every
+        stage and every action on it, saying where the action leads (`-> X`), that it is refused
+        (`x`), does not apply (`-`), is still open (`?`, also for a cell or a stage row the draft
+        lacks, which is refused until decided) or only proposed (`*`); a per-role cell shows each
+        role. `n/a` carries no provenance in schema v1, so it never shows `*`. With `mermaid`, also
+        the world map's state diagrams. `d` is the parsed draft when the caller has it."""
+        if d is None:
+            try:
+                d = Domain.model_validate(self.draft())
+            except ValidationError:
+                return {"text": "", "mermaid": {}}
+
+        def show(c: Any) -> str:
+            mark = "*" if getattr(c, "status", None) == "proposed" else ""
+            if isinstance(c, str):
+                return "?" if c == UNDECIDED else "-" if c == "n/a" else f"-> {c}"
+            if hasattr(c, "by_role"):
+                return "by role: " + "; ".join(f"{r} {show(v)}" for r, v in c.by_role.items()) + \
+                    " (other roles -)" + mark
+            if hasattr(c, "deny"):
+                return "x" + mark
+            return f"-> {getattr(c, 'to', '?')}{mark}"
+
+        lines = []
+        for obj, tr in d.transitions.items():
+            acts = [n for n, a in d.actions.items() if a.target == obj and a.creates is None]
+            prop = d.objects[obj].properties.get(tr.field) if obj in d.objects else None
+            states = list(tr.matrix) + [s for s in (getattr(prop, "enum", None) or []) if s not in tr.matrix]
+            lines.append(f"{obj} ({tr.field}; starts {tr.initial or '?'})")
+            for state in states:
+                row = tr.matrix.get(state) or {}
+                lines.append(f"  {state}: " + ", ".join(f"{n} {show(row.get(n, UNDECIDED))}" for n in acts))
+        if lines:
+            lines.append("(-> leads to, x refused, - does not apply, ? still open and refused until decided, "
+                         "* proposed, not yet confirmed)")
+        lines += self._cast_map(d)
+        out: dict[str, Any] = {"text": "\n".join(lines), "mermaid": {}}
+        if mermaid:
+            from ..worldmap import build_world_map, to_mermaid
+            out["mermaid"] = to_mermaid(build_world_map(d)).get("states", {})
+        return out
+
+    def _cast_map(self, d: Domain) -> list[str]:
+        """Roles → things → actions, from the cast stage on (ADR-0053; review of 2026-11-10): who
+        does what to which thing, before there is any stage to draw. An action named but whose
+        actor is still open shows under `?`."""
+        if not (d.roles or d.objects):
+            return []
+        named, _ = self._named()
+
+        def mark(x: Any) -> str:
+            return "*" if getattr(getattr(x, "status", None), "value", getattr(x, "status", None)) == "proposed" else ""
+        out = ["Who does what" + (" (* proposed, not yet confirmed)" if self._proposed(self.draft()) else "") + ":"]
+        out.append("  roles: " + (", ".join(d.roles) or "(none yet)"))
+        for obj, o in d.objects.items():
+            facts = ", ".join(o.properties) or "no facts yet"
+            out.append(f"  {obj}{mark(o)}: {facts}")
+        for r in d.roles:
+            acts = [f"{n}{mark(a)} -> " + (f"new {a.creates}" if a.creates else str(a.target)) +
+                    (" (a person only)" if a.requires == "human" else "")
+                    for n, a in d.actions.items()
+                    if any((x if isinstance(x, str) else x.role) == r for x in a.actor)]
+            out.append(f"  {r}: " + ("; ".join(acts) if acts else "nothing yet"))
+        pending = {n: v for n, v in named.items() if n not in d.actions}
+        if pending:
+            out.append("  ? (who may, still open): " + "; ".join(
+                f"{n} -> " + (f"new {v.get('creates')}" if v.get("creates") else str(v.get("target"))) for n, v in pending.items()))
+        return out
+
+    def decisions(self) -> list[dict[str, str]]:
+        """What confirming and approving the draft decides, in the domain's words (ADR-0049, D2).
+        Against the approved `main`, since approving merges into it: a branch's own earlier,
+        unapproved commits are part of what this approval decides. Empty when the draft does not
+        parse."""
+        from ..check.decisions import decisions
+        doc = self.draft()
+        try:
+            new = Domain.model_validate(doc)
+        except ValidationError:
+            return []
+        d = doc.get("domain")
+        main = self.commits.main(d) if isinstance(d, str) and d and self.commits.log(d) else None
+        return decisions(new, self.commits.domain(d, main.id) if main else None)
+
+    def _unenforced(self) -> int:
+        from ..check.decisions import unenforced
+        doc = self.draft()
+        try:
+            new = Domain.model_validate(doc)
+        except ValidationError:
+            return 0
+        d = doc.get("domain")
+        main = self.commits.main(d) if isinstance(d, str) and d and self.commits.log(d) else None
+        return unenforced(new, self.commits.domain(d, main.id) if main else None)
+
     def render_review(self) -> str:
         items = self.review()
         if not items:
@@ -537,7 +948,8 @@ class Workspace:
             for ln in _show(it["now"]).rstrip().splitlines():
                 lines.append(f"    + {ln}")
             lines.append("")
-        return "\n".join(lines)
+        from ..check.decisions import render
+        return "\n".join(lines) + "\n" + render(self.decisions(), self._unenforced())
 
     # -- interview questions (ADR-0014) ----------------------------------------------------
     def attempts_by_action(self) -> dict[str, int]:
@@ -579,18 +991,27 @@ class Workspace:
                 Domain.model_validate(plan.doc)
             except ValidationError as e:
                 why = f"the draft does not parse: {e.errors()[0]['msg']}"
-            return {"stage": None, "questions": [], "progress": [], "stop": {"stop": False, "why": why}}
+            return {"stage": None, "questions": [], "progress": [], "stop": {"stop": False, "why": why}, "map": ""}
         if stage is not None and stage not in BY_NAME:
             raise AuthoringError(fixed(f"unknown stage {stage!r}: one of {list(BY_NAME)}", "use one of the stages listed"))
         st = BY_NAME[stage] if stage else plan.current()
         if st is None:
             return {"stage": None, "goal": "Every stage is done.", "questions": [], "total": 0,
+                    "map": self.live_map(plan.d)["text"],
                     "progress": plan.progress(), "stop": self._stop(plan.d, plan.attempts)}
         qs = plan.bundle(st)
         return {"stage": st.name, "title": st.title, "goal": st.goal, "optional": st.optional,
+                "map": self.live_map(plan.d)["text"],
                 "bundle_id": self._bundle_id(st.name, qs),
                 "questions": [x.as_dict() for x in qs[:limit]], "total": len(qs),
                 "progress": plan.progress(), "stop": self._stop(plan.d, plan.attempts)}
+
+    def current_bundle(self) -> tuple[Any, list[Question]]:
+        """The current stage and its questions as objects (for a front end such as
+        `toprope-interview`); (None, []) when every stage is done or the draft does not parse."""
+        plan = self._plan()
+        st = plan.current() if plan.d is not None else None
+        return st, (plan.bundle(st) if st is not None else [])
 
     @staticmethod
     def _bundle_id(stage: str, qs) -> str:
@@ -638,9 +1059,12 @@ class Workspace:
         """ADR-0014 within the transitions stage: defaults first, then grouped rows, by priority."""
         qs: list[Question] = []
 
-        def q(kind: str, subject: str, text: str, decides: list[str], priority: float) -> None:
+        def q(kind: str, subject: str, text: str, decides: list[str], priority: float,
+              choices: list[tuple[str, list[dict[str, Any]], bool, str]] = ()) -> None:
             qid = hashlib.sha1(f"{kind}:{subject}".encode()).hexdigest()[:10]
-            qs.append(Question(qid, kind, text, decides, priority))
+            qs.append(Question(qid, kind, text, decides, priority,
+                               [Choice(choice_id(qid, i, dec), label, dec, rec, why)
+                                for i, (label, dec, rec, why) in enumerate(choices, 1)]))
 
         for obj, tr in d.transitions.items():
             acts = {n: a for n, a in d.actions.items() if a.target == obj and a.creates is None}
@@ -648,20 +1072,51 @@ class Workspace:
             for name, a in acts.items():
                 undecided = [s for s in tr.matrix if tr.matrix[s].get(name, UNDECIDED) == UNDECIDED]
                 if len(undecided) >= 2 and a.applies_in is None:
-                    q("default", f"{obj}.{name}", f"In which states can someone '{a.description.rstrip('.').lower()}' "
-                      f"at all? Everywhere else it will be not applicable.",
-                      [f"transitions.{obj}.matrix.{s}.{name}" for s in undecided],
-                      self._priority(undecided, a, attempts.get(name, 0)))
+                    allowed = sorted(s for s in tr.matrix if _target(tr.matrix[s].get(name)) is not None)
+                    paths = [f"transitions.{obj}.matrix.{s}.{name}" for s in undecided]
+                    verb = a.description.rstrip(".").lower()
+                    deny = [{"path": p_, "value": {"deny": f"Not while {_a(obj)} is {s}."}} for p_, s in zip(paths, undecided)]
+                    na = [{"path": p_, "value": "n/a"} for p_ in paths]
+                    moves = _moves(d, obj, tr, name, a, undecided)
+                    choices = [(label, [{"path": f"transitions.{obj}.matrix.{s}.{name}",
+                                         "value": to if s == frm else {"deny": f"Not while {_a(obj)} is {s}."}}
+                                        for s in undecided], rec, why)
+                               for label, frm, to, rec, why in moves]
+                    choices += [
+                        # refusing the whole column is recommended only once the action is allowed somewhere:
+                        # for an action that is allowed nowhere, refusing everywhere is never the answer
+                        (f"refused in {', '.join(undecided)}, with a reason", deny,
+                         bool(allowed) and not any(m[3] for m in moves),
+                         "refusing is the safe default (fail-closed), and each refusal is proposed for a "
+                         "person to confirm; a reviewed change can open it later"),
+                        (f"not applicable in {', '.join(undecided)}"
+                         + (f" (it applies only in {', '.join(allowed)})" if allowed else "")
+                         + "; n/a cells are not listed for confirmation", na, False, ""),
+                    ]
+                    q("default", f"{obj}.{name}", f"In which states can someone '{verb}' at all? In every "
+                      "other state it is refused, with a reason, or marked not applicable where it makes no sense.",
+                      paths, self._priority(undecided, a, attempts.get(name, 0)) + 0.5, choices)
             # Then grouped rows: one question per state with undecided cells.
             for state, cells in tr.matrix.items():
                 undecided = [n for n in acts if cells.get(n, UNDECIDED) == UNDECIDED]
                 if not undecided:
                     continue
                 names = ", ".join(acts[n].description.rstrip(".").lower() for n in undecided)
-                q("row", f"{obj}.{state}", f"Once a {obj} is {state}, can anyone still: {names}? "
-                  "If so, who, and what does it become?",
-                  [f"transitions.{obj}.matrix.{state}.{n}" for n in undecided],
-                  max(self._priority([state], acts[n], attempts.get(n, 0)) for n in undecided) + len(undecided))
+                paths = [f"transitions.{obj}.matrix.{state}.{n}" for n in undecided]
+                recs = [_recommend(tr, state, n, obj) for n in undecided]
+                choices = [
+                    ("; ".join(f"{n}: {label}" for n, (_, label, _) in zip(undecided, recs)),
+                     [{"path": p_, "value": v} for p_, (v, _, _) in zip(paths, recs)], True,
+                     "; ".join(f"{n}: {why}" for n, (_, _, why) in zip(undecided, recs))),
+                    (f"none of them: each is refused while {_a(obj)} is {state}",
+                     [{"path": p_, "value": {"deny": f"Not while {_a(obj)} is {state}."}} for p_ in paths], False, ""),
+                    (f"none of them applies to {_a(state)} {obj}", [{"path": p_, "value": "n/a"} for p_ in paths],
+                     False, ""),
+                ]
+                q("row", f"{obj}.{state}", f"Once {_a(obj)} is {state}{_like(d, obj, tr.field, state)}, can anyone "
+                  f"still: {names}? If so, who, and what does it become?", paths,
+                  max(self._priority([state], acts[n], attempts.get(n, 0)) for n in undecided) + len(undecided),
+                  choices)
         return qs
 
     @staticmethod

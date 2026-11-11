@@ -32,6 +32,7 @@ toprope-rename = "toprope.adapters.cli.rule:rename_main"
 toprope-remove = "toprope.adapters.cli.rule:remove_main"
 toprope-change = "toprope.adapters.cli.change:main"
 toprope-apply = "toprope.adapters.cli.apply:main"
+toprope-interview = "toprope.adapters.cli.interview:main"
 
 [dependency-groups]
 dev = [
