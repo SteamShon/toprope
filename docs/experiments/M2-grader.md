@@ -168,3 +168,52 @@ the two sittings, the largest difference and whether it is within 0.05. M1's own
 (`scoring/`, `scoring-2/`) are not touched, and no number is compared with them. Over the limit,
 the grader is revised and checked again, at most twice; each revision is its own PR.
 
+
+## Revisions (each counts toward the cap of two)
+
+### Revision 1 (2026-11-11): each answer in its own order
+
+**What the first validation run showed** (#252). The two sittings differed by up to 0.1 of recall
+(NL 0.10, structured 0.08, Toprope 0.06), over 0.05. The diagnosis used only what *Validation*
+allows: agreement per flag and per item between the sittings, and how the k = 3 answers within
+a sitting split. No flag, finding or reason was read, and nothing was compared with M1's labels.
+
+- Per flag, the sittings agree on 93.5% of labels; per item, `names` 96.5%, `conflict` 97.2%,
+  `outcome` 97.3%, `real` 95.8%. No single item carries the noise.
+- Of the 141 flags that are `seeded` in one sitting and not in the other, 74 had a unanimous answer
+  in **both** sittings, unanimous for `seeded` in one and against it in the other (66 of them 0
+  of 3 and then 3 of 3). Within a sitting, the three answers almost always agree; between
+  sittings they flip together.
+- So the three answers were not independent draws. All three saw the same prompt, and what
+  differed between sittings was the prompt itself: the labels' blocks come in the order of their
+  random letters, so each sitting showed the arms, and the flags, in another order. A majority
+  of three copies of one prompt cannot remove noise that lives in the prompt.
+- 44 gradings of a flag (over both sittings) had an item with no true or false, so no label; a run in which such a
+  flag was the catching one lost it.
+
+**The change** (`grade_change_checklist`):
+1. Each of the k answers sees the labels' blocks, and the flags within each block, in **its own
+   random order**, drawn from the sitting's seed. The letters, the ids and the formula do not
+   change. The majority is now taken over orders.
+2. An answer that leaves any item without a true or false is **asked once more**, in a new order.
+   The number of such repeats is recorded per change (`grader.asked_again`).
+3. `grade --changes-only` grades the changes and not the probes. The probes do not enter recall,
+   so a check of the grader needs only the changes; the first run spent most of its 3.5 hours on
+   them. `score` refuses such a sitting.
+
+Nothing in the prompt, the items, k, the formula or the limit changed. The change was chosen from
+the structure of the disagreements, not from their content, and would be made for any key.
+
+**Check again** (from `experiments/m1`; the earlier checklist sittings stay as they are):
+
+```bash
+uv run python -m phase_b grade --model MODEL --out runs/phase-b-recheck-combined --grader checklist --changes-only --into scoring-checklist-r1-1
+uv run python -m phase_b grade --model MODEL --out runs/phase-b-recheck-combined --grader checklist --changes-only --into scoring-checklist-r1-2
+uv run python -m phase_b compare-gradings --out runs/phase-b-recheck-combined \
+  --first scoring-checklist-r1-1 --second scoring-checklist-r1-2 --limit 0.05
+```
+
+Report only `grader-noise.scoring-checklist-r1-1.scoring-checklist-r1-2.json`. Over the limit,
+revision 2 is the last. If it fails too, the grader is not frozen as is: M2's preregistration
+then states the measured noise and the researcher decides how M2's verdicts take it into account
+(for example, a gap must exceed the noise to count).
