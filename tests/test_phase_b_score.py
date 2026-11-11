@@ -654,6 +654,70 @@ def test_the_checklist_grader_asks_k_times_once_per_distinct_flag_and_takes_the_
     assert {e["fidelity"] for c in prop["changes"] for e in c["edits"].values()} == {"implements"}
 
 
+def checklist_script(asked: list[str], omit_first: bool = False):
+    """A grader that answers every checklist item true, recording each change's prompts; with
+    `omit_first`, its first answer leaves out `real`."""
+    def script(system, messages, tools):
+        user = messages[0]["content"]
+        if "grade one run of a probe" in system:
+            asked.append("PROBE")
+            return json.dumps({"passed": True, "why": "w"})
+        asked.append(user)
+        ids = re.findall(r"^([ABC]\.u\d+)\. ", user, re.MULTILINE)
+        first = omit_first and len([u for u in asked if u != "PROBE"]) == 1
+        flags = [{"id": i, "names": True, "conflict": True, "outcome": False, "why": "w",
+                  **({} if first else {"real": True})} for i in ids]
+        return json.dumps({"flags": flags, "edits": [{"label": x, "fidelity": "implements", "why": "w"}
+                                                     for x in "ABC"]})
+    return script
+
+
+def many_flags(run: Path) -> None:
+    for arm in ("nl", "structured", "toprope"):
+        write_run(run, arm, {1: [F(f"{arm}-{n}") for n in range(4)]}, {1: 1, 2: 1, 3: 1})
+
+
+def test_each_checklist_answer_sees_the_flags_in_its_own_order(tmp_path):
+    """Revision 1: the k answers of one sitting must not be k copies of one prompt."""
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    many_flags(run)
+    asked: list[str] = []
+    score.grade(run, inst, ApiBackend(FakeModel(checklist_script(asked))), runner.change_requests(inst),
+                seed=7, grader="checklist")
+    change1 = [u for u in asked if u.startswith("Change request 1:")]
+    orders = [tuple(re.findall(r"^([ABC]\.u\d+|=== [ABC] ===)", u, re.MULTILINE)) for u in change1]
+    assert len(orders) == 3 and len(set(orders)) == 3
+    assert all(sorted(o) == sorted(orders[0]) for o in orders)                 # the same items, reordered
+    prop = yaml.safe_load((run / "scoring/proposed.yaml").read_text())
+    assert all(f["grader_label"] == "seeded" for c in prop["changes"] if c["seq"] == 1 for f in c["flags"])
+
+
+def test_a_checklist_answer_with_an_item_missing_is_asked_once_more(tmp_path):
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    many_flags(run)
+    asked: list[str] = []
+    score.grade(run, inst, ApiBackend(FakeModel(checklist_script(asked, omit_first=True))),
+                runner.change_requests(inst), seed=7, grader="checklist")
+    first_change = [u for u in asked if u != "PROBE" and u.startswith(asked[0].split(":")[0] + ":")]
+    assert len(first_change) == 4                                              # k = 3, and once more
+    prop = yaml.safe_load((run / "scoring/proposed.yaml").read_text())
+    c = next(c for c in prop["changes"] if c["grader"]["asked_again"])
+    assert c["grader"]["asked_again"] == 1
+    assert all(f["grader_label"] is not None for f in c["flags"])
+
+
+def test_a_changes_only_sitting_grades_no_probe_and_cannot_be_scored(tmp_path):
+    inst, run = instruments(tmp_path), tmp_path / "run"
+    many_flags(run)
+    asked: list[str] = []
+    runner.main(["grade", "--out", str(run), "--instruments", str(inst), "--model", "m", "--grader", "checklist",
+                 "--changes-only"], backend=ApiBackend(FakeModel(checklist_script(asked))))
+    assert "PROBE" not in asked and asked
+    assert confirmed(run)["changes_only"] is True
+    with pytest.raises(SystemExit, match="changes-only"):
+        score.score(run, inst)
+
+
 def test_two_checklist_sittings_are_compared_against_their_own_limit(tmp_path):
     inst, run = instruments(tmp_path), tmp_path / "run"
     three_arms(run)

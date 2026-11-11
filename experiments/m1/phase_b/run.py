@@ -541,6 +541,8 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     g.add_argument("--grader", choices=["single", "checklist"], default="single",
                    help="single: one pass, one label per flag (M1); checklist: M2's grader (M2-grader.md)")
     g.add_argument("--k", type=int, default=3, help="answers per checklist item, decided by majority (M2: 3)")
+    g.add_argument("--changes-only", action="store_true",
+                   help="grade the changes, not the probes: a check of the grader's noise, which `score` refuses")
     rs = sub.add_parser("rescript", help="take back script labels the current rule no longer gives (a sitting "
                         "graded before the fix); the label becomes the grader's")
     rs.add_argument("--out", type=Path, default=DEFAULT_OUT)
@@ -628,7 +630,7 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
         if errs:
             raise SystemExit("the instruments do not verify; nothing is graded:\n" + "\n".join(errs))
         path = grade_run(args.out, args.instruments, backend, change_requests(args.instruments), args.partial,
-                         into=args.into, grader=args.grader, k=args.k)
+                         into=args.into, grader=args.grader, k=args.k, changes_only=args.changes_only)
         print(json.dumps({"proposed": str(path), "usage": backend.report()}))
         return
     if args.cmd == "render":
