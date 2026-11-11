@@ -1,0 +1,12 @@
+# Which tools of the payments server the agent gets, and which declared action each one is.
+confirmed: {"by": "dana", "at": "2026-11-10T11:28:16+00:00", "sha256": "3a6411b7ea7a2cb37faa25dad86369f3f663b5128de4d90d17e4de3297aa01a4"}
+upstream:
+  command: [python, examples/proxy/payments_server.py]
+tools:
+  refund_order:
+    action: refund
+    target: order_id
+    result: {refund_id: string}
+    load: get_order          # an order the proxy has not seen yet is read from the server first
+  get_order:
+    read: true

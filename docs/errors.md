@@ -292,6 +292,7 @@ to do about it. `{…}` is filled in when the error is raised.
 | Error | Fix |
 |---|---|
 | mapping-error: {…} | fix the call's `with` mapping in the declaration |
+| no service {…} in this process | run it where `toprope-proxy` registers that upstream tool |
 
 ## `src/toprope/harness/mechanical.py`
 
@@ -348,6 +349,82 @@ to do about it. `{…}` is filled in when the error is raised.
 | sub must be a string | issue the token with `sub` as the caller's id |
 | unsigned JWTs (alg none) are never accepted | name a signing algorithm, such as HS256 |
 
+## `src/toprope/importers/__init__.py`
+
+| Error | Fix |
+|---|---|
+| the {…} extractor made a draft that does not validate: {…} | report it to the extractor's author; meanwhile a profile's `ignore` can leave the named part out |
+
+## `src/toprope/importers/cli.py`
+
+| Error | Fix |
+|---|---|
+| --into and --out both name where the draft goes | give one |
+| --patch joins the workspace's draft, so it takes no --into or --out | give --patch alone (the loop proposes into the workspace's draft), or --into/--out to write a file |
+| --workspace and --source-id go with --patch | add --patch FILE, or leave them out |
+| cannot read the draft {…}: {…} | give --into an existing draft, or --out for a new one |
+| no source given | give `toprope-import <extractor> <source>` |
+| nothing to import from {…} | check that it is {…}: no things, enums, statuses or rules were found |
+| nothing to propose from {…}: it names no element | work from its questions (--questions); an agent proposes elements from the answers |
+| nothing to propose from {…}: the draft already says all of it | nothing to do; any conflict with the draft is for the interview (--questions) |
+| the {…} extractor drafts no binding | --binding-out goes with `mcp`, which reads a server's tools |
+| two options name the same file | give each its own file |
+| {…} does not read as {…}: {…} | give the export as it was written, or another extractor |
+| {…} exists | give {…} a new file |
+| {…} exists | give --out a new file, or --into it to join this source to the draft |
+| {…} is not a declaration | give --into a `*.domain.yaml` draft |
+
+## `src/toprope/importers/extractors/__init__.py`
+
+| Error | Fix |
+|---|---|
+| {…} is not {…}: its top level is a {…}, not a mapping | give the {…} document itself |
+
+## `src/toprope/importers/loop.py`
+
+| Error | Fix |
+|---|---|
+| could not add the source to {…} so that it reads back | add `- {…}` under `sources:` yourself, then import again |
+| no workspace to register the source in | give --workspace (a `*.workspace.yaml` file; a new one is made), or set `workspace:` in toprope.yaml |
+| the source {…} already holds a different snapshot ({…}): the source changed since it was imported, and the elements proposed from it cite the old one | give --source-id a new id for this version of the source |
+| the source {…} has no text the workspace can read | import a text source (the workspace skips binary files and files over 512 KiB) |
+| the workspace {…} already has a source {…}, at {…} | give --source-id a new id for this source |
+| the workspace {…} does not read: {…} | fix the file, then import again |
+| the workspace {…} writes `sources:` in a form this cannot extend | write it as a block list, or add `- {…}` under it yourself, then import again |
+| {…} is not a workspace file | name it `<something>.workspace.yaml` |
+
+## `src/toprope/importers/port.py`
+
+| Error | Fix |
+|---|---|
+| cannot read the profile {…}: {…} | give a YAML file of profile keys |
+| no extractor {…} | use one of {…}, or install a package that plugs one into `toprope.extractors` |
+| no reader {…} | use one of {…}, or install a package that plugs one into `toprope.readers` |
+| the profile {…} has unknown key(s) {…} | use {…}; put an extractor's own settings under `options` |
+| the profile {…} is a {…}, not a mapping of keys | write `key: value` lines, e.g. `stage_fields: [status]` |
+| the profile {…}: `{…}` holds something other than names | write `{…}` as a list of names |
+| the profile {…}: `{…}` is a {…} | write it as {…} |
+
+## `src/toprope/importers/readers.py`
+
+| Error | Fix |
+|---|---|
+| cannot fetch {…}: {…} | check the URL and that the network allows it |
+| cannot read the server command {…}: {…} | quote the command as one argument, e.g. "python server.py" |
+| cannot read {…}: {…} | give the path of the file to import |
+| no file under {…} matches {…} | set `options: {glob: ...}` in the profile |
+| no server command given | give the command that starts the server, or its URL |
+| the glob {…} does not work: {…} | give a pattern like `**/*.md` |
+| the glob {…} reaches outside {…} | give a pattern inside the folder, e.g. `**/*.md` |
+| {…} is not a URL | give an http(s) URL, or use the file reader |
+| {…} is not a folder | give a folder, or use the file reader for one file |
+
+## `src/toprope/kernel/__init__.py`
+
+| Error | Fix |
+|---|---|
+| an upstream tool's service is named `mcp:<tool>`, not {…} | name it `mcp:` and the tool's name |
+
 ## `src/toprope/kernel/reference.py`
 
 | Error | Fix |
@@ -377,6 +454,46 @@ to do about it. `{…}` is filled in when the error is raised.
 | {…} is outside the kernel's root | give a path inside the repository the kernel runs on (`--kernel-root`) |
 | {…} is {…}: not a {…} | cite it with `--kind {…}` |
 | {…} records a person's decision: the calling person must be the approver | the person named as approver takes the action themselves |
+
+## `src/toprope/proxy/__init__.py`
+
+| Error | Fix |
+|---|---|
+| Refused by the declaration ({…}): {…} | if the declaration is wrong, a person changes it |
+| Unknown or missing credentials | connect with a token the proxy's identity knows |
+| cannot read the binding {…}: {…} | give the binding's YAML file |
+| no kernel services in this proxy for {…} | call only `mcp:` tools from a declaration served by toprope-proxy |
+| the binding {…} has unknown key(s) {…} | keep only `upstream`, `tools` and the `confirmed` record `toprope-proxy --confirm-binding` writes |
+| the binding {…} needs `upstream:` and `tools:` mappings | see `toprope-proxy --help` for the binding's shape |
+| the binding {…}: `confirmed` is not a confirmation record | remove it, and let a person confirm with `toprope-proxy --confirm-binding` |
+| the binding {…}: `upstream` has exactly one of `command` or `url` | give `command: [program, args…]` for stdio, or `url:` for streamable HTTP |
+| the binding {…}: tool {…} has unknown key(s) {…} | use only the keys {…} |
+| the binding {…}: tool {…} is either `read: true` or an `action` | bind it to a declared action, or mark it read-only |
+| the binding {…}: tool {…} names exactly one of `target` or `new_id` | name the argument that identifies the object |
+| the upstream MCP server did not start: {…} | check the binding's `upstream` command or URL, and that the server runs on its own |
+| toprope-proxy needs POSIX file locks, which this system lacks | run the proxy on Linux or macOS |
+| {…} failed upstream: {…} | to try again, call with a new `idempotency_key` |
+| {…} from {…} cannot be checked: {…} | make {…} return {…} with their declared types; nothing was sent |
+| {…} is an agent; only a person confirms a binding (ADR-0041) | ask the person the agent acts for to run it |
+| {…} needs `{…}`, the object it acts on | call it again with `{…}` |
+| {…} was allowed but not sent | ask again; nothing was sent upstream |
+| {…}: could not read {…} with {…} ({…}: {…}) | ask again when the server answers; nothing was sent |
+| {…}: the confirmation could not be written so that it reads back | write `upstream:` and `tools:` as top-level keys, then confirm again |
+| {…}: the same call is still running | ask again in a moment |
+| {…}: the server did not answer ({…}: {…}); it may or may not have acted | read the object upstream before you call again, then call with a new `idempotency_key` |
+| {…}: {…} could not read {…}: {…} | check that {…} exists on the server; nothing was sent |
+| {…}: {…} was recorded, but calls nothing upstream | check the declaration's effect for this action |
+
+## `src/toprope/proxy/cli.py`
+
+| Error | Fix |
+|---|---|
+| --confirm-binding needs --identity | give the identity that says who you are |
+| TOPROPE_TOKEN is missing or does not resolve to a caller | set TOPROPE_TOKEN to your token in the identity file |
+| TOPROPE_TOKEN is missing or does not resolve to a caller | set TOPROPE_TOKEN to a token in the identity file |
+| the proxy needs --store and --identity to serve | give both, or --check to only check the binding |
+| {…} is an agent; only a person confirms a binding (ADR-0041) | ask the person the agent acts for to run it |
+| {…} would not start, so it was not confirmed | fix what is listed, then confirm it again |
 
 ## `src/toprope/semantics/interpreter.py`
 

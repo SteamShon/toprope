@@ -25,6 +25,8 @@ def _commands() -> list[tuple[str, Callable[[], argparse.ArgumentParser], str]]:
     from ..adapters.mcp.cli import build_parser as server
     from ..commits.cli import build_parser as commits
     from ..harness.cli import build_parser as harness
+    from ..importers.cli import build_parser as importer
+    from ..proxy.cli import build_parser as proxy
     from ..worldmap.cli import build_parser as worldmap
     return [
         ("toprope-run", lambda: _base_parser(add_help=True),
@@ -40,7 +42,9 @@ def _commands() -> list[tuple[str, Callable[[], argparse.ArgumentParser], str]]:
         ("toprope-change", change, ""),
         ("toprope-apply", apply, ""),
         ("toprope-interview", interview, "The interview's route for a newcomer: docs/interview.md."),
+        ("toprope-import", importer, ""),
         ("toprope-server", server, ""),
+        ("toprope-proxy", proxy, ""),
         ("toprope-harness", harness, ""),
         ("toprope-worldmap", worldmap, ""),
         ("toprope-commits", commits, ""),

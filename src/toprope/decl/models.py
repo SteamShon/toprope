@@ -19,6 +19,7 @@ from ..errors import fixed
 
 Ident = Annotated[str, StringConstraints(pattern=r"^[A-Za-z_][A-Za-z0-9_-]*$")]
 RESERVED_ACTORS = {"system", "external:kernel"}   # other `external:<source>` actors: M0b (ADR-0028)
+UNASSIGNED = "unassigned"      # the role an importer names until a person says who acts (ADR-0051)
 
 
 class Strict(BaseModel):
