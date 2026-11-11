@@ -45,6 +45,49 @@ through review, with a record of why.
 
 ## Try it
 
+You need [`uv`](https://docs.astral.sh/uv/) and a clone of this repository:
+
+```bash
+git clone https://github.com/SteamShon/toprope.git && cd toprope && uv sync
+```
+
+Start a domain from a template, add a rule of your own by command, and see the gate enforce it.
+No YAML is written by hand ([`docs/tutorial.md`](docs/tutorial.md) goes on to a connected agent):
+
+```bash
+export TOPROPE="$(pwd)"                              # the clone; every command runs through uv from it
+uv run --project "$TOPROPE" toprope-init my-access --template approval --dir /tmp  # or budget, experiment, refunds, release
+cd /tmp/my-access && uv run --project "$TOPROPE" toprope-try                        # the template's rules refuse an agent
+uv run --project "$TOPROPE" toprope-add field amount --set-by submit_request --default 0
+uv run --project "$TOPROPE" toprope-rule threshold --action approve_request --when "amount > 1000" --needs finance
+uv run --project "$TOPROPE" toprope-try                                              # the story shows your rule refusing
+uv run --project "$TOPROPE" toprope-run submit_request R-wiki --amount 1500 --token t-mia
+uv run --project "$TOPROPE" toprope-run approve_request R-wiki --token t-max || echo "refused by your rule"
+```
+```
+...
+max (manager)   asks to approve request one with amount 1001
+                -> denied: When amount > 1000, only finance may approve request.
+kim (finance)   asks to approve request one with amount 1001
+                -> done
+...
+refused by your rule
+```
+
+Your workflow is not a template? Start from a sentence: `toprope-init "Staff submit orders; a lead
+approves them. An order over 5,000 needs a director."` picks the closest template, drafts the rules
+it recognises (you confirm them with `toprope-rule confirm`) and asks about the rest. Other rule
+kinds: `no-self-approval`, `person-only`, `window` (`toprope-rule --help`); `toprope-rename` fits
+the template's names to yours.
+
+A rule added this way is `proposed` unless you confirm it at the terminal where you typed it (you
+are asked to type yes); a proposed rule is enforced all the same, and `toprope-rule confirm`, run by
+a person at a terminal, makes it yours. This is a local guard, not authentication: there is no
+identity behind it, only a check that a terminal answered. It keeps an agent that runs these
+commands in a script or a pipeline from making rules a person's on its own.
+
+### A worked example
+
 An agent proposes ad budget changes; a person approves them
 ([`examples/paid-media/`](examples/paid-media/), runs locally with no keys):
 
@@ -87,7 +130,7 @@ cells: 16 decided, covered model 16, execution 16, mcp 16; 0 undecided; 0 withou
 Raise the step limit to 1000, and before it ships you see what the change touches:
 
 ```
-changes 1 precondition(s); affects 4 cell test(s), 14 param test(s), 2 precondition test(s), exploration; replays past propose_budget_change
+changes 1 precondition(s); affects 4 cell test(s), 14 param test(s), 3 precondition test(s), exploration; replays past propose_budget_change
 passes; 0 error(s), 0 warning(s)
 ```
 
@@ -119,7 +162,7 @@ In this example, approving updates Toprope's own record. Calling the ad platform
 
 ## How to adopt it
 
-1. Run an example (above).
+1. Start from a template and try it (`toprope-init`, `toprope-try`; [`docs/tutorial.md`](docs/tutorial.md)).
 2. Declare one workflow: let your agent interview you about it, and confirm what it drafts.
 3. Serve it over MCP to the agent that does the work.
 4. Put one write action behind it: the one that would hurt most if the agent got it wrong.
@@ -220,7 +263,7 @@ changes only in a PR that reports a preregistered experiment verdict.
 
 | To | Read |
 |---|---|
-| try it | [`examples/paid-media/`](examples/paid-media/), [`examples/refunds/`](examples/refunds/) |
+| try it | [`docs/tutorial.md`](docs/tutorial.md) (15 minutes), [`examples/paid-media/`](examples/paid-media/), [`examples/refunds/`](examples/refunds/) |
 | see how it works | [`docs/concepts.md`](docs/concepts.md) (every part, and how they work together), [`docs/how-it-works.md`](docs/how-it-works.md), [`docs/domain-model.md`](docs/domain-model.md), [`docs/commits.md`](docs/commits.md) |
 | the problem, at length | [`docs/problem.md`](docs/problem.md) |
 | the design and its claims | [`docs/charter.md`](docs/charter.md), [`docs/architecture.md`](docs/architecture.md) |

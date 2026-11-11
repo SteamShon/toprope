@@ -1,0 +1,5 @@
+t-ana: {id: ana, roles: [media_lead]}
+t-eli: {id: eli, roles: [analyst, media_lead]}
+t-bot: {id: bot, kind: agent, roles: [analyst],
+        on_behalf_of: {id: eli, roles: [analyst]},
+        grant: {id: g1, actions: [propose_budget_change]}}

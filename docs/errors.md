@@ -21,6 +21,7 @@ to do about it. `{…}` is filled in when the error is raised.
 | {…} requires a person | run it yourself on a terminal, or through a human request (tools/human_request.py): approved in GitHub, or applied with `toprope-apply` |
 | {…} requires a person, and the apply's confirmation did not reach this step (no terminal, or {…} names no confirmation of {…} by this command's parent) | run `toprope-apply` yourself on your terminal; or unset {…} and run the step yourself |
 | {…}: `{…}` must be a single value | give one value, such as a path |
+| {…}: both `domain` and `composition` | keep one: `domain` for one declaration, `composition` for several |
 | {…}: cannot read it ({…}) | give --config FILE, or --no-config |
 | {…}: expected a mapping such as `composition: x.composition.yaml` | fix the file, or give --no-config |
 | {…}: no member of {…} has this action | check the spelling; `toprope-run --member <member> --help` lists the actions |
@@ -52,6 +53,99 @@ to do about it. `{…}` is filled in when the error is raised.
 | {…} exists | name a new request file, or leave --request out |
 | {…} names no origin | give it `origin:` (a Source object's id), or --origin for every element |
 | {…}{…} | {…}run the change again with the elements not yet proposed, or restore the draft with `git checkout -- <declaration>` |
+
+## `src/toprope/adapters/cli/prose.py`
+
+| Error | Fix |
+|---|---|
+| {…} is not a domain name | give --name, in lowercase letters, digits and dashes |
+
+## `src/toprope/adapters/cli/rule.py`
+
+| Error | Fix |
+|---|---|
+| --days must be positive, not {…} | give e.g. --days 30 |
+| --when {…} is not `field op value` | give e.g. --when "amount > 1000" |
+| a date field takes no --default | leave --default out; the field starts empty |
+| a window counts days from something | give --field (one of {…}: a date, or a number of days), or --since ACTION (one of {…}) to count from when it was taken |
+| confirming makes rules a person's, and needs a person at a terminal | run `toprope-rule confirm` yourself in a terminal; run by an agent or a script, the rules stay proposed (they are enforced either way) |
+| no action {…} | use one of {…} |
+| no field {…} | give a field as domain.yaml names it (`toprope-rule list` shows the rules that read fields) |
+| no object {…} | give --on, one of {…} |
+| no person or agent {…} in tokens.yaml | give one of {…} |
+| no person {…} in tokens.yaml | give --for, one of {…} |
+| no role {…} | add it first: toprope-add role {…} |
+| no role {…} | give one of {…} |
+| no rule {…} | see `toprope-rule list` for the ids |
+| no type {…} | use one of {…}, or give --choices a,b,c |
+| no {…} in {…} | run this in a directory toprope-init wrote, or give --dir |
+| not proposed: {…} | confirm one of {…}, or give no id to confirm all |
+| not removed | type yes to remove {…} |
+| nothing called {…}{…} | give the name of an object, an action, a role or a field, as `toprope-rule list` and domain.yaml show it |
+| nothing confirmed | type yes to confirm them |
+| nothing records who made a {…} theirs | give --by ACTION, the action that does (one of {…}) |
+| the harness finds a problem with this change: {…} | nothing was written; change the command (or undo the hand edit it builds on), then try again |
+| the role {…} is still used: {…} | remove those first (`toprope-rule remove ID`, `toprope-remove person NAME`); nothing was removed |
+| the story would no longer run: {…} | nothing was written; change the command so the story's actions and objects stay |
+| there is already a rule {…} | give another --id, or `toprope-rule remove {…}` first |
+| there is already a rule {…}-known | give another --id |
+| which object gets {…}? | give --on, one of {…} |
+| {…} ({…}) cannot be compared with {…} in a threshold | compare a number, a choice (enum) or plain text; for time limits use `toprope-rule window` |
+| {…} acts on {…}, not {…} | give --set-by an action on that object |
+| {…} already has a field {…} | give another --by, or rename that field |
+| {…} already has {…} | choose another name, or rename it with toprope-rename |
+| {…} already takes a param {…} | choose another field name |
+| {…} does not hold {…}, so an agent acting for them may not either | give --roles from {…}, or give {…} the role first |
+| {…} has agents acting for them: {…} | remove those first (`toprope-remove person <the agent's name>`); nothing was removed |
+| {…} has no {…} (it has {…}) | add it first: toprope-add field {…} --type integer --set-by {…} --default 0 |
+| {…} is a field of {…} | give --on, one of {…} |
+| {…} is a number, not {…} | give e.g. --when "{…} > 1000" |
+| {…} is a rule a person made theirs, and removing it needs a person | run `toprope-rule remove {…}` yourself in a terminal; nothing was removed |
+| {…} is already a role | choose another name |
+| {…} is already in tokens.yaml | choose another name |
+| {…} is already taken | choose another name |
+| {…} is both a {…} and a {…} | give --kind {…} or --kind {…} |
+| {…} is not a field name | use lowercase letters, digits and `_` |
+| {…} is not a name for a token | use lowercase letters, digits, `-` and `_` |
+| {…} is not a name for a {…} | an object's name starts with a capital letter (Claim); an action's or a field's is lowercase letters, digits and `_` (approve_claim); a role's is letters, digits, `_` and `-` |
+| {…} is not a role name | use letters, digits, `_` and `-` |
+| {…} is not a rule id | use letters, digits, `-` and `_`, starting with a letter |
+| {…} is not person-only | see `toprope-rule list` |
+| {…} is one of {…}, not {…} | give one of those |
+| {…}.{…} is not a date or a number of days | give --field naming one, or --since ACTION |
+| {…}.{…} is still used: {…} | remove those first (`toprope-rule remove ID` for a rule); nothing was removed |
+
+## `src/toprope/adapters/cli/start.py`
+
+| Error | Fix |
+|---|---|
+| a step did not end as the story says | if you changed domain.yaml on purpose, run `toprope-try --accept` to make the story expect what happens now; otherwise undo the change |
+| a step of story.yaml expects a refusal without saying which ({…} {…}) | give the step the `code` of the refusal it expects, so any other refusal (a wrong token, a missing grant) does not pass for it |
+| no --template | choose one of {…} |
+| no `- id: {…}` line in domain.yaml | write the precondition's id on its own line, as the template does |
+| no `{…}:` line found for the setting's rule | write the rule's check and reason on their own lines, as the template does |
+| no story.yaml in {…} | run toprope-set in a directory toprope-init wrote |
+| no template recorded in {…} | run --check in a directory toprope-init wrote |
+| no template {…} | use one of {…} (`toprope-init --list` describes them) |
+| no {…} in {…} | run toprope-try in a directory toprope-init wrote, or give --dir |
+| the edited domain.yaml would not read back as intended | edit the rule by hand; the file's layout is not one toprope-set can edit |
+| the story names {…}, which domain.yaml does not declare | rename the step's action in story.yaml, or put the action back |
+| these steps cannot run on domain.yaml as it is: {…} | undo the hand edit that removed or renamed what the step names (`toprope-rename` renames a thing everywhere, the story too); nothing was written |
+| {…} | use one of {…}, as name=value |
+| {…} (a rule may no longer hold) | if that is what you meant, run `toprope-try --accept --yes`; otherwise undo the change; nothing was written |
+| {…} cannot be read: {…} | fix the YAML at the line named |
+| {…} exists | choose another name, or remove that directory |
+| {…} is a whole number, not {…} | give e.g. {…}={…} |
+| {…} is not a domain name | use lowercase letters, digits and dashes, starting with a letter |
+| {…} is not a role name | use letters, digits, `_` and `-` |
+| {…} may not take this action, so nobody could pass the rule | use one of {…} |
+| {…} must be positive, not {…} | give e.g. {…}={…} |
+| {…} names no SQLite store to reset | run --reset in a directory toprope-init wrote |
+| {…} names {…}, which domain.yaml no longer has | put that precondition back, or edit domain.yaml by hand |
+| {…} would not read back as written | a value holds characters YAML reads as something else; give it in plain words |
+| {…}: {…} | fix those elements; docs/domain-schema.md describes them |
+| {…}: {…} has characters a setting may not hold | use letters, digits and spaces |
+| {…}: {…}: {…}{…} | fix that line; docs/domain-schema.md describes every field |
 
 ## `src/toprope/adapters/mcp/__init__.py`
 

@@ -49,7 +49,8 @@ READS = ("get", "history", "allowed", "whoami", "guide", "review")
 CONFIRMS = ("confirm_all_proposed", "confirm_element")   # a person confirms from one diff (B5)
 CONFIG = "toprope.yaml"
 # The keys `toprope.yaml` may set, and the option each one stands for.
-CONFIG_KEYS = {"composition": "--composition", "member": "--member", "kernel_root": "--kernel-root",
+CONFIG_KEYS = {"domain": "--domain", "store": "--store",
+               "composition": "--composition", "member": "--member", "kernel_root": "--kernel-root",
                "workspace": "--workspace", "env": "--env", "store_dir": "--store-dir",
                "identity": "--identity", "failures": "--failures", "person_route": "--person-route"}
 
@@ -110,6 +111,9 @@ def read_config(path: Path) -> dict[str, str]:
     if not isinstance(data, dict):
         raise SystemExit(fixed(f"{path}: expected a mapping such as `composition: x.composition.yaml`",
                                "fix the file, or give --no-config"))
+    if data.get("domain") and data.get("composition"):
+        raise SystemExit(fixed(f"{path}: both `domain` and `composition`",
+                               "keep one: `domain` for one declaration, `composition` for several"))
     unknown = sorted(set(data) - set(CONFIG_KEYS))
     if unknown:
         raise SystemExit(fixed(f"{path}: unknown key(s) {', '.join(unknown)}",
@@ -121,7 +125,11 @@ def read_config(path: Path) -> dict[str, str]:
             raise SystemExit(fixed(f"{path}: `{key}` must be a single value", "give one value, such as a path"))
         value = str(value)
         # A path in the file is relative to the file, so the file works from anywhere.
-        if key in ("composition", "kernel_root", "workspace", "env", "store_dir", "failures"):
+        if key == "store" and value.split(":", 1)[0] in ("sqlite", "jsonl") and ":" in value:
+            kind, _, where = value.partition(":")
+            if not where.startswith(":"):                  # `sqlite::memory:` is no path
+                value = f"{kind}:{where if Path(where).is_absolute() else base / where}"
+        elif key in ("domain", "composition", "kernel_root", "workspace", "env", "store_dir", "failures"):
             value = str((base / value)) if not Path(value).is_absolute() else value
         elif key == "identity" and value.split(":", 1)[0] in ("git", "github", "static"):
             kind, _, file = value.partition(":")
@@ -214,11 +222,23 @@ def build_parser(d: Domain) -> argparse.ArgumentParser:
         p.add_argument("target", help=target)
         for pname, spec in a.params.items():
             _param_option(p, pname, spec)
+        # Who you are may also follow the action (`act T --token t-mia`), unless the action has a
+        # param of that name (ADR-0049, A4). SUPPRESS keeps the value given before the action.
+        if "token" not in a.params:
+            p.add_argument("--token", default=argparse.SUPPRESS, help="your credential, as before the action")
+        if "identity" not in a.params:
+            p.add_argument("--identity", default=argparse.SUPPRESS, help="as before the action")
+    reads = []
     for cmd, what in (("get", "an object's current state"), ("history", "an object's events"),
                       ("allowed", "the actions you may take on an object now")):
-        sub.add_parser(cmd, help=what).add_argument("target")
-    sub.add_parser("whoami", help="who you are here, and your roles")
-    sub.add_parser("guide", help="the domain guide: how this domain works and who does what")
+        r = sub.add_parser(cmd, help=what)
+        r.add_argument("target")
+        reads.append(r)
+    reads.append(sub.add_parser("whoami", help="who you are here, and your roles"))
+    reads.append(sub.add_parser("guide", help="the domain guide: how this domain works and who does what"))
+    for r in reads:                              # who you are may follow a read too (ADR-0049, A4)
+        r.add_argument("--token", default=argparse.SUPPRESS, help="your credential, as before the command")
+        r.add_argument("--identity", default=argparse.SUPPRESS, help="as before the command")
     if "review" not in d.actions:            # a domain's own action named `review` keeps its name
         sub.add_parser("review", help="the proposed elements of the authoring workspace, as one diff to "
                        "confirm from (needs --workspace)")
@@ -296,11 +316,58 @@ def _execution(args: Any, d: Domain) -> Execution:
         args.no_seed = not args.seed
         ex = _member(args, identity, services)
     else:
+        _keep_in_step(args, d)
         ex = Execution(d, open_store(args.store or "memory"), identity, services=services)
         if args.seed:
             ex.seed_world()
     ex.person_route = args.person_route
     return ex
+
+
+def _started_here(args: Any) -> Path | None:
+    """The directory of a domain `toprope-init` wrote whose store is its own SQLite file."""
+    if not args.domain or not str(args.store or "").startswith("sqlite:") or args.store == "sqlite::memory:":
+        return None
+    where = Path(args.domain).resolve().parent
+    return where if (where / ".template").is_file() else None
+
+
+def _keep_in_step(args: Any, d: Domain) -> None:
+    """A domain started with `toprope-init`: if its store was seeded from an earlier domain.yaml
+    and nothing was done in it, seed it again from this one (ADR-0053, F2); if something was,
+    say how to start it again, and leave it as it is."""
+    where = _started_here(args)
+    f = Path(args.store[len("sqlite:"):]) if where else None
+    if where is None or f is None or not f.exists():
+        return
+    from .start import _drift_of, hint, sync_store
+    drift, done = _drift_of(f, d)
+    if drift and done == 0:
+        sync_store(where, d)
+        print("note: the store was seeded from an earlier domain.yaml and nothing had been done in it; "
+              "it now holds the examples of this one", file=sys.stderr)
+    elif drift:
+        print(f"note: the store was seeded from an earlier domain.yaml ({'; '.join(drift[:3])}); "
+              f"to start it again from this one: {hint('toprope-try --reset')} (the old file is kept)", file=sys.stderr)
+
+
+def refusal_fix(args: Any, d: Domain, ex: Execution, code: str | None, reason: str | None) -> str | None:
+    """What to do about a refusal that comes from the store, not from a rule."""
+    stale = ""
+    if (where := _started_here(args)) is not None:
+        from .start import _drift_of, hint
+        if _drift_of(Path(args.store[len("sqlite:"):]), d)[0]:
+            stale = (f"the store was seeded from an earlier domain.yaml: start it again from this one with "
+                     f"`{hint('toprope-try --reset')}` in {where} (the old file is kept)")
+    if code == "not-found":
+        obj = d.actions[args.cmd].object_type
+        ids = [s for s in ex.store.streams() if (ex.lookup(s) or ("",))[0] == obj][:5]
+        return stale or (f"use the id of a {obj} the store has ({', '.join(ids) or 'none yet'}); "
+                         f"`toprope-run get <id>` shows one")
+    if reason and "(could not evaluate:" in reason:
+        return stale or (f"the object lacks a value this rule reads: `toprope-run get {args.target}` shows it; "
+                         "if domain.yaml changed since the store was seeded, run `toprope-try --reset` in its directory")
+    return None
 
 
 def followed(ex: Execution, d: Domain, target: str, before: int) -> list[dict[str, Any]]:
@@ -482,6 +549,8 @@ def _main(argv: list[str]) -> None:
         out = outcome_json(o)
         if o.ok and (follow := followed(ex, d, args.target, before)):
             out["then"] = follow
+        if not o.ok and (fix := refusal_fix(args, d, ex, o.code, o.reason)):
+            out["fix"] = fix
     except Exception as e:                                   # noqa: BLE001 - reached the gate
         raise _AtTheGate() from e
     print(json.dumps(out, indent=2, ensure_ascii=False, default=str))
