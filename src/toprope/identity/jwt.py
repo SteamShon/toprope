@@ -20,18 +20,21 @@ import jwt
 
 from ..types import Actor, Grant
 from . import Caller, Identity, str_list
+from ..errors import fixed
 
 
 class JWTIdentity(Identity):
     def __init__(self, key: str, *, audience: str, algorithms: list[str] | None = None,
                  issuer: str | None = None):
         if not key:
-            raise ValueError("a JWT key is required")
+            raise ValueError(fixed("a JWT key is required", "give the identity the key the tokens are signed with"))
         if not audience:
-            raise ValueError("a JWT audience is required")
+            raise ValueError(fixed("a JWT audience is required",
+                                   "give the identity the audience the tokens are issued for"))
         self._alg = algorithms or ["HS256"]
         if not self._alg or any(not a or a.lower() == "none" for a in self._alg):
-            raise ValueError("unsigned JWTs (alg none) are never accepted")
+            raise ValueError(fixed("unsigned JWTs (alg none) are never accepted",
+                                   "name a signing algorithm, such as HS256"))
         self._key = key
         self._aud = audience
         self._iss = issuer or None
@@ -50,7 +53,7 @@ class JWTIdentity(Identity):
     def _caller(c: dict) -> Caller:
         def sub(d: dict) -> str:
             if not isinstance(d.get("sub"), str):
-                raise ValueError("sub must be a string")
+                raise ValueError(fixed("sub must be a string", "issue the token with `sub` as the caller's id"))
             return d["sub"]
 
         kind = c.get("kind", "person")
@@ -59,12 +62,14 @@ class JWTIdentity(Identity):
             return Caller(actor)
         act, g = c.get("act"), c.get("grant")
         if not isinstance(act, dict) or not isinstance(g, dict) or not isinstance(g.get("id"), str):
-            raise ValueError("an agent token needs act and grant objects")
+            raise ValueError(fixed("an agent token needs act and grant objects",
+                                   "issue the agent's token with `act` (its person) and `grant` claims"))
         principal = Actor(sub(act), "person", str_list(act.get("roles", []), "act.roles"))
         targets = g.get("targets")
         exp = g.get("exp")
         if exp is not None and (isinstance(exp, bool) or not isinstance(exp, (int, float))):
-            raise ValueError("grant.exp must be a number")
+            raise ValueError(fixed("grant.exp must be a number",
+                                   "issue the grant's `exp` as seconds since the epoch"))
         grant = Grant(g["id"], frozenset(str_list(g.get("actions", []), "grant.actions")),
                       None if targets is None else frozenset(str_list(targets, "grant.targets")),
                       None if exp is None else datetime.fromtimestamp(exp, timezone.utc))

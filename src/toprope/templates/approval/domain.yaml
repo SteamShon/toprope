@@ -1,0 +1,68 @@
+domain: approval
+version: 1
+glossary:
+  access request: "A request that a person get access to one system."
+roles: [member, manager, security]
+
+objects:
+  AccessRequest:
+    description: A request for one person's access to one system.
+    properties:
+      person: {type: string}
+      system: {enum: [wiki, crm, prod]}
+      status: {enum: [draft, submitted, approved, rejected]}
+      requested_by: {type: string, optional: true}
+
+actions:
+  submit_request:
+    description: Submit the request for a decision.
+    actor: [member]
+    target: AccessRequest
+    effects:
+      - set: {target.requested_by: actor.principal.id}
+  approve_request:
+    description: Grant the access the request asks for.
+    actor: [manager, security]
+    target: AccessRequest
+    requires: human
+    preconditions:
+      - id: not-the-requester
+        check: target.requested_by != actor.principal.id
+        reason: Whoever asked for access, or had their agent ask, cannot approve it.
+      - id: prod-needs-security
+        check: target.system != 'prod' or 'security' in actor.roles
+        reason: Access to prod is approved by security.
+    records_decision: true
+  reject_request:
+    description: Refuse the request.
+    actor: [manager, security]
+    target: AccessRequest
+    requires: human
+    records_decision: true
+
+transitions:
+  AccessRequest:
+    field: status
+    initial: draft
+    matrix:
+      draft:
+        submit_request: submitted
+        approve_request: {deny: "Submit the request first."}
+        reject_request: {deny: "Submit the request first."}
+      submitted:
+        submit_request: {deny: "The request is already submitted."}
+        approve_request: approved
+        reject_request: rejected
+      approved:
+        submit_request: {deny: "The request is already decided."}
+        approve_request: {deny: "The request is already decided."}
+        reject_request: {deny: "The request is already decided."}
+      rejected:
+        submit_request: {deny: "The request is already decided."}
+        approve_request: {deny: "The request is already decided."}
+        reject_request: {deny: "The request is already decided."}
+
+world:
+  fixtures:
+    - AccessRequest: {id: R-wiki, person: dana, system: wiki, status: draft}
+    - AccessRequest: {id: R-prod, person: dana, system: prod, status: draft}

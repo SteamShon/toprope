@@ -34,6 +34,18 @@ def test_the_guide_follows_the_declaration_and_the_harness():
     assert "**Harness**: passes" in g
 
 
+def test_the_guide_lists_each_outcome_rule_and_what_it_covers():
+    raw = schema_doc_domain()
+    raw["rules"] = {"only-approvers": {"on": "Experiment.approved", "requires": {"roles": ["approver"]},
+                                       "reason": "Only an approver approves."},
+                    "a-person-ends": {"on": "Experiment.ended", "requires": "human", "reason": "People end them."}}
+    g = build_domain_guide(Domain.model_validate(raw))
+    assert "## Who may bring about an outcome (rules)" in g
+    assert ("- **only-approvers** on `Experiment.approved`: only `approver`. Only an approver approves. "
+            "Covers: `approve_experiment`.") in g
+    assert "- **a-person-ends** on `Experiment.ended`: only a person." in g
+
+
 def test_preview_and_the_cli_write_the_guide(tmp_path):
     from toprope.deploy import LocalEnvironment
     p = tmp_path / "d.domain.yaml"

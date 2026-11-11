@@ -20,6 +20,7 @@ from pathlib import Path
 
 from . import Caller, Identity
 from .git import load_table
+from ..errors import fixed
 
 ENV = "TOPROPE_GITHUB_APPROVER"
 
@@ -40,9 +41,11 @@ def github_logins(path: str | Path) -> dict[str, Caller]:
         if login is None:
             continue
         if not isinstance(login, str) or not login:
-            raise ValueError(f"people.{email}: github must be a login")
+            raise ValueError(fixed(f"people.{email}: github must be a login",
+                                   "write the person's GitHub login, such as `github: octocat`"))
         if login.lower() in out:
-            raise ValueError(f"people.{email}: github login {login} is listed twice")
+            raise ValueError(fixed(f"people.{email}: github login {login} is listed twice",
+                                   "give that login to one person only"))
         out[login.lower()] = table[str(email)]
     return out
 

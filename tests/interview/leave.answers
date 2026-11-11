@@ -1,0 +1,30 @@
+# purpose
+Leave requests get lost in email, and nobody knows who approved what.
+requests decided within two days, up
+Every leave request is decided by the right person. Nobody approves their own.
+# people and things
+employee: asks for time off; manager: approves or refuses requests; hr: approves long requests
+Leave request: a request for time off | days: integer
+# an example, then the actions in your words
+LR-7: days 12
+request_leave: Ask for time off -> new Leave request; approve_leave: Approve the request -> Leave request; reject_leave: Refuse the request -> Leave request
+# who may (three actions), the limit, who must not: the recommended choices
+ 
+ 
+ 
+ 
+ 
+# stages, then each action's column and the outcome rule: recommended
+status: submitted, approved, rejected; starts submitted
+ 
+ 
+ 
+# invariants: nothing beyond the stages
+nothing
+# world
+employee: eli; manager: mia; hr: hana
+employee request_leave LR-9 days=3 -> submitted; manager approve_leave LR-9 -> approved; manager approve_leave LR-9 -> refused
+# handoffs: none
+none
+# review: confirm
+yes

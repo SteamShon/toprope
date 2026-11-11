@@ -1,0 +1,753 @@
+domain: delivery
+purpose:
+  problem: An approved domain version must become working software in an environment,
+    and nothing unverified may reach it.
+  success_metric:
+    name: share of approved versions that reach verified-in-use without a manual fix
+      or rollback
+    direction: up
+  announcement: Approved domain versions now reach the environment as working software
+    in one step. Nothing that fails its checks or lacks a person's approval gets there.
+roles:
+- approver
+objects:
+  DeliveryRequest:
+    description: A request to deliver an approved commit of a domain, handed off by
+      Authoring.
+    properties:
+      domain_id:
+        type: string
+      commit:
+        type: string
+      branch:
+        type: string
+      interface:
+        type: string
+      environment:
+        type: string
+      approver:
+        type: string
+      build:
+        type: string
+        optional: true
+      harness_ok:
+        type: boolean
+        optional: true
+      deployed:
+        type: boolean
+        optional: true
+      refusal:
+        type: string
+        optional: true
+      verified:
+        type: boolean
+        optional: true
+      stage:
+        enum:
+        - requested
+        - previewing
+        - built
+        - deploying
+        - done
+        - verified
+      probes_passed:
+        type: boolean
+        optional: true
+      probe_summary:
+        type: string
+        optional: true
+    source:
+      kind: interview
+      ref: interview:domains/delivery/interview.jsonl#L27
+    status: confirmed
+  Environment:
+    description: Where a domain runs; it points at one deployed commit.
+    properties:
+      name:
+        type: string
+      current_commit:
+        type: string
+        optional: true
+    source:
+      kind: interview
+      ref: interview:domains/delivery/interview.jsonl#L4
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+    status: confirmed
+links: {}
+actions:
+  request_delivery:
+    description: Receive a request to deliver an approved commit, handed off by Authoring.
+      The request must say which branch the commit came from.
+    actor:
+    - system
+    creates: DeliveryRequest
+    params:
+      domain_id:
+        type: string
+      commit:
+        type: string
+      branch:
+        type: string
+      interface:
+        type: string
+      environment:
+        type: string
+      approver:
+        type: string
+    source:
+      kind: interview
+      ref: interview:domains/delivery/interview.jsonl#L27
+    status: confirmed
+  preview:
+    description: Build the commit and run its harness, before anything is deployed.
+    actor:
+    - approver
+    target: DeliveryRequest
+    effects:
+    - call: preview
+      with:
+        domain: target.domain_id
+        commit: target.commit
+      reply: record_build
+    source:
+      kind: interview
+      ref: interview:domains/delivery/interview.jsonl#L4
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+    status: confirmed
+    preconditions:
+    - id: not-deployed
+      check: target.deployed != true
+      reason: Already deployed; deliver again with a new request.
+      source:
+        kind: record
+        ref: records:docs/harness.md#L76-L94
+      status: confirmed
+  record_build:
+    description: Record the build and its harness result.
+    actor:
+    - external:kernel
+    target: DeliveryRequest
+    params:
+      build:
+        type: string
+      harness_ok:
+        type: boolean
+    effects:
+    - set:
+        target.build: params.build
+        target.harness_ok: params.harness_ok
+    source:
+      kind: interview
+      ref: interview:domains/delivery/interview.jsonl#L4
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+    status: confirmed
+  deploy:
+    description: Deploy the commit, under the fixed floor. Only a person deploys.
+    actor:
+    - approver
+    target: DeliveryRequest
+    requires: human
+    records_decision: true
+    effects:
+    - call: deploy
+      with:
+        domain: target.domain_id
+        commit: target.commit
+        approver: actor.id
+      reply: record_deployment
+    source:
+      kind: interview
+      ref: interview:domains/delivery/interview.jsonl#L4
+      quote: 9번은 추천대로 하면 될 것 같고 10번도 추천대로 하면 될 것 같아. 일단 A로 가되 나중에 추가할 수 있는 거지?
+    status: confirmed
+    preconditions:
+    - id: harness-passed
+      check: target.harness_ok == true
+      reason: Deploy only a build whose harness passed.
+      source:
+        kind: interview
+        ref: interview:domains/delivery/interview.jsonl#L5
+        quote: 전부 다 추천한 거 동의.
+      status: confirmed
+  record_deployment:
+    description: Record whether the deploy happened, or which floor rule refused it.
+      A new deploy clears the earlier probes.
+    actor:
+    - external:kernel
+    target: DeliveryRequest
+    params:
+      deployed:
+        type: boolean
+      error:
+        type: string
+    effects:
+    - set:
+        target.deployed: params.deployed
+        target.refusal: params.error
+        target.probes_passed: false
+    source:
+      kind: record
+      ref: records:docs/handoffs-and-deploy.md#L76-L86
+    status: confirmed
+  verify:
+    description: Verify the deployed domain in use, after its probes passed. Only
+      a person verifies.
+    actor:
+    - approver
+    target: DeliveryRequest
+    requires: human
+    effects:
+    - set:
+        target.verified: true
+    preconditions:
+    - id: deployed
+      check: target.deployed == true
+      reason: Only a deployment that happened can be verified.
+      source:
+        kind: interview
+        ref: interview:domains/delivery/interview.jsonl#L5
+        quote: 전부 다 추천한 거 동의.
+      status: confirmed
+    - id: probes-passed
+      check: target.probes_passed == true
+      reason: Run the probes on the deployment first; verify only one whose probes
+        passed.
+      source:
+        kind: record
+        ref: records:docs/handoffs-and-deploy.md#L76-L86
+      status: confirmed
+    source:
+      kind: record
+      ref: records:docs/handoffs-and-deploy.md#L76-L86
+    status: confirmed
+  record_probes:
+    description: Record what the probes found on the deployed commit.
+    actor:
+    - external:kernel
+    target: DeliveryRequest
+    params:
+      passed:
+        type: boolean
+      summary:
+        type: string
+    effects:
+    - set:
+        target.probes_passed: params.passed
+        target.probe_summary: params.summary
+    source:
+      kind: record
+      ref: records:docs/handoffs-and-deploy.md#L76-L86
+    status: confirmed
+  run_probes:
+    description: 'Run the probes on the deployed commit: its build, its scenarios
+      where it runs, and the objects in use against every invariant.'
+    actor:
+    - approver
+    target: DeliveryRequest
+    effects:
+    - call: probe
+      with:
+        domain: target.domain_id
+        commit: target.commit
+      reply: record_probes
+    preconditions:
+    - id: deployed
+      check: target.deployed == true
+      reason: Only a deployment that happened can be probed.
+    source:
+      kind: record
+      ref: records:docs/handoffs-and-deploy.md#L76-L86
+    status: confirmed
+transitions:
+  DeliveryRequest:
+    field: stage
+    initial: requested
+    matrix:
+      requested:
+        preview:
+          to: previewing
+          source:
+            kind: interview
+            ref: interview:domains/delivery/interview.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: confirmed
+        record_build: n/a
+        deploy:
+          deny: Preview it first.
+          source:
+            kind: interview
+            ref: interview:domains/delivery/interview.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: confirmed
+        record_deployment: n/a
+        verify: n/a
+        run_probes: n/a
+        record_probes: n/a
+      previewing:
+        preview:
+          deny: A preview is running.
+          source:
+            kind: interview
+            ref: interview:domains/delivery/interview.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: confirmed
+        record_build:
+          to: built
+          source:
+            kind: interview
+            ref: interview:domains/delivery/interview.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: confirmed
+        deploy:
+          deny: The preview has not finished.
+          source:
+            kind: interview
+            ref: interview:domains/delivery/interview.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: confirmed
+        record_deployment: n/a
+        verify: n/a
+        run_probes: n/a
+        record_probes: n/a
+      built:
+        preview:
+          to: previewing
+          source:
+            kind: interview
+            ref: interview:domains/delivery/interview.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: confirmed
+        record_build: n/a
+        deploy:
+          to: deploying
+          source:
+            kind: interview
+            ref: interview:domains/delivery/interview.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: confirmed
+        record_deployment: n/a
+        verify: n/a
+        run_probes: n/a
+        record_probes: n/a
+      deploying:
+        preview:
+          deny: A deploy is running.
+          source:
+            kind: interview
+            ref: interview:domains/delivery/interview.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: confirmed
+        record_build: n/a
+        deploy:
+          deny: A deploy is running.
+          source:
+            kind: interview
+            ref: interview:domains/delivery/interview.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: confirmed
+        record_deployment:
+          to: done
+          source:
+            kind: interview
+            ref: interview:domains/delivery/interview.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: confirmed
+        verify: n/a
+        run_probes: n/a
+        record_probes: n/a
+      done:
+        preview:
+          to: previewing
+          source:
+            kind: interview
+            ref: interview:domains/delivery/interview.jsonl#L5
+          status: confirmed
+        record_build: n/a
+        deploy:
+          to: deploying
+          source:
+            kind: interview
+            ref: interview:domains/delivery/interview.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: confirmed
+        record_deployment: n/a
+        verify:
+          to: verified
+          source:
+            kind: interview
+            ref: interview:domains/delivery/interview.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: confirmed
+        run_probes:
+          to: done
+          source:
+            kind: record
+            ref: records:docs/handoffs-and-deploy.md#L76-L86
+          status: confirmed
+        record_probes:
+          to: done
+          source:
+            kind: record
+            ref: records:docs/handoffs-and-deploy.md#L76-L86
+          status: confirmed
+      verified:
+        preview: n/a
+        record_build: n/a
+        deploy: n/a
+        record_deployment: n/a
+        verify:
+          deny: Already verified.
+          source:
+            kind: interview
+            ref: interview:domains/delivery/interview.jsonl#L5
+            quote: 전부 다 추천한 거 동의.
+          status: confirmed
+        run_probes: n/a
+        record_probes: n/a
+invariants:
+- id: deployed-builds-passed-their-harness
+  'on': DeliveryRequest
+  check: target.deployed != true or target.harness_ok == true
+  reason: Nothing reaches the environment unless its harness passed.
+  source:
+    kind: interview
+    ref: interview:domains/delivery/interview.jsonl#L6
+    quote: '19: a'
+  status: confirmed
+- id: verified-requests-were-deployed
+  'on': DeliveryRequest
+  check: target.stage != 'verified' or target.deployed == true
+  reason: Only a deployment that happened is verified.
+  source:
+    kind: interview
+    ref: interview:domains/delivery/interview.jsonl#L6
+    quote: '19: a'
+  status: confirmed
+- id: finished-deploys-record-the-outcome
+  'on': DeliveryRequest
+  check: target.stage not in ['done', 'verified'] or exists(target.deployed)
+  reason: A finished deploy records whether it happened.
+  source:
+    kind: interview
+    ref: interview:domains/delivery/interview.jsonl#L6
+    quote: '19: a'
+  status: confirmed
+- id: deploying-builds-passed-their-harness
+  'on': DeliveryRequest
+  check: target.stage != 'deploying' or target.harness_ok == true
+  reason: A deploy starts only from a build whose harness passed.
+  source:
+    kind: interview
+    ref: interview:domains/delivery/interview.jsonl#L11
+    quote: 25번은 A로 추천으로 해도 될 것 같고, 이십육 번도 A로.
+  status: confirmed
+- id: verified-requests-passed-their-probes
+  'on': DeliveryRequest
+  check: target.stage != 'verified' or target.probes_passed == true
+  reason: A verified deployment passed its probes.
+  source:
+    kind: record
+    ref: records:docs/handoffs-and-deploy.md#L76-L86
+  status: confirmed
+world:
+  actors:
+    approver:
+    - ana
+  fixtures:
+  - Environment:
+      id: ENV-local
+      name: local
+  - DeliveryRequest:
+      id: R1
+      domain_id: authoring
+      commit: 2-c3d4
+      branch: main
+      interface: 1.1.0
+      environment: local
+      approver: ana
+      stage: requested
+  - DeliveryRequest:
+      id: R2
+      domain_id: authoring
+      commit: 3-e5f6
+      branch: main
+      interface: 1.1.0
+      environment: local
+      approver: ana
+      stage: built
+      build: b2
+      harness_ok: false
+  - DeliveryRequest:
+      id: R3
+      domain_id: authoring
+      commit: 4-a7b8
+      branch: main
+      interface: 1.2.0
+      environment: local
+      approver: ana
+      stage: done
+      build: b3
+      harness_ok: true
+      deployed: false
+      refusal: 'stranded: E-live (state ''ended'' is gone)'
+  - DeliveryRequest:
+      id: R4
+      domain_id: delivery
+      commit: 5-c9d0
+      branch: main
+      interface: 1.0.0
+      environment: local
+      approver: ana
+      stage: done
+      build: b4
+      harness_ok: true
+      deployed: true
+      refusal: ''
+  - DeliveryRequest:
+      id: R5
+      domain_id: delivery
+      commit: 6-e1f2
+      branch: main
+      interface: 1.0.0
+      environment: local
+      approver: ana
+      stage: done
+      build: b5
+      harness_ok: true
+      deployed: true
+      refusal: ''
+      probes_passed: true
+      probe_summary: 'passed: 4 of 4 scenario(s) pass; 1 object(s) checked'
+  - DeliveryRequest:
+      id: R6
+      domain_id: authoring
+      commit: 7-a3b4
+      branch: main
+      interface: 1.2.0
+      environment: local
+      approver: ana
+      stage: verified
+      build: b6
+      harness_ok: true
+      deployed: true
+      refusal: ''
+      probes_passed: true
+      probe_summary: 'passed: 9 of 9 scenario(s) pass; 3 object(s) checked'
+      verified: true
+scenarios:
+- id: deliver-preview-deploy-verify
+  given:
+    from_world: R1
+  steps:
+  - actor:
+      role: approver
+    do: deploy
+    target: R1
+    expect:
+      denied_by: matrix
+      reason_shown: true
+  - actor:
+      role: approver
+    do: preview
+    target: R1
+    expect:
+      state:
+        R1.stage: previewing
+  - actor:
+      external: kernel
+    do: record_build
+    target: R1
+    params:
+      build: b1
+      harness_ok: true
+    expect:
+      state:
+        R1.stage: built
+        R1.harness_ok: true
+  - actor:
+      role: approver
+    do: deploy
+    target: R1
+    expect:
+      state:
+        R1.stage: deploying
+  - actor:
+      external: kernel
+    do: record_deployment
+    target: R1
+    params:
+      deployed: true
+      error: ''
+    expect:
+      state:
+        R1.stage: done
+        R1.deployed: true
+  - actor:
+      role: approver
+    do: run_probes
+    target: R1
+    expect:
+      state:
+        R1.stage: done
+  - actor:
+      external: kernel
+    do: record_probes
+    target: R1
+    params:
+      passed: true
+      summary: 'passed: 3 of 3 scenario(s) pass; 1 object(s) checked'
+    expect:
+      state:
+        R1.probes_passed: true
+  - actor:
+      role: approver
+    do: verify
+    target: R1
+    expect:
+      state:
+        R1.stage: verified
+        R1.verified: true
+  source:
+    kind: interview
+    ref: interview:domains/delivery/interview.jsonl#L20
+  status: confirmed
+- id: a-failed-harness-is-never-deployed
+  given:
+    from_world: R2
+  steps:
+  - actor:
+      role: approver
+    do: deploy
+    target: R2
+    expect:
+      denied_by: harness-passed
+- id: a-refused-deploy-is-not-verified-and-can-be-retried
+  given:
+    from_world: R3
+  steps:
+  - actor:
+      role: approver
+    do: verify
+    target: R3
+    expect:
+      denied_by: deployed
+  - actor:
+      role: approver
+    do: run_probes
+    target: R3
+    expect:
+      denied_by: deployed
+  - actor:
+      role: approver
+    do: preview
+    target: R3
+    expect:
+      state:
+        R3.stage: previewing
+- id: verify-needs-probes-that-passed
+  given:
+    from_world: R4
+  steps:
+  - actor:
+      role: approver
+    do: verify
+    target: R4
+    expect:
+      denied_by: probes-passed
+      reason_shown: true
+  - actor:
+      role: approver
+    do: run_probes
+    target: R4
+    expect:
+      state:
+        R4.stage: done
+  - actor:
+      external: kernel
+    do: record_probes
+    target: R4
+    params:
+      passed: false
+      summary: 'R9: breaks verified-requests-were-deployed'
+    expect:
+      state:
+        R4.probes_passed: false
+  - actor:
+      role: approver
+    do: verify
+    target: R4
+    expect:
+      denied_by: probes-passed
+  - actor:
+      external: kernel
+    do: record_probes
+    target: R4
+    params:
+      passed: true
+      summary: 'passed: 3 of 3 scenario(s) pass; 1 object(s) checked'
+    expect:
+      state:
+        R4.probes_passed: true
+  - actor:
+      role: approver
+    do: verify
+    target: R4
+    expect:
+      state:
+        R4.stage: verified
+        R4.verified: true
+glossary:
+  delivery request: A request, handed over from Authoring, to put one approved commit
+    of a domain into an environment.
+  preview: Building a commit and running its harness before anything is deployed;
+    a preview changes no environment.
+  deploy floor: 'Rules the kernel enforces on every deploy that no declaration can
+    weaken: approved, on main, not a downgrade, harness passed, a person deploys,
+    nothing stranded.'
+  verified: A deployment a person has verified in use, after its probes passed there.
+rules:
+  only-a-person-deliveryrequest-deployed:
+    'on': DeliveryRequest.deployed
+    requires: human
+    reason: 'Only a person sets the deployed of a DeliveryRequest: every action that
+      does so today requires a person (deploy).'
+    source:
+      kind: record
+      ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
+    status: confirmed
+  only-a-person-deliveryrequest-deploying:
+    'on': DeliveryRequest.deploying
+    requires: human
+    reason: 'Only a person brings a DeliveryRequest to deploying: every action that
+      does so today requires a person (deploy).'
+    source:
+      kind: record
+      ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
+    status: confirmed
+  only-a-person-deliveryrequest-done:
+    'on': DeliveryRequest.done
+    requires: human
+    reason: 'Only a person brings a DeliveryRequest to done: every action that does
+      so today requires a person (deploy).'
+    source:
+      kind: record
+      ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
+    status: confirmed
+  only-a-person-deliveryrequest-refusal:
+    'on': DeliveryRequest.refusal
+    requires: human
+    reason: 'Only a person sets the refusal of a DeliveryRequest: every action that
+      does so today requires a person (deploy).'
+    source:
+      kind: record
+      ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
+    status: confirmed
+  only-a-person-deliveryrequest-verified:
+    'on': DeliveryRequest.verified
+    requires: human
+    reason: 'Only a person brings a DeliveryRequest to verified: every action that
+      does so today requires a person (verify).'
+    source:
+      kind: record
+      ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
+    status: confirmed

@@ -629,61 +629,6 @@
         "additionalProperties": false
       }
     },
-    "rules": {
-      "type": "object",
-      "description": "outcome rules (ADR-0048): whatever action brings `on` about, its actor must meet `requires`",
-      "additionalProperties": {
-        "type": "object",
-        "properties": {
-          "on": {
-            "type": "string",
-            "description": "<Object>.<state> or <Object>.<property>"
-          },
-          "requires": {
-            "oneOf": [
-              {
-                "const": "human"
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "roles": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
-                    "minItems": 1
-                  }
-                },
-                "required": [
-                  "roles"
-                ],
-                "additionalProperties": false
-              }
-            ]
-          },
-          "reason": {
-            "type": "string"
-          },
-          "source": {
-            "$ref": "#/$defs/source"
-          },
-          "status": {
-            "enum": [
-              "proposed",
-              "confirmed",
-              "unknown"
-            ]
-          }
-        },
-        "required": [
-          "on",
-          "requires",
-          "reason"
-        ],
-        "additionalProperties": false
-      }
-    },
     "invariants": {
       "type": "array",
       "items": {
@@ -1005,6 +950,74 @@
         },
         "required": [
           "actions"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "rules": {
+      "type": "object",
+      "description": "outcome rules (ADR-0048): whatever action brings `on` about, its actor must meet `requires`",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "on": {
+            "type": "string",
+            "description": "<Object>.<state> or <Object>.<property>"
+          },
+          "requires": {
+            "oneOf": [
+              {
+                "const": "human"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "roles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "roles"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "check": {
+                    "type": "string",
+                    "description": "check-language expression (docs/domain-schema.md)"
+                  }
+                },
+                "required": [
+                  "check"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/$defs/source"
+          },
+          "status": {
+            "enum": [
+              "proposed",
+              "confirmed",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "on",
+          "requires",
+          "reason"
         ],
         "additionalProperties": false
       }

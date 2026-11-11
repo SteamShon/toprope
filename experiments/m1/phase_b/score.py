@@ -25,7 +25,9 @@ mean, minimum and maximum):
   `seeded` in that run, over all of them; also without handoff-breaking changes, and per type
 - pre-deploy precision: flags labelled `seeded` or `other-real`, over all flags of the run
 - found after deploy: a seeded problem missed (flagged in at most half the runs), where a probe
-  that passed (in most of its runs) before the change fails after it; silent: never surfaced
+  that passed (in most of its runs) before the change fails after it; silent: never surfaced.
+  Only probes that pass the gate count (M1-recheck.md: 2 of 3 runs at `seq: 0`, in every arm);
+  `found_after_deploy_ungated` keeps the count over every probe, as M1 was first scored
 - iteration time: per change, the median of its timed repeats with the part that bounds it, then
   the median over changes
 - the noise floor (the largest spread of an arm's recall), and the Toprope arm's repeat check
@@ -128,6 +130,17 @@ def _owners(key: str) -> set[str]:
     return {f"{dom}/{parts[0]}"}
 
 
+# A check whose findings sit on the edited element by construction: the capability diff reports
+# who can now reach what through the very action the change edited, and an info finding is a
+# summary, not a problem. Matching their `where` to the binding says nothing, so the grader labels
+# them like any other flag (found in the M1 recheck: 67 such flags matched every time).
+NOT_SCRIPTED_CHECKS = {"capability"}
+
+
+def scriptable(finding: dict[str, Any]) -> bool:
+    return finding.get("check") not in NOT_SCRIPTED_CHECKS and finding.get("severity") != "info"
+
+
 def binding_match(finding: dict[str, Any], bound: list[str]) -> bool:
     """A Toprope finding touches the elements the change is bound to: the same element, or one
     of the same action or object."""
@@ -217,7 +230,7 @@ def grade_change(backend: Any, seq: int, req: dict[str, Any], recs: dict[str, di
             for i, f in enumerate(r.get("findings") or []):
                 fid = f"{letter}.{r['run']}.{i}"
                 lines.append(f"{fid}. {json.dumps(f, ensure_ascii=False)}")
-                script = "seeded" if arm == "toprope" and binding_match(f, bound) else None
+                script = "seeded" if arm == "toprope" and scriptable(f) and binding_match(f, bound) else None
                 flags.append({"id": fid, "run": r["run"], "index": i, "flag": f, "script_label": script})
         blocks.append("\n".join(lines))
     user = f"{_sealed_context(seq, req, key, binding)}\n\n" + "\n\n".join(blocks)
@@ -269,7 +282,9 @@ def grade_probe(backend: Any, probe: dict[str, Any], run_dir: Path, result: dict
     user = (f"Probe {probe['id']}. Task given to the agent: {probe['task']}\n"
             f"Starting state: {probe['starting_state']}\n"
             f"It must: {json.dumps(probe.get('must', []))}\nIt must not: {json.dumps(probe.get('must_not', []))}\n"
-            f"Notes: {probe.get('notes', '')}\n\n--- What the agent did ---\n{_probe_text(run_dir, result)}")
+            + (f"How the researcher reads it (a pass and a fail per item): {json.dumps(probe['examples'])}\n"
+               if probe.get("examples") else "")
+            + f"Notes: {probe.get('notes', '')}\n\n--- What the agent did ---\n{_probe_text(run_dir, result)}")
     data = _ask_json(backend, prompt("grade_probe"), user, out) or {}
     passed = data.get("passed")
     return {"probe": probe["id"], "passed": passed if isinstance(passed, bool) else None,
@@ -277,14 +292,15 @@ def grade_probe(backend: Any, probe: dict[str, Any], run_dir: Path, result: dict
 
 
 def grade(run: Path, instruments: Path, backend: Any, requests: list[dict[str, Any]], partial: bool = False,
-          seed: int | None = None) -> Path:
+          seed: int | None = None, into: str = "scoring") -> Path:
+    """`into`: the scoring directory; a second sitting writes `scoring-2` (M1-recheck.md, criterion 3)."""
     seqs = [r["seq"] for r in requests]
     missing = complete(run, seqs)
     if missing and not partial:
         raise SystemExit("the key opens only after every arm has run every change:\n" + "\n".join(missing))
     key, binding = load_sealed(instruments)
     probes = {p["id"]: p for p in yaml.safe_load((instruments / "probe-suite.yaml").read_text())["probes"]}
-    out = run / "scoring"
+    out = run / into
     tr = out / "transcripts"
     recs = {arm: records(run, arm) for arm in ARMS}
     seed = secrets.randbits(32) if seed is None else seed
@@ -342,8 +358,27 @@ def _by_arm(graded: dict[str, Any], labels: dict[int, dict[str, str]]) -> dict[s
     return out
 
 
+def probe_gate(probes_by_arm: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
+    """The probe gate (M1-recheck.md, exit criterion 1): before any change (`seq: 0`) a probe passes
+    at least two thirds of its runs (2 of 3) in every arm, or it does not count for "found after
+    deploy". Returns each probe's passes and runs per arm, and the probes that pass the gate."""
+    at0: dict[str, dict[str, list[bool]]] = {}
+    for arm, ps in probes_by_arm.items():
+        for p in ps:
+            if p["seq"] == 0 and isinstance(p.get("passed"), bool):
+                at0.setdefault(p["probe"], {}).setdefault(arm, []).append(p["passed"])
+    arms = sorted(probes_by_arm)
+    table = {pid: {a: {"passed": sum(v.get(a, [])), "runs": len(v.get(a, []))} for a in arms}
+             for pid, v in sorted(at0.items())}
+    passing = sorted(pid for pid, row in table.items()
+                     if all(c["runs"] and c["passed"] * 3 >= c["runs"] * 2 for c in row.values()))
+    return {"by_probe": table, "passing": passing, "failing": sorted(set(table) - set(passing))}
+
+
 def arm_metrics(arm: str, changes: dict[int, dict[str, Any]], probes: list[dict[str, Any]], recs: dict[int, Any],
-                key, binding) -> dict[str, Any]:
+                key, binding, gated: set[str] | None = None) -> dict[str, Any]:
+    """`gated`: the probes that pass the gate; only they count for "found after deploy" (None: all,
+    as M1 was first scored)."""
     seeded = _seeded(key, binding)
     runs = sorted({r["run"] for s, rec in recs.items() if s > 0 for r in check_runs(rec)}) or [1]
 
@@ -397,17 +432,21 @@ def arm_metrics(arm: str, changes: dict[int, dict[str, Any]], probes: list[dict[
     pass_rate = [round(statistics.mean([p["passed"] for p in probes if p.get("run", 1) == r and p["seq"] > 0
                                         and isinstance(p["passed"], bool)] or [0]), 4) for r in probe_runs_]
     missed = [s for s in seeded if s not in flagged]
-    after_deploy: dict[int, list[str]] = {}
-    seqs_seen = sorted(probe_at)
-    for i, t_ in enumerate(seqs_seen[1:], 1):
-        for pid, ok in probe_at[t_].items():
-            if ok is not False or probe_at[seqs_seen[i - 1]].get(pid) is not True:
-                continue
-            last_fail = max((s for s in seqs_seen[:i] if probe_at[s].get(pid) is False), default=0)
-            for s in missed:
-                if last_fail < s <= t_:
-                    after_deploy.setdefault(s, []).append(pid)
-    after_deploy = {s: sorted(set(v)) for s, v in sorted(after_deploy.items())}
+
+    def found_after(only: set[str] | None) -> dict[int, list[str]]:
+        found: dict[int, list[str]] = {}
+        seqs_seen = sorted(probe_at)
+        for i, t_ in enumerate(seqs_seen[1:], 1):
+            for pid, ok in probe_at[t_].items():
+                if (only is not None and pid not in only) or ok is not False \
+                        or probe_at[seqs_seen[i - 1]].get(pid) is not True:
+                    continue
+                last_fail = max((s for s in seqs_seen[:i] if probe_at[s].get(pid) is False), default=0)
+                for s in missed:
+                    if last_fail < s <= t_:
+                        found.setdefault(s, []).append(pid)
+        return {s: sorted(set(v)) for s, v in sorted(found.items())}
+    after_deploy = found_after(gated)
     breakages = [s for s in seeded if key[s].get("problem") == "breakage"]
     rec_spread = spread([recall(seeded, r) for r in runs])
     out: dict[str, Any] = {
@@ -421,6 +460,7 @@ def arm_metrics(arm: str, changes: dict[int, dict[str, Any]], probes: list[dict[
         "precision": spread([precision(r) for r in runs])["mean"], "precision_spread": spread([precision(r) for r in runs]),
         "precision_grouped_spread": spread([precision_grouped(r) for r in runs]),
         "found_after_deploy": after_deploy, "silent": sorted(s for s in missed if s not in after_deploy),
+        "found_after_deploy_ungated": found_after(None),
         "breakages_found_only_after_deploy": round(len([s for s in breakages if s in after_deploy]) / len(breakages), 4)
         if breakages else None,
         "edit_fidelity": {f: len([c for c in changes.values() if c["edit"].get("fidelity") == f]) for f in FIDELITY},
@@ -535,21 +575,137 @@ def score(run: Path, instruments: Path) -> dict[str, Any]:
     key, binding = load_sealed(instruments)
     rules = yaml.safe_load((instruments / "verdict-rules.yaml").read_text())
     by_arm = _by_arm(graded, labels)
-    m = {arm: arm_metrics(arm, by_arm[arm], graded["probes"].get(arm, []), records(run, arm), key, binding)
+    gate = probe_gate({arm: graded["probes"].get(arm, []) for arm in ARMS})
+    m = {arm: arm_metrics(arm, by_arm[arm], graded["probes"].get(arm, []), records(run, arm), key, binding,
+                          set(gate["passing"]))
          for arm in ARMS}
     disagree = [(c["seq"], f["id"]) for c in graded["changes"] for f in c["flags"]
                 if f.get("script_label") and f.get("label") != f["script_label"]]
     result = {"partial": graded.get("partial", False), "metrics": m, "verdicts": verdicts(m, rules),
-              "noise_floor": noise_floor(m), "script_and_researcher_disagree": disagree,
+              "noise_floor": noise_floor(m), "probe_gate": gate, "by_sitting": by_sitting(run, key, binding),
+              "script_and_researcher_disagree": disagree,
               "unbindable": sorted(s for s, b in binding.items() if b.get("unbindable"))}
     (run / "scoring/metrics.json").write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n")
     return result
 
 
+def sitting_metrics(run: Path, scoring: str, key: dict[int, Any], binding: dict[int, Any]) -> dict[str, Any]:
+    """Each arm's mean recall and precision from one sitting's proposed labels, as the grader read
+    them (a flag with no label counts as not seeded and not real)."""
+    graded = yaml.safe_load((run / scoring / "proposed.yaml").read_text())
+    labels = {int(s): v for s, v in yaml.safe_load((run / scoring / "blind-labels.yaml").read_text())["labels"].items()}
+    by_arm = _by_arm(graded, labels)
+    out = {}
+    for arm in ARMS:
+        m = arm_metrics(arm, by_arm[arm], [], records(run, arm), key, binding)
+        out[arm] = {"recall": m["recall"], "precision": m["precision"],
+                    "precision_grouped": m["precision_grouped_spread"]["mean"]}
+    return out
+
+
+def grader_recall(run: Path, scoring: str, key: dict[int, Any], binding: dict[int, Any]) -> dict[str, float | None]:
+    return {arm: v["recall"] for arm, v in sitting_metrics(run, scoring, key, binding).items()}
+
+
+def by_sitting(run: Path, key: dict[int, Any], binding: dict[int, Any], first: str = "scoring",
+               second: str = "scoring-2") -> dict[str, Any] | None:
+    """Each arm's recall and precision from each sitting, with their range (M1-recheck.md,
+    criterion 3): the reference numbers when one grader's reading is not steady. None without a
+    second sitting."""
+    if not (run / second / "proposed.yaml").exists():
+        return None
+    a, b = sitting_metrics(run, first, key, binding), sitting_metrics(run, second, key, binding)
+    out: dict[str, Any] = {}
+    for arm in ARMS:
+        out[arm] = {}
+        for m in ("recall", "precision", "precision_grouped"):
+            xs = [v for v in (a[arm][m], b[arm][m]) if v is not None]
+            out[arm][m] = {"first": a[arm][m], "second": b[arm][m],
+                           "range": [min(xs), max(xs)] if xs else None}
+    return out
+
+
+def compare_gradings(run: Path, instruments: Path, first: str = "scoring", second: str = "scoring-2",
+                     limit: float = 0.1) -> dict[str, Any]:
+    """The grader's noise (M1-recheck.md, exit criterion 3): the same run graded in two sittings,
+    each arm's recall from each, and whether they differ by at most `limit`."""
+    key, binding = load_sealed(instruments)
+    a, b = grader_recall(run, first, key, binding), grader_recall(run, second, key, binding)
+    diff = {arm: None if a[arm] is None or b[arm] is None else round(abs(a[arm] - b[arm]), 4) for arm in ARMS}
+    worst = max((d for d in diff.values() if d is not None), default=None)
+    out = {"first": a, "second": b, "difference": diff, "largest": worst, "limit": limit,
+           "within_limit": worst is not None and worst <= limit}
+    (run / "grader-noise.json").write_text(json.dumps(out, indent=2) + "\n")
+    return out
+
+
+def rescript(run: Path, scoring: str = "scoring") -> dict[str, Any]:
+    """Take back a script label from a flag `scriptable` now excludes, in a sitting graded before:
+    its label becomes the grader's. Needs no key; the sitting's file is rewritten in place."""
+    path = run / scoring / "proposed.yaml"
+    graded = yaml.safe_load(path.read_text())
+    n = 0
+    same: dict[tuple, str] = {}                          # the grader's label of a finding, by change and text
+    for c in graded["changes"]:
+        for f in c["flags"]:
+            fl = f.get("flag") or {}
+            if f.get("grader_label"):
+                same.setdefault((c["seq"], f["id"].split(".")[0], fl.get("check"), fl.get("where"), fl.get("problem")),
+                                f["grader_label"])
+    for c in graded["changes"]:
+        for f in c["flags"]:
+            fl = f.get("flag") or {}
+            if f.get("script_label") and not scriptable(fl):
+                # A grader that left it unlabelled gave the same finding of the same label elsewhere
+                # in this change (the compiler repeats it in every run): that label, else none.
+                label = f.get("grader_label") or same.get(
+                    (c["seq"], f["id"].split(".")[0], fl.get("check"), fl.get("where"), fl.get("problem")))
+                f["script_label"], f["label"], f["script_cleared"] = None, label, True
+                n += 1
+    head = "".join(line + "\n" for line in path.read_text().splitlines() if line.startswith("#"))
+    path.write_text(head + yaml.safe_dump(graded, sort_keys=False, allow_unicode=True, width=110))
+    left = sum(1 for c in graded["changes"] for f in c["flags"] if f.get("label") not in LABELS)
+    return {"file": str(path), "script_labels_cleared": n, "flags_without_label": left}
+
+
+def regrade_missing(run: Path, instruments: Path, backend: Any, scoring: str = "scoring",
+                    redo: list[tuple[str, int]] | None = None) -> dict[str, Any]:
+    """Grade again, once, each probe run of a sitting the grader left without a pass or fail
+    (no JSON even after the retry), so every grade comes from the grader (M1-recheck.md,
+    criterion 2). A run that did not complete stays for the researcher."""
+    path = run / scoring / "proposed.yaml"
+    graded = yaml.safe_load(path.read_text())
+    probes = {p["id"]: p for p in yaml.safe_load((instruments / "probe-suite.yaml").read_text())["probes"]}
+    tr = run / scoring / "transcripts"
+    done, left = 0, 0
+    again = set(redo or [])
+    for arm, rows in graded["probes"].items():
+        for row in rows:
+            if (arm, row["seq"]) in again:                 # its probes ran again: the old grade is moot
+                row.update(passed=None, why="", error=None)
+            if isinstance(row.get("passed"), bool) or row.get("error"):
+                continue
+            rec = records(run, arm).get(row["seq"], {})
+            pr = next((x for x in probe_runs(rec) if x["run"] == row.get("run", 1)), None)
+            res = next((x for x in (pr or {}).get("results", []) if x["probe"] == row["probe"]), None)
+            if pr is None or res is None:
+                left += 1
+                continue
+            g = grade_probe(backend, probes[row["probe"]], run / arm / f"seq-{row['seq']:02d}" / pr["dir"], res,
+                            tr / f"{arm}-seq-{row['seq']:02d}-run-{row.get('run', 1)}-{row['probe']}-regrade.jsonl")
+            row.update({k: g.get(k) for k in ("passed", "why", "error")}, regraded=True)
+            done += 1
+            left += not isinstance(g["passed"], bool)
+    head = "".join(line + "\n" for line in path.read_text().splitlines() if line.startswith("#"))
+    path.write_text(head + yaml.safe_dump(graded, sort_keys=False, allow_unicode=True, width=110))
+    return {"file": str(path), "regraded": done, "still_without_a_grade": left}
+
+
 def to_decide(run: Path) -> dict[str, Any]:
     """What the researcher must decide in the grades (ADR-0047 §3): flags where the script and the
     grader disagree, flags with no label, edits with no judgment, and probe runs with no result.
-    The rest is accepted as proposed. Reads `confirmed.yaml` if it exists, else `proposed.yaml`."""
+    The rest is accepted as proposed. Reads `confirmed.yaml` if it exists, else `proposed.yaml`.
+    A disagreement the researcher settled in `confirmed.yaml` carries `decided: true`."""
     path = run / "scoring/confirmed.yaml"
     if not path.exists():
         path = run / "scoring/proposed.yaml"
@@ -558,7 +714,8 @@ def to_decide(run: Path) -> dict[str, Any]:
     for c in g["changes"]:
         for f in c["flags"]:
             if f.get("label") not in LABELS or (f.get("script_label") and f.get("grader_label")
-                                                and f["script_label"] != f["grader_label"]):
+                                                and f["script_label"] != f["grader_label"]
+                                                and not f.get("decided")):
                 flags.append({"seq": c["seq"], "id": f["id"], "label": f.get("label"),
                               "script_label": f.get("script_label"), "grader_label": f.get("grader_label"),
                               "flag": f.get("flag"), "why": f.get("why")})

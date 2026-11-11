@@ -57,12 +57,13 @@ CATALOG: dict[str, Service] = {s.name: s for s in (
     Service("search_sources", "Search the workspace's sources (redacted; local-only never served).",
             {"query": "string"}, {"refs": "strings"}),
     Service("stage_questions", "The current stage of the working copy and its bundle of questions.", {},
-            {"stage": "string", "bundle": "string", "questions": "strings"}),
+            {"stage": "string", "bundle": "string", "questions": "strings", "text": "string"}),
     Service("propose_element", "Write a drafted element into the working copy, citing a source chunk; "
             "always `proposed`. `value` is JSON.", {"path": "string", "value": "string", "source": "string"},
             {"issues": "integer", "summary": "string"}),
     Service("record_answer", "Record the owner's answer in their words; its decisions (JSON list of "
-            "{path, value}) become proposed elements citing it.",
+            "{path, value}, or `choice:<id>` for a choice the question offered) become proposed elements "
+            "citing it.",
             {"question": "string", "answer": "string", "decisions": "string"}, {"ref": "string"}),
     Service("confirm_element", "Confirm drafted elements (space-separated paths, or `all` for every "
             "proposed one). The calling person must be the approver.",

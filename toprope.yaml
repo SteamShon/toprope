@@ -5,3 +5,5 @@ kernel_root: .
 workspace: toprope.authoring.workspace.yaml
 env: .toprope/env
 failures: .toprope/failures
+# How a person takes a step an agent is refused, for the self domains (ADR-0039): added to the fix.
+person_route: "through a human request they approve in GitHub (`toprope-change` writes one)"

@@ -42,7 +42,7 @@ def test_a_domain_a_composition_or_no_config_ignores_the_file(tmp_path, monkeypa
 
 
 @pytest.mark.parametrize("text, says", [
-    ("compositon: c.yaml\n", "unknown key(s) compositon. Fix: use only the keys composition"),
+    ("compositon: c.yaml\n", "unknown key(s) compositon. Fix: use only the keys domain, store, composition"),
     ("- a\n- b\n", "expected a mapping"),
     ("composition: [a, b]\n", "`composition` must be a single value"),
     ("composition: : :\n", "not valid YAML"),

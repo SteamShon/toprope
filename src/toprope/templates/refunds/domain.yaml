@@ -1,0 +1,29 @@
+domain: refunds
+version: 1
+roles: [support, finance]
+objects:
+  Order:
+    description: A paid order.
+    properties:
+      status: {enum: [paid, refunded]}
+      days_since_purchase: {type: integer}
+actions:
+  refund_order:
+    description: Refund a paid order.
+    actor: [support]
+    target: Order
+    preconditions:
+      - id: within-window
+        check: target.days_since_purchase <= 7
+        reason: Refunds are allowed within 7 days of purchase.
+    event: OrderRefunded
+transitions:
+  Order:
+    field: status
+    matrix:
+      paid:     {refund_order: refunded}
+      refunded: {refund_order: {deny: "This order is already refunded."}}
+world:
+  fixtures:
+    - Order: {id: O-3, status: paid, days_since_purchase: 3}
+    - Order: {id: O-8, status: paid, days_since_purchase: 8}
