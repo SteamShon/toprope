@@ -17,12 +17,10 @@ def proposed_elements(doc: dict[str, Any]) -> list[str]:
                 for p in el.get("preconditions") or []:
                     if isinstance(p, dict) and p.get("status") == "proposed":
                         out.append(f"actions.{name}.preconditions.{p.get('id')}")
-    for name, r in (doc.get("rules") or {}).items():              # outcome rules (ADR-0048)
-        if isinstance(r, dict) and r.get("status") == "proposed":
-            out.append(f"rules.{name}")
-    for name, h in (doc.get("handoffs") or {}).items():
-        if isinstance(h, dict) and h.get("status") == "proposed":
-            out.append(f"handoffs.{name}")
+    for kind in ("handoffs", "rules"):
+        for name, el in (doc.get(kind) or {}).items():
+            if isinstance(el, dict) and el.get("status") == "proposed":
+                out.append(f"{kind}.{name}")
     for inv in doc.get("invariants") or []:
         if isinstance(inv, dict) and inv.get("status") == "proposed":
             out.append(f"invariants.{inv.get('id')}")

@@ -10,7 +10,7 @@
 instrument: binding
 experiment: M1
 status: frozen
-domain_version: authoring@9-b4ec65433222f096, delivery@1-584aaeea5e686ee8
+domain_version: authoring@12-acf2a5f6e362166c, delivery@6-c2678fc294429d48
 bindings:
 - seq: 1
   elements:

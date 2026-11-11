@@ -14,7 +14,7 @@ sources:
     kind: records
     path: docs
     globs: ["workflow.md", "kernel-commands.md", "commits.md", "change-check.md", "world-map.md", "experiments/M1-self-domains-scope.md",
-            "adr/0014-*", "adr/0017-*", "adr/0022-*", "adr/0025-*", "adr/0029-*", "adr/0032-*", "adr/0033-*", "adr/0037-*"]
+            "adr/0014-*", "adr/0017-*", "adr/0022-*", "adr/0025-*", "adr/0029-*", "adr/0032-*", "adr/0033-*", "adr/0037-*", "adr/0048-*"]
   - id: interview
     kind: interview-log
     path: domains/authoring/interview.jsonl

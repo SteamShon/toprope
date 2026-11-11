@@ -264,3 +264,18 @@ def test_the_kernel_serves_stages_and_skips_an_optional_one(ws):
     assert not refused["ok"] and "optional" in refused["error"]
 
 
+
+
+def test_the_invariants_stage_asks_for_outcome_rules_and_a_rule_fills_it(ws):
+    put(ws, upto("invariants"))
+    b = ws.questions(limit=50)
+    assert b["stage"] == "invariants"
+    assert any(q["kind"] == "rules" and q["decides"] == ["rules"] and "whatever the action" in q["text"]
+               for q in b["questions"])
+    doc = upto("invariants")
+    doc["rules"] = {"only-clerks-ship": {"on": "Order.shipped", "requires": {"roles": ["clerk"]},
+                                         "reason": "Only a clerk ships.", "status": "proposed"}}
+    put(ws, doc)
+    assert current(ws) == "world"
+    p = {s["stage"]: s for s in ws.progress()["stages"]}["invariants"]
+    assert p["rules"] == 1

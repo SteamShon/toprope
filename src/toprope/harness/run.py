@@ -147,7 +147,12 @@ class Harness:
                 if c.instance:
                     s.seed(c.obj, {**copy.deepcopy(c.instance.data), "id": oid})
                     side[c.id + "#allowed"] = sorted(s.allowed(actor, oid))
-                o = s.do(actor, c.action, oid, c.params, f"h{n}")
+                if c.agent:
+                    from ..identity import Caller
+                    from .cases import agent_grant, agent_of
+                    o = s.do_as(Caller(agent_of(actor), actor, agent_grant(c.action)), c.action, oid, c.params, f"h{n}")
+                else:
+                    o = s.do(actor, c.action, oid, c.params, f"h{n}")
                 obs[c.id] = o
                 if not matches(c.expect, o, self.d, c.obj):
                     kind = "invariant" if o.get("code") == "invariant-guard" else "expectation"

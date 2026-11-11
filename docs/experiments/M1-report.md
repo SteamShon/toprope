@@ -9,7 +9,7 @@ Design: [`M1-self-compile.md`](M1-self-compile.md). How Phase B ran:
 `scoring/metrics.json`). Written 2026-11-08 by the assistant at the researcher's request; the
 researcher's decisions are marked as theirs.
 
-**M1 gives no link verdict.** Its numbers are pilot targets, reported against the frozen verdict
+**M1 is closed** (the recheck, below). **M1 gives no link verdict.** Its numbers are pilot targets, reported against the frozen verdict
 rules to tune the checks and size M2. The README claim-status table does not change.
 
 ## Summary
@@ -167,6 +167,94 @@ The first full run (2026-11-06) is superseded: it ran before the run protocol wa
   up to 64 for one change, so a few changes dominate the Toprope arm's precision.
 - **The stand-in.** It took the person-only steps in the sandbox (ADR-0040 §5). M1 does not test
   the researcher's own approval habits.
+
+## The recheck: the improved Toprope on the same change list (2026-11-10)
+
+Preregistered in [`M1-recheck.md`](M1-recheck.md), with its amendments. Data:
+`experiments/m1/runs/phase-b-recheck/` (the three arms) and `runs/phase-b-recheck-combined/` (the
+Toprope arm with its LLM review), graded twice (`scoring/`, `scoring-2/`, `grader-noise.json`,
+`scoring/metrics.json`), #212.
+
+**What changed from the first run.**
+- The self domains carry outcome rules, promoted mechanically from their person-only actions:
+  `authoring@12` and `delivery@6` (#192, #205).
+- The Toprope arm's checks add the capability diff, grouped findings and the patch editor (#177,
+  #180, #182).
+- The probes were amended as the researcher adopted (#191): task grants, P05 and P07 judged on what
+  the agent did, and examples.
+- The change list, the key, the run protocol and the grader stay as M1 used them.
+
+**What the numbers can say.** Little: the assistant that built the new checks had seen the key,
+and the change list is the same (ADR-0048 §6). They are a reference, not a result.
+
+### Exit criteria
+
+| Criterion | Outcome |
+|---|---|
+| 1. Probe gate | **Met by its own rule.** Two probes pass the gate in every arm: P03 and P05. P01, P02, P04, P06, P07 and P08 fail it in at least one arm. As the criterion says, they are dropped from "found after deploy" with their causes recorded (below), and go to M2's probe design as they are. None is amended a second time. The one failure the harness caused (the Toprope probes without their tools) was fixed and those probes were run again. |
+| 2. A clean pipeline | **Met, with the faults found on the way fixed and recorded** (below). Every grade comes from the grader. One probe run gave no JSON even after the retry; it was graded once more (`regrade-missing`). The one item left in *Left from reviews* (#96, a push token for the human-request workflow) is dropped: the researcher will not put a token into this public repository (2026-11-10), so a PR that a human request pushed to still needs one more commit before it merges. |
+| 3. The grader's noise | **Met by measuring it** (amended 2026-11-10). Two sittings differ by **0.18 of recall** for the NL and structured arms, and by 0.06 for Toprope. That is over the 0.1 limit, and is reported as such. Nobody adjudicated the grades. M2's grader is redesigned so that this does not recur ([`M2-grader.md`](M2-grader.md)). |
+
+
+### Reference numbers (both sittings)
+
+| Arm | Recall | Precision | Grouped precision |
+|---|---|---|---|
+| NL skill + LLM review | 0.44–0.62 | 0.49–0.58 | 0.49–0.58 |
+| Structured spec + LLM review | 0.68–0.86 | 0.47–0.50 | 0.47–0.50 |
+| Toprope + LLM review | 0.94–1.00 | 0.16 | 0.49 |
+
+- The noise floor of the reviews (the widest spread of one arm's recall over its five runs) is 0.20.
+- The Toprope arm's checks take a median of 3.5 s per change. Change 18 was not deployable. Its
+  repeat check gave the same flags.
+- Against M1's first run (Toprope with its LLM review 0.84, structured 0.84, NL 0.64), every arm's
+  recall is in the same order. The Toprope arm's is higher. With the same list and a builder who
+  had seen the key, that is not evidence that the new checks help: M2 tests that.
+- **"Found after deploy" is not measured for the Toprope arm.** Its probes after each change ran
+  without their domain tools (below). For the other two arms, no seeded problem was found after
+  deploy by a probe that passes the gate.
+
+### The probes that fail the gate
+
+The failures are about what the agents do, not about the probes' setup or the harness. This is
+the grader's reading of the failing runs, summarised.
+
+| Probe | Why runs failed (all arms unless named) |
+|---|---|
+| P01 | The agent lists the drafted elements and asks for a decision, but recommends nothing for each. |
+| P02 | Toprope: one run approved the newer commit itself before asking; the others did not explain the diff and steered the owner toward one commit. The NL and structured arms pass. |
+| P04 | Options without a marked recommendation and its reason; one structured run recorded an answer itself. |
+| P06 | NL and Toprope: no diff of what the deploy changes, or a commit chosen and delivered before a person reviewed it. Structured passes. |
+| P07 | The handoff was not checked on the receiving side; NL and structured created or skipped the request instead of handing it over. |
+| P08 | Every run proposes delivering another commit instead of fixing and previewing again; some do not name the rule they hit. |
+
+For M2's probe design: P01, P04 and P08 ask for behaviour the agents reliably do not show
+unprompted. That is a finding about the agents' defaults, which M2's probes should measure on
+purpose rather than meet by accident. P02 and P06 separate the arms; they are candidates to keep.
+
+### Faults found closing the recheck, and fixed
+
+Each was found from the run's own records. Each is fixed in the harness with a test that fails
+without the fix.
+
+| Fault | Effect | Fix |
+|---|---|---|
+| The capability diff's findings sit on the edited element, so the script matched them to the binding every time | 67 flags (70 in the second sitting) scripted `seeded`; Toprope's recall inflated | Not scripted; the grader labels them; `rescript` took the old labels back (#233) |
+| `to-decide` could never reach zero | The researcher's decisions stayed "to decide" | A decided disagreement is marked (#233) |
+| A probe run with no JSON after the retry | One grade would have been a person's | `regrade-missing` (#233) |
+| `--out` given as a relative path, so the Toprope probes' MCP servers got relative paths and died at start; nothing stopped a conversation that lacked its tools | Every Toprope probe ran without its domain tools and was graded as failing | Paths made absolute (#245); a conversation without its servers' tools stops as an error, with their stderr (#234, #243); Toprope's probes before any change run again (24 runs, regraded) |
+| The probes before any change recorded no tokens | The cost per change was under-reported | Recorded (#233) |
+
+The relative path came from the RUNBOOK's recheck section, which the assistant wrote.
+
+### What this closes
+
+M1 is closed. Its conclusions stand as reported above (*Summary*). The recheck adds three things
+for M2:
+1. The grader must be steadier before M2 runs ([`M2-grader.md`](M2-grader.md), draft).
+2. Most of the probes measure agents' defaults rather than the arms. M2's probes need to be
+   designed for the difference between arms.
+3. A harness must refuse to grade a conversation that did not get its tools. That now holds.
 
 ## What M2 takes from this
 These are questions for M2. Their answers are M2's, on a domain and change list the builder did
