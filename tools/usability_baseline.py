@@ -534,16 +534,48 @@ def _date(value: str) -> str:
     return value
 
 
+def _commit_time(root: Path, ref: str) -> str:
+    """The time a commit was made (its committer date), for a window that starts at a merge."""
+    import subprocess
+    r = subprocess.run(["git", "-C", str(root), "log", "-1", "--format=%cI", ref, "--"],
+                       capture_output=True, text=True)
+    if r.returncode != 0 or not r.stdout.strip():
+        raise SystemExit(fixed(f"{ref!r} is not a commit in {root}",
+                               "give a commit or tag the repository has, e.g. the merge that started the window"))
+    return r.stdout.strip()
+
+
+def _head(root: Path) -> str | None:
+    import subprocess
+    r = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], capture_output=True, text=True)
+    return r.stdout.strip() if r.returncode == 0 else None
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--root", default=".")
-    ap.add_argument("--since", type=_date, help="count only what happened at or after this date or time (ISO, UTC "
-                                                "if no offset)")
+    when = ap.add_mutually_exclusive_group()
+    when.add_argument("--since", type=_date, help="count only what happened at or after this date or time (ISO, UTC "
+                                                  "if no offset)")
+    when.add_argument("--since-commit", metavar="REF", help="count only what happened at or after this commit was "
+                                                            "made (e.g. the merge that started the window)")
     ap.add_argument("--until", type=_date, help="count only what happened before this date or time")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--record", metavar="FILE", help="also write the measure, its window and the repository's HEAD "
+                                                     "to this new JSON file (never overwritten)")
     a = ap.parse_args(argv)
-    m = measure(Path(a.root), a.since, a.until)
+    root = Path(a.root)
+    since = _commit_time(root, a.since_commit) if a.since_commit else a.since
+    if a.record and Path(a.record).exists():
+        raise SystemExit(fixed(f"{a.record} exists", "give --record a new file; a recorded measure is never rewritten"))
+    m = measure(root, since, a.until)
     print(json.dumps(m, indent=2, sort_keys=True) if a.json else render(m))
+    if a.record:
+        rec = {"measured_at": datetime.now(UTC).isoformat(timespec="seconds"), "head": _head(root),
+               "since_commit": a.since_commit, "measures": m}
+        Path(a.record).parent.mkdir(parents=True, exist_ok=True)
+        Path(a.record).write_text(json.dumps(rec, indent=2, sort_keys=True) + "\n")
+        print(f"\nRecorded in {a.record}.")
     return 0
 
 
