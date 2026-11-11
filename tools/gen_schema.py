@@ -129,6 +129,14 @@ domain = {
         "external": {"type": "object", "additionalProperties": obj(
             {"description": {"type": "string"}, "actions": {"type": "array", "items": {"type": "string"}}},
             ["actions"])},
+        "rules": {"type": "object", "description":
+                  "outcome rules (ADR-0048): whatever action brings `on` about, its actor must meet `requires`",
+                  "additionalProperties": with_prov({
+                      "on": {"type": "string", "description": "<Object>.<state> or <Object>.<property>"},
+                      "requires": {"oneOf": [{"const": "human"},
+                                             obj({"roles": {"type": "array", "items": {"type": "string"}, "minItems": 1}}, ["roles"]),
+                                             obj({"check": EXPR}, ["check"])]},
+                      "reason": {"type": "string"}}, ["on", "requires", "reason"])},
         "handoffs": {"type": "object", "additionalProperties": with_prov(
             {"when": obj({"action": {"type": "string"}, "outcome": {"enum": ["ok"]}}, ["action"]),
              "to": obj({"domain": ID, "interface": {"type": "string", "pattern": r"^[0-9]+\.x$"},

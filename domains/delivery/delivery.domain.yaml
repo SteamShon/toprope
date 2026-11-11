@@ -693,3 +693,49 @@ glossary:
     weaken: approved, on main, not a downgrade, harness passed, a person deploys,
     nothing stranded.'
   verified: A deployment a person has verified in use, after its probes passed there.
+rules:
+  only-a-person-deliveryrequest-deployed:
+    'on': DeliveryRequest.deployed
+    requires: human
+    reason: 'Only a person sets the deployed of a DeliveryRequest: every action that
+      does so today requires a person (deploy).'
+    source:
+      kind: record
+      ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
+    status: confirmed
+  only-a-person-deliveryrequest-deploying:
+    'on': DeliveryRequest.deploying
+    requires: human
+    reason: 'Only a person brings a DeliveryRequest to deploying: every action that
+      does so today requires a person (deploy).'
+    source:
+      kind: record
+      ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
+    status: confirmed
+  only-a-person-deliveryrequest-done:
+    'on': DeliveryRequest.done
+    requires: human
+    reason: 'Only a person brings a DeliveryRequest to done: every action that does
+      so today requires a person (deploy).'
+    source:
+      kind: record
+      ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
+    status: confirmed
+  only-a-person-deliveryrequest-refusal:
+    'on': DeliveryRequest.refusal
+    requires: human
+    reason: 'Only a person sets the refusal of a DeliveryRequest: every action that
+      does so today requires a person (deploy).'
+    source:
+      kind: record
+      ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
+    status: confirmed
+  only-a-person-deliveryrequest-verified:
+    'on': DeliveryRequest.verified
+    requires: human
+    reason: 'Only a person brings a DeliveryRequest to verified: every action that
+      does so today requires a person (verify).'
+    source:
+      kind: record
+      ref: records:docs/adr/0048-rules-bind-to-outcomes.md#L20-L56
+    status: confirmed

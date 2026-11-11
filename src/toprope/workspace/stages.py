@@ -3,7 +3,7 @@ Each stage asks one bundle of questions, takes the owner's answers at once, and 
 far the domain has come. The current stage is the first one that is not done, so a later
 change that breaks an earlier stage sends the interview back to it.
 
-  sources → purpose → cast (roles, objects, links) → actions → transitions → invariants
+  sources → purpose → cast (roles, objects, links) → actions → transitions → invariants and rules
           → world (fixtures, scenarios) → handoffs → review (confirmations, glossary)
 
 Within a stage, conflicts come first, then the questions for what is missing. In
@@ -43,8 +43,9 @@ STAGES: tuple[Stage, ...] = (
           "what it changes.", ("actions",)),
     Stage("transitions", "Transitions", "The stages each tracked thing goes through, and what each "
           "action does in each stage.", ("transitions",)),
-    Stage("invariants", "Invariants", "What must always be true, however things got there.",
-          ("invariants",), optional=True),
+    Stage("invariants", "Invariants and rules", "What must always be true, however things got there; "
+          "and what only some may bring about, whatever the action (ADR-0048).",
+          ("invariants", "rules"), optional=True),
     Stage("world", "World and scenarios", "Realistic examples of everything, and flows that test "
           "the world, including a refused step.", ("world", "scenarios")),
     Stage("handoffs", "Handoffs", "What this domain hands to another domain, when, and with what.",
@@ -62,6 +63,10 @@ ONCE = {"guard", "limit", "rule"}
 
 def _qid(kind: str, subject: str) -> str:
     return hashlib.sha1(f"{kind}:{subject}".encode()).hexdigest()[:10]
+
+
+# The invariants stage asks one question, for every thing at once, with "none" recommended (1c).
+INVARIANTS_Q = _qid("invariants", "all")
 
 
 class Plan:
@@ -124,8 +129,8 @@ class Plan:
             if st.get("why") != BUDGET and self.rest_question() is not None:
                 return False                 # cells the stop rule skipped are still asked, as one choice
             return not self.outcome_questions()
-        if n == "invariants":
-            return bool(d.invariants)
+        if n == "invariants":     # an invariant, or the one question answered (its "none" skips the stage);
+            return bool(d.invariants) or INVARIANTS_Q in self.answered    # a rule does not: rules are asked in transitions
         if n == "world":
             return bool(d.world.fixtures and d.scenarios)
         if n == "handoffs":
@@ -231,10 +236,15 @@ class Plan:
             if rest is not None and self.ws._stop(d, self.attempts)["stop"]:
                 out.append(rest)
             out += self.outcome_questions()
-        elif n == "invariants":
-            for obj in sorted(d.transitions):
-                q("invariants", obj, f"What must always be true about a {obj}, in every stage, however it got "
-                  "there? (If nothing, say so.)", ["invariants"], skip="invariants")
+        elif n == "invariants" and INVARIANTS_Q not in self.answered and n not in self.skipped:   # asked once
+            from . import Choice, Question, choice_id
+            things = ", ".join(sorted(d.transitions) or sorted(d.objects))
+            out.append(Question(INVARIANTS_Q, "invariants", "Must anything always be true, in every stage and "
+                                f"however it got there ({things})? Say what and why; or none.", ["invariants"], 0,
+                                [Choice(choice_id(INVARIANTS_Q, 1, [], "invariants"), "none: skip the invariants stage",
+                                        [], True, "the stages, each action's rules and the outcome rules already "
+                                        "hold what was decided; an invariant is for a fact no action may break", "invariants")],
+                                "all"))
         elif n == "world":
             if not d.world.fixtures:
                 q("world", "fixtures", "Give realistic examples: at least one of each thing, with its key "
@@ -469,8 +479,9 @@ class Plan:
 
     def outcome_questions(self) -> list[Question]:
         """Outcome rules (ADR-0048): which stage of a thing needs a person, or a role, whatever
-        action reaches it. Asked for each thing the interview drafted actions on, once its cells
-        are settled."""
+        action reaches it. Asked for each thing with stages and no outcome rule yet, once its cells
+        are settled: in every domain, drafted here or not (1c). It lives in transitions, so skipping
+        the invariants stage never drops it."""
         import re
 
         from ..decl.words import term
@@ -481,7 +492,7 @@ class Plan:
             return out
         for obj, tr in d.transitions.items():
             acts = {n: a for n, a in d.actions.items() if a.target == obj and a.creates is None}
-            if not any(self._drafted(a) for a in acts.values()) or any(r.on.startswith(f"{obj}.") for r in d.rules.values()):
+            if any(r.on.startswith(f"{obj}.") for r in d.rules.values()):
                 continue
             if any(tr.matrix[s].get(n, "undecided") == "undecided" for s in tr.matrix for n in acts):
                 continue
@@ -557,7 +568,7 @@ class Plan:
                         undecided += tr.matrix[st].get(a, "undecided") == "undecided"
             return {"objects_with_stages": len(d.transitions), "cells": cells, "undecided": undecided}
         if n == "invariants":
-            return {"invariants": len(d.invariants)}
+            return {"invariants": len(d.invariants), "rules": len(d.rules)}
         if n == "world":
             return {"fixtures": len(d.world.fixtures), "scenarios": len(d.scenarios)}
         if n == "handoffs":

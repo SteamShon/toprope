@@ -154,7 +154,8 @@ def test_a_denial_in_the_receiver_is_recorded_in_the_sender():
     (p,) = [e for e in sender.history("V1") if e.kind == "outbox"]
     res = Outbox(sender).resolution(f"deliver:V1@{p.version}")
     assert res.type == "HandoffDenied" and res.payload["code"] == "positive-version"
-    assert res.payload["reason"] == "A version number starts at 1."
+    assert res.payload["reason"] == ("A version number starts at 1. Fix: the action is allowed when "
+                                     "`params.version >= 1` holds; change the object or the params first")
     assert sender.state("V1")["status"] == "approved"
 
 

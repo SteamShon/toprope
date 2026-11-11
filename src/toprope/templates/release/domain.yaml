@@ -1,0 +1,69 @@
+domain: release
+version: 1
+glossary:
+  release: "A version of the software, from approval to shipping."
+roles: [engineer, release_manager]
+
+objects:
+  Release:
+    description: One version of the software.
+    properties:
+      version: {type: string}
+      author: {type: string}
+      tests_passed: {type: boolean}
+      status: {enum: [draft, approved, shipped]}
+
+actions:
+  record_tests:
+    description: Record that the release's tests passed.
+    actor: [engineer]
+    target: Release
+    effects:
+      - set: {target.tests_passed: true}
+  approve_release:
+    description: Approve the release for shipping.
+    actor: [release_manager]
+    target: Release
+    requires: human
+    preconditions:
+      - id: tests-passed
+        check: target.tests_passed == true
+        reason: A release ships only after its tests pass.
+      - id: not-the-author
+        check: target.author != actor.principal.id
+        reason: Whoever wrote a release, or had their agent write it, cannot approve it.
+    records_decision: true
+  ship_release:
+    description: Ship the approved release.
+    actor: [engineer]
+    target: Release
+
+transitions:
+  Release:
+    field: status
+    initial: draft
+    matrix:
+      draft:
+        record_tests: draft
+        approve_release: approved
+        ship_release: {deny: "Approve the release before shipping it."}
+      approved:
+        record_tests: {deny: "The release is approved; record tests before approval."}
+        approve_release: {deny: "The release is already approved."}
+        ship_release: shipped
+      shipped:
+        record_tests: {deny: "The release has shipped."}
+        approve_release: {deny: "The release has shipped."}
+        ship_release: {deny: "The release has shipped."}
+
+invariants:
+  - id: shipped-means-tested
+    on: Release
+    check: target.status != 'shipped' or target.tests_passed == true
+    reason: Nothing ships untested.
+
+world:
+  fixtures:
+    - Release: {id: V-1-4, version: "1.4.0", author: eli, tests_passed: false, status: draft}
+    - Release: {id: V-1-3, version: "1.3.0", author: eli, tests_passed: true, status: approved}
+    - Release: {id: V-1-2, version: "1.2.0", author: eli, tests_passed: true, status: shipped}

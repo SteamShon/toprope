@@ -1,0 +1,14 @@
+{
+  "build": "b28d22c1d0ea0504",
+  "domain": "delivery",
+  "version": 12,
+  "declaration": "/Users/doyungyoon/Workspace/toprope/experiments/m1/runs/phase-b-recheck/toprope/sandbox/.toprope/env-delivery/builds/b28d22c1d0ea0504/domain.yaml",
+  "deployed_at": "2026-11-09T17:17:57+00:00",
+  "approver": {
+    "id": "researcher-standin <standin@m1.invalid>",
+    "kind": "person"
+  },
+  "commit": "12-e7237ed229aac337",
+  "seq": 12,
+  "commit_domain": "delivery"
+}

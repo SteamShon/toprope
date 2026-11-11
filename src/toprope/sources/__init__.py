@@ -19,6 +19,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
+from ..errors import fixed
 
 Kind = Literal["repository", "records", "transcripts", "interview-log"]
 # Source kind → the `source.kind` a drafted element records (docs/domain-schema.md).
@@ -125,7 +126,8 @@ def files(spec: SourceSpec, root: Path, exclude: tuple[str, ...] = DEFAULT_EXCLU
     base = (root / spec.path).resolve()
     rootr = root.resolve()
     if not base.is_relative_to(rootr):
-        raise ValueError(f"source {spec.id}: {spec.path} is outside the workspace")
+        raise ValueError(fixed(f"source {spec.id}: {spec.path} is outside the workspace",
+                               "give a path inside the workspace"))
     cands = [base] if base.is_file() else sorted(p for p in base.rglob("*") if p.is_file())
     globs = spec.globs or tuple(DEFAULT_GLOBS[spec.kind])
     out = []
@@ -241,16 +243,19 @@ def fetch(spec: SourceSpec, root: Path, timeout: float = 20) -> dict:
     import urllib.request
     from datetime import datetime, timezone
     if not spec.url or not spec.url.lower().startswith(("http://", "https://")):
-        raise FetchError(f"source {spec.id}: only http(s) links can be fetched")
+        raise FetchError(fixed(f"source {spec.id}: only http(s) links can be fetched",
+                               "give an http(s) link, or download the document and give its path"))
     if spec.kind not in ("records", "transcripts"):
-        raise FetchError(f"source {spec.id}: a link can be a records or transcripts source; "
-                         "clone a repository and give its path instead")
+        raise FetchError(fixed(f"source {spec.id}: a link can be a records or transcripts source; "
+                               "clone a repository and give its path instead",
+                               "give the source `kind: records` or `kind: transcripts`"))
     req = urllib.request.Request(spec.url, headers={"User-Agent": "toprope/0", "Accept": "text/*, application/json"})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             final = r.geturl()
             if not final.lower().startswith(("http://", "https://")):
-                raise FetchError(f"source {spec.id}: redirected to a non-http(s) address")
+                raise FetchError(fixed(f"source {spec.id}: redirected to a non-http(s) address",
+                                       "give the final http(s) address, or download the document and give its path"))
             ctype = r.headers.get("Content-Type", "")
             body = r.read(MAX_FETCH_BYTES + 1)
     except FetchError:
@@ -260,15 +265,18 @@ def fetch(spec: SourceSpec, root: Path, timeout: float = 20) -> dict:
                          "A private document (behind a login) cannot be fetched: download it into the "
                          "workspace and give its path instead.") from None
     if len(body) > MAX_FETCH_BYTES:
-        raise FetchError(f"source {spec.id}: larger than {MAX_FETCH_BYTES} bytes")
+        raise FetchError(fixed(f"source {spec.id}: larger than {MAX_FETCH_BYTES} bytes",
+                               "download the part you need into the workspace and give its path"))
     if not (ctype.startswith("text/") or "json" in ctype or "xml" in ctype or not ctype):
-        raise FetchError(f"source {spec.id}: not text ({ctype})")
+        raise FetchError(fixed(f"source {spec.id}: not text ({ctype})",
+                               "link a text, HTML or JSON page, or convert the document to text and give its path"))
     text = body.decode("utf-8", errors="replace")
     if "html" in ctype or text.lstrip()[:15].lower().startswith(("<!doctype html", "<html")):
         text = _html_to_text(text)
     out = (root / spec.path).resolve()
     if not out.is_relative_to(root.resolve()):
-        raise FetchError(f"source {spec.id}: snapshot path outside the workspace")
+        raise FetchError(fixed(f"source {spec.id}: snapshot path outside the workspace",
+                               "give the source a `path` inside the workspace"))
     out.mkdir(parents=True, exist_ok=True)
     (out / "snapshot.md").write_text(text)
     meta = {"url": spec.url, "final_url": final, "fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),

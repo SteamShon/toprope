@@ -18,8 +18,8 @@ domain's commit store, so the tracked store gains no commit until the person's r
 the one that is approved (#208's review). If a check finds something it stops there and says
 which, with the fix. If not, it prints the diff a person will confirm (`toprope-run review`)
 and writes one human request, `.toprope/requests/<id>.yaml`, whose steps confirm, commit, check
-and approve (ADR-0039). The person approves that one request; nothing an agent did is enforced
-before they do (ADR-0041).
+and approve (ADR-0039). The person approves that one request, in GitHub or with `toprope-apply` at
+their terminal; nothing an agent did is enforced before they do (ADR-0041).
 
 Every step runs as its own process, as `toprope-run` does, so the identity and the kernel are
 the same as by hand. Options a step needs come from toprope.yaml, as for `toprope-run`.
@@ -41,7 +41,7 @@ from typing import Any
 
 import yaml
 
-from ...errors import fixed
+from ...errors import MARK, fixed
 
 REQUESTS = ".toprope/requests"
 RUN = [sys.executable, "-c", "from toprope.adapters.cli import main; main()"]
@@ -167,11 +167,12 @@ SHIP = (("authoring", "deliver", "$commit", {"environment": "local"}),
 
 
 def request_for(intent: str, draft: str, member: str, workspace: str | None,
-                risk: str | None = None) -> dict[str, Any]:
+                risk: str | None = None, reasons: list[str] | None = None) -> dict[str, Any]:
     """The human request that takes the change through (ADR-0039; tools/human_request.py). A
     low-risk change also ships on the same approval, verify included, which runs only if the
     probes passed (ADR-0050); a high-risk one stops at approval, and ships on a second request
-    after the person has read the preview."""
+    after the person has read the preview. With `reasons`, the request carries the risk the change
+    check found, which the run page shows (ADR-0050, 4)."""
     base = {"member": member, **({"workspace": workspace} if workspace else {})}
     steps = [{"run": {**base, "action": a, "target": t}} for a, t in (
         ("confirm_all_proposed", draft), ("commit_draft", draft),
@@ -181,7 +182,10 @@ def request_for(intent: str, draft: str, member: str, workspace: str | None,
             steps.append({"run": {"member": m, "action": action, "target": target.format(draft=draft),
                                   **({"params": params} if params else {})}})
     head = {"low": "[low risk: one approval ships it] ", "high": "[high risk: approval only] "}.get(risk or "", "")
-    return {"summary": head + intent, "steps": steps}
+    out: dict[str, Any] = {"summary": head + intent, "steps": steps}
+    if risk is not None and reasons is not None:
+        out["risk"] = {"level": risk, "reasons": [str(r) for r in reasons]}
+    return out
 
 
 def pending_requests() -> list[str]:
@@ -215,9 +219,11 @@ def main(argv: list[str] | None = None) -> None:
                  str(origin), "--cites", str(it["cites"]), "--value", json.dumps(it["value"]))
         except StepFailed as e:
             left = f"; already proposed and still in the draft: {', '.join(proposed)}" if proposed else ""
-            raise SystemExit(fixed(f"{e.code}{left}", "fix that element and run the change again with the "
-                                   "elements not yet proposed, or restore the draft with `git checkout -- "
-                                   "<declaration>`")) from None
+            # the step's message names its own fix: keep one `Fix:`, the step's first
+            said, _, its_fix = str(e.code).partition(MARK)
+            first = f"{its_fix.strip().rstrip('.')}; then " if its_fix else "fix that element and "
+            raise SystemExit(fixed(f"{said.strip()}{left}", f"{first}run the change again with the elements not "
+                                   "yet proposed, or restore the draft with `git checkout -- <declaration>`")) from None
         proposed.append(str(it["path"]))
         print(f"proposed {it['path']}", file=sys.stderr)
     domain, failing, summary, (risk, reasons) = dry_check(kernel_root(a.kernel_root), a.workspace)
@@ -226,19 +232,25 @@ def main(argv: list[str] | None = None) -> None:
                                + "; ".join(failing) + f" (proposed and still in the draft: {', '.join(proposed)})",
                                "fix the proposals and run the change again; nothing was requested"))
     review = step(base, "review")
-    req = request_for(a.intent, a.draft, a.member, a.workspace, risk)
+    req = request_for(a.intent, a.draft, a.member, a.workspace, risk, list(reasons))
     path = Path(a.request) if a.request else Path(REQUESTS) / f"{slug(a.intent)}.yaml"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.safe_dump(req, sort_keys=False, allow_unicode=True))
     print(review.get("text", "") if isinstance(review, dict) else str(review), end="")
     print(json.dumps({"proposed": proposed, "checked": summary, "risk": risk, "risk_reasons": reasons,
                       "request": str(path),
-                      **({"then": f"high risk: after this request is approved, read the preview, then write "
-                                  f"the delivery request with `python tools/human_request.py ship <request> "
-                                  f"--commit <the approved commit> --domain {domain}`"} if risk != "low" else {}),
-                      "next": "commit the request with the draft and the event logs it changed, and push "
-                              "them; the person approves the request in GitHub, and that one approval "
-                              "confirms, commits, checks and approves (one loop at a time: AGENTS.md)"},
+                      **({"then": f"high risk: in GitHub, after this request is approved, read the preview, "
+                                  f"then write the delivery request with `python tools/human_request.py ship "
+                                  f"<request> --commit <the approved commit> --domain {domain}`; at a terminal, "
+                                  f"`toprope-apply --ship {path}` approves it and stops after the preview, and "
+                                  f"`toprope-apply {path}` again ships it once the person has read it"}
+                         if risk != "low" else {}),
+                      "next": "a person takes the request by one of two routes, and that one approval "
+                              "confirms, commits, checks and approves: (a) commit the request with the draft "
+                              "and the event logs it changed and push them, and the person approves its run "
+                              f"in GitHub; or (b) the person runs `toprope-apply {path}` on their own "
+                              "terminal and types `yes`, then commits the result (one loop at a time: "
+                              "AGENTS.md)"},
                      indent=2))
 
 

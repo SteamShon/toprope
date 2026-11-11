@@ -1,0 +1,29 @@
+t-owner:
+  id: owner <owner@library.invalid>
+  roles: &id001
+  - owner
+  - approver
+  kind: person
+t-agent:
+  id: agent <agent@library.invalid>
+  kind: agent
+  roles:
+  - owner
+  - approver
+  on_behalf_of:
+    id: owner <owner@library.invalid>
+    roles: *id001
+  grant:
+    id: drafting+p03
+    actions:
+    - add_source
+    - fetch_source
+    - ask_question
+    - propose_element
+    - request_decision
+    - next_questions
+    - search
+    - commit_draft
+    - check_commit
+    - cite_evidence
+    - preview

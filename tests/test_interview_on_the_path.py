@@ -237,6 +237,54 @@ def test_an_outcome_rule_is_offered_once_the_cells_are_settled_and_needs_confirm
     assert ws.progress()["current"] == "invariants"
 
 
+# 1c, as the researcher decided: the outcome-rule question in every domain, a skip of invariants
+# never drops it, and the invariants stage asks one choice with "none" recommended.
+
+def confirmed(ws):  # noqa: F811
+    """A domain whose actions the interview did not draft (a template's, a self domain's), no rule yet."""
+    doc = upto("invariants")
+    doc.pop("rules")
+    put(ws, doc)
+    return ws
+
+
+def test_the_outcome_rule_is_asked_in_a_domain_the_interview_did_not_draft(ws):  # noqa: F811
+    confirmed(ws)
+    assert ws.progress()["current"] == "transitions"
+    (rule,) = qs(ws, "rule")
+    assert "only the clerk may bring an Order to shipped" in [c["label"] for c in rule["choices"]]
+    ws.answer(rule["id"], "No.", f"choice:{rec(rule)['id']}")              # "no outcome rule": nothing cited
+    assert "rules" not in ws.draft() and ws.progress()["current"] == "invariants"
+
+
+def test_skipping_invariants_keeps_the_outcome_rule_question(ws):  # noqa: F811
+    confirmed(ws)
+    ws.skip_stage("invariants", "Nothing beyond the stages.")
+    assert ws.progress()["current"] == "transitions"
+    (rule,) = qs(ws, "rule")
+    (clerk,) = [c for c in rule["choices"] if c["label"] == "only the clerk may bring an Order to shipped"]
+    ws.answer(rule["id"], "Only clerks ship.", f"choice:{clerk['id']}")
+    assert ws.draft()["rules"]["Order-shipped-needs-clerk"]["requires"] == {"roles": ["clerk"]}
+    assert ws.progress()["current"] == "world"
+
+
+def test_after_the_outcome_rule_invariants_are_asked_once_with_none_recommended(tmp_path):
+    ws = leave(tmp_path)
+    to_transitions(ws)
+    for q in qs(ws, "default"):
+        ws.answer(q["id"], "Yes.", f"choice:{rec(q)['id']}")
+    (rule,) = qs(ws, "rule")
+    (no,) = [c for c in rule["choices"] if c["label"] == "no outcome rule"]
+    ws.answer(rule["id"], "No.", f"choice:{no['id']}")
+    assert ws.progress()["current"] == "invariants"
+    (q,) = ws.questions(limit=50)["questions"]                          # one question, not one per thing
+    assert q["kind"] == "invariants" and rec(q)["label"].startswith("none")
+    ws.answer(q["id"], "None.", f"choice:{rec(q)['id']}")
+    assert ws.progress()["current"] == "world"
+    assert not [x for s in ("transitions", "invariants") for x in ws.questions(stage=s, limit=50)["questions"]
+                if x["kind"] in ("rule", "rules", "invariants")]
+
+
 def test_cells_the_stop_rule_skips_are_asked_as_one_choice(ws):  # noqa: F811
     doc = upto("invariants")
     doc["objects"]["Order"]["properties"]["status"] = {"enum": ["open", "shipped", "held"]}
