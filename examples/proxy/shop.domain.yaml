@@ -1,0 +1,48 @@
+domain: shop
+version: 1
+roles: [support]
+objects:
+  Order:
+    description: A paid order.
+    properties:
+      status: {enum: [paid, refunded]}
+      days_since_purchase: {type: integer}
+      refund_id: {type: string, optional: true}
+actions:
+  refund:
+    description: Refund a paid order through the payments server.
+    actor: [support]
+    target: Order
+    params:
+      amount: {type: number}
+    preconditions:
+      - id: within-window
+        check: target.days_since_purchase <= 7
+        reason: Refunds are allowed within 7 days of purchase.
+    effects:
+      - call: mcp:refund_order
+        with: {order_id: target.id, amount: params.amount}
+        reply: record_refund
+  record_refund:
+    description: Record the payment server's answer.
+    actor: [external:kernel]
+    target: Order
+    params:
+      ok: {type: boolean}
+      refund_id: {type: string, optional: true}
+    preconditions:
+      - id: refunded-upstream
+        check: params.ok == true
+        reason: The payment server did not refund.
+    effects:
+      - set: {target.refund_id: params.refund_id}
+transitions:
+  Order:
+    field: status
+    matrix:
+      paid:     {refund: paid, record_refund: refunded}
+      refunded: {refund: {deny: "This order is already refunded."}, record_refund: n/a}
+world:
+  fixtures:
+    - Order: {id: O-3, status: paid, days_since_purchase: 3}
+    - Order: {id: O-8, status: paid, days_since_purchase: 8}

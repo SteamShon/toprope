@@ -25,6 +25,7 @@ from datetime import datetime
 from typing import Any
 
 from ..decl.models import ByRole, Domain, Target
+from ..errors import fixed
 from ..semantics.interpreter import Interpreter
 from .world import default_params, world_actors
 
@@ -176,7 +177,8 @@ def run_mechanical(d: Domain, surfaces: dict[str, Any], clock: Callable[[], date
                     if not found:
                         res.no_sample.append(cell)
                         res.findings.append(Finding("no-sample", ref, f"mechanical:{cell}", {
-                            "reason": "no generated object satisfies the invariants in this stage",
+                            "reason": fixed("no generated object satisfies the invariants in this stage",
+                                            "give an example in this stage"),
                             "why": "the cell is not tested mechanically; give an example in this stage"}))
                         continue
                     for data, extras in found:

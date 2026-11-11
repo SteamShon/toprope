@@ -1,0 +1,4 @@
+# Who may call through the proxy. An agent acts for a person, under a grant (ADR-0016).
+t-sam: {id: sam, kind: agent, roles: [support], on_behalf_of: {id: dana, roles: [support]}, grant: {id: g-support, actions: [refund]}}
+t-guest: {id: guest, kind: agent, roles: [], on_behalf_of: {id: kim, roles: []}, grant: {id: g-none, actions: []}}
+t-dana: {id: dana, roles: [support]}     # a person: confirms the binding (toprope-proxy --confirm-binding)

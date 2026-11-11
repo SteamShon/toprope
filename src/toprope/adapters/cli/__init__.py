@@ -14,6 +14,19 @@ directory and no token is given), your repository's git email, looked up in that
 (ADR-0037). An action that requires a person asks you to confirm on your terminal, so an agent's
 ordinary shell cannot take it as you. With `static:FILE` or `jwt`, the caller comes from TOPROPE_TOKEN (or --token), as for the server.
 Exit status 1 when the command is denied or rejected.
+
+A `toprope.yaml` in the current directory (or `--config FILE`) gives the options a composition
+needs, so a command is just the action (ADR-0049, C3):
+
+  composition: domains/toprope-self.composition.yaml
+  kernel_root: .
+  workspace: toprope.authoring.workspace.yaml
+  env: .toprope/env
+
+  toprope-run approve_commit authoring 7-92bc...     # the member is the one with that action
+
+An option on the command line wins over the file. A `--domain` or `--composition` on the command
+line ignores the file, as does `--no-config`: the file's paths belong to its own composition.
 """
 
 from __future__ import annotations
@@ -29,14 +42,36 @@ from typing import Any
 from ...decl import load_domain, validate_domain
 from ...decl.models import Domain
 from ...exec import Execution
+from ...errors import fixed
 from ...identity import Caller, Identity
 
-READS = ("get", "history", "allowed", "whoami", "guide")
+READS = ("get", "history", "allowed", "whoami", "guide", "review")
+CONFIRMS = ("confirm_all_proposed", "confirm_element")   # a person confirms from one diff (B5)
+CONFIG = "toprope.yaml"
+# The keys `toprope.yaml` may set, and the option each one stands for.
+CONFIG_KEYS = {"domain": "--domain", "store": "--store",
+               "composition": "--composition", "member": "--member", "kernel_root": "--kernel-root",
+               "workspace": "--workspace", "env": "--env", "store_dir": "--store-dir",
+               "identity": "--identity", "failures": "--failures", "person_route": "--person-route"}
+
+
+_USAGE: list[str] = []          # the last usage error argparse reported, for the failure record
+
+
+class _Parser(argparse.ArgumentParser):
+    """Keeps argparse's own message, so a usage error is recorded with it. Subcommands use the
+    same class."""
+
+    def error(self, message: str):  # type: ignore[override]
+        _USAGE[:] = [message]
+        super().error(message)
 
 
 def _base_parser(add_help: bool) -> argparse.ArgumentParser:
-    ap = argparse.ArgumentParser(prog="toprope-run", description=__doc__, add_help=add_help,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    # allow_abbrev=False: `--tok` is not `--token`, so a shortened option cannot carry a secret
+    # past the redaction of the failure record (#204's review).
+    ap = _Parser(prog="toprope-run", description=__doc__, add_help=add_help, allow_abbrev=False,
+                 formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--domain", help="one declaration (or --composition with --member)")
     ap.add_argument("--composition", help="a *.composition.yaml: every member wired in this process")
     ap.add_argument("--member", help="with --composition: the member whose actions these are")
@@ -55,7 +90,105 @@ def _base_parser(add_help: bool) -> argparse.ArgumentParser:
     ap.add_argument("--key", help="idempotency key (default: a new one); reuse it to retry safely")
     ap.add_argument("--working-copy", action="store_true", help="with --composition and --kernel-root: run "
                     "each member from its working-copy file, not from its deployed commit (ADR-0045)")
+    ap.add_argument("--config", help=f"the options file (default: {CONFIG} in the current directory, if any)")
+    ap.add_argument("--no-config", action="store_true", help=f"ignore {CONFIG}")
+    ap.add_argument("--failures", help="a directory where a command that fails before the gate is recorded, "
+                    "one file per failure (ADR-0049, D1b)")
+    ap.add_argument("--person-route", help="how a person takes a step an agent is refused here, added to such "
+                    "refusals' fix (for the self domains: the human request, ADR-0039)")
     return ap
+
+
+def read_config(path: Path) -> dict[str, str]:
+    """`toprope.yaml`: option defaults for a composition. Every error names the fix."""
+    import yaml
+    try:
+        data = yaml.safe_load(path.read_text()) or {}
+    except OSError as e:
+        raise SystemExit(fixed(f"{path}: cannot read it ({e.strerror})", "give --config FILE, or --no-config")) from None
+    except yaml.YAMLError as e:
+        raise SystemExit(fixed(f"{path}: not valid YAML ({e})", "fix the file, or give --no-config")) from None
+    if not isinstance(data, dict):
+        raise SystemExit(fixed(f"{path}: expected a mapping such as `composition: x.composition.yaml`",
+                               "fix the file, or give --no-config"))
+    if data.get("domain") and data.get("composition"):
+        raise SystemExit(fixed(f"{path}: both `domain` and `composition`",
+                               "keep one: `domain` for one declaration, `composition` for several"))
+    unknown = sorted(set(data) - set(CONFIG_KEYS))
+    if unknown:
+        raise SystemExit(fixed(f"{path}: unknown key(s) {', '.join(unknown)}",
+                               f"use only the keys {', '.join(CONFIG_KEYS)}"))
+    base = path.parent
+    out = {}
+    for key, value in data.items():
+        if not isinstance(value, (str, int, float)):
+            raise SystemExit(fixed(f"{path}: `{key}` must be a single value", "give one value, such as a path"))
+        value = str(value)
+        # A path in the file is relative to the file, so the file works from anywhere.
+        if key == "store" and value.split(":", 1)[0] in ("sqlite", "jsonl") and ":" in value:
+            kind, _, where = value.partition(":")
+            if not where.startswith(":"):                  # `sqlite::memory:` is no path
+                value = f"{kind}:{where if Path(where).is_absolute() else base / where}"
+        elif key in ("domain", "composition", "kernel_root", "workspace", "env", "store_dir", "failures"):
+            value = str((base / value)) if not Path(value).is_absolute() else value
+        elif key == "identity" and value.split(":", 1)[0] in ("git", "github", "static"):
+            kind, _, file = value.partition(":")
+            if kind in ("git", "github") and not file:
+                file = "toprope.identity.yaml"      # the default file, next to this one
+            if file:
+                value = f"{kind}:{file if Path(file).is_absolute() else base / file}"
+        out[key] = value
+    return out
+
+
+def with_config(argv: list[str]) -> list[str]:
+    """The command line with `toprope.yaml`'s options added where the command line has none."""
+    pre, _ = _base_parser(add_help=False).parse_known_args(argv)
+    if pre.domain or pre.composition or pre.no_config:
+        return argv
+    path = Path(pre.config) if pre.config else Path(CONFIG)
+    if not path.is_file():
+        if pre.config:
+            raise SystemExit(fixed(f"{path}: no such file", f"give the path of a {CONFIG}, or leave --config out"))
+        return argv
+    added = []
+    for key, value in read_config(path).items():
+        if getattr(pre, key) in (None, False):
+            added += [CONFIG_KEYS[key], value]
+    return added + argv
+
+
+def infer_member(argv: list[str]) -> list[str]:
+    """With a composition and no --member: the member whose actions include the command."""
+    pre, rest = _base_parser(add_help=False).parse_known_args(argv)
+    if not pre.composition or pre.member:
+        return argv
+    cmd = next((a for a in rest if not a.startswith("-")), None)
+    from ...compose import load_composition
+    from ..mcp.cli import running_commits
+    try:
+        c = load_composition(pre.composition, running_commits(pre))
+    except (OSError, ValueError) as e:
+        raise SystemExit(f"error {e}") from None
+    if cmd is None:
+        members = ", ".join(sorted(c.domains))
+        if not ({"-h", "--help"} & set(argv)):
+            raise SystemExit(fixed("no action given", f"give an action, or --member (one of {members}) "
+                                     "with --help to list its actions"))
+        _base_parser(add_help=True).print_help()
+        print(f"\nmembers of {pre.composition}: {members}; `--member <member> --help` lists its actions")
+        raise SystemExit(0)
+    members = sorted(n for n, d in c.domains.items() if cmd in d.actions)
+    if cmd == "review":                                   # the member whose drafts a person confirms
+        members = sorted(n for n, d in c.domains.items() if set(CONFIRMS) & set(d.actions))
+    if len(members) == 1:
+        return ["--member", members[0], *argv]
+    if cmd in READS:
+        raise SystemExit(fixed(f"{cmd} reads one member", f"give --member, one of {', '.join(sorted(c.domains))}"))
+    if members:
+        raise SystemExit(fixed(f"{cmd} is an action of {', '.join(members)}", "give --member"))
+    raise SystemExit(fixed(f"{cmd}: no member of {pre.composition} has this action",
+                           "check the spelling; `toprope-run --member <member> --help` lists the actions"))
 
 
 def _param_option(sub: argparse.ArgumentParser, name: str, spec: Any) -> None:
@@ -89,11 +222,26 @@ def build_parser(d: Domain) -> argparse.ArgumentParser:
         p.add_argument("target", help=target)
         for pname, spec in a.params.items():
             _param_option(p, pname, spec)
+        # Who you are may also follow the action (`act T --token t-mia`), unless the action has a
+        # param of that name (ADR-0049, A4). SUPPRESS keeps the value given before the action.
+        if "token" not in a.params:
+            p.add_argument("--token", default=argparse.SUPPRESS, help="your credential, as before the action")
+        if "identity" not in a.params:
+            p.add_argument("--identity", default=argparse.SUPPRESS, help="as before the action")
+    reads = []
     for cmd, what in (("get", "an object's current state"), ("history", "an object's events"),
                       ("allowed", "the actions you may take on an object now")):
-        sub.add_parser(cmd, help=what).add_argument("target")
-    sub.add_parser("whoami", help="who you are here, and your roles")
-    sub.add_parser("guide", help="the domain guide: how this domain works and who does what")
+        r = sub.add_parser(cmd, help=what)
+        r.add_argument("target")
+        reads.append(r)
+    reads.append(sub.add_parser("whoami", help="who you are here, and your roles"))
+    reads.append(sub.add_parser("guide", help="the domain guide: how this domain works and who does what"))
+    for r in reads:                              # who you are may follow a read too (ADR-0049, A4)
+        r.add_argument("--token", default=argparse.SUPPRESS, help="your credential, as before the command")
+        r.add_argument("--identity", default=argparse.SUPPRESS, help="as before the command")
+    if "review" not in d.actions:            # a domain's own action named `review` keeps its name
+        sub.add_parser("review", help="the proposed elements of the authoring workspace, as one diff to "
+                       "confirm from (needs --workspace)")
     return ap
 
 
@@ -103,7 +251,7 @@ def _identity(spec: str | None, token: str | None = None) -> Identity:
     if spec is None and token is None and Path(FILE).is_file():     # a given token is never ignored
         spec = "git"
     if not spec:
-        raise SystemExit(f"--identity is required for this command (or put {FILE} here)")
+        raise SystemExit(fixed("--identity is required for this command", f"give --identity, or put {FILE} here"))
     if spec == "git" or spec.startswith("git:"):
         try:
             return GitIdentity(spec[4:] or FILE, once=True)        # one command per process
@@ -122,21 +270,42 @@ def _caller(identity: Identity, token: str | None) -> Caller:
     caller = identity.resolve(token)
     if caller is None:
         explain = getattr(identity, "explain", None)    # the local identities say why
-        raise SystemExit(explain() if explain else "TOPROPE_TOKEN (or --token) does not resolve to a caller")
+        raise SystemExit(explain() if explain else fixed("TOPROPE_TOKEN (or --token) does not resolve to a caller",
+                                                         "give a token the identity file lists"))
     return caller
 
 
-def _confirm_on_terminal(identity: Identity, caller: Caller, action: str, target: str) -> None:
+def review_text(args: Any) -> str:
+    if not getattr(args, "workspace", None):
+        raise SystemExit(fixed("review needs the authoring workspace",
+                               "give --workspace, or set `workspace:` in toprope.yaml"))
+    from ...workspace import Workspace
+    return Workspace(args.workspace).render_review()
+
+
+def _confirm_on_terminal(identity: Identity, caller: Caller, action: str, target: str,
+                         preface: Any = None) -> None:
     """A git identity is self-asserted, so an action that requires a person is confirmed on a
     terminal: a process without one (an agent's ordinary shell, a script) cannot take it as you.
     It is a guard against mistakes, not a security boundary: a process can fake a terminal."""
     from ...identity.git import GitIdentity
+    from .apply import APPLY_ENV, confirmed_by_apply
     if not isinstance(identity, GitIdentity) or caller.actor.kind != "person":
         return
+    if os.environ.get(APPLY_ENV):                # a step of a request the person confirmed once
+        if sys.stdin.isatty() and confirmed_by_apply(caller):   # never weaker than the prompt below
+            return
+        raise SystemExit(fixed(f"{action} requires a person, and the apply's confirmation did not reach this step "
+                               f"(no terminal, or {APPLY_ENV} names no confirmation of {caller.actor.id} by this "
+                               "command's parent)", f"run `toprope-apply` yourself on your terminal; or unset "
+                               f"{APPLY_ENV} and run the step yourself"))
     if not sys.stdin.isatty():
-        raise SystemExit(f"{action} requires a person: run it yourself on a terminal")
+        raise SystemExit(fixed(f"{action} requires a person", "run it yourself on a terminal, or through a human "
+                                "request (tools/human_request.py): approved in GitHub, or applied with `toprope-apply`"))
+    if preface is not None:                      # built only now, for a person who will read it
+        print(preface() if callable(preface) else preface)
     if input(f"{action} {target} as {caller.actor.id}? [y/N] ").strip().lower() != "y":
-        raise SystemExit("not taken")
+        raise SystemExit(fixed("not taken", "answer `y` to take it"))
 
 
 def _execution(args: Any, d: Domain) -> Execution:
@@ -145,11 +314,60 @@ def _execution(args: Any, d: Domain) -> Execution:
     services = _kernel(args)
     if args.composition:
         args.no_seed = not args.seed
-        return _member(args, identity, services)
-    ex = Execution(d, open_store(args.store or "memory"), identity, services=services)
-    if args.seed:
-        ex.seed_world()
+        ex = _member(args, identity, services)
+    else:
+        _keep_in_step(args, d)
+        ex = Execution(d, open_store(args.store or "memory"), identity, services=services)
+        if args.seed:
+            ex.seed_world()
+    ex.person_route = args.person_route
     return ex
+
+
+def _started_here(args: Any) -> Path | None:
+    """The directory of a domain `toprope-init` wrote whose store is its own SQLite file."""
+    if not args.domain or not str(args.store or "").startswith("sqlite:") or args.store == "sqlite::memory:":
+        return None
+    where = Path(args.domain).resolve().parent
+    return where if (where / ".template").is_file() else None
+
+
+def _keep_in_step(args: Any, d: Domain) -> None:
+    """A domain started with `toprope-init`: if its store was seeded from an earlier domain.yaml
+    and nothing was done in it, seed it again from this one (ADR-0053, F2); if something was,
+    say how to start it again, and leave it as it is."""
+    where = _started_here(args)
+    f = Path(args.store[len("sqlite:"):]) if where else None
+    if where is None or f is None or not f.exists():
+        return
+    from .start import _drift_of, hint, sync_store
+    drift, done = _drift_of(f, d)
+    if drift and done == 0:
+        sync_store(where, d)
+        print("note: the store was seeded from an earlier domain.yaml and nothing had been done in it; "
+              "it now holds the examples of this one", file=sys.stderr)
+    elif drift:
+        print(f"note: the store was seeded from an earlier domain.yaml ({'; '.join(drift[:3])}); "
+              f"to start it again from this one: {hint('toprope-try --reset')} (the old file is kept)", file=sys.stderr)
+
+
+def refusal_fix(args: Any, d: Domain, ex: Execution, code: str | None, reason: str | None) -> str | None:
+    """What to do about a refusal that comes from the store, not from a rule."""
+    stale = ""
+    if (where := _started_here(args)) is not None:
+        from .start import _drift_of, hint
+        if _drift_of(Path(args.store[len("sqlite:"):]), d)[0]:
+            stale = (f"the store was seeded from an earlier domain.yaml: start it again from this one with "
+                     f"`{hint('toprope-try --reset')}` in {where} (the old file is kept)")
+    if code == "not-found":
+        obj = d.actions[args.cmd].object_type
+        ids = [s for s in ex.store.streams() if (ex.lookup(s) or ("",))[0] == obj][:5]
+        return stale or (f"use the id of a {obj} the store has ({', '.join(ids) or 'none yet'}); "
+                         f"`toprope-run get <id>` shows one")
+    if reason and "(could not evaluate:" in reason:
+        return stale or (f"the object lacks a value this rule reads: `toprope-run get {args.target}` shows it; "
+                         "if domain.yaml changed since the store was seeded, run `toprope-try --reset` in its directory")
+    return None
 
 
 def followed(ex: Execution, d: Domain, target: str, before: int) -> list[dict[str, Any]]:
@@ -161,7 +379,8 @@ def followed(ex: Execution, d: Domain, target: str, before: int) -> list[dict[st
 
 def _domain(args: Any) -> Domain:
     if bool(args.domain) == bool(args.composition) or bool(args.composition) != bool(args.member):
-        raise SystemExit("give --domain, or --composition with --member")
+        raise SystemExit(fixed("no declaration given", "give --domain, or --composition with --member, "
+                                    f"or put a {CONFIG} here"))
     if args.domain:
         d = load_domain(args.domain)
     else:
@@ -172,18 +391,127 @@ def _domain(args: Any) -> Domain:
     if errors:
         for i in errors:
             print(f"error {i.code} at {i.where}: {i.message}", file=sys.stderr)
-        raise SystemExit(1)
+        raise SystemExit(fixed(f"the declaration has {len(errors)} error(s), listed above",
+                               "fix them, then run `toprope-harness --domain <file>` to check"))
     return d
 
 
+def _is_secret_option(a: str) -> bool:
+    """`--token`, or any start of it long enough to be meant as it (`--tok`)."""
+    name = a.split("=", 1)[0]
+    return len(name) >= 4 and "--token".startswith(name)
+
+
+def redact(argv: list[str]) -> list[str]:
+    shown, skip = [], False
+    for a in argv:
+        if skip:
+            shown.append("***")
+            skip = False
+        elif _is_secret_option(a) and "=" in a:
+            shown.append(a.split("=", 1)[0] + "=***")
+        elif _is_secret_option(a):
+            shown.append(a)
+            skip = True
+        else:
+            shown.append(a)
+    return shown
+
+
+def record_failure(directory: str | Path, argv: list[str], kind: str, message: str) -> Path | None:
+    """One file per failed command, so two branches never write the same file. The command line
+    is kept without secrets; who ran it is the git email, when there is one. A record that cannot
+    be written never hides the failure itself: it is skipped, with a warning."""
+    import datetime
+    import subprocess
+    try:
+        who = subprocess.run(["git", "config", "user.email"], capture_output=True, text=True,
+                             timeout=5).stdout.strip() or None
+    except (OSError, subprocess.SubprocessError):
+        who = None
+    now = datetime.datetime.now(datetime.timezone.utc)
+    secrets = [x for a, x in zip(["", *argv], argv) if _is_secret_option(a) and "=" not in a]
+    secrets += [a.split("=", 1)[1] for a in argv if _is_secret_option(a) and "=" in a]
+    for s in sorted(filter(None, secrets), key=len, reverse=True):   # argparse may echo a value back
+        message = message.replace(s, "***")
+    entry = {"at": now.isoformat(timespec="seconds"), "by": who, "argv": redact(argv), "kind": kind,
+             "message": message, "has_fix": "Fix: " in message}
+    try:
+        d = Path(directory)
+        d.mkdir(parents=True, exist_ok=True)
+        path = d / f"{now:%Y%m%dT%H%M%S}-{uuid.uuid4().hex[:8]}.json"
+        path.write_text(json.dumps(entry, ensure_ascii=False, indent=1) + "\n")
+        return path
+    except OSError as err:
+        print(f"warning: the failure was not recorded in {directory}: {err}", file=sys.stderr)
+        return None
+
+
+def failures_dir(raw: list[str]) -> str | None:
+    """Where failures go, found before anything else can fail: `--failures DIR` on the command
+    line, then TOPROPE_FAILURES, then `failures:` in the toprope.yaml here (or `--config`). It is
+    a setting of the repository, so it holds whatever composition the command names."""
+    for i, a in enumerate(raw):
+        if a == "--failures" and i + 1 < len(raw):
+            return raw[i + 1]
+        if a.startswith("--failures="):
+            return a.split("=", 1)[1]
+    if os.environ.get("TOPROPE_FAILURES"):
+        return os.environ["TOPROPE_FAILURES"]
+    if "--no-config" in raw:
+        return None
+    cfg = next((raw[i + 1] for i, a in enumerate(raw) if a == "--config" and i + 1 < len(raw)), None)
+    path = Path(cfg) if cfg else Path(CONFIG)
+    try:
+        import yaml
+        value = (yaml.safe_load(path.read_text()) or {}).get("failures") if path.is_file() else None
+    except Exception:                                      # noqa: BLE001 - read_config reports it
+        return None
+    if not isinstance(value, str) or not value:
+        return None
+    return value if Path(value).is_absolute() else str(path.parent / value)
+
+
+class _AtTheGate(Exception):
+    """A crash after the command reached the gate: not a failure before it."""
+
+
 def main(argv: list[str] | None = None) -> None:
-    argv = list(sys.argv[1:] if argv is None else argv)
+    """Run one command. A command that fails before the gate (a usage error, a refused option or
+    file, a crash) is recorded under `failures_dir`, so F1 counts it (ADR-0049, D1b). A denial at
+    the gate (exit 1) is the gate's own record, and a person declining to confirm is no failure."""
+    raw = list(sys.argv[1:] if argv is None else argv)
+    failures = failures_dir(raw)
+    _USAGE.clear()
+    try:
+        _main(infer_member(with_config(raw)))
+    except SystemExit as e:
+        declined = isinstance(e.code, str) and e.code.startswith("not taken")
+        if failures and e.code not in (None, 0, 1) and not declined:
+            if e.code == 2:
+                record_failure(failures, raw, "usage", _USAGE[0] if _USAGE else "usage error")
+            else:
+                record_failure(failures, raw, "refused", str(e.code))
+        raise
+    except _AtTheGate as e:
+        raise e.__cause__ from None                         # type: ignore[misc]
+    except Exception as e:                                  # noqa: BLE001 - a crash is a failure too
+        if failures:
+            record_failure(failures, raw, "crash", f"{type(e).__name__}: {e}")
+        raise
+
+
+def _main(argv: list[str]) -> None:
     pre, _ = _base_parser(add_help=False).parse_known_args(argv)
     if not (pre.domain or pre.composition):
         _base_parser(add_help=True).parse_args(argv or ["--help"])
-        raise SystemExit("give --domain, or --composition with --member")
+        raise SystemExit(fixed("no declaration given", "give --domain, or --composition with --member, "
+                                    f"or put a {CONFIG} here"))
     d = _domain(pre)
     args = build_parser(d).parse_args(argv)
+    if args.cmd == "review" and "review" not in d.actions:
+        print(review_text(args), end="")
+        return
     if args.cmd == "guide":
         from ...worldmap.guide import build_domain_guide
         print(build_domain_guide(d), end="")
@@ -212,13 +540,19 @@ def main(argv: list[str] | None = None) -> None:
     if isinstance(ex.identity, (GitIdentity, GitHubApprovalIdentity)):
         caller = _caller(ex.identity, token)          # says why the caller is not listed
         if d.actions[args.cmd].requires == "human":
-            _confirm_on_terminal(ex.identity, caller, args.cmd, args.target)
+            _confirm_on_terminal(ex.identity, caller, args.cmd, args.target,
+                                 (lambda: review_text(args)) if args.cmd in CONFIRMS and args.workspace else None)
     from ..mcp import outcome_json
     before = ex.store.version(args.target)
-    o = ex.submit(token, args.cmd, args.target, params, idempotency_key=args.key or str(uuid.uuid4()))
-    out = outcome_json(o)
-    if o.ok and (follow := followed(ex, d, args.target, before)):
-        out["then"] = follow
+    try:
+        o = ex.submit(token, args.cmd, args.target, params, idempotency_key=args.key or str(uuid.uuid4()))
+        out = outcome_json(o)
+        if o.ok and (follow := followed(ex, d, args.target, before)):
+            out["then"] = follow
+        if not o.ok and (fix := refusal_fix(args, d, ex, o.code, o.reason)):
+            out["fix"] = fix
+    except Exception as e:                                   # noqa: BLE001 - reached the gate
+        raise _AtTheGate() from e
     print(json.dumps(out, indent=2, ensure_ascii=False, default=str))
     if not o.ok:
         raise SystemExit(1)

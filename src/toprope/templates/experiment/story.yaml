@@ -1,0 +1,32 @@
+title: An agent runs A/B experiments; an analyst ships them
+keywords: [experiment, variant, traffic, analyst, launch, rollout, hypothesis, metric, ab]   # toprope-init "<a sentence>" picks the template whose words it uses most
+about: >
+  An agent sets up and starts experiments for an engineer. A variant gets at most half of the
+  traffic, a running experiment cannot be edited, and only an analyst (a person) ships a variant.
+next: >
+  Try `toprope-set max_traffic=80` to allow bigger tests, or `toprope-set ship_approver=engineer`,
+  and see what the change touches.
+settings:
+  max_traffic:
+    says: The largest share of traffic (in %) a variant may get.
+    type: integer
+    default: 50
+    at: actions.edit_experiment.preconditions.traffic-limit
+    check: "params.traffic_percent > 0 and params.traffic_percent <= {value}"
+    reason: "A variant gets between 1% and {value}% of the traffic."
+  ship_approver:
+    says: The role that ships a variant.
+    type: role
+    default: analyst
+    at: actions.ship_experiment.preconditions.ship-needs-analyst
+    check: "'{value}' in actor.roles"
+    reason: "Shipping a variant needs {value}, who has read its results."
+steps:
+  - {who: t-bot, as: the agent, action: edit_experiment, target: X-checkout, params: {traffic_percent: 30}, says: "give the variant 30% of traffic", expect: ok}
+  - {who: t-bot, as: the agent, action: edit_experiment, target: X-checkout, params: {traffic_percent: 80}, says: "give it 80%", expect: denied, code: traffic-limit}
+  - {who: t-bot, as: the agent, action: start_experiment, target: X-checkout, says: "start it", expect: ok}
+  - {who: t-bot, as: the agent, action: edit_experiment, target: X-checkout, params: {traffic_percent: 40}, says: "change it while it runs", expect: denied, code: matrix}
+  - {who: t-bot, as: the agent, action: stop_experiment, target: X-checkout, says: "stop it", expect: ok}
+  - {who: t-bot, as: the agent, action: ship_experiment, target: X-checkout, says: "ship the variant", expect: denied, code: actor}
+  - {who: t-eli, as: eli (engineer), action: ship_experiment, target: X-checkout, says: "ship the variant", expect: denied, code: ship-needs-analyst}
+  - {who: t-ann, as: ann (analyst), action: ship_experiment, target: X-checkout, says: "ship the variant", expect: ok}

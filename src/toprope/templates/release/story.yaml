@@ -1,0 +1,15 @@
+title: An agent ships releases; a person approves them
+keywords: [release, ship, deploy, version, test, build, engineer]   # toprope-init "<a sentence>" picks the template whose words it uses most
+about: >
+  An agent records test results and ships releases. A release manager approves each release,
+  only after its tests pass, and never one they wrote.
+next: >
+  Try letting the author approve: remove `not-the-author` from domain.yaml, and see what the
+  change check says with `toprope-try --check`.
+steps:
+  - {who: t-bot, as: the agent, action: ship_release, target: V-1-4, says: "ship 1.4.0", expect: denied, code: matrix}
+  - {who: t-ana, as: ana (release manager), action: approve_release, target: V-1-4, says: "approve 1.4.0", expect: denied, code: tests-passed}
+  - {who: t-bot, as: the agent, action: record_tests, target: V-1-4, says: "record that the tests passed", expect: ok}
+  - {who: t-eli, as: eli (the author), action: approve_release, target: V-1-4, says: "approve his own release", expect: denied, code: not-the-author}
+  - {who: t-ana, as: ana (release manager), action: approve_release, target: V-1-4, says: "approve 1.4.0", expect: ok}
+  - {who: t-bot, as: the agent, action: ship_release, target: V-1-4, says: "ship 1.4.0", expect: ok}

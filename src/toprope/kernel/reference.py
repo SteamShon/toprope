@@ -12,19 +12,39 @@ import argparse
 import sys
 from collections.abc import Callable
 from pathlib import Path
+from ..errors import fixed
 
 
 def _commands() -> list[tuple[str, Callable[[], argparse.ArgumentParser], str]]:
     from ..adapters.cli import _base_parser
+    from ..adapters.cli.apply import build_parser as apply
+    from ..adapters.cli.change import build_parser as change
+    from ..adapters.cli.rule import add_parser, remove_parser, rename_parser, rule_parser
+    from ..adapters.cli.start import init_parser, set_parser, try_parser
+    from ..adapters.cli.interview import build_parser as interview
     from ..adapters.mcp.cli import build_parser as server
     from ..commits.cli import build_parser as commits
     from ..harness.cli import build_parser as harness
+    from ..importers.cli import build_parser as importer
+    from ..proxy.cli import build_parser as proxy
     from ..worldmap.cli import build_parser as worldmap
     return [
         ("toprope-run", lambda: _base_parser(add_help=True),
          "Its subcommands are the domain's actions, one per action, plus `get`, `history`, `allowed`, "
          "`whoami` and `guide`; each domain's guide lists them with who may take each."),
+        ("toprope-init", init_parser, ""),
+        ("toprope-try", try_parser, ""),
+        ("toprope-set", set_parser, ""),
+        ("toprope-rule", rule_parser, ""),
+        ("toprope-add", add_parser, ""),
+        ("toprope-rename", rename_parser, ""),
+        ("toprope-remove", remove_parser, ""),
+        ("toprope-change", change, ""),
+        ("toprope-apply", apply, ""),
+        ("toprope-interview", interview, "The interview's route for a newcomer: docs/interview.md."),
+        ("toprope-import", importer, ""),
         ("toprope-server", server, ""),
+        ("toprope-proxy", proxy, ""),
         ("toprope-harness", harness, ""),
         ("toprope-worldmap", worldmap, ""),
         ("toprope-commits", commits, ""),
@@ -38,8 +58,9 @@ def _actions(p: argparse.ArgumentParser) -> list[argparse.Action]:
     try:
         return list(p._actions)
     except AttributeError:
-        raise RuntimeError("argparse no longer has ArgumentParser._actions: update "
-                           "toprope.kernel.reference._actions") from None
+        raise RuntimeError(fixed("argparse no longer has ArgumentParser._actions: update "
+                                 "toprope.kernel.reference._actions",
+                                 "update `_actions` in toprope/kernel/reference.py for this Python's argparse")) from None
 
 
 def _sub_help(sp: argparse.Action) -> dict[str, str | None]:

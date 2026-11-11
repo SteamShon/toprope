@@ -15,6 +15,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from ..errors import fixed
+
 KERNEL = "external:kernel"
 
 
@@ -62,7 +64,8 @@ CATALOG: dict[str, Service] = {s.name: s for s in (
             "always `proposed`. `value` is JSON.", {"path": "string", "value": "string", "source": "string"},
             {"issues": "integer", "summary": "string"}),
     Service("record_answer", "Record the owner's answer in their words; its decisions (JSON list of "
-            "{path, value}) become proposed elements citing it.",
+            "{path, value}, or `choice:<id>` for a choice the question offered) become proposed elements "
+            "citing it.",
             {"question": "string", "answer": "string", "decisions": "string"}, {"ref": "string"}),
     Service("confirm_element", "Confirm drafted elements (space-separated paths, or `all` for every "
             "proposed one). The calling person must be the approver.",
@@ -116,4 +119,24 @@ CATALOG: dict[str, Service] = {s.name: s for s in (
             {"passed": "boolean", "summary": "string"}),
 )}
 
-__all__ = ["CATALOG", "KERNEL", "Service"]
+UPSTREAM = "mcp:"                           # a tool of an existing MCP server (ADR-0052)
+
+# Tools of an upstream MCP server, as services a declaration may call (ADR-0052). Only
+# `toprope-proxy` registers them, from its binding and the server's tool list; they never shadow
+# a kernel service, and a declaration names them with the `mcp:` prefix.
+UPSTREAM_SERVICES: dict[str, Service] = {}
+
+
+def service(name: str) -> Service | None:
+    """A kernel service, or an upstream tool the proxy registered."""
+    return CATALOG.get(name) or UPSTREAM_SERVICES.get(name)
+
+
+def register_upstream(svc: Service) -> None:
+    if not svc.name.startswith(UPSTREAM):
+        raise ValueError(fixed(f"an upstream tool's service is named `{UPSTREAM}<tool>`, not {svc.name!r}",
+                               f"name it `{UPSTREAM}` and the tool's name"))
+    UPSTREAM_SERVICES[svc.name] = svc
+
+
+__all__ = ["CATALOG", "KERNEL", "UPSTREAM", "UPSTREAM_SERVICES", "Service", "register_upstream", "service"]

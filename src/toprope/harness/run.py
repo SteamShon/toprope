@@ -50,6 +50,7 @@ class Report:
     minimal_flows: list[dict[str, Any]]
 
     warnings: list[Finding] = field(default_factory=list)   # reported, never failing (ADR-0035)
+    stories: list[str] = field(default_factory=list)         # the counterexamples, told (ADR-0049, D3)
 
     @property
     def ok(self) -> bool:
@@ -58,7 +59,7 @@ class Report:
     def to_json(self) -> dict[str, Any]:
         return {"ok": self.ok, "levels": list(self.levels), "findings": [asdict(f) for f in self.findings],
                 "coverage": self.coverage, "minimal_flows": self.minimal_flows,
-                "warnings": [asdict(f) for f in self.warnings]}
+                "warnings": [asdict(f) for f in self.warnings], "stories": self.stories}
 
     def summary(self) -> str:
         c = self.coverage["cells"]
@@ -85,6 +86,8 @@ class Report:
         for mf in self.minimal_flows:
             lines.append(f"  minimal flow breaking {mf['invariant']}: " +
                          " → ".join(f"{s['actor']} {s['action']} {s['target']}" for s in mf["steps"]))
+        for s in self.stories:
+            lines.append(f"  in your words: {s}")
         return "\n".join(lines)
 
 
@@ -321,7 +324,11 @@ class Harness:
         mech = self.mechanical(mechanical) if mechanical else None
         coverage = self._coverage(cases, results, flows, n_races)
         coverage["mechanical"] = mech.coverage() if mech else None
-        return Report(self.levels, self.findings, coverage, [minimal] if minimal else [], self.warnings)
+        from .story import case_stories, flow_story, inductive_story
+        stories = [flow_story(self.d, minimal)] if minimal else []
+        stories += case_stories(self.d, self.findings)
+        stories += [inductive_story(self.d, w.case, w.detail) for w in self.warnings if w.kind == "inductive"][:5]
+        return Report(self.levels, self.findings, coverage, [minimal] if minimal else [], self.warnings, stories)
 
     def _edge_verdicts(self, cases, results) -> dict[str, str]:
         """Per world-map edge (ADR-0020): failed if any of its cases has a finding at any level,
