@@ -108964,10 +108964,12 @@ changes:
       conflict: true
       outcome: true
       real: true
-    grader_label: null
+    grader_label: seeded
     why: Previously checked commits without checked_at are treated as unchecked, though only unapproved ones are
       affected.
-    label: null
+    label: seeded
+    relabelled:
+      from: null
   - id: C.1.4
     item: C.u4
     run: 1

@@ -137,7 +137,7 @@ compares the arms.
 3. A test shows that one judgement graded k times takes the majority.
 4. The grader is validated on M1's run as above, then frozen with M2's instruments.
 
-## Validity, not only consistency (proposed; the researcher decides)
+## Validity, not only consistency (decided 2026-11-11: the expert sample adopted; the grader's model decided on cost)
 
 The grader is still an LLM judging free text. The checklist, the majority and the noise gate make
 it **steady**. They do not show that it is **right**: two sittings can agree on the same mistake.
@@ -150,6 +150,11 @@ Two additions would close that gap before M2's main run:
 - **The grader's model.** The arms and the grader use the same model today. A grader of the same
   family may favour the reviews written in its own style. Grading with another model, or with two
   models that must agree, removes that doubt, at a cost.
+
+**Decision** (the researcher, 2026-11-11: "다음 순서는 추천대로 하면 될 것 같아"): the
+agreement with the domain expert on a sample of M2's pilot flags is adopted; its sample size and
+minimum agreement go into M2's preregistration. The grader's model is decided there too, once the
+pilot shows what a second model would cost.
 
 ## The validation run (on M1's combined run, consistency only)
 
@@ -217,3 +222,29 @@ Report only `grader-noise.scoring-checklist-r1-1.scoring-checklist-r1-2.json`. O
 revision 2 is the last. If it fails too, the grader is not frozen as is: M2's preregistration
 then states the measured noise and the researcher decides how M2's verdicts take it into account
 (for example, a gap must exceed the noise to count).
+
+**Result** (#257): the sittings differ by at most **0.02** of recall (NL 0.66 and 0.68, structured
+0.88 both, Toprope 1.0 both), within 0.05. Toprope is at 1.0 in both, so for that arm the check
+shows no noise but cannot show much either.
+
+### After revision 1: flags left without a label (2026-11-11)
+
+The second sitting after revision 1 left 16 flags in one change without a label; the first left
+none. M2's `score` stops at an unlabelled flag, and a person deciding it afterwards is what this
+design rules out. The researcher asked whether to handle this now (2026-11-11: "라벨이 빠진 지적
+16개 처리는 지금 하는 게 좋을까?"); it is done now, before the grader is frozen, with two
+completions:
+
+1. **The label waits only for an answer that could change it.** `seeded` needs `names` and
+   (`conflict` or `outcome`), so it no longer waits for `real`; on a change with no seeded problem,
+   only `real` counts. Before, any missing answer left the flag unlabelled.
+2. **A flag still without a label gets more answers**, at most two more, each in its own order,
+   and only for the undecided flags (`grader.extra_votes`). A tie (one true, one false, one
+   missing) is the usual cause.
+
+Neither changes a judgement the grader made; they decide what happens when it gave none. On the
+two sittings' recorded answers (`relabel`, no grading again), rule 1 labels 1 of the 16 flags; the
+noise is unchanged (0.02, within 0.05). The other 15 are undecided on `real` only, on a change
+where they are not `seeded`, so they cannot change recall; rule 2 would have asked them again, and
+was not run on these sittings. **Proposed for M2's preregistration** (the researcher decides): a flag still without a label after
+the extra answers is not `seeded` and is left out of precision, with its count reported.
