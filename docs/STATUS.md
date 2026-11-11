@@ -6,7 +6,7 @@ this page); plans live in [`roadmap.md`](roadmap.md) and the milestone and exper
 Every PR into `develop` or an `umbrella/*` branch fixes any line here it makes untrue, or says
 why not; each release trims it ([`AGENTS.md`](../AGENTS.md), "Progress").
 
-Updated: 2026-11-10 · Cleaned for release: `v0.1.0`
+Updated: 2026-11-11 · Cleaned for release: `v0.1.0`
 
 Legend: ✅ done · 🟡 in part · ⬜ not started
 
@@ -380,7 +380,7 @@ M2 runs, with no person adjudicating grades after the results.
 | Item | Status | PR |
 |---|---|---|
 | The checklist grader: `grade --grader checklist`, four yes/no items per distinct flag (rule B in item `outcome`), each answered k=3 times and decided by majority, the label by a fixed rule; `compare-gradings --first --second --limit` | ✅ | |
-| The validation run on M1's combined run: two checklist sittings, noise within 0.05 (local session) | ⬜ | |
+| The validation run on M1's combined run: two checklist sittings, noise within 0.05 (local session). First run: the sittings differ by up to 0.1 of recall (nl 0.1, structured 0.08, toprope 0.06), over the limit; the grader is revised and checked again (at most twice) | 🟡 | |
 | The invented examples for rule B reviewed by the researcher; the grader frozen with M2's instruments | ⬜ | |
 
 ## M0b, M2 to M5
