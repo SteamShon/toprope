@@ -6,7 +6,9 @@ arm before any change. A probe that fails there cannot show a problem a change b
 "found after deploy" and its probe pass rates measure the probes as much as the arms (M1-report,
 *Limits*). This note groups the grader's reasons. **The probe suite is an instrument.** Changing
 its content is the researcher's call: M2's probes are written by people only. This note proposes,
-and decides nothing.
+and decides nothing. **Adopted** (2026-11-09): the researcher adopted every proposal for the M1
+recheck ([`M1-recheck.md`](../../docs/experiments/M1-recheck.md)); see `probe-suite.yaml`'s
+amendment and `phase_b/probes.py` (`TASK_ACTIONS`).
 
 Probe runs failed before any change (of 3 per arm):
 

@@ -3,7 +3,7 @@ Each stage asks one bundle of questions, takes the owner's answers at once, and 
 far the domain has come. The current stage is the first one that is not done, so a later
 change that breaks an earlier stage sends the interview back to it.
 
-  sources → purpose → cast (roles, objects, links) → actions → transitions → invariants
+  sources → purpose → cast (roles, objects, links) → actions → transitions → invariants and rules
           → world (fixtures, scenarios) → handoffs → review (confirmations, glossary)
 
 Within a stage, conflicts come first, then the questions for what is missing. In
@@ -42,8 +42,9 @@ STAGES: tuple[Stage, ...] = (
           "what it changes.", ("actions",)),
     Stage("transitions", "Transitions", "The stages each tracked thing goes through, and what each "
           "action does in each stage.", ("transitions",)),
-    Stage("invariants", "Invariants", "What must always be true, however things got there.",
-          ("invariants",), optional=True),
+    Stage("invariants", "Invariants and rules", "What must always be true, however things got there; "
+          "and what only some may bring about, whatever the action (ADR-0048).",
+          ("invariants", "rules"), optional=True),
     Stage("world", "World and scenarios", "Realistic examples of everything, and flows that test "
           "the world, including a refused step.", ("world", "scenarios")),
     Stage("handoffs", "Handoffs", "What this domain hands to another domain, when, and with what.",
@@ -92,7 +93,7 @@ class Plan:
         if n == "transitions":
             return not self.untracked() and bool(d.transitions) and self.ws._stop(d, self.attempts)["stop"]
         if n == "invariants":
-            return bool(d.invariants)
+            return bool(d.invariants or d.rules)
         if n == "world":
             return bool(d.world.fixtures and d.scenarios)
         if n == "handoffs":
@@ -178,6 +179,9 @@ class Plan:
             for obj in sorted(d.transitions):
                 q("invariants", obj, f"What must always be true about a {obj}, in every stage, however it got "
                   "there? (If nothing, say so.)", ["invariants"])
+                q("rules", obj, f"Which stages of a {obj} may only some bring about, whatever the action that "
+                  "gets it there: only a person, or only certain roles? Say who, and why. (If none, say so.)",
+                  ["rules"])
         elif n == "world":
             if not d.world.fixtures:
                 q("world", "fixtures", "Give realistic examples: at least one of each thing, with its key "
@@ -237,7 +241,7 @@ class Plan:
                         undecided += tr.matrix[st].get(a, "undecided") == "undecided"
             return {"objects_with_stages": len(d.transitions), "cells": cells, "undecided": undecided}
         if n == "invariants":
-            return {"invariants": len(d.invariants)}
+            return {"invariants": len(d.invariants), "rules": len(d.rules)}
         if n == "world":
             return {"fixtures": len(d.world.fixtures), "scenarios": len(d.scenarios)}
         if n == "handoffs":

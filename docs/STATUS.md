@@ -15,7 +15,7 @@ Legend: ✅ done · 🟡 in part · ⬜ not started
 | Milestone | Link | Status | Note |
 |---|---|---|---|
 | M0a thin slice | none (enabler) | ✅ | released as `v0.1.0` (#65); the tag is not pushed yet |
-| M1 self-compile | ① ⑥ pilot, no verdict | ✅ | reported ([`M1-report.md`](experiments/M1-report.md)): with its LLM review Toprope's recall is 0.84 against 0.64 for the NL skill (at the noise floor) and level with the structured spec; the compiler alone weakens ①; ⑥ inconclusive; self-compile not shown (probes) |
+| M1 self-compile | ① ⑥ pilot, no verdict | ✅ | closed after the recheck ([`M1-report.md`](experiments/M1-report.md)): Toprope with its LLM review leads on recall (first run 0.84 against 0.64 NL; recheck 0.94–1.0 against 0.44–0.62, biased and a reference only); the grader's noise (0.18) moves to M2's grader redesign; six probes carried to M2's probe design; ⑥ inconclusive |
 | U usability before M2 (ADR-0049) | none (enabler) | 🟡 | F1 baseline recorded; F2's script written, its run waits for an operator; theme 1 started |
 | M0b surfaces and effects | none (enabler) | ⬜ | |
 | M2 dogfood | ① ② ③ | ⬜ | the first ① and ② verdicts |
@@ -320,12 +320,35 @@ From [`M1-report.md`](experiments/M1-report.md), *What M2 takes from this*.
 |---|---|---|
 | ADR-0048: outcome rules, and a capability diff in the change check | ✅ | #176 |
 | The capability diff (a check over two declarations; no schema change): the change check's `capability` | ✅ | #177 |
-| Outcome rules: schema, validator, interpreter, harness, TLA+ export (`requires: human` or roles; the generated guide and the self domains' adoption follow) | 🟡 | |
-| Grouped findings in the change report (`groups`: one per check, severity and message, with a count) | 🟡 | |
-| The natural-language check: `CommandChecker` (`TOPROPE_NL_COMMAND`) gives an LLM the changed elements, the capability diff, the rules and the declaration (ADR-0009) | 🟡 | |
-| An editor that proposes a patch: the Toprope arm's editor gets `propose_patch` (several elements, in order, stopping at the first refused) and `check_draft` (the draft validated before a commit) | 🟡 | |
-| Probes that pass before any change: why they fail at `seq: 0` ([`probe-baseline-findings.md`](../experiments/m1/probe-baseline-findings.md)): criteria the right behaviour fails (P05, P07), unequal worlds (the Toprope agent's grant lacks `deliver`/`deploy`), strict readings; proposals wait for the researcher (the suite is an instrument) | 🟡 | |
-| M2's design, a draft for the researcher ([`M2-design.md`](experiments/M2-design.md)): the full Toprope check against a structured spec reviewed by an LLM, the same edit checked both ways, grouped precision, the grader's noise, probes gated before any change, draft verdict rules | 🟡 | |
+| Outcome rules: schema, validator, interpreter, harness, TLA+ export (`requires: human` or roles; the generated guide and the self domains' adoption follow, in the M1 recheck) | ✅ | #179 |
+| Grouped findings in the change report (`groups`: one per check, severity and message, with a count) | ✅ | #180 |
+| The natural-language check: `CommandChecker` (`TOPROPE_NL_COMMAND`) gives an LLM the changed elements, the capability diff, the rules and the declaration (ADR-0009) | ✅ | #181 |
+| An editor that proposes a patch: the Toprope arm's editor gets `propose_patch` (several elements, in order, stopping at the first refused) and `check_draft` (the draft validated before a commit) | ✅ | #182 |
+| Probes that pass before any change: why they fail at `seq: 0` ([`probe-baseline-findings.md`](../experiments/m1/probe-baseline-findings.md)): criteria the right behaviour fails (P05, P07), unequal worlds (the Toprope agent's grant lacks `deliver`/`deploy`), strict readings; adopted by the researcher, in the M1 recheck | ✅ | #183 |
+| M2's design, a draft for the researcher ([`M2-design.md`](experiments/M2-design.md)): the full Toprope check against a structured spec reviewed by an LLM, the same edit checked both ways, grouped precision, the grader's noise, probes gated before any change, draft verdict rules | ✅ | #184 |
+
+## M1 recheck (umbrella `umbrella/m1-recheck`, link: ① ⑥)
+
+Preregistered in [`M1-recheck.md`](experiments/M1-recheck.md): the improved Toprope rerun on M1's
+change list, to close M1 before M2. Reference numbers only (ADR-0048 §6); M1 closes on the probe
+gate, a clean pipeline and the grader's measured noise.
+
+| Item | Status | PR |
+|---|---|---|
+| Preregistration: what changes, what stays, the exit criteria | ✅ | #187 |
+| #179's leftovers: the `check` form of `requires` (validator, interpreter, harness, TLA+ guard; the schema generated with rules), `rule-agent:` harness cases with an agent for the role's person, rules in the generated guide, the invariants stage asks for rules | ✅ | |
+| Mechanical promotion (`python -m toprope.decl.rules suggest`: an outcome every non-system action reaches only with `requires: human` gets that rule; the self domains get 5 and 5, and pass their checks with them); the Phase B log keeps one header under a lock and `phase_b status` leaves out runs moved aside | ✅ | |
+| Authoring's `record_questions` keeps the bundle's questions: `stage_questions` also returns them as one string (`text`), and `Draft.questions` holds it; proposed in the loop with the rules; approved in `authoring@11-4961f900bb4663e1` | ✅ | #192 |
+| The probes: each probe agent's grant adds what its task asks (`TASK_ACTIONS`; a person-only action stays refused); the gate in the scorer (`probe_gate`; `found_after_deploy_ungated` kept); the grader reads a probe's `examples`; the amended suite (P05, P07 judged on what the agent did and what its tools show; examples for P01, P04, P08), amended by the researcher's approved request (`FROZEN.json`, version 2) | ✅ | #191 |
+| The grader's second sitting (`grade --into scoring-2`) and its noise (`compare-gradings`, `grader-noise.json`); the recheck's steps in the RUNBOOK | ✅ | #198 |
+| Criterion 3 met by measuring the grader's noise (0.18 of recall, over the 0.1 limit; amended again 2026-11-10): nobody adjudicates; `score` reports each arm's recall and precision from both sittings with their range (`by_sitting`); the adjudication commands (#217, #227) removed | ✅ | |
+| The self domains adopt the promoted rules (Authoring 5, Delivery 5): confirmed, approved, deployed and verified as `authoring@11-4961f900bb4663e1` and `delivery@6-c2678fc294429d48` (approval run 42605372607; three runs before it found and fixed TLC's state space, #195, and unseen proposed rules, #199) | ✅ | #192 |
+| No experiment words in what an arm sees: `Draft.questions` and `record_questions` cited the recheck's own doc (`docs/experiments/M1-recheck.md`), which the arms' materials would show; re-cited to ADR-0025 and ADR-0037 through the loop, approved as `authoring@12-acf2a5f6e362166c` | ✅ | #205 |
+| The baseline moves to `authoring@12-acf2a5f6e362166c` and `delivery@6-c2678fc294429d48` (`phase_b/baseline.py`); the structured and Toprope arms' materials rebuilt; the NL skill removed, to be rendered again | ✅ | |
+| Harness fixes found closing the recheck: the script no longer scripts capability or info findings as `seeded` (their `where` is the edited element by construction; 67 and 70 flags in the two sittings), `rescript` takes those labels back from graded sittings (an unlabelled repeat takes the grader's label of the same finding); `to-decide` stops asking about a disagreement marked `decided`; `regrade-missing` grades once more a probe run left without a grade; the probes before any change record their tokens; an end-to-end test runs the recheck's closing steps | ✅ | |
+| Every Toprope probe of the recheck ran without its domain servers' tools (they did not connect; nothing stopped it): a conversation whose servers gave no tool now stops as an error, with their status and stderr; servers get longer to connect (`MCP_TIMEOUT`); `check-probe-tools` checks them; `arm --redo-baseline-probes` and `regrade-missing --redo` run and grade the probes before any change again. Toprope's found-after-deploy is not measured in the recheck | ✅ | |
+| Phase B rerun (local session, RUNBOOK's recheck section): the NL skill rendered from authoring@12 and delivery@6, accepted by the researcher; three arms and the combined arm run, graded twice, script labels taken back (`rescript`) and one probe run graded again (`regrade-missing`); confirmed and scored. Criterion 3: the two sittings differ by up to 0.18 of recall (limit 0.1), measured; Toprope's probes before any change run again with the domain servers connected (#234, #243, #245) and graded again; criterion 1: P01, P02, P04, P06, P07 and P08 fail the probe gate | 🟡 | #212 |
+| The recheck report ([`M1-report.md`](experiments/M1-report.md), *The recheck*): criterion 1 met by its rule (P03, P05 pass the gate; six probes carried to M2 with their causes), 2 met (faults fixed and recorded; #96 dropped: no push token in this public repository, the researcher's decision), 3 met by measuring the noise (0.18, over the limit); M1 closed | ✅ | |
 
 ## Usability before M2 (ADR-0049, link: none)
 
@@ -367,20 +390,20 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 
 ## Next
 
-1. ADR-0049: the F2 baseline run (an operator the researcher finds), and theme 1 (the change loop). M2's spec waits for the
-   program.
-2. M2's spec, from the draft (`docs/experiments/M2-design.md`): the researcher decides each point,
+1. Merge `umbrella/m1-recheck` into `develop` (a merge commit). Then M2's grader, as decided
+   (`docs/experiments/M2-grader.md`, 2026-11-10): the checklist, the majority of three, rule B and
+   the noise gate, validated on M1's combined run for consistency only.
+2. ADR-0049: the F2 baseline run (an operator the researcher finds), and theme 1 (the change loop).
+3. M2's spec, from the draft (`docs/experiments/M2-design.md`): the researcher decides each point,
    freezes the verdict rules, and finds the domain expert who is not the builder; the expert
-   writes the change list, seeds it and keeps the key. The probe proposals
-   (`experiments/m1/probe-baseline-findings.md`) are the researcher's to adopt. The self domains
-   adopt outcome rules through their own reviewed changes (ADR-0048 §5).
-3. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
-4. When a domain is shared by several people or agents (M2, or a hosted server): its event
+   writes the change list, seeds it and keeps the key.
+4. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
+5. When a domain is shared by several people or agents (M2, or a hosted server): its event
    log moves from git to a database (`--store postgres:DSN` for a composition, one schema per
    member), through a new ADR superseding decision 29A for that case; an export to git can
    keep the audit trail (decided 2026-11-06). Until then the self domains keep their logs in
    git (`domains/<domain>/events/`).
-5. ADR-0041's follow-up work (decided 2026-11-06), the third on in
+6. ADR-0041's follow-up work (decided 2026-11-06), the third on in
    `umbrella/adr-0041-follow-ups` (#114). Done: approval refuses commits with proposed
    elements, and the change check records how many are left (#110); every decision action takes
    an optional `rationale` (#111); a check can read `actor.principal` (#113);
@@ -388,7 +411,7 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    permissions it ran under (#116); a commit may cite its evidence (#117, #118: free strings
    on `commit`, Authoring commit `5-c8fd1b8fc98be17c`), replaced by typed evidence that must
    resolve, cited with `cite_evidence` (#124, in the pstack umbrella).
-6. ADR-0042's follow-up work (accepted 2026-11-07): done: `domain_version` with the deployment
+7. ADR-0042's follow-up work (accepted 2026-11-07): done: `domain_version` with the deployment
    log gives the rule in force when an event was decided, documented, the self domains too
    (ADR-0045, #150); read visibility defined in the schema (`read`, refused until M0b); in M0b,
    deadlines with timers, read visibility enforced by the query and MCP read tools, an observed
@@ -398,11 +421,11 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    (recommendation, evidence, rules and version applied, the person's decision and reason, the
    action, the outcome). A source kind for process mining (event logs of existing systems) is a
    candidate for the authoring interview's sources, with the adapters (M0b).
-7. ADR-0043's follow-ups: make `tla` a required check on `develop` (maintainer). Creation
+8. ADR-0043's follow-ups: make `tla` a required check on `develop` (maintainer). Creation
    (#155), link paths to what no action changes (#156) and time, frozen at the harness's clock
    (#157), are modeled; no declaration in the repository leaves anything out.
 
-8. Before M2's Phase B: a probe's starting state written as conditions on objects (for example
+9. Before M2's Phase B: a probe's starting state written as conditions on objects (for example
    a Commit with `checks_passed` true and `approved` false), and generated from the declarations
    by searching their actions for a way to reach it, instead of a hand-written setup per probe.
    This needs a format change to the probe suite (an ADR). M1 keeps the hand-written setups in
@@ -414,22 +437,7 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 Each item names the PR it came from and the review date. The PR that resolves an item deletes
 it; each release's cleanup PR handles items older than one release.
 
-- The `human-request` workflow pushes its result with the workflow token, so no `pull_request`
-  check runs on that head, and the ruleset does not accept the `status` run the workflow
-  dispatches; the PR needs one more commit before it can merge. A push token that triggers
-  workflows (a GitHub App or a fine-grained token, set up by the maintainer) would remove the
-  step (#96, 2026-11-06)
-- Authoring's `record_questions` sets the stage and the bundle but not `params.questions`, so the
-  generated tools never show the bundle's questions (`next_questions` returns only the bundle id).
-  Found building probe P04's starting state (#103, 2026-11-06). Not fixed in M1: the self domains
-  are the experiment's baseline
-
-- The Phase B harness: `phase-b-runs.tsv` has a second header where two arms created it at once; `phase_b
-  status` lists the superseded `*.stale-1` folders too (#166, #170, 2026-11-08)
-
-- Outcome rules (#179): the `check`-expression form of `requires`, an agent actor in the harness
-  world (a `human` rule is tested at the interpreter for now), rules in the generated guide, and the
-  interview stage that asks for them (ADR-0048 §4) are not done yet (#179, 2026-11-09)
+None.
 
 ## Open questions
 

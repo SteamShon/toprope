@@ -13,7 +13,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "experiments/m1"))
 from phase_b.agent import ToolError  # noqa: E402
-from phase_b.baseline import baseline_root  # noqa: E402
+from phase_b.baseline import BASELINE, baseline_root  # noqa: E402
 from toprope.commits import CommitStore  # noqa: E402
 
 from phase_b.backend import Backend
@@ -88,7 +88,8 @@ def test_a_passing_change_goes_through_the_declared_actions(materials, tmp_path)
     assert "Change request 1: An intent." in ed.seen[1]
     check = arm.check(REQ, out)
     (c,) = check.data["commits"].values()
-    assert check.data["findings"] == [] and c["passed"] and c["preview"]["ok"]
+    assert [f for f in check.data["findings"] if not f.get("carried")] == [] and c["passed"] and c["preview"]["ok"]
+    assert all(f["severity"] == "warning" for f in check.data["findings"])     # delivery@6's own warnings, carried
     assert c["detail_passed"] and c["verdicts_agree"]
     deploy = arm.deploy(REQ, out)
     assert deploy.data["deployed"] and deploy.data["domains"]["delivery"]["path"] == "approved"
@@ -339,8 +340,8 @@ def test_flags_come_from_the_kernels_inputs_and_say_what_the_base_had(materials,
     data = arm.check(REQ, out).data
     cid = data["commits"]["delivery"]["commit"]
     root = arm.sb.root
-    assert recorded_base(root, "delivery", cid) == "1-584aaeea5e686ee8"
-    report = check_report(root, "delivery", cid, "1-584aaeea5e686ee8")
+    assert recorded_base(root, "delivery", cid) == BASELINE["delivery"]
+    report = check_report(root, "delivery", cid, BASELINE["delivery"])
     assert report.checks["log_replay"].ran                               # the member's own history
     assert report.checks["log_replay"].note == "" or "past action" in report.checks["log_replay"].summary()
     found, _ = flags(root, "delivery", cid)
