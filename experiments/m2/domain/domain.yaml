@@ -1,2 +1,1090 @@
 domain: domain
 version: 1
+roles:
+- unassigned
+objects:
+  ClientOrder:
+    description: A ClientOrder, as the server keeps it.
+    properties: {}
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/0
+    status: proposed
+  Locate:
+    description: A Locate, as the server keeps it.
+    properties: {}
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/16
+    status: proposed
+  Order:
+    description: An Order, as the server keeps it.
+    properties: {}
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/19
+    status: proposed
+  SymbolOrAsset:
+    description: A SymbolOrAsset, as the server keeps it.
+    properties: {}
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/25
+    status: proposed
+  CorporateActionAnnouncement:
+    description: A CorporateActionAnnouncement, as the server keeps it.
+    properties: {}
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/29
+    status: proposed
+  SymbolOr:
+    description: A SymbolOr, as the server keeps it.
+    properties: {}
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/31
+    status: proposed
+  BeforeOrder:
+    description: A BeforeOrder, as the server keeps it.
+    properties: {}
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/32
+    status: proposed
+  SymbolOrContract:
+    description: A SymbolOrContract, as the server keeps it.
+    properties: {}
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/42
+    status: proposed
+  Watchlist:
+    description: A Watchlist, as the server keeps it.
+    properties: {}
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/46
+    status: proposed
+actions:
+  place_stock_order:
+    description: Place a stock or ETF order.
+    actor:
+    - unassigned
+    params:
+      symbol:
+        type: string
+        optional: false
+      side:
+        type: string
+        optional: false
+      qty:
+        type: string
+        optional: true
+      notional:
+        type: string
+        optional: true
+      type:
+        type: string
+        optional: true
+      time_in_force:
+        type: string
+        optional: true
+      limit_price:
+        type: string
+        optional: true
+      stop_price:
+        type: string
+        optional: true
+      trail_price:
+        type: string
+        optional: true
+      trail_percent:
+        type: string
+        optional: true
+      extended_hours:
+        type: boolean
+        optional: true
+      order_class:
+        type: string
+        optional: true
+      take_profit_limit_price:
+        type: string
+        optional: true
+      stop_loss_stop_price:
+        type: string
+        optional: true
+      stop_loss_limit_price:
+        type: string
+        optional: true
+    target: ClientOrder
+    effects:
+    - call: mcp:place_stock_order
+      with:
+        client_order_id: target.id
+        symbol: params.symbol
+        side: params.side
+        qty: params.qty
+        notional: params.notional
+        type: params.type
+        time_in_force: params.time_in_force
+        limit_price: params.limit_price
+        stop_price: params.stop_price
+        trail_price: params.trail_price
+        trail_percent: params.trail_percent
+        extended_hours: params.extended_hours
+        order_class: params.order_class
+        take_profit_limit_price: params.take_profit_limit_price
+        stop_loss_stop_price: params.stop_loss_stop_price
+        stop_loss_limit_price: params.stop_loss_limit_price
+      reply: record_place_stock_order
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/0
+    status: proposed
+  place_crypto_order:
+    description: Place a cryptocurrency order.
+    actor:
+    - unassigned
+    params:
+      symbol:
+        type: string
+        optional: false
+      side:
+        type: string
+        optional: false
+      qty:
+        type: string
+        optional: true
+      notional:
+        type: string
+        optional: true
+      type:
+        type: string
+        optional: true
+      time_in_force:
+        type: string
+        optional: true
+      limit_price:
+        type: string
+        optional: true
+      stop_price:
+        type: string
+        optional: true
+    target: ClientOrder
+    effects:
+    - call: mcp:place_crypto_order
+      with:
+        client_order_id: target.id
+        symbol: params.symbol
+        side: params.side
+        qty: params.qty
+        notional: params.notional
+        type: params.type
+        time_in_force: params.time_in_force
+        limit_price: params.limit_price
+        stop_price: params.stop_price
+      reply: record_place_crypto_order
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/1
+    status: proposed
+  place_option_order:
+    description: 'Place an options order (single-leg or multi-leg).
+
+
+      For single-leg orders, provide symbol, side, and qty.
+
+      For multi-leg orders, provide qty, legs, and optionally
+
+      order_class="mleg" (auto-inferred). Symbol and side on the
+
+      parent are not needed for multi-leg.'
+    actor:
+    - unassigned
+    params:
+      qty:
+        type: string
+        optional: false
+      type:
+        type: string
+        optional: true
+      time_in_force:
+        type: string
+        optional: true
+      symbol:
+        type: string
+        optional: true
+      side:
+        type: string
+        optional: true
+      position_intent:
+        type: string
+        optional: true
+      limit_price:
+        type: string
+        optional: true
+      stop_price:
+        type: string
+        optional: true
+      order_class:
+        type: string
+        optional: true
+    target: ClientOrder
+    effects:
+    - call: mcp:place_option_order
+      with:
+        client_order_id: target.id
+        qty: params.qty
+        type: params.type
+        time_in_force: params.time_in_force
+        symbol: params.symbol
+        side: params.side
+        position_intent: params.position_intent
+        limit_price: params.limit_price
+        stop_price: params.stop_price
+        order_class: params.order_class
+      reply: record_place_option_order
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/2
+    status: proposed
+  get_locate:
+    description: Returns a single locate request by its ID. Not available in paper
+      trading.
+    actor:
+    - unassigned
+    params: {}
+    target: Locate
+    effects:
+    - call: mcp:get_locate
+      with:
+        locate_id: target.id
+      reply: record_get_locate
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/16
+    status: proposed
+  get_account_activities:
+    description: Returns a list of account activities such as fills, dividends, and
+      transfers.
+    actor:
+    - unassigned
+    params:
+      category:
+        enum:
+        - trade_activity
+        - non_trade_activity
+        optional: true
+      date:
+        type: datetime
+        optional: true
+      until:
+        type: datetime
+        optional: true
+      after:
+        type: datetime
+        optional: true
+      direction:
+        enum:
+        - asc
+        - desc
+        optional: true
+      page_size:
+        type: integer
+        optional: true
+      page_token:
+        type: string
+        optional: true
+    target: Order
+    effects:
+    - call: mcp:get_account_activities
+      with:
+        order_id: target.id
+        category: params.category
+        date: params.date
+        until: params.until
+        after: params.after
+        direction: params.direction
+        page_size: params.page_size
+        page_token: params.page_token
+      reply: record_get_account_activities
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/19
+    status: proposed
+  get_account_activities_by_type:
+    description: Returns account activity entries for a specific type of activity.
+    actor:
+    - unassigned
+    params:
+      date:
+        type: datetime
+        optional: true
+      until:
+        type: datetime
+        optional: true
+      after:
+        type: datetime
+        optional: true
+      direction:
+        enum:
+        - asc
+        - desc
+        optional: true
+      page_size:
+        type: integer
+        optional: true
+      page_token:
+        type: string
+        optional: true
+      activity_type:
+        type: string
+        optional: false
+    target: Order
+    effects:
+    - call: mcp:get_account_activities_by_type
+      with:
+        order_id: target.id
+        date: params.date
+        until: params.until
+        after: params.after
+        direction: params.direction
+        page_size: params.page_size
+        page_token: params.page_token
+        activity_type: params.activity_type
+      reply: record_get_account_activities_by_type
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/20
+    status: proposed
+  get_asset:
+    description: Retrieves and formats detailed information about a specific asset.
+    actor:
+    - unassigned
+    params: {}
+    target: SymbolOrAsset
+    effects:
+    - call: mcp:get_asset
+      with:
+        symbol_or_asset_id: target.id
+      reply: record_get_asset
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/25
+    status: proposed
+  get_corporate_action_announcement:
+    description: Retrieves a single corporate action announcement by ID.
+    actor:
+    - unassigned
+    params: {}
+    target: CorporateActionAnnouncement
+    effects:
+    - call: mcp:get_corporate_action_announcement
+      with:
+        id: target.id
+      reply: record_get_corporate_action_announcement
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/29
+    status: proposed
+  get_option_contract:
+    description: Retrieves a single option contract by symbol or contract ID.
+    actor:
+    - unassigned
+    params: {}
+    target: SymbolOr
+    effects:
+    - call: mcp:get_option_contract
+      with:
+        symbol_or_id: target.id
+      reply: record_get_option_contract
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/31
+    status: proposed
+  get_orders:
+    description: Retrieves and formats orders with the specified filters.
+    actor:
+    - unassigned
+    params:
+      status:
+        enum:
+        - open
+        - closed
+        - all
+        optional: true
+      limit:
+        type: integer
+        optional: true
+      after:
+        type: string
+        optional: true
+      until:
+        type: string
+        optional: true
+      direction:
+        enum:
+        - asc
+        - desc
+        optional: true
+      nested:
+        type: boolean
+        optional: true
+      symbols:
+        type: string
+        optional: true
+      side:
+        type: string
+        optional: true
+      after_order_id:
+        type: string
+        optional: true
+    target: BeforeOrder
+    effects:
+    - call: mcp:get_orders
+      with:
+        before_order_id: target.id
+        status: params.status
+        limit: params.limit
+        after: params.after
+        until: params.until
+        direction: params.direction
+        nested: params.nested
+        symbols: params.symbols
+        side: params.side
+        after_order_id: params.after_order_id
+      reply: record_get_orders
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/32
+    status: proposed
+  get_order_by_id:
+    description: Retrieves a single order by its ID.
+    actor:
+    - unassigned
+    params:
+      nested:
+        type: boolean
+        optional: true
+    target: Order
+    effects:
+    - call: mcp:get_order_by_id
+      with:
+        order_id: target.id
+        nested: params.nested
+      reply: record_get_order_by_id
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/34
+    status: proposed
+  cancel_order_by_id:
+    description: Cancel a specific order by its ID.
+    actor:
+    - unassigned
+    params: {}
+    target: Order
+    effects:
+    - call: mcp:cancel_order_by_id
+      with:
+        order_id: target.id
+      reply: record_cancel_order_by_id
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/35
+    status: proposed
+  replace_order_by_id:
+    description: Replaces an existing open order with updated parameters. At least
+      one optional field must be provided.
+    actor:
+    - unassigned
+    params:
+      client_order_id:
+        type: string
+        optional: true
+      limit_price:
+        type: string
+        optional: true
+      notional:
+        type: string
+        optional: true
+      qty:
+        type: string
+        optional: true
+      stop_price:
+        type: string
+        optional: true
+      time_in_force:
+        enum:
+        - day
+        - gtc
+        - opg
+        - cls
+        - ioc
+        - fok
+        optional: true
+      trail:
+        type: string
+        optional: true
+    target: Order
+    effects:
+    - call: mcp:replace_order_by_id
+      with:
+        order_id: target.id
+        client_order_id: params.client_order_id
+        limit_price: params.limit_price
+        notional: params.notional
+        qty: params.qty
+        stop_price: params.stop_price
+        time_in_force: params.time_in_force
+        trail: params.trail
+      reply: record_replace_order_by_id
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/36
+    status: proposed
+  get_order_by_client_id:
+    description: 'Retrieves a single order specified by the client order ID. Note:
+      if the order was replaced, this returns the original order (status "replaced")
+      with a replaced_by field pointing to the new order ID.'
+    actor:
+    - unassigned
+    params: {}
+    target: ClientOrder
+    effects:
+    - call: mcp:get_order_by_client_id
+      with:
+        client_order_id: target.id
+      reply: record_get_order_by_client_id
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/37
+    status: proposed
+  get_open_position:
+    description: Retrieves and formats details for a specific open position.
+    actor:
+    - unassigned
+    params: {}
+    target: SymbolOrAsset
+    effects:
+    - call: mcp:get_open_position
+      with:
+        symbol_or_asset_id: target.id
+      reply: record_get_open_position
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/40
+    status: proposed
+  close_position:
+    description: Closes a specific position for a single symbol by placing a sell
+      order. If the market is closed, the sell order will remain queued and execute
+      at the next market open.
+    actor:
+    - unassigned
+    params:
+      qty:
+        type: number
+        optional: true
+      percentage:
+        type: number
+        optional: true
+    target: SymbolOrAsset
+    effects:
+    - call: mcp:close_position
+      with:
+        symbol_or_asset_id: target.id
+        qty: params.qty
+        percentage: params.percentage
+      reply: record_close_position
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/41
+    status: proposed
+  do_not_exercise_options_position:
+    description: Submits a do-not-exercise instruction for a held option contract.
+    actor:
+    - unassigned
+    params: {}
+    target: SymbolOrContract
+    effects:
+    - call: mcp:do_not_exercise_options_position
+      with:
+        symbol_or_contract_id: target.id
+      reply: record_do_not_exercise_options_position
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/42
+    status: proposed
+  exercise_options_position:
+    description: Exercises a held option contract, converting it into the underlying
+      asset.
+    actor:
+    - unassigned
+    params: {}
+    target: SymbolOrContract
+    effects:
+    - call: mcp:exercise_options_position
+      with:
+        symbol_or_contract_id: target.id
+      reply: record_exercise_options_position
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/43
+    status: proposed
+  get_watchlist_by_id:
+    description: Get a specific watchlist by its ID.
+    actor:
+    - unassigned
+    params: {}
+    target: Watchlist
+    effects:
+    - call: mcp:get_watchlist_by_id
+      with:
+        watchlist_id: target.id
+      reply: record_get_watchlist_by_id
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/46
+    status: proposed
+  update_watchlist_by_id:
+    description: 'Update an existing watchlist. IMPORTANT: this replaces the entire
+      watchlist. You must include the symbols parameter with the full list of desired
+      symbols, otherwise all assets will be removed.'
+    actor:
+    - unassigned
+    params:
+      name:
+        type: string
+        optional: true
+    target: Watchlist
+    effects:
+    - call: mcp:update_watchlist_by_id
+      with:
+        watchlist_id: target.id
+        name: params.name
+      reply: record_update_watchlist_by_id
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/47
+    status: proposed
+  add_asset_to_watchlist_by_id:
+    description: Add an asset by symbol to a specific watchlist.
+    actor:
+    - unassigned
+    params:
+      symbol:
+        type: string
+        optional: true
+    creates: Watchlist
+    effects:
+    - call: mcp:add_asset_to_watchlist_by_id
+      with:
+        watchlist_id: target.id
+        symbol: params.symbol
+      reply: record_add_asset_to_watchlist_by_id
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/48
+    status: proposed
+  delete_watchlist_by_id:
+    description: Delete a specific watchlist by its ID.
+    actor:
+    - unassigned
+    params: {}
+    target: Watchlist
+    effects:
+    - call: mcp:delete_watchlist_by_id
+      with:
+        watchlist_id: target.id
+      reply: record_delete_watchlist_by_id
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/49
+    status: proposed
+  remove_asset_from_watchlist_by_id:
+    description: Remove an asset by symbol from a specific watchlist.
+    actor:
+    - unassigned
+    params:
+      symbol:
+        type: string
+        optional: false
+    target: Watchlist
+    effects:
+    - call: mcp:remove_asset_from_watchlist_by_id
+      with:
+        watchlist_id: target.id
+        symbol: params.symbol
+      reply: record_remove_asset_from_watchlist_by_id
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/50
+    status: proposed
+  record_place_stock_order:
+    description: Record the server's answer to place_stock_order.
+    actor:
+    - external:kernel
+    target: ClientOrder
+    params:
+      ok:
+        type: boolean
+    preconditions:
+    - id: place-stock-order-done
+      check: params.ok == true
+      reason: The server did not do it (place_stock_order).
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/0
+    status: proposed
+  record_place_crypto_order:
+    description: Record the server's answer to place_crypto_order.
+    actor:
+    - external:kernel
+    target: ClientOrder
+    params:
+      ok:
+        type: boolean
+    preconditions:
+    - id: place-crypto-order-done
+      check: params.ok == true
+      reason: The server did not do it (place_crypto_order).
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/1
+    status: proposed
+  record_place_option_order:
+    description: Record the server's answer to place_option_order.
+    actor:
+    - external:kernel
+    target: ClientOrder
+    params:
+      ok:
+        type: boolean
+    preconditions:
+    - id: place-option-order-done
+      check: params.ok == true
+      reason: The server did not do it (place_option_order).
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/2
+    status: proposed
+  record_get_locate:
+    description: Record the server's answer to get_locate.
+    actor:
+    - external:kernel
+    target: Locate
+    params:
+      ok:
+        type: boolean
+    preconditions:
+    - id: get-locate-done
+      check: params.ok == true
+      reason: The server did not do it (get_locate).
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/16
+    status: proposed
+  record_get_account_activities:
+    description: Record the server's answer to get_account_activities.
+    actor:
+    - external:kernel
+    target: Order
+    params:
+      ok:
+        type: boolean
+    preconditions:
+    - id: get-account-activities-done
+      check: params.ok == true
+      reason: The server did not do it (get_account_activities).
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/19
+    status: proposed
+  record_get_account_activities_by_type:
+    description: Record the server's answer to get_account_activities_by_type.
+    actor:
+    - external:kernel
+    target: Order
+    params:
+      ok:
+        type: boolean
+    preconditions:
+    - id: get-account-activities-by-type-done
+      check: params.ok == true
+      reason: The server did not do it (get_account_activities_by_type).
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/20
+    status: proposed
+  record_get_asset:
+    description: Record the server's answer to get_asset.
+    actor:
+    - external:kernel
+    target: SymbolOrAsset
+    params:
+      ok:
+        type: boolean
+    preconditions:
+    - id: get-asset-done
+      check: params.ok == true
+      reason: The server did not do it (get_asset).
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/25
+    status: proposed
+  record_get_corporate_action_announcement:
+    description: Record the server's answer to get_corporate_action_announcement.
+    actor:
+    - external:kernel
+    target: CorporateActionAnnouncement
+    params:
+      ok:
+        type: boolean
+    preconditions:
+    - id: get-corporate-action-announcement-done
+      check: params.ok == true
+      reason: The server did not do it (get_corporate_action_announcement).
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/29
+    status: proposed
+  record_get_option_contract:
+    description: Record the server's answer to get_option_contract.
+    actor:
+    - external:kernel
+    target: SymbolOr
+    params:
+      ok:
+        type: boolean
+    preconditions:
+    - id: get-option-contract-done
+      check: params.ok == true
+      reason: The server did not do it (get_option_contract).
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/31
+    status: proposed
+  record_get_orders:
+    description: Record the server's answer to get_orders.
+    actor:
+    - external:kernel
+    target: BeforeOrder
+    params:
+      ok:
+        type: boolean
+    preconditions:
+    - id: get-orders-done
+      check: params.ok == true
+      reason: The server did not do it (get_orders).
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/32
+    status: proposed
+  record_get_order_by_id:
+    description: Record the server's answer to get_order_by_id.
+    actor:
+    - external:kernel
+    target: Order
+    params:
+      ok:
+        type: boolean
+    preconditions:
+    - id: get-order-by-id-done
+      check: params.ok == true
+      reason: The server did not do it (get_order_by_id).
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/34
+    status: proposed
+  record_cancel_order_by_id:
+    description: Record the server's answer to cancel_order_by_id.
+    actor:
+    - external:kernel
+    target: Order
+    params:
+      ok:
+        type: boolean
+    preconditions:
+    - id: cancel-order-by-id-done
+      check: params.ok == true
+      reason: The server did not do it (cancel_order_by_id).
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/35
+    status: proposed
+  record_replace_order_by_id:
+    description: Record the server's answer to replace_order_by_id.
+    actor:
+    - external:kernel
+    target: Order
+    params:
+      ok:
+        type: boolean
+    preconditions:
+    - id: replace-order-by-id-done
+      check: params.ok == true
+      reason: The server did not do it (replace_order_by_id).
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/36
+    status: proposed
+  record_get_order_by_client_id:
+    description: Record the server's answer to get_order_by_client_id.
+    actor:
+    - external:kernel
+    target: ClientOrder
+    params:
+      ok:
+        type: boolean
+    preconditions:
+    - id: get-order-by-client-id-done
+      check: params.ok == true
+      reason: The server did not do it (get_order_by_client_id).
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/37
+    status: proposed
+  record_get_open_position:
+    description: Record the server's answer to get_open_position.
+    actor:
+    - external:kernel
+    target: SymbolOrAsset
+    params:
+      ok:
+        type: boolean
+    preconditions:
+    - id: get-open-position-done
+      check: params.ok == true
+      reason: The server did not do it (get_open_position).
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/40
+    status: proposed
+  record_close_position:
+    description: Record the server's answer to close_position.
+    actor:
+    - external:kernel
+    target: SymbolOrAsset
+    params:
+      ok:
+        type: boolean
+    preconditions:
+    - id: close-position-done
+      check: params.ok == true
+      reason: The server did not do it (close_position).
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/41
+    status: proposed
+  record_do_not_exercise_options_position:
+    description: Record the server's answer to do_not_exercise_options_position.
+    actor:
+    - external:kernel
+    target: SymbolOrContract
+    params:
+      ok:
+        type: boolean
+    preconditions:
+    - id: do-not-exercise-options-position-done
+      check: params.ok == true
+      reason: The server did not do it (do_not_exercise_options_position).
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/42
+    status: proposed
+  record_exercise_options_position:
+    description: Record the server's answer to exercise_options_position.
+    actor:
+    - external:kernel
+    target: SymbolOrContract
+    params:
+      ok:
+        type: boolean
+    preconditions:
+    - id: exercise-options-position-done
+      check: params.ok == true
+      reason: The server did not do it (exercise_options_position).
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/43
+    status: proposed
+  record_get_watchlist_by_id:
+    description: Record the server's answer to get_watchlist_by_id.
+    actor:
+    - external:kernel
+    target: Watchlist
+    params:
+      ok:
+        type: boolean
+    preconditions:
+    - id: get-watchlist-by-id-done
+      check: params.ok == true
+      reason: The server did not do it (get_watchlist_by_id).
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/46
+    status: proposed
+  record_update_watchlist_by_id:
+    description: Record the server's answer to update_watchlist_by_id.
+    actor:
+    - external:kernel
+    target: Watchlist
+    params:
+      ok:
+        type: boolean
+    preconditions:
+    - id: update-watchlist-by-id-done
+      check: params.ok == true
+      reason: The server did not do it (update_watchlist_by_id).
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/47
+    status: proposed
+  record_add_asset_to_watchlist_by_id:
+    description: Record the server's answer to add_asset_to_watchlist_by_id.
+    actor:
+    - external:kernel
+    target: Watchlist
+    params:
+      ok:
+        type: boolean
+    preconditions:
+    - id: add-asset-to-watchlist-by-id-done
+      check: params.ok == true
+      reason: The server did not do it (add_asset_to_watchlist_by_id).
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/48
+    status: proposed
+  record_delete_watchlist_by_id:
+    description: Record the server's answer to delete_watchlist_by_id.
+    actor:
+    - external:kernel
+    target: Watchlist
+    params:
+      ok:
+        type: boolean
+    preconditions:
+    - id: delete-watchlist-by-id-done
+      check: params.ok == true
+      reason: The server did not do it (delete_watchlist_by_id).
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/49
+    status: proposed
+  record_remove_asset_from_watchlist_by_id:
+    description: Record the server's answer to remove_asset_from_watchlist_by_id.
+    actor:
+    - external:kernel
+    target: Watchlist
+    params:
+      ok:
+        type: boolean
+    preconditions:
+    - id: remove-asset-from-watchlist-by-id-done
+      check: params.ok == true
+      reason: The server did not do it (remove_asset_from_watchlist_by_id).
+    source:
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/50
+    status: proposed
