@@ -78,8 +78,13 @@ off, wrapper commands, unpinned or git-sourced servers, and a second `--binding`
    - ③'s thresholds;
    - the grader: its checklist, the majority, the noise limit, the expert sample's size and
      minimum agreement, and its model (M2-grader).
-3. **Held-out items for ②** (the researcher, before the interview). The researcher writes them in
-   a sitting no agent sees. They are sealed as in M1's protocol (`experiments/m1/interview-guide.md`).
+3. **Held-out items for ②** (the researcher, before the interview). The researcher writes them
+   alone, from `experiments/m2/heldout.template.yaml`, into a file outside the repository
+   (`~/m2-private/heldout.yaml`). The project's `.claude/settings.json` denies agents' Read and
+   Edit of `~/m2-private/**`. `experiments/tools/m2_heldout.py validate` checks the format and
+   prints counts only. `seal` writes `experiments/m2/heldout.sealed.json`: the file's sha256 and
+   the item ids. The researcher commits that record before the interview starts. After Phase A,
+   `unseal` copies the file in for scoring, but only if its hash is the sealed one.
 4. **Phase A** (the researcher). The interview, with the agent drafting and the researcher
    confirming. The declaration is approved and deployed, and the proxy's binding is confirmed.
    The probes are written and frozen before ③'s window starts.

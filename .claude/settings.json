@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(~/m2-private/**)",
+      "Edit(~/m2-private/**)",
+      "Write(~/m2-private/**)"
+    ]
+  }
+}

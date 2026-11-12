@@ -189,6 +189,7 @@ check starts enforcing a rule, and drop a rule from the text once its mistake ca
 | M2 trades on a paper account only (ADR-0054) | `experiments/tools/m2_paper.py serve` (reads the proxy's own arguments, then starts it only when the binding runs the pinned official server with paper trading set and the keys passed in); tested in `checks` |
 | M2's seeds come from the preregistered draw, not the researcher's choice (ADR-0054 §3) | `experiments/tools/m2_draw.py`: a public beacon round published after the bases reach `develop` decides with the salt; it refuses bases or a draw file not on `origin/develop`, changed there, or not frozen; `verify` recomputes every draw, the fallback and each request's frozen intent |
 | Raw run records stay outside the working tree; summaries stay in git (ADR-0055) | `checks` workflow (`tools/run_archive.py check`); Phase B refuses a split run without its records and names `restore` |
+| M2's held-out items stay unseen by agents until scoring (ADR-0054) | `experiments/tools/m2_heldout.py` (seal refuses a file inside the repository; prints counts, never content; `unseal` checks the sealed hash); `.claude/settings.json` denies agents' Read and Edit of `~/m2-private/**` |
 | Gold sets and sealed files are human-only | text only: review |
 | Real tests only; no skipped or weakened tests | text only: review |
 | No model identifiers in commits, PRs or code (run records excepted) | text only: review |
