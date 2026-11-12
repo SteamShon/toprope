@@ -175,6 +175,16 @@ def test_ask_refuses_a_csv_row_it_cannot_read_and_names_the_row(tmp_path):
         _ask(tmp_path, ["d"], notes=notes)
 
 
+def test_ask_csv_refuses_a_file_not_in_utf8_and_adds_a_repeated_rule_once(tmp_path):
+    notes = tmp_path / "rules.csv"
+    notes.write_bytes("규칙,상황,결과,이유,출처\nrule one,s,거부,,\n".encode("cp949"))
+    with pytest.raises(SystemExit, match="UTF-8"):
+        _ask(tmp_path, ["d"], notes=notes)
+    notes.write_text("규칙,상황,결과,이유,출처\nrule one,s,거부,,\nrule one,s,거부,,\n", encoding="utf-8")
+    doc, _ = _ask(tmp_path, ["d"], notes=notes)
+    assert len(doc["items"]) == 1
+
+
 def test_csv_turns_a_text_memo_into_the_csv_to_fill(tmp_path, capsys):
     notes = tmp_path / "rules.txt"
     notes.write_text("# a comment\nrule one\n[from-list L01] rule, two\n\n")

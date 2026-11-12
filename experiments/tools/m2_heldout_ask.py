@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import io
 import sys
 from pathlib import Path
 from typing import Callable
@@ -157,7 +158,11 @@ class Asker:
             self.doc["domain"] = self.line("도메인 이름 (인터뷰에서 붙일 이름, 모르면 아무거나): ")
             self.save()
         done = {i.get("rule_key") for i in self.doc["items"]}
-        todo = [r for r in rows if r["rule_key"] not in done]
+        todo = []
+        for r in rows:
+            if r["rule_key"] not in done:
+                done.add(r["rule_key"])
+                todo.append(r)
         for r in todo:
             self.add(r)
         self.say(f"CSV의 항목 {len(rows)}개 중 {len(rows) - len(todo)}개는 이미 있고, {len(todo)}개를 넣었습니다. "
@@ -208,7 +213,12 @@ def read_csv(path: Path) -> tuple[list[dict], int]:
     an agent's list, ADR-0056). A row without a situation stays memo. Errors name the row, never
     its content.
     """
-    with path.expanduser().open(encoding="utf-8-sig", newline="") as f:
+    try:
+        text = path.expanduser().read_text(encoding="utf-8-sig")
+    except UnicodeDecodeError:
+        raise SystemExit(f"error: {path} is not UTF-8. Fix: save it again as CSV UTF-8 "
+                         "(Excel: CSV UTF-8; Numbers: Export to CSV, Unicode UTF-8)") from None
+    with io.StringIO(text, newline="") as f:
         reader = csv.DictReader(f)
         if [c.strip() for c in (reader.fieldnames or [])][: len(CSV_COLUMNS)] != CSV_COLUMNS:
             raise SystemExit(f"error: {path}: the first row is not the header. "
