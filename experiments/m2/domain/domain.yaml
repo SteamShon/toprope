@@ -8,6 +8,13 @@ objects:
     properties:
       status:
         enum:
+        - proposed
+        - approved
+        - declined
+        - cancel_proposed
+        - cancel_approved
+        - replace_proposed
+        - replace_approved
         - pending_new
         - accepted
         - new
@@ -25,6 +32,78 @@ objects:
         - expired
         - replaced
         - rejected
+      symbol:
+        type: string
+        optional: true
+      side:
+        type: string
+        optional: true
+      qty:
+        type: string
+        optional: true
+      notional:
+        type: string
+        optional: true
+      type:
+        type: string
+        optional: true
+      time_in_force:
+        type: string
+        optional: true
+      limit_price:
+        type: string
+        optional: true
+      stop_price:
+        type: string
+        optional: true
+      trail_price:
+        type: string
+        optional: true
+      trail_percent:
+        type: string
+        optional: true
+      extended_hours:
+        type: boolean
+        optional: true
+      order_class:
+        type: string
+        optional: true
+      take_profit_limit_price:
+        type: string
+        optional: true
+      stop_loss_stop_price:
+        type: string
+        optional: true
+      stop_loss_limit_price:
+        type: string
+        optional: true
+      replace_client_order_id:
+        type: string
+        optional: true
+      replace_limit_price:
+        type: string
+        optional: true
+      replace_notional:
+        type: string
+        optional: true
+      replace_qty:
+        type: string
+        optional: true
+      replace_stop_price:
+        type: string
+        optional: true
+      replace_time_in_force:
+        enum:
+        - day
+        - gtc
+        - opg
+        - cls
+        - ioc
+        - fok
+        optional: true
+      replace_trail:
+        type: string
+        optional: true
     source:
       kind: interview
       ref: interview:interview/log.jsonl#L7
@@ -52,7 +131,15 @@ objects:
       state:
         enum:
         - held
+        - close_proposed
+        - close_approved
         - closed
+      close_qty:
+        type: number
+        optional: true
+      close_percentage:
+        type: number
+        optional: true
     source:
       kind: interview
       ref: interview:interview/log.jsonl#L8
@@ -122,80 +209,34 @@ links:
     status: proposed
 actions:
   place_stock_order:
-    description: Place a stock or ETF order.
+    description: Place an approved stock or ETF order, as it was approved.
     actor:
     - unassigned
-    params:
-      symbol:
-        type: string
-        optional: false
-      side:
-        type: string
-        optional: false
-      qty:
-        type: string
-        optional: true
-      notional:
-        type: string
-        optional: true
-      type:
-        type: string
-        optional: true
-      time_in_force:
-        type: string
-        optional: true
-      limit_price:
-        type: string
-        optional: true
-      stop_price:
-        type: string
-        optional: true
-      trail_price:
-        type: string
-        optional: true
-      trail_percent:
-        type: string
-        optional: true
-      extended_hours:
-        type: boolean
-        optional: true
-      order_class:
-        type: string
-        optional: true
-      take_profit_limit_price:
-        type: string
-        optional: true
-      stop_loss_stop_price:
-        type: string
-        optional: true
-      stop_loss_limit_price:
-        type: string
-        optional: true
     effects:
     - call: mcp:place_stock_order
       with:
         client_order_id: target.id
-        symbol: params.symbol
-        side: params.side
-        qty: params.qty
-        notional: params.notional
-        type: params.type
-        time_in_force: params.time_in_force
-        limit_price: params.limit_price
-        stop_price: params.stop_price
-        trail_price: params.trail_price
-        trail_percent: params.trail_percent
-        extended_hours: params.extended_hours
-        order_class: params.order_class
-        take_profit_limit_price: params.take_profit_limit_price
-        stop_loss_stop_price: params.stop_loss_stop_price
-        stop_loss_limit_price: params.stop_loss_limit_price
+        symbol: target.symbol
+        side: target.side
+        qty: target.qty
+        notional: target.notional
+        type: target.type
+        time_in_force: target.time_in_force
+        limit_price: target.limit_price
+        stop_price: target.stop_price
+        trail_price: target.trail_price
+        trail_percent: target.trail_percent
+        extended_hours: target.extended_hours
+        order_class: target.order_class
+        take_profit_limit_price: target.take_profit_limit_price
+        stop_loss_stop_price: target.stop_loss_stop_price
+        stop_loss_limit_price: target.stop_loss_limit_price
       reply: record_place_stock_order
     source:
       kind: system
       ref: uvx alpaca-mcp-server==2.4.1#/tools/0
     status: proposed
-    creates: Order
+    target: Order
   cancel_order_by_id:
     description: Cancel a specific order by its ID.
     actor:
@@ -216,46 +257,18 @@ actions:
       one optional field must be provided.
     actor:
     - unassigned
-    params:
-      client_order_id:
-        type: string
-        optional: true
-      limit_price:
-        type: string
-        optional: true
-      notional:
-        type: string
-        optional: true
-      qty:
-        type: string
-        optional: true
-      stop_price:
-        type: string
-        optional: true
-      time_in_force:
-        enum:
-        - day
-        - gtc
-        - opg
-        - cls
-        - ioc
-        - fok
-        optional: true
-      trail:
-        type: string
-        optional: true
     target: Order
     effects:
     - call: mcp:replace_order_by_id
       with:
         order_id: target.id
-        client_order_id: params.client_order_id
-        limit_price: params.limit_price
-        notional: params.notional
-        qty: params.qty
-        stop_price: params.stop_price
-        time_in_force: params.time_in_force
-        trail: params.trail
+        client_order_id: target.replace_client_order_id
+        limit_price: target.replace_limit_price
+        notional: target.replace_notional
+        qty: target.replace_qty
+        stop_price: target.replace_stop_price
+        time_in_force: target.replace_time_in_force
+        trail: target.replace_trail
       reply: record_replace_order_by_id
     source:
       kind: system
@@ -267,20 +280,13 @@ actions:
       at the next market open.
     actor:
     - unassigned
-    params:
-      qty:
-        type: number
-        optional: true
-      percentage:
-        type: number
-        optional: true
     target: Position
     effects:
     - call: mcp:close_position
       with:
         symbol_or_asset_id: target.id
-        qty: params.qty
-        percentage: params.percentage
+        qty: target.close_qty
+        percentage: target.close_percentage
       reply: record_close_position
     source:
       kind: system
@@ -350,6 +356,238 @@ actions:
       kind: system
       ref: uvx alpaca-mcp-server==2.4.1#/tools/41
     status: proposed
+  propose_order:
+    actor:
+    - unassigned
+    description: Propose a stock or ETF order; nothing is sent to Alpaca until a person
+      approves it.
+    creates: Order
+    params:
+      symbol:
+        type: string
+        optional: false
+      side:
+        type: string
+        optional: false
+      qty:
+        type: string
+        optional: true
+      notional:
+        type: string
+        optional: true
+      type:
+        type: string
+        optional: true
+      time_in_force:
+        type: string
+        optional: true
+      limit_price:
+        type: string
+        optional: true
+      stop_price:
+        type: string
+        optional: true
+      trail_price:
+        type: string
+        optional: true
+      trail_percent:
+        type: string
+        optional: true
+      extended_hours:
+        type: boolean
+        optional: true
+      order_class:
+        type: string
+        optional: true
+      take_profit_limit_price:
+        type: string
+        optional: true
+      stop_loss_stop_price:
+        type: string
+        optional: true
+      stop_loss_limit_price:
+        type: string
+        optional: true
+    effects:
+    - set:
+        target.symbol: params.symbol
+        target.side: params.side
+        target.qty: params.qty
+        target.notional: params.notional
+        target.type: params.type
+        target.time_in_force: params.time_in_force
+        target.limit_price: params.limit_price
+        target.stop_price: params.stop_price
+        target.trail_price: params.trail_price
+        target.trail_percent: params.trail_percent
+        target.extended_hours: params.extended_hours
+        target.order_class: params.order_class
+        target.take_profit_limit_price: params.take_profit_limit_price
+        target.stop_loss_stop_price: params.stop_loss_stop_price
+        target.stop_loss_limit_price: params.stop_loss_limit_price
+    source:
+      kind: interview
+      ref: interview/log.jsonl
+      quote: '1'
+    status: proposed
+  approve_order:
+    actor:
+    - unassigned
+    description: Approve a proposed order.
+    target: Order
+    source:
+      kind: interview
+      ref: interview/log.jsonl
+      quote: '1'
+    status: proposed
+  decline_order:
+    actor:
+    - unassigned
+    description: Decline a proposed order.
+    target: Order
+    source:
+      kind: interview
+      ref: interview/log.jsonl
+      quote: '1'
+    status: proposed
+  propose_cancel:
+    actor:
+    - unassigned
+    description: Propose cancelling an open order.
+    target: Order
+    source:
+      kind: interview
+      ref: interview/log.jsonl
+      quote: '1'
+    status: proposed
+  approve_cancel:
+    actor:
+    - unassigned
+    description: Approve a proposed cancellation.
+    target: Order
+    source:
+      kind: interview
+      ref: interview/log.jsonl
+      quote: '1'
+    status: proposed
+  decline_cancel:
+    actor:
+    - unassigned
+    description: Decline a proposed cancellation.
+    target: Order
+    source:
+      kind: interview
+      ref: interview/log.jsonl
+      quote: '1'
+    status: proposed
+  propose_replace:
+    actor:
+    - unassigned
+    description: Propose replacing an open order with new parameters.
+    target: Order
+    params:
+      client_order_id:
+        type: string
+        optional: true
+      limit_price:
+        type: string
+        optional: true
+      notional:
+        type: string
+        optional: true
+      qty:
+        type: string
+        optional: true
+      stop_price:
+        type: string
+        optional: true
+      time_in_force:
+        enum:
+        - day
+        - gtc
+        - opg
+        - cls
+        - ioc
+        - fok
+        optional: true
+      trail:
+        type: string
+        optional: true
+    effects:
+    - set:
+        target.replace_client_order_id: params.client_order_id
+        target.replace_limit_price: params.limit_price
+        target.replace_notional: params.notional
+        target.replace_qty: params.qty
+        target.replace_stop_price: params.stop_price
+        target.replace_time_in_force: params.time_in_force
+        target.replace_trail: params.trail
+    source:
+      kind: interview
+      ref: interview/log.jsonl
+      quote: '1'
+    status: proposed
+  approve_replace:
+    actor:
+    - unassigned
+    description: Approve a proposed replacement.
+    target: Order
+    source:
+      kind: interview
+      ref: interview/log.jsonl
+      quote: '1'
+    status: proposed
+  decline_replace:
+    actor:
+    - unassigned
+    description: Decline a proposed replacement.
+    target: Order
+    source:
+      kind: interview
+      ref: interview/log.jsonl
+      quote: '1'
+    status: proposed
+  propose_close:
+    actor:
+    - unassigned
+    description: Propose closing a position.
+    target: Position
+    params:
+      qty:
+        type: number
+        optional: true
+      percentage:
+        type: number
+        optional: true
+    effects:
+    - set:
+        target.close_qty: params.qty
+        target.close_percentage: params.percentage
+    source:
+      kind: interview
+      ref: interview/log.jsonl
+      quote: '1'
+    status: proposed
+  approve_close:
+    actor:
+    - unassigned
+    description: Approve a proposed close.
+    target: Position
+    source:
+      kind: interview
+      ref: interview/log.jsonl
+      quote: '1'
+    status: proposed
+  decline_close:
+    actor:
+    - unassigned
+    description: Decline a proposed close.
+    target: Position
+    source:
+      kind: interview
+      ref: interview/log.jsonl
+      quote: '1'
+    status: proposed
 purpose:
   problem: 이 도메인은 계좌 주인을 위해서 에이전트랑 사람이 포트폴리오를 운영하는 문제를 해결하는 거야.
   success_metric:
@@ -359,118 +597,1063 @@ purpose:
 transitions:
   Order:
     field: status
-    initial: new
+    initial: proposed
     matrix:
-      pending_new:
+      proposed:
+        approve_order:
+          to: approved
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_order:
+          to: declined
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        place_stock_order:
+          deny: 사람이 승인한 주문만 낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_cancel:
+          deny: '취소할 수 없는 주문입니다 (Alpaca: not cancelable).'
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_cancel:
+          deny: 승인할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_cancel:
+          deny: 거절할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        cancel_order_by_id:
+          deny: 사람이 승인한 취소만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_replace:
+          deny: '바꿀 수 없는 주문입니다 (Alpaca: only an open order is replaced).'
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_replace:
+          deny: 승인할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_replace:
+          deny: 거절할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        replace_order_by_id:
+          deny: 사람이 승인한 교체만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        record_place_stock_order: n/a
+        record_cancel_order_by_id: n/a
+        record_replace_order_by_id: n/a
+      approved:
+        approve_order:
+          deny: 승인할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_order:
+          deny: 거절할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        place_stock_order:
+          to: new
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_cancel:
+          deny: '취소할 수 없는 주문입니다 (Alpaca: not cancelable).'
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_cancel:
+          deny: 승인할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_cancel:
+          deny: 거절할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        cancel_order_by_id:
+          deny: 사람이 승인한 취소만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_replace:
+          deny: '바꿀 수 없는 주문입니다 (Alpaca: only an open order is replaced).'
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_replace:
+          deny: 승인할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_replace:
+          deny: 거절할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        replace_order_by_id:
+          deny: 사람이 승인한 교체만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        record_place_stock_order: n/a
+        record_cancel_order_by_id: n/a
+        record_replace_order_by_id: n/a
+      declined:
+        approve_order:
+          deny: 승인할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_order:
+          deny: 거절할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        place_stock_order:
+          deny: 사람이 승인한 주문만 낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_cancel:
+          deny: '취소할 수 없는 주문입니다 (Alpaca: not cancelable).'
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_cancel:
+          deny: 승인할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_cancel:
+          deny: 거절할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        cancel_order_by_id:
+          deny: 사람이 승인한 취소만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_replace:
+          deny: '바꿀 수 없는 주문입니다 (Alpaca: only an open order is replaced).'
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_replace:
+          deny: 승인할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_replace:
+          deny: 거절할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        replace_order_by_id:
+          deny: 사람이 승인한 교체만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        record_place_stock_order: n/a
+        record_cancel_order_by_id: n/a
+        record_replace_order_by_id: n/a
+      cancel_proposed:
+        approve_order:
+          deny: 승인할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_order:
+          deny: 거절할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        place_stock_order:
+          deny: 사람이 승인한 주문만 낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_cancel:
+          deny: '취소할 수 없는 주문입니다 (Alpaca: not cancelable).'
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_cancel:
+          to: cancel_approved
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_cancel:
+          to: new
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        cancel_order_by_id:
+          deny: 사람이 승인한 취소만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_replace:
+          deny: '바꿀 수 없는 주문입니다 (Alpaca: only an open order is replaced).'
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_replace:
+          deny: 승인할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_replace:
+          deny: 거절할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        replace_order_by_id:
+          deny: 사람이 승인한 교체만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        record_place_stock_order: n/a
+        record_cancel_order_by_id: n/a
+        record_replace_order_by_id: n/a
+      cancel_approved:
+        approve_order:
+          deny: 승인할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_order:
+          deny: 거절할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        place_stock_order:
+          deny: 사람이 승인한 주문만 낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_cancel:
+          deny: '취소할 수 없는 주문입니다 (Alpaca: not cancelable).'
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_cancel:
+          deny: 승인할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_cancel:
+          deny: 거절할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
         cancel_order_by_id:
           to: pending_cancel
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
+          status: proposed
+        propose_replace:
+          deny: '바꿀 수 없는 주문입니다 (Alpaca: only an open order is replaced).'
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_replace:
+          deny: 승인할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_replace:
+          deny: 거절할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        replace_order_by_id:
+          deny: 사람이 승인한 교체만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        record_place_stock_order: n/a
+        record_cancel_order_by_id: n/a
+        record_replace_order_by_id: n/a
+      replace_proposed:
+        approve_order:
+          deny: 승인할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_order:
+          deny: 거절할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        place_stock_order:
+          deny: 사람이 승인한 주문만 낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_cancel:
+          deny: '취소할 수 없는 주문입니다 (Alpaca: not cancelable).'
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_cancel:
+          deny: 승인할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_cancel:
+          deny: 거절할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        cancel_order_by_id:
+          deny: 사람이 승인한 취소만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_replace:
+          deny: '바꿀 수 없는 주문입니다 (Alpaca: only an open order is replaced).'
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_replace:
+          to: replace_approved
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_replace:
+          to: new
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        replace_order_by_id:
+          deny: 사람이 승인한 교체만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        record_place_stock_order: n/a
+        record_cancel_order_by_id: n/a
+        record_replace_order_by_id: n/a
+      replace_approved:
+        approve_order:
+          deny: 승인할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_order:
+          deny: 거절할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        place_stock_order:
+          deny: 사람이 승인한 주문만 낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_cancel:
+          deny: '취소할 수 없는 주문입니다 (Alpaca: not cancelable).'
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_cancel:
+          deny: 승인할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_cancel:
+          deny: 거절할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        cancel_order_by_id:
+          deny: 사람이 승인한 취소만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_replace:
+          deny: '바꿀 수 없는 주문입니다 (Alpaca: only an open order is replaced).'
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_replace:
+          deny: 승인할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_replace:
+          deny: 거절할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
           status: proposed
         replace_order_by_id:
           to: pending_replace
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
+          status: proposed
+        record_place_stock_order: n/a
+        record_cancel_order_by_id: n/a
+        record_replace_order_by_id: n/a
+      pending_new:
+        approve_order:
+          deny: 승인할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_order:
+          deny: 거절할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        place_stock_order:
+          deny: 사람이 승인한 주문만 낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_cancel:
+          to: cancel_proposed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_cancel:
+          deny: 승인할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_cancel:
+          deny: 거절할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        cancel_order_by_id:
+          deny: 사람이 승인한 취소만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_replace:
+          to: replace_proposed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_replace:
+          deny: 승인할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_replace:
+          deny: 거절할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        replace_order_by_id:
+          deny: 사람이 승인한 교체만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
           status: proposed
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
       accepted:
-        cancel_order_by_id:
-          to: pending_cancel
+        approve_order:
+          deny: 승인할 주문 제안이 아닙니다.
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
+          status: proposed
+        decline_order:
+          deny: 거절할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        place_stock_order:
+          deny: 사람이 승인한 주문만 낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_cancel:
+          to: cancel_proposed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_cancel:
+          deny: 승인할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_cancel:
+          deny: 거절할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        cancel_order_by_id:
+          deny: 사람이 승인한 취소만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_replace:
+          to: replace_proposed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_replace:
+          deny: 승인할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_replace:
+          deny: 거절할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
           status: proposed
         replace_order_by_id:
-          to: pending_replace
+          deny: 사람이 승인한 교체만 보낼 수 있습니다.
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
           status: proposed
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
       new:
-        cancel_order_by_id:
-          to: pending_cancel
+        approve_order:
+          deny: 승인할 주문 제안이 아닙니다.
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
+          status: proposed
+        decline_order:
+          deny: 거절할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        place_stock_order:
+          deny: 사람이 승인한 주문만 낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_cancel:
+          to: cancel_proposed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_cancel:
+          deny: 승인할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_cancel:
+          deny: 거절할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        cancel_order_by_id:
+          deny: 사람이 승인한 취소만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_replace:
+          to: replace_proposed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_replace:
+          deny: 승인할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_replace:
+          deny: 거절할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
           status: proposed
         replace_order_by_id:
-          to: pending_replace
+          deny: 사람이 승인한 교체만 보낼 수 있습니다.
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
           status: proposed
         record_place_stock_order:
           to: new
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
           status: proposed
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
       partially_filled:
-        cancel_order_by_id:
-          to: pending_cancel
+        approve_order:
+          deny: 승인할 주문 제안이 아닙니다.
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
+          status: proposed
+        decline_order:
+          deny: 거절할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        place_stock_order:
+          deny: 사람이 승인한 주문만 낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_cancel:
+          to: cancel_proposed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_cancel:
+          deny: 승인할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_cancel:
+          deny: 거절할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        cancel_order_by_id:
+          deny: 사람이 승인한 취소만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_replace:
+          to: replace_proposed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_replace:
+          deny: 승인할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_replace:
+          deny: 거절할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
           status: proposed
         replace_order_by_id:
-          to: pending_replace
+          deny: 사람이 승인한 교체만 보낼 수 있습니다.
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
           status: proposed
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
       done_for_day:
-        cancel_order_by_id:
-          to: pending_cancel
+        approve_order:
+          deny: 승인할 주문 제안이 아닙니다.
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
+          status: proposed
+        decline_order:
+          deny: 거절할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        place_stock_order:
+          deny: 사람이 승인한 주문만 낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_cancel:
+          to: cancel_proposed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_cancel:
+          deny: 승인할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_cancel:
+          deny: 거절할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        cancel_order_by_id:
+          deny: 사람이 승인한 취소만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_replace:
+          to: replace_proposed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_replace:
+          deny: 승인할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_replace:
+          deny: 거절할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
           status: proposed
         replace_order_by_id:
-          to: pending_replace
+          deny: 사람이 승인한 교체만 보낼 수 있습니다.
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
           status: proposed
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
       pending_cancel:
-        cancel_order_by_id:
-          to: pending_cancel
+        approve_order:
+          deny: 승인할 주문 제안이 아닙니다.
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
+          status: proposed
+        decline_order:
+          deny: 거절할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        place_stock_order:
+          deny: 사람이 승인한 주문만 낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_cancel:
+          to: cancel_proposed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_cancel:
+          deny: 승인할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_cancel:
+          deny: 거절할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        cancel_order_by_id:
+          deny: 사람이 승인한 취소만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_replace:
+          to: replace_proposed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_replace:
+          deny: 승인할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_replace:
+          deny: 거절할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
           status: proposed
         replace_order_by_id:
-          to: pending_replace
+          deny: 사람이 승인한 교체만 보낼 수 있습니다.
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
           status: proposed
         record_place_stock_order: n/a
         record_cancel_order_by_id:
@@ -478,23 +1661,86 @@ transitions:
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
           status: proposed
         record_replace_order_by_id: n/a
       pending_replace:
-        cancel_order_by_id:
-          to: pending_cancel
+        approve_order:
+          deny: 승인할 주문 제안이 아닙니다.
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
+          status: proposed
+        decline_order:
+          deny: 거절할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        place_stock_order:
+          deny: 사람이 승인한 주문만 낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_cancel:
+          to: cancel_proposed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_cancel:
+          deny: 승인할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_cancel:
+          deny: 거절할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        cancel_order_by_id:
+          deny: 사람이 승인한 취소만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_replace:
+          to: replace_proposed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_replace:
+          deny: 승인할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_replace:
+          deny: 거절할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
           status: proposed
         replace_order_by_id:
-          to: pending_replace
+          deny: 사람이 승인한 교체만 보낼 수 있습니다.
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
           status: proposed
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
@@ -503,184 +1749,814 @@ transitions:
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
           status: proposed
       accepted_for_bidding:
-        cancel_order_by_id:
-          to: pending_cancel
+        approve_order:
+          deny: 승인할 주문 제안이 아닙니다.
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
+          status: proposed
+        decline_order:
+          deny: 거절할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        place_stock_order:
+          deny: 사람이 승인한 주문만 낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_cancel:
+          to: cancel_proposed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_cancel:
+          deny: 승인할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_cancel:
+          deny: 거절할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        cancel_order_by_id:
+          deny: 사람이 승인한 취소만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_replace:
+          to: replace_proposed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_replace:
+          deny: 승인할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_replace:
+          deny: 거절할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
           status: proposed
         replace_order_by_id:
-          to: pending_replace
+          deny: 사람이 승인한 교체만 보낼 수 있습니다.
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
           status: proposed
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
       stopped:
-        cancel_order_by_id:
-          to: pending_cancel
+        approve_order:
+          deny: 승인할 주문 제안이 아닙니다.
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
+          status: proposed
+        decline_order:
+          deny: 거절할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        place_stock_order:
+          deny: 사람이 승인한 주문만 낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_cancel:
+          to: cancel_proposed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_cancel:
+          deny: 승인할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_cancel:
+          deny: 거절할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        cancel_order_by_id:
+          deny: 사람이 승인한 취소만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_replace:
+          to: replace_proposed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_replace:
+          deny: 승인할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_replace:
+          deny: 거절할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
           status: proposed
         replace_order_by_id:
-          to: pending_replace
+          deny: 사람이 승인한 교체만 보낼 수 있습니다.
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
           status: proposed
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
       suspended:
-        cancel_order_by_id:
-          to: pending_cancel
+        approve_order:
+          deny: 승인할 주문 제안이 아닙니다.
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
+          status: proposed
+        decline_order:
+          deny: 거절할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        place_stock_order:
+          deny: 사람이 승인한 주문만 낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_cancel:
+          to: cancel_proposed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_cancel:
+          deny: 승인할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_cancel:
+          deny: 거절할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        cancel_order_by_id:
+          deny: 사람이 승인한 취소만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_replace:
+          to: replace_proposed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_replace:
+          deny: 승인할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_replace:
+          deny: 거절할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
           status: proposed
         replace_order_by_id:
-          to: pending_replace
+          deny: 사람이 승인한 교체만 보낼 수 있습니다.
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
           status: proposed
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
       calculated:
-        cancel_order_by_id:
-          to: pending_cancel
+        approve_order:
+          deny: 승인할 주문 제안이 아닙니다.
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
+          status: proposed
+        decline_order:
+          deny: 거절할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        place_stock_order:
+          deny: 사람이 승인한 주문만 낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_cancel:
+          to: cancel_proposed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_cancel:
+          deny: 승인할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_cancel:
+          deny: 거절할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        cancel_order_by_id:
+          deny: 사람이 승인한 취소만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_replace:
+          to: replace_proposed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_replace:
+          deny: 승인할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_replace:
+          deny: 거절할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
           status: proposed
         replace_order_by_id:
-          to: pending_replace
+          deny: 사람이 승인한 교체만 보낼 수 있습니다.
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
           status: proposed
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
       held:
-        cancel_order_by_id:
-          to: pending_cancel
+        approve_order:
+          deny: 승인할 주문 제안이 아닙니다.
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
+          status: proposed
+        decline_order:
+          deny: 거절할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        place_stock_order:
+          deny: 사람이 승인한 주문만 낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_cancel:
+          to: cancel_proposed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_cancel:
+          deny: 승인할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_cancel:
+          deny: 거절할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        cancel_order_by_id:
+          deny: 사람이 승인한 취소만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_replace:
+          to: replace_proposed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_replace:
+          deny: 승인할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_replace:
+          deny: 거절할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
           status: proposed
         replace_order_by_id:
-          to: pending_replace
+          deny: 사람이 승인한 교체만 보낼 수 있습니다.
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
           status: proposed
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
       filled:
-        cancel_order_by_id:
+        approve_order:
+          deny: 승인할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_order:
+          deny: 거절할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        place_stock_order:
+          deny: 사람이 승인한 주문만 낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_cancel:
           deny: '취소할 수 없는 주문입니다 (Alpaca: not cancelable).'
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
           status: proposed
-        replace_order_by_id:
+        approve_cancel:
+          deny: 승인할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_cancel:
+          deny: 거절할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        cancel_order_by_id:
+          deny: 사람이 승인한 취소만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_replace:
           deny: '바꿀 수 없는 주문입니다 (Alpaca: only an open order is replaced).'
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
+          status: proposed
+        approve_replace:
+          deny: 승인할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_replace:
+          deny: 거절할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        replace_order_by_id:
+          deny: 사람이 승인한 교체만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
           status: proposed
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
       canceled:
-        cancel_order_by_id:
+        approve_order:
+          deny: 승인할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_order:
+          deny: 거절할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        place_stock_order:
+          deny: 사람이 승인한 주문만 낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_cancel:
           deny: '취소할 수 없는 주문입니다 (Alpaca: not cancelable).'
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
           status: proposed
-        replace_order_by_id:
+        approve_cancel:
+          deny: 승인할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_cancel:
+          deny: 거절할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        cancel_order_by_id:
+          deny: 사람이 승인한 취소만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_replace:
           deny: '바꿀 수 없는 주문입니다 (Alpaca: only an open order is replaced).'
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
+          status: proposed
+        approve_replace:
+          deny: 승인할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_replace:
+          deny: 거절할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        replace_order_by_id:
+          deny: 사람이 승인한 교체만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
           status: proposed
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
       expired:
-        cancel_order_by_id:
+        approve_order:
+          deny: 승인할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_order:
+          deny: 거절할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        place_stock_order:
+          deny: 사람이 승인한 주문만 낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_cancel:
           deny: '취소할 수 없는 주문입니다 (Alpaca: not cancelable).'
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
           status: proposed
-        replace_order_by_id:
+        approve_cancel:
+          deny: 승인할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_cancel:
+          deny: 거절할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        cancel_order_by_id:
+          deny: 사람이 승인한 취소만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_replace:
           deny: '바꿀 수 없는 주문입니다 (Alpaca: only an open order is replaced).'
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
+          status: proposed
+        approve_replace:
+          deny: 승인할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_replace:
+          deny: 거절할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        replace_order_by_id:
+          deny: 사람이 승인한 교체만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
           status: proposed
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
       replaced:
-        cancel_order_by_id:
+        approve_order:
+          deny: 승인할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_order:
+          deny: 거절할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        place_stock_order:
+          deny: 사람이 승인한 주문만 낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_cancel:
           deny: '취소할 수 없는 주문입니다 (Alpaca: not cancelable).'
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
           status: proposed
-        replace_order_by_id:
+        approve_cancel:
+          deny: 승인할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_cancel:
+          deny: 거절할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        cancel_order_by_id:
+          deny: 사람이 승인한 취소만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_replace:
           deny: '바꿀 수 없는 주문입니다 (Alpaca: only an open order is replaced).'
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
+          status: proposed
+        approve_replace:
+          deny: 승인할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_replace:
+          deny: 거절할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        replace_order_by_id:
+          deny: 사람이 승인한 교체만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
           status: proposed
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
       rejected:
-        cancel_order_by_id:
+        approve_order:
+          deny: 승인할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_order:
+          deny: 거절할 주문 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        place_stock_order:
+          deny: 사람이 승인한 주문만 낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_cancel:
           deny: '취소할 수 없는 주문입니다 (Alpaca: not cancelable).'
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
           status: proposed
-        replace_order_by_id:
+        approve_cancel:
+          deny: 승인할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_cancel:
+          deny: 거절할 취소 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        cancel_order_by_id:
+          deny: 사람이 승인한 취소만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        propose_replace:
           deny: '바꿀 수 없는 주문입니다 (Alpaca: only an open order is replaced).'
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
+          status: proposed
+        approve_replace:
+          deny: 승인할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_replace:
+          deny: 거절할 교체 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        replace_order_by_id:
+          deny: 사람이 승인한 교체만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
           status: proposed
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
@@ -690,26 +2566,165 @@ transitions:
     initial: held
     matrix:
       held:
+        propose_close:
+          to: close_proposed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_close:
+          deny: 승인할 청산 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_close:
+          deny: 거절할 청산 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        close_position:
+          deny: 사람이 승인한 청산만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        record_close_position: n/a
+      close_proposed:
+        propose_close:
+          deny: 청산을 제안할 수 있는 포지션이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_close:
+          to: close_approved
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_close:
+          to: held
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        close_position:
+          deny: 사람이 승인한 청산만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        record_close_position: n/a
+      close_approved:
+        propose_close:
+          deny: 청산을 제안할 수 있는 포지션이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        approve_close:
+          deny: 승인할 청산 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_close:
+          deny: 거절할 청산 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
         close_position:
           to: closed
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
           status: proposed
         record_close_position: n/a
       closed:
-        close_position:
-          deny: 이미 청산된 포지션입니다.
+        propose_close:
+          deny: 청산을 제안할 수 있는 포지션이 아닙니다.
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
+          status: proposed
+        approve_close:
+          deny: 승인할 청산 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        decline_close:
+          deny: 거절할 청산 제안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
+          status: proposed
+        close_position:
+          deny: 사람이 승인한 청산만 보낼 수 있습니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: '1'
           status: proposed
         record_close_position:
           to: closed
           source:
             kind: interview
             ref: interview/log.jsonl
-            quote: A로 해줘.
+            quote: '1'
           status: proposed
+rules:
+  Order-approved-needs-a-person:
+    'on': Order.approved
+    requires: human
+    reason: Only a person brings an Order to approved.
+    source:
+      kind: interview
+      ref: interview/log.jsonl
+      quote: '1'
+    status: proposed
+  Order-cancel_approved-needs-a-person:
+    'on': Order.cancel_approved
+    requires: human
+    reason: Only a person brings an Order to cancel_approved.
+    source:
+      kind: interview
+      ref: interview/log.jsonl
+      quote: '1'
+    status: proposed
+  Order-replace_approved-needs-a-person:
+    'on': Order.replace_approved
+    requires: human
+    reason: Only a person brings an Order to replace_approved.
+    source:
+      kind: interview
+      ref: interview/log.jsonl
+      quote: '1'
+    status: proposed
+  Position-close_approved-needs-a-person:
+    'on': Position.close_approved
+    requires: human
+    reason: Only a person brings a Position to close_approved.
+    source:
+      kind: interview
+      ref: interview/log.jsonl
+      quote: '1'
+    status: proposed

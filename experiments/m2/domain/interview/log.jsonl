@@ -9,3 +9,4 @@
 {"at": "2026-11-12T14:57:24+00:00", "kind": "abandoned", "question_id": "17df56be89", "qkind": "default", "offered": true}
 {"at": "2026-11-12T14:57:32+00:00", "kind": "abandoned", "question_id": "17df56be89", "qkind": "default", "offered": true}
 {"at": "2026-11-12T15:02:42+00:00", "kind": "abandoned", "question_id": "125bc6a010", "qkind": "rule", "offered": true}
+{"at": "2026-11-12T15:34:41+00:00", "kind": "abandoned", "question_id": "195c1caf90", "qkind": "guard", "offered": true}
