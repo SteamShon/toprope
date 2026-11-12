@@ -407,15 +407,31 @@ theme 1 records those (D1), it is measured again before it is compared (ADR-0049
 | … A2: `toprope-proxy` (ADR-0052): an MCP server in front of an existing one; a binding maps each tool to a declared action, unbound tools are hidden, read-only tools pass through to an audit log, the kernel decides before the call, the call is the action's `call: mcp:<tool>` effect sent once, and the reply records the answer; gated calls run one at a time, across every proxy on a store (a lock file beside it); the binding's `load:` reads the object from the server before every gated call (new objects recorded, changed facts recorded, the stage kept as the gate's own; values checked by type); it will not start while the declaration has a `proposed` element, on a memory store, or when binding, server and declaration disagree, and offers no argument the gate does not check ([`examples/proxy/`](../examples/proxy/)). It serves over stdio | ✅ | #230, #235 |
 | … From an import to an enforced declaration, without hand work (the integrated review of 2026-11-10): `toprope-import --patch FILE` registers the source as a workspace source (a snapshot under `.toprope/imports/` when it is not a file in the workspace) and writes the elements, joined to the workspace's draft, as a patch for `toprope-change` (a changed source under the same id, or a `sources:` it cannot extend, is refused before anything is written), so they are proposed, checked and confirmed from theme 1's one diff; `--into DRAFT` joins a second source to a draft file (what it lacks is added, a disagreement is a conflict naming both places, nothing is overwritten); questions and conflicts are also records (`id`, `kind`, `text`, `decides`, `places`, `quote`, `modality` for rules) that `--questions` writes and `ask_question` puts in the interview; the `mcp` reader lists a server's tools and the `mcp` extractor drafts each changing tool as a proposed action with typed params, its `call: mcp:<tool>` effect passing every argument, a reply action (`external:kernel`, `ok` and the output schema's fields) and `undecided` cells, read-only tools as read bindings, and a draft binding (`--binding-out`, every guess commented); the proxy serves a binding only with a person's confirmation record (`toprope-proxy --confirm-binding`: who, when, the hash of `upstream` and `tools`), refusing one without it or changed since (`--check` checks without serving); camelCase and `*Id` arguments, typed enums kept typed, the thing as a whole word of the tool's name, a server-assigned id asked about; OpenAPI asks how each thing is created when no operation creates it and drafts a call only when one is named (`x-toprope-call`, or `options.calls` in the profile), else asks; a draft whose actions name only `unassigned` is reported not ready (`unassigned-actor` warning; `toprope-harness` says so after its PASS). Tested end to end: `payments_server.py` → draft and binding → `toprope-change` → the person's confirm commands → `toprope-proxy --check` passes | ✅ | #240 |
 
+## M2's grader (umbrella `umbrella/m2-grader`, link: ① ②)
+
+As decided in [`M2-grader.md`](experiments/M2-grader.md) (2026-11-10): the grader steady enough before
+M2 runs, with no person adjudicating grades after the results.
+
+| Item | Status | PR |
+|---|---|---|
+| The checklist grader: `grade --grader checklist`, four yes/no items per distinct flag (rule B in item `outcome`), each answered k=3 times and decided by majority, the label by a fixed rule; `compare-gradings --first --second --limit` | ✅ | #248 |
+| The validation run on M1's combined run: two checklist sittings, noise within 0.05 (local session). First run: the sittings differ by up to 0.1 of recall (nl 0.1, structured 0.08, toprope 0.06), over the limit; after revision 1, up to 0.02 (nl 0.66 and 0.68; structured and toprope equal), within it | ✅ | #252, #257 |
+| Rule B's invented examples reviewed and accepted by the researcher (2026-11-10) | ✅ | |
+| Revision 1 of the grader (1 of 2): each of the k answers in its own random order, an incomplete answer asked once more, `grade --changes-only` for the check; then the validation run again (local session): the sittings differ by up to 0.02 of recall (nl 0.02, structured 0, toprope 0), within 0.05 | ✅ | #253, #257 |
+| Flags left without a label after revision 1: the label waits only for an answer that could change it; an undecided flag gets at most two more answers; `relabel` applies the rule to a sitting's recorded answers (noise unchanged, 0.02) | ✅ |#259 |
+| The grader frozen with M2's instruments, after the validation run | ⬜ | |
+| Validity, not only consistency: the grader's agreement with the domain expert's own labels on a sample of M2's pilot flags, and which model grades (`M2-grader.md`: the expert sample adopted 2026-11-11, its size and minimum set in M2's preregistration; the model decided there on the pilot's cost) | 🟡 | |
+
 ## M0b, M2 to M5
 
 Not started. Plans: [`roadmap.md`](roadmap.md).
 
 ## Next
 
-1. M2's grader, as decided (`docs/experiments/M2-grader.md`, 2026-11-10): the checklist, the
-   majority of three, rule B and the noise gate, validated on M1's combined run for consistency
-   only.
+1. M2's grader is validated on M1's combined run for consistency (noise 0.02 of recall after
+   revision 1, within 0.05; #253, #257, #259). It is frozen with M2's instruments in M2's
+   preregistration, which also sets the expert sample's size and minimum agreement and the
+   grader's model; its final noise check is on M2's pilot (`docs/experiments/M2-grader.md`).
 2. ADR-0049, now that the four themes' code is in `develop`: F2 on ADR-0053's named path, run by a
    newcomer the researcher finds; F1 measured again on the changes since theme 1's merge, once five
    are approved, three of them low risk ([`U-f1-remeasure.md`](experiments/U-f1-remeasure.md):

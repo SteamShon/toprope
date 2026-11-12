@@ -1,0 +1,83 @@
+# Which arm each label stands for, per change. Do not open it while grading.
+seed: 4069767282
+labels:
+  1:
+    A: structured
+    B: toprope
+    C: nl
+  2:
+    A: structured
+    B: toprope
+    C: nl
+  3:
+    A: toprope
+    B: structured
+    C: nl
+  4:
+    A: toprope
+    B: nl
+    C: structured
+  5:
+    A: structured
+    B: toprope
+    C: nl
+  6:
+    A: structured
+    B: toprope
+    C: nl
+  7:
+    A: nl
+    B: toprope
+    C: structured
+  8:
+    A: toprope
+    B: nl
+    C: structured
+  9:
+    A: structured
+    B: toprope
+    C: nl
+  10:
+    A: structured
+    B: nl
+    C: toprope
+  11:
+    A: structured
+    B: toprope
+    C: nl
+  12:
+    A: toprope
+    B: nl
+    C: structured
+  13:
+    A: structured
+    B: nl
+    C: toprope
+  14:
+    A: toprope
+    B: nl
+    C: structured
+  15:
+    A: structured
+    B: nl
+    C: toprope
+  16:
+    A: structured
+    B: nl
+    C: toprope
+  17:
+    A: toprope
+    B: structured
+    C: nl
+  18:
+    A: nl
+    B: toprope
+    C: structured
+  19:
+    A: toprope
+    B: structured
+    C: nl
+  20:
+    A: structured
+    B: toprope
+    C: nl

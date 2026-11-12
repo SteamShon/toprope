@@ -123,8 +123,9 @@ compares the arms.
 2. **Noise limit: 0.05 of recall per arm**; at most **2** revisions of the grader before it is frozen.
 3. **k = 3** for the majority.
 4. The checklist's items (a), (b), (c) and the formula `seeded = (a) and ((b) or (c))`, as above;
-   rule B's wording as option 4 gives it. The invented examples are drafted with the
-   implementation, and the researcher reviews them before the grader is frozen.
+   rule B's wording as option 4 gives it. The invented examples are in
+   `phase_b/prompts/grade_checklist.md`; the researcher reviewed and accepted them (2026-11-10:
+   "기준 B 예시 2개 확인했어. 이대로 하면 될 것 같아").
 5. **Calibration:** M1's combined run, graded twice, for options 2 to 4 (consistency only); M2's
    pilot for option 1 and for the final check.
 
@@ -135,3 +136,115 @@ compares the arms.
 2. The harness grades with it, by majority, grouping identical flags.
 3. A test shows that one judgement graded k times takes the majority.
 4. The grader is validated on M1's run as above, then frozen with M2's instruments.
+
+## Validity, not only consistency (decided 2026-11-11: the expert sample adopted; the grader's model decided on cost)
+
+The grader is still an LLM judging free text. The checklist, the majority and the noise gate make
+it **steady**. They do not show that it is **right**: two sittings can agree on the same mistake.
+Two additions would close that gap before M2's main run:
+
+- **Agreement with a person on a sample.** In M2's pilot, the domain expert, who writes the key,
+  labels a random sample of flags blind, with the same checklist. The grader's agreement with
+  those labels is reported per item. A minimum agreement is set in the preregistration, and below
+  it the grader is revised within the same cap. The sample comes from the pilot, never from M1.
+- **The grader's model.** The arms and the grader use the same model today. A grader of the same
+  family may favour the reviews written in its own style. Grading with another model, or with two
+  models that must agree, removes that doubt, at a cost.
+
+**Decision** (the researcher, 2026-11-11: "다음 순서는 추천대로 하면 될 것 같아"): the
+agreement with the domain expert on a sample of M2's pilot flags is adopted; its sample size and
+minimum agreement go into M2's preregistration. The grader's model is decided there too, once the
+pilot shows what a second model would cost.
+
+## The validation run (on M1's combined run, consistency only)
+
+The checklist grader is `grade --grader checklist` (k = 3 by default). From `experiments/m1`, two
+sittings into their own directories, then their noise against M2's limit:
+
+```bash
+uv run python -m phase_b grade --model MODEL --out runs/phase-b-recheck-combined --grader checklist --into scoring-checklist-1
+uv run python -m phase_b grade --model MODEL --out runs/phase-b-recheck-combined --grader checklist --into scoring-checklist-2
+uv run python -m phase_b compare-gradings --out runs/phase-b-recheck-combined \
+  --first scoring-checklist-1 --second scoring-checklist-2 --limit 0.05
+```
+
+Only `grader-noise.scoring-checklist-1.scoring-checklist-2.json` is reported: each arm's recall in
+the two sittings, the largest difference and whether it is within 0.05. M1's own grades
+(`scoring/`, `scoring-2/`) are not touched, and no number is compared with them. Over the limit,
+the grader is revised and checked again, at most twice; each revision is its own PR.
+
+
+## Revisions (each counts toward the cap of two)
+
+### Revision 1 (2026-11-11): each answer in its own order
+
+**What the first validation run showed** (#252). The two sittings differed by up to 0.1 of recall
+(NL 0.10, structured 0.08, Toprope 0.06), over 0.05. The diagnosis used only what *Validation*
+allows: agreement per flag and per item between the sittings, and how the k = 3 answers within
+a sitting split. No flag, finding or reason was read, and nothing was compared with M1's labels.
+
+- Per flag, the sittings agree on 93.5% of labels; per item, `names` 96.5%, `conflict` 97.2%,
+  `outcome` 97.3%, `real` 95.8%. No single item carries the noise.
+- Of the 141 flags that are `seeded` in one sitting and not in the other, 74 had a unanimous answer
+  in **both** sittings, unanimous for `seeded` in one and against it in the other (66 of them 0
+  of 3 and then 3 of 3). Within a sitting, the three answers almost always agree; between
+  sittings they flip together.
+- So the three answers were not independent draws. All three saw the same prompt, and what
+  differed between sittings was the prompt itself: the labels' blocks come in the order of their
+  random letters, so each sitting showed the arms, and the flags, in another order. A majority
+  of three copies of one prompt cannot remove noise that lives in the prompt.
+- 44 gradings of a flag (over both sittings) had an item with no true or false, so no label; a run in which such a
+  flag was the catching one lost it.
+
+**The change** (`grade_change_checklist`):
+1. Each of the k answers sees the labels' blocks, and the flags within each block, in **its own
+   random order**, drawn from the sitting's seed. The letters, the ids and the formula do not
+   change. The majority is now taken over orders.
+2. An answer that leaves any item without a true or false is **asked once more**, in a new order.
+   The number of such repeats is recorded per change (`grader.asked_again`).
+3. `grade --changes-only` grades the changes and not the probes. The probes do not enter recall,
+   so a check of the grader needs only the changes; the first run spent most of its 3.5 hours on
+   them. `score` refuses such a sitting.
+
+Nothing in the prompt, the items, k, the formula or the limit changed. The change was chosen from
+the structure of the disagreements, not from their content, and would be made for any key.
+
+**Check again** (from `experiments/m1`; the earlier checklist sittings stay as they are):
+
+```bash
+uv run python -m phase_b grade --model MODEL --out runs/phase-b-recheck-combined --grader checklist --changes-only --into scoring-checklist-r1-1
+uv run python -m phase_b grade --model MODEL --out runs/phase-b-recheck-combined --grader checklist --changes-only --into scoring-checklist-r1-2
+uv run python -m phase_b compare-gradings --out runs/phase-b-recheck-combined \
+  --first scoring-checklist-r1-1 --second scoring-checklist-r1-2 --limit 0.05
+```
+
+Report only `grader-noise.scoring-checklist-r1-1.scoring-checklist-r1-2.json`. Over the limit,
+revision 2 is the last. If it fails too, the grader is not frozen as is: M2's preregistration
+then states the measured noise and the researcher decides how M2's verdicts take it into account
+(for example, a gap must exceed the noise to count).
+
+**Result** (#257): the sittings differ by at most **0.02** of recall (NL 0.66 and 0.68, structured
+0.88 both, Toprope 1.0 both), within 0.05. Toprope is at 1.0 in both, so for that arm the check
+shows no noise but cannot show much either.
+
+### After revision 1: flags left without a label (2026-11-11)
+
+The second sitting after revision 1 left 16 flags in one change without a label; the first left
+none. M2's `score` stops at an unlabelled flag, and a person deciding it afterwards is what this
+design rules out. The researcher asked whether to handle this now (2026-11-11: "라벨이 빠진 지적
+16개 처리는 지금 하는 게 좋을까?"); it is done now, before the grader is frozen, with two
+completions:
+
+1. **The label waits only for an answer that could change it.** `seeded` needs `names` and
+   (`conflict` or `outcome`), so it no longer waits for `real`; on a change with no seeded problem,
+   only `real` counts. Before, any missing answer left the flag unlabelled.
+2. **A flag still without a label gets more answers**, at most two more, each in its own order,
+   and only for the undecided flags (`grader.extra_votes`). A tie (one true, one false, one
+   missing) is the usual cause.
+
+Neither changes a judgement the grader made; they decide what happens when it gave none. On the
+two sittings' recorded answers (`relabel`, no grading again), rule 1 labels 1 of the 16 flags; the
+noise is unchanged (0.02, within 0.05). The other 15 are undecided on `real` only, on a change
+where they are not `seeded`, so they cannot change recall; rule 2 would have asked them again, and
+was not run on these sittings. **Proposed for M2's preregistration** (the researcher decides): a flag still without a label after
+the extra answers is not `seeded` and is left out of precision, with its count reported.
