@@ -42,9 +42,18 @@ check refuses to start M2's proxy unless all of these hold:
 - the binding names the paper server only;
 - the key in use is a paper key.
 
-The check runs before `toprope-proxy` serves. Its error names the fix. It is shown to fail on a
-binding that sets live trading. It is built in M2's setup PR, as a format change (a tool, not an
-instrument).
+**Built** (M2's setup PR): `experiments/tools/m2_paper.py`. M2's proxy is started only through
+`m2_paper.py serve -- <toprope-proxy arguments>`, which runs the check first. The check requires
+all of the following:
+- the upstream is a command running `alpaca-mcp-server`;
+- the binding's `env` sets `ALPACA_PAPER_TRADE: "true"`, and nothing passes it in;
+- the keys reach the server through `pass_env`, a proxy feature added for this: the binding names
+  each variable, and its value comes from the proxy's environment, so no key is written in the
+  binding;
+- the key ID is a paper one, starting with `PK`;
+- no variable the server gets points at `api.alpaca.markets`.
+
+Each refusal names its fix. Tests show it refusing a binding that turns paper trading off.
 
 ## 2. Roles
 
@@ -58,8 +67,8 @@ instrument).
 
 ## 3. Phases and order
 
-1. **Setup** (builder). Build the paper-only check and the draw tool (§5). Record the Toprope
-   revision that M2's checks run on.
+1. **Setup** (builder). Build the paper-only check and the draw tool (§5); done in the setup PR.
+   Record the Toprope revision that M2's checks run on.
 2. **Preregistration** (the researcher freezes):
    - the checks' revision;
    - the verdict rules (§7);
@@ -122,15 +131,26 @@ instrument).
 
 ## 5. The draw (ADR-0054 §3)
 
-**Format** (the draw tool, built in setup; a format change, no content):
-- The researcher makes a salt of 32 random bytes on their own machine. Only `sha256(salt)` is
-  committed, in the preregistration.
-- Each change request is frozen first. Its text's `sha256` goes into `FROZEN.json` before the draw.
-- For request *i*: `u = int(sha256(salt ‖ i ‖ sha256(text_i))) / 2^256`. The value `u` picks the
-  type by the cumulative shares below.
-- The tool prints each request's drawn type to the researcher only. The types are part of the key
-  and are sealed with it.
-- After scoring, the salt is published, and `m2_draw.py verify` recomputes every draw.
+**Format.** The draw tool is `experiments/tools/m2_draw.py`, built in the setup PR. It is a
+format change and holds no content. The steps:
+1. `make-salt` makes 32 random bytes, as hex, on the researcher's machine. It refuses a path
+   inside the repository.
+2. `salt-hash` prints the salt's sha256. That hash goes into `experiments/m2/draw.yaml` (copied
+   from `draw.template.yaml`), committed with the preregistration.
+3. `freeze-bases` records each change request's intent hash in `experiments/m2/draw-bases.json`.
+   It runs before any seed is written, and it runs once.
+4. `draw` refuses unless all of these hold:
+   - `draw.yaml` and `draw-bases.json` are committed and unchanged;
+   - the salt matches the committed hash;
+   - at least 12 requests are frozen.
+
+   It prints each request's type, to the researcher only. The types are part of the key and are
+   sealed with it.
+5. For request `seq`, with base hash `h`:
+   `u = int(sha256(salt ‖ 0x00 ‖ seq ‖ 0x00 ‖ h)) / 2^256`. The value `u` picks the type by the
+   cumulative shares below, in their order.
+6. After scoring, the salt is published, and `verify` recomputes every draw. It also checks the
+   fallback against the key. Each key entry holds `seq`, `drawn`, `type` and `not_applicable`.
 
 **Types and shares** (ADR-0054, open question 2), **decided:**
 

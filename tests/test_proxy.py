@@ -531,3 +531,26 @@ def test_a_drafted_fact_the_server_gives_as_a_number_is_loaded_as_one(tmp_path):
         up.close()
     assert "cannot be checked" not in (r.content[0].text if r.content else "")
     assert ex.state("T-1")["priority"] == 2
+
+
+# --- secrets reach the upstream from the proxy's environment, never from the binding (M2 setup) ---
+
+def test_pass_env_gives_the_server_named_values_from_the_proxys_environment():
+    from toprope.proxy import stdio_params
+    p = stdio_params({"command": ["srv"], "env": {"MODE": "paper"}, "pass_env": ["KEY"]},
+                     environ={"KEY": "s3cret", "OTHER": "x"})
+    assert p.env == {"MODE": "paper", "KEY": "s3cret"}       # only what is named, not the whole environment
+
+
+def test_pass_env_refuses_a_name_the_proxys_environment_lacks():
+    from toprope.proxy import stdio_params
+    with pytest.raises(SystemExit, match="does not set it.*Fix: set KEY before starting the proxy"):
+        stdio_params({"command": ["srv"], "pass_env": ["KEY"]}, environ={})
+
+
+@pytest.mark.parametrize("upstream", ['{command: [srv], pass_env: KEY}', '{url: "http://x/mcp", pass_env: [KEY]}'])
+def test_pass_env_must_be_a_list_of_names_on_a_command(tmp_path, upstream):
+    f = tmp_path / "b.yaml"
+    f.write_text(f"upstream: {upstream}\ntools: {{}}\n")
+    with pytest.raises(SystemExit, match="pass_env.*never write the values"):
+        Binding.load(f)
