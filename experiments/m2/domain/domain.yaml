@@ -5,34 +5,63 @@ roles:
 objects:
   Order:
     description: An Order, as the server keeps it.
-    properties: {}
+    properties:
+      status:
+        enum:
+        - pending_new
+        - accepted
+        - new
+        - partially_filled
+        - done_for_day
+        - pending_cancel
+        - pending_replace
+        - accepted_for_bidding
+        - stopped
+        - suspended
+        - calculated
+        - held
+        - filled
+        - canceled
+        - expired
+        - replaced
+        - rejected
     source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/19
+      kind: interview
+      ref: interview:interview/log.jsonl#L7
+      quote: 'status: pending_new, accepted, new, partially_filled, done_for_day,
+        pending_cancel, pending_replace, accepted_for_bidding, stopped, suspended,
+        calculated, held, filled, canceled, expired, replaced, rejected; starts new'
     status: proposed
   CorporateActionAnnouncement:
     description: A CorporateActionAnnouncement, as the server keeps it.
     properties: {}
-    source: &id004
+    source:
       kind: interview
       ref: interview/log.jsonl
     status: proposed
   Asset:
     description: An Asset, as the server keeps it.
-    properties: &id001 {}
-    source: &id002
+    properties: {}
+    source:
       kind: system
       ref: uvx alpaca-mcp-server==2.4.1#/tools/25
     status: proposed
   Position:
     description: A Position, as the server keeps it.
-    properties: *id001
-    source: *id002
+    properties:
+      state:
+        enum:
+        - held
+        - closed
+    source:
+      kind: interview
+      ref: interview:interview/log.jsonl#L8
+      quote: 'state: held, closed; starts held'
     status: proposed
   Account:
     description: An Account, as the server keeps it.
     properties: {}
-    source: &id003
+    source:
       kind: interview
       ref: interview/log.jsonl
     status: proposed
@@ -42,42 +71,54 @@ links:
     to: Account
     cardinality: many-to-one
     required: true
-    source: *id003
+    source:
+      kind: interview
+      ref: interview/log.jsonl
     status: proposed
   position_asset:
     from: Position
     to: Asset
     cardinality: many-to-one
     required: true
-    source: *id003
+    source:
+      kind: interview
+      ref: interview/log.jsonl
     status: proposed
   order_account:
     from: Order
     to: Account
     cardinality: many-to-one
     required: true
-    source: *id003
+    source:
+      kind: interview
+      ref: interview/log.jsonl
     status: proposed
   order_asset:
     from: Order
     to: Asset
     cardinality: many-to-one
     required: true
-    source: *id003
+    source:
+      kind: interview
+      ref: interview/log.jsonl
     status: proposed
   announcement_initiating_asset:
     from: CorporateActionAnnouncement
     to: Asset
     cardinality: many-to-one
     required: true
-    source: *id004
+    source:
+      kind: interview
+      ref: interview/log.jsonl
     status: proposed
   announcement_target_asset:
     from: CorporateActionAnnouncement
     to: Asset
     cardinality: many-to-one
     required: false
-    source: *id004
+    source:
+      kind: interview
+      ref: interview/log.jsonl
     status: proposed
 actions:
   place_stock_order:
@@ -155,189 +196,6 @@ actions:
       kind: system
       ref: uvx alpaca-mcp-server==2.4.1#/tools/0
     status: proposed
-  get_account_activities:
-    description: Returns a list of account activities such as fills, dividends, and
-      transfers.
-    actor:
-    - unassigned
-    params:
-      category:
-        enum:
-        - trade_activity
-        - non_trade_activity
-        optional: true
-      date:
-        type: datetime
-        optional: true
-      until:
-        type: datetime
-        optional: true
-      after:
-        type: datetime
-        optional: true
-      direction:
-        enum:
-        - asc
-        - desc
-        optional: true
-      page_size:
-        type: integer
-        optional: true
-      page_token:
-        type: string
-        optional: true
-    target: Order
-    effects:
-    - call: mcp:get_account_activities
-      with:
-        order_id: target.id
-        category: params.category
-        date: params.date
-        until: params.until
-        after: params.after
-        direction: params.direction
-        page_size: params.page_size
-        page_token: params.page_token
-      reply: record_get_account_activities
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/19
-    status: proposed
-  get_account_activities_by_type:
-    description: Returns account activity entries for a specific type of activity.
-    actor:
-    - unassigned
-    params:
-      date:
-        type: datetime
-        optional: true
-      until:
-        type: datetime
-        optional: true
-      after:
-        type: datetime
-        optional: true
-      direction:
-        enum:
-        - asc
-        - desc
-        optional: true
-      page_size:
-        type: integer
-        optional: true
-      page_token:
-        type: string
-        optional: true
-      activity_type:
-        type: string
-        optional: false
-    target: Order
-    effects:
-    - call: mcp:get_account_activities_by_type
-      with:
-        order_id: target.id
-        date: params.date
-        until: params.until
-        after: params.after
-        direction: params.direction
-        page_size: params.page_size
-        page_token: params.page_token
-        activity_type: params.activity_type
-      reply: record_get_account_activities_by_type
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/20
-    status: proposed
-  get_asset:
-    description: Retrieves and formats detailed information about a specific asset.
-    actor:
-    - unassigned
-    params: {}
-    target: Asset
-    effects:
-    - call: mcp:get_asset
-      with:
-        symbol_or_asset_id: target.id
-      reply: record_get_asset
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/25
-    status: proposed
-  get_orders:
-    description: Retrieves and formats orders with the specified filters.
-    actor:
-    - unassigned
-    params:
-      status:
-        enum:
-        - open
-        - closed
-        - all
-        optional: true
-      limit:
-        type: integer
-        optional: true
-      after:
-        type: string
-        optional: true
-      until:
-        type: string
-        optional: true
-      direction:
-        enum:
-        - asc
-        - desc
-        optional: true
-      nested:
-        type: boolean
-        optional: true
-      symbols:
-        type: string
-        optional: true
-      side:
-        type: string
-        optional: true
-      after_order_id:
-        type: string
-        optional: true
-    target: Order
-    effects:
-    - call: mcp:get_orders
-      with:
-        before_order_id: target.id
-        status: params.status
-        limit: params.limit
-        after: params.after
-        until: params.until
-        direction: params.direction
-        nested: params.nested
-        symbols: params.symbols
-        side: params.side
-        after_order_id: params.after_order_id
-      reply: record_get_orders
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/32
-    status: proposed
-  get_order_by_id:
-    description: Retrieves a single order by its ID.
-    actor:
-    - unassigned
-    params:
-      nested:
-        type: boolean
-        optional: true
-    target: Order
-    effects:
-    - call: mcp:get_order_by_id
-      with:
-        order_id: target.id
-        nested: params.nested
-      reply: record_get_order_by_id
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/34
-    status: proposed
   cancel_order_by_id:
     description: Cancel a specific order by its ID.
     actor:
@@ -403,38 +261,6 @@ actions:
       kind: system
       ref: uvx alpaca-mcp-server==2.4.1#/tools/36
     status: proposed
-  get_order_by_client_id:
-    description: 'Retrieves a single order specified by the client order ID. Note:
-      if the order was replaced, this returns the original order (status "replaced")
-      with a replaced_by field pointing to the new order ID.'
-    actor:
-    - unassigned
-    params: {}
-    target: Order
-    effects:
-    - call: mcp:get_order_by_client_id
-      with:
-        client_order_id: target.id
-      reply: record_get_order_by_client_id
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/37
-    status: proposed
-  get_open_position:
-    description: Retrieves and formats details for a specific open position.
-    actor:
-    - unassigned
-    params: {}
-    target: Position
-    effects:
-    - call: mcp:get_open_position
-      with:
-        symbol_or_asset_id: target.id
-      reply: record_get_open_position
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/40
-    status: proposed
   close_position:
     description: Closes a specific position for a single symbol by placing a sell
       order. If the market is closed, the sell order will remain queued and execute
@@ -476,86 +302,6 @@ actions:
       kind: system
       ref: uvx alpaca-mcp-server==2.4.1#/tools/0
     status: proposed
-  record_get_account_activities:
-    description: Record the server's answer to get_account_activities.
-    actor:
-    - external:kernel
-    target: Order
-    params:
-      ok:
-        type: boolean
-    preconditions:
-    - id: get-account-activities-done
-      check: params.ok == true
-      reason: The server did not do it (get_account_activities).
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/19
-    status: proposed
-  record_get_account_activities_by_type:
-    description: Record the server's answer to get_account_activities_by_type.
-    actor:
-    - external:kernel
-    target: Order
-    params:
-      ok:
-        type: boolean
-    preconditions:
-    - id: get-account-activities-by-type-done
-      check: params.ok == true
-      reason: The server did not do it (get_account_activities_by_type).
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/20
-    status: proposed
-  record_get_asset:
-    description: Record the server's answer to get_asset.
-    actor:
-    - external:kernel
-    target: Asset
-    params:
-      ok:
-        type: boolean
-    preconditions:
-    - id: get-asset-done
-      check: params.ok == true
-      reason: The server did not do it (get_asset).
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/25
-    status: proposed
-  record_get_orders:
-    description: Record the server's answer to get_orders.
-    actor:
-    - external:kernel
-    target: Order
-    params:
-      ok:
-        type: boolean
-    preconditions:
-    - id: get-orders-done
-      check: params.ok == true
-      reason: The server did not do it (get_orders).
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/32
-    status: proposed
-  record_get_order_by_id:
-    description: Record the server's answer to get_order_by_id.
-    actor:
-    - external:kernel
-    target: Order
-    params:
-      ok:
-        type: boolean
-    preconditions:
-    - id: get-order-by-id-done
-      check: params.ok == true
-      reason: The server did not do it (get_order_by_id).
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/34
-    status: proposed
   record_cancel_order_by_id:
     description: Record the server's answer to cancel_order_by_id.
     actor:
@@ -588,38 +334,6 @@ actions:
       kind: system
       ref: uvx alpaca-mcp-server==2.4.1#/tools/36
     status: proposed
-  record_get_order_by_client_id:
-    description: Record the server's answer to get_order_by_client_id.
-    actor:
-    - external:kernel
-    target: Order
-    params:
-      ok:
-        type: boolean
-    preconditions:
-    - id: get-order-by-client-id-done
-      check: params.ok == true
-      reason: The server did not do it (get_order_by_client_id).
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/37
-    status: proposed
-  record_get_open_position:
-    description: Record the server's answer to get_open_position.
-    actor:
-    - external:kernel
-    target: Position
-    params:
-      ok:
-        type: boolean
-    preconditions:
-    - id: get-open-position-done
-      check: params.ok == true
-      reason: The server did not do it (get_open_position).
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/40
-    status: proposed
   record_close_position:
     description: Record the server's answer to close_position.
     actor:
@@ -642,3 +356,137 @@ purpose:
     name: 총 계좌의 넷 밸류
     direction: up
   announcement: 서프라이즈 없이 계좌 주인이 이해한 대로 매매가 이루어지고 그 결과 2주 후에 계좌 잔액이 증가했다.
+transitions:
+  Order:
+    field: status
+    initial: new
+    matrix:
+      pending_new:
+        place_stock_order: undecided
+        cancel_order_by_id: undecided
+        replace_order_by_id: undecided
+        record_place_stock_order: undecided
+        record_cancel_order_by_id: undecided
+        record_replace_order_by_id: undecided
+      accepted:
+        place_stock_order: undecided
+        cancel_order_by_id: undecided
+        replace_order_by_id: undecided
+        record_place_stock_order: undecided
+        record_cancel_order_by_id: undecided
+        record_replace_order_by_id: undecided
+      new:
+        place_stock_order: undecided
+        cancel_order_by_id: undecided
+        replace_order_by_id: undecided
+        record_place_stock_order: undecided
+        record_cancel_order_by_id: undecided
+        record_replace_order_by_id: undecided
+      partially_filled:
+        place_stock_order: undecided
+        cancel_order_by_id: undecided
+        replace_order_by_id: undecided
+        record_place_stock_order: undecided
+        record_cancel_order_by_id: undecided
+        record_replace_order_by_id: undecided
+      done_for_day:
+        place_stock_order: undecided
+        cancel_order_by_id: undecided
+        replace_order_by_id: undecided
+        record_place_stock_order: undecided
+        record_cancel_order_by_id: undecided
+        record_replace_order_by_id: undecided
+      pending_cancel:
+        place_stock_order: undecided
+        cancel_order_by_id: undecided
+        replace_order_by_id: undecided
+        record_place_stock_order: undecided
+        record_cancel_order_by_id: undecided
+        record_replace_order_by_id: undecided
+      pending_replace:
+        place_stock_order: undecided
+        cancel_order_by_id: undecided
+        replace_order_by_id: undecided
+        record_place_stock_order: undecided
+        record_cancel_order_by_id: undecided
+        record_replace_order_by_id: undecided
+      accepted_for_bidding:
+        place_stock_order: undecided
+        cancel_order_by_id: undecided
+        replace_order_by_id: undecided
+        record_place_stock_order: undecided
+        record_cancel_order_by_id: undecided
+        record_replace_order_by_id: undecided
+      stopped:
+        place_stock_order: undecided
+        cancel_order_by_id: undecided
+        replace_order_by_id: undecided
+        record_place_stock_order: undecided
+        record_cancel_order_by_id: undecided
+        record_replace_order_by_id: undecided
+      suspended:
+        place_stock_order: undecided
+        cancel_order_by_id: undecided
+        replace_order_by_id: undecided
+        record_place_stock_order: undecided
+        record_cancel_order_by_id: undecided
+        record_replace_order_by_id: undecided
+      calculated:
+        place_stock_order: undecided
+        cancel_order_by_id: undecided
+        replace_order_by_id: undecided
+        record_place_stock_order: undecided
+        record_cancel_order_by_id: undecided
+        record_replace_order_by_id: undecided
+      held:
+        place_stock_order: undecided
+        cancel_order_by_id: undecided
+        replace_order_by_id: undecided
+        record_place_stock_order: undecided
+        record_cancel_order_by_id: undecided
+        record_replace_order_by_id: undecided
+      filled:
+        place_stock_order: undecided
+        cancel_order_by_id: undecided
+        replace_order_by_id: undecided
+        record_place_stock_order: undecided
+        record_cancel_order_by_id: undecided
+        record_replace_order_by_id: undecided
+      canceled:
+        place_stock_order: undecided
+        cancel_order_by_id: undecided
+        replace_order_by_id: undecided
+        record_place_stock_order: undecided
+        record_cancel_order_by_id: undecided
+        record_replace_order_by_id: undecided
+      expired:
+        place_stock_order: undecided
+        cancel_order_by_id: undecided
+        replace_order_by_id: undecided
+        record_place_stock_order: undecided
+        record_cancel_order_by_id: undecided
+        record_replace_order_by_id: undecided
+      replaced:
+        place_stock_order: undecided
+        cancel_order_by_id: undecided
+        replace_order_by_id: undecided
+        record_place_stock_order: undecided
+        record_cancel_order_by_id: undecided
+        record_replace_order_by_id: undecided
+      rejected:
+        place_stock_order: undecided
+        cancel_order_by_id: undecided
+        replace_order_by_id: undecided
+        record_place_stock_order: undecided
+        record_cancel_order_by_id: undecided
+        record_replace_order_by_id: undecided
+  Position:
+    field: state
+    initial: held
+    matrix:
+      held:
+        close_position: undecided
+        record_close_position: undecided
+      closed:
+        close_position: undecided
+        record_close_position: undecided
