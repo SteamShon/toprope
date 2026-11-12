@@ -8,3 +8,4 @@
 {"at": "2026-11-12T14:57:24+00:00", "kind": "answer", "stage": "transitions", "question_id": "a529fadea6", "question": "What stages does a Position go through? Where does it start, and which stages are final?", "answer": "state: held, closed; starts held", "decisions": ["objects.Position.properties.state", "transitions.Position"], "offered": false, "choice": null, "qkind": "transitions", "recommended": false, "asked": "transitions:stages:Position"}
 {"at": "2026-11-12T14:57:24+00:00", "kind": "abandoned", "question_id": "17df56be89", "qkind": "default", "offered": true}
 {"at": "2026-11-12T14:57:32+00:00", "kind": "abandoned", "question_id": "17df56be89", "qkind": "default", "offered": true}
+{"at": "2026-11-12T15:02:42+00:00", "kind": "abandoned", "question_id": "125bc6a010", "qkind": "rule", "offered": true}

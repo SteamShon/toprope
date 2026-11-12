@@ -171,7 +171,6 @@ actions:
       stop_loss_limit_price:
         type: string
         optional: true
-    target: Order
     effects:
     - call: mcp:place_stock_order
       with:
@@ -196,6 +195,7 @@ actions:
       kind: system
       ref: uvx alpaca-mcp-server==2.4.1#/tools/0
     status: proposed
+    creates: Order
   cancel_order_by_id:
     description: Cancel a specific order by its ID.
     actor:
@@ -362,131 +362,354 @@ transitions:
     initial: new
     matrix:
       pending_new:
-        place_stock_order: undecided
-        cancel_order_by_id: undecided
-        replace_order_by_id: undecided
-        record_place_stock_order: undecided
-        record_cancel_order_by_id: undecided
-        record_replace_order_by_id: undecided
+        cancel_order_by_id:
+          to: pending_cancel
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        replace_order_by_id:
+          to: pending_replace
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        record_place_stock_order: n/a
+        record_cancel_order_by_id: n/a
+        record_replace_order_by_id: n/a
       accepted:
-        place_stock_order: undecided
-        cancel_order_by_id: undecided
-        replace_order_by_id: undecided
-        record_place_stock_order: undecided
-        record_cancel_order_by_id: undecided
-        record_replace_order_by_id: undecided
+        cancel_order_by_id:
+          to: pending_cancel
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        replace_order_by_id:
+          to: pending_replace
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        record_place_stock_order: n/a
+        record_cancel_order_by_id: n/a
+        record_replace_order_by_id: n/a
       new:
-        place_stock_order: undecided
-        cancel_order_by_id: undecided
-        replace_order_by_id: undecided
-        record_place_stock_order: undecided
-        record_cancel_order_by_id: undecided
-        record_replace_order_by_id: undecided
+        cancel_order_by_id:
+          to: pending_cancel
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        replace_order_by_id:
+          to: pending_replace
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        record_place_stock_order:
+          to: new
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        record_cancel_order_by_id: n/a
+        record_replace_order_by_id: n/a
       partially_filled:
-        place_stock_order: undecided
-        cancel_order_by_id: undecided
-        replace_order_by_id: undecided
-        record_place_stock_order: undecided
-        record_cancel_order_by_id: undecided
-        record_replace_order_by_id: undecided
+        cancel_order_by_id:
+          to: pending_cancel
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        replace_order_by_id:
+          to: pending_replace
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        record_place_stock_order: n/a
+        record_cancel_order_by_id: n/a
+        record_replace_order_by_id: n/a
       done_for_day:
-        place_stock_order: undecided
-        cancel_order_by_id: undecided
-        replace_order_by_id: undecided
-        record_place_stock_order: undecided
-        record_cancel_order_by_id: undecided
-        record_replace_order_by_id: undecided
+        cancel_order_by_id:
+          to: pending_cancel
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        replace_order_by_id:
+          to: pending_replace
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        record_place_stock_order: n/a
+        record_cancel_order_by_id: n/a
+        record_replace_order_by_id: n/a
       pending_cancel:
-        place_stock_order: undecided
-        cancel_order_by_id: undecided
-        replace_order_by_id: undecided
-        record_place_stock_order: undecided
-        record_cancel_order_by_id: undecided
-        record_replace_order_by_id: undecided
+        cancel_order_by_id:
+          to: pending_cancel
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        replace_order_by_id:
+          to: pending_replace
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        record_place_stock_order: n/a
+        record_cancel_order_by_id:
+          to: pending_cancel
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        record_replace_order_by_id: n/a
       pending_replace:
-        place_stock_order: undecided
-        cancel_order_by_id: undecided
-        replace_order_by_id: undecided
-        record_place_stock_order: undecided
-        record_cancel_order_by_id: undecided
-        record_replace_order_by_id: undecided
+        cancel_order_by_id:
+          to: pending_cancel
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        replace_order_by_id:
+          to: pending_replace
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        record_place_stock_order: n/a
+        record_cancel_order_by_id: n/a
+        record_replace_order_by_id:
+          to: pending_replace
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
       accepted_for_bidding:
-        place_stock_order: undecided
-        cancel_order_by_id: undecided
-        replace_order_by_id: undecided
-        record_place_stock_order: undecided
-        record_cancel_order_by_id: undecided
-        record_replace_order_by_id: undecided
+        cancel_order_by_id:
+          to: pending_cancel
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        replace_order_by_id:
+          to: pending_replace
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        record_place_stock_order: n/a
+        record_cancel_order_by_id: n/a
+        record_replace_order_by_id: n/a
       stopped:
-        place_stock_order: undecided
-        cancel_order_by_id: undecided
-        replace_order_by_id: undecided
-        record_place_stock_order: undecided
-        record_cancel_order_by_id: undecided
-        record_replace_order_by_id: undecided
+        cancel_order_by_id:
+          to: pending_cancel
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        replace_order_by_id:
+          to: pending_replace
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        record_place_stock_order: n/a
+        record_cancel_order_by_id: n/a
+        record_replace_order_by_id: n/a
       suspended:
-        place_stock_order: undecided
-        cancel_order_by_id: undecided
-        replace_order_by_id: undecided
-        record_place_stock_order: undecided
-        record_cancel_order_by_id: undecided
-        record_replace_order_by_id: undecided
+        cancel_order_by_id:
+          to: pending_cancel
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        replace_order_by_id:
+          to: pending_replace
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        record_place_stock_order: n/a
+        record_cancel_order_by_id: n/a
+        record_replace_order_by_id: n/a
       calculated:
-        place_stock_order: undecided
-        cancel_order_by_id: undecided
-        replace_order_by_id: undecided
-        record_place_stock_order: undecided
-        record_cancel_order_by_id: undecided
-        record_replace_order_by_id: undecided
+        cancel_order_by_id:
+          to: pending_cancel
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        replace_order_by_id:
+          to: pending_replace
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        record_place_stock_order: n/a
+        record_cancel_order_by_id: n/a
+        record_replace_order_by_id: n/a
       held:
-        place_stock_order: undecided
-        cancel_order_by_id: undecided
-        replace_order_by_id: undecided
-        record_place_stock_order: undecided
-        record_cancel_order_by_id: undecided
-        record_replace_order_by_id: undecided
+        cancel_order_by_id:
+          to: pending_cancel
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        replace_order_by_id:
+          to: pending_replace
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        record_place_stock_order: n/a
+        record_cancel_order_by_id: n/a
+        record_replace_order_by_id: n/a
       filled:
-        place_stock_order: undecided
-        cancel_order_by_id: undecided
-        replace_order_by_id: undecided
-        record_place_stock_order: undecided
-        record_cancel_order_by_id: undecided
-        record_replace_order_by_id: undecided
+        cancel_order_by_id:
+          deny: '취소할 수 없는 주문입니다 (Alpaca: not cancelable).'
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        replace_order_by_id:
+          deny: '바꿀 수 없는 주문입니다 (Alpaca: only an open order is replaced).'
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        record_place_stock_order: n/a
+        record_cancel_order_by_id: n/a
+        record_replace_order_by_id: n/a
       canceled:
-        place_stock_order: undecided
-        cancel_order_by_id: undecided
-        replace_order_by_id: undecided
-        record_place_stock_order: undecided
-        record_cancel_order_by_id: undecided
-        record_replace_order_by_id: undecided
+        cancel_order_by_id:
+          deny: '취소할 수 없는 주문입니다 (Alpaca: not cancelable).'
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        replace_order_by_id:
+          deny: '바꿀 수 없는 주문입니다 (Alpaca: only an open order is replaced).'
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        record_place_stock_order: n/a
+        record_cancel_order_by_id: n/a
+        record_replace_order_by_id: n/a
       expired:
-        place_stock_order: undecided
-        cancel_order_by_id: undecided
-        replace_order_by_id: undecided
-        record_place_stock_order: undecided
-        record_cancel_order_by_id: undecided
-        record_replace_order_by_id: undecided
+        cancel_order_by_id:
+          deny: '취소할 수 없는 주문입니다 (Alpaca: not cancelable).'
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        replace_order_by_id:
+          deny: '바꿀 수 없는 주문입니다 (Alpaca: only an open order is replaced).'
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        record_place_stock_order: n/a
+        record_cancel_order_by_id: n/a
+        record_replace_order_by_id: n/a
       replaced:
-        place_stock_order: undecided
-        cancel_order_by_id: undecided
-        replace_order_by_id: undecided
-        record_place_stock_order: undecided
-        record_cancel_order_by_id: undecided
-        record_replace_order_by_id: undecided
+        cancel_order_by_id:
+          deny: '취소할 수 없는 주문입니다 (Alpaca: not cancelable).'
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        replace_order_by_id:
+          deny: '바꿀 수 없는 주문입니다 (Alpaca: only an open order is replaced).'
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        record_place_stock_order: n/a
+        record_cancel_order_by_id: n/a
+        record_replace_order_by_id: n/a
       rejected:
-        place_stock_order: undecided
-        cancel_order_by_id: undecided
-        replace_order_by_id: undecided
-        record_place_stock_order: undecided
-        record_cancel_order_by_id: undecided
-        record_replace_order_by_id: undecided
+        cancel_order_by_id:
+          deny: '취소할 수 없는 주문입니다 (Alpaca: not cancelable).'
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        replace_order_by_id:
+          deny: '바꿀 수 없는 주문입니다 (Alpaca: only an open order is replaced).'
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        record_place_stock_order: n/a
+        record_cancel_order_by_id: n/a
+        record_replace_order_by_id: n/a
   Position:
     field: state
     initial: held
     matrix:
       held:
-        close_position: undecided
-        record_close_position: undecided
+        close_position:
+          to: closed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        record_close_position: n/a
       closed:
-        close_position: undecided
-        record_close_position: undecided
+        close_position:
+          deny: 이미 청산된 포지션입니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
+        record_close_position:
+          to: closed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: A로 해줘.
+          status: proposed
