@@ -43,17 +43,18 @@ check refuses to start M2's proxy unless all of these hold:
 - the key in use is a paper key.
 
 **Built** (M2's setup PR): `experiments/tools/m2_paper.py`. M2's proxy is started only through
-`m2_paper.py serve -- <toprope-proxy arguments>`, which runs the check first. The check requires
-all of the following:
-- the upstream is a command running `alpaca-mcp-server`;
-- the binding's `env` sets `ALPACA_PAPER_TRADE: "true"`, and nothing passes it in;
-- the keys reach the server through `pass_env`, a proxy feature added for this: the binding names
-  each variable, and its value comes from the proxy's environment, so no key is written in the
+`m2_paper.py serve -- <toprope-proxy arguments>`. It reads the arguments with the proxy's own
+parser, so it checks the binding the proxy will load, and runs the proxy only after the check
+passes. The check requires all of these:
+- the upstream command is exactly `[uvx, alpaca-mcp-server==X.Y.Z]`: the official server, pinned;
+- the binding's `env` is exactly `ALPACA_PAPER_TRADE: "true"`;
+- `pass_env` is exactly the two keys. `pass_env` is a proxy feature added for this: the binding
+  names a variable, and its value comes from the proxy's environment, so no key is written in the
   binding;
-- the key ID is a paper one, starting with `PK`;
-- no variable the server gets points at `api.alpaca.markets`.
+- the key ID is a paper one (it starts with `PK`), as a second guard.
 
-Each refusal names its fix. Tests show it refusing a binding that turns paper trading off.
+Each refusal names its fix. The tests show the check refusing a binding that turns paper trading
+off, wrapper commands, unpinned or git-sourced servers, and a second `--binding`.
 
 ## 2. Roles
 
@@ -132,25 +133,41 @@ Each refusal names its fix. Tests show it refusing a binding that turns paper tr
 ## 5. The draw (ADR-0054 §3)
 
 **Format.** The draw tool is `experiments/tools/m2_draw.py`, built in the setup PR. It is a
-format change and holds no content. The steps:
-1. `make-salt` makes 32 random bytes, as hex, on the researcher's machine. It refuses a path
-   inside the repository.
-2. `salt-hash` prints the salt's sha256. That hash goes into `experiments/m2/draw.yaml` (copied
-   from `draw.template.yaml`), committed with the preregistration.
-3. `freeze-bases` records each change request's intent hash in `experiments/m2/draw-bases.json`.
-   It runs before any seed is written, and it runs once.
-4. `draw` refuses unless all of these hold:
-   - `draw.yaml` and `draw-bases.json` are committed and unchanged;
-   - the salt matches the committed hash;
-   - at least 12 requests are frozen.
+format change and holds no content. Two secrets do two jobs:
+- **A public beacon stops the researcher from choosing.** The draw mixes in a drand round
+  (`quicknet`) published an hour after the bases reach `develop`. Nobody knows that round when the
+  bases are frozen. So no wording of a request can be tried until it draws a type the researcher
+  wants. An adversarial review found that a salt alone allowed that.
+- **The salt keeps the key sealed.** The beacon and the bases are public, so without a secret
+  anyone could compute the types.
 
-   It prints each request's type, to the researcher only. The types are part of the key and are
-   sealed with it.
-5. For request `seq`, with base hash `h`:
-   `u = int(sha256(salt ‖ 0x00 ‖ seq ‖ 0x00 ‖ h)) / 2^256`. The value `u` picks the type by the
-   cumulative shares below, in their order.
-6. After scoring, the salt is published, and `verify` recomputes every draw. It also checks the
-   fallback against the key. Each key entry holds `seq`, `drawn`, `type` and `not_applicable`.
+The steps:
+1. `make-salt` makes the salt on the researcher's machine. It refuses a path inside the
+   repository.
+2. `salt-hash` prints the salt's hash. It goes into `experiments/m2/draw.yaml`, copied from
+   `draw.template.yaml`, with `status: frozen`. That file is merged into `develop`.
+3. `freeze-bases` records each request's `intent` hash in `experiments/m2/draw-bases.json`. It
+   runs once, before any seed is written, and its output is merged into `develop`. From then on
+   `intent` never changes, and the seeded wording goes in `seeded_intent`.
+4. `draw` reads both files as `origin/develop` holds them. It refuses unless:
+   - each file was added there once and never changed since;
+   - the working copy matches;
+   - `draw.yaml` is frozen and landed no later than the bases;
+   - the salt matches its hash;
+   - at least 12 requests are frozen;
+   - the beacon round is out.
+
+   It prints the commits, the round and each request's type, to the researcher only. The types
+   are part of the key and are sealed with it.
+5. For request `seq`, with base hash `h` and beacon randomness `r` (the sha256 of the round's
+   signature): `u = int(sha256(salt ‖ 0x00 ‖ r ‖ 0x00 ‖ seq ‖ 0x00 ‖ h)) / 2^256`. The value `u`
+   picks the type by the cumulative shares below, in their order.
+6. After scoring, the salt is published, and `verify` recomputes every draw. It also checks:
+   - the fallback, against the key. Each entry holds `seq`, `drawn`, `type` and
+     `not_applicable`, and each `not_applicable` entry has a `why`;
+   - that every `intent` still matches its base.
+
+   It lists every not-applicable reason, for the report.
 
 **Types and shares** (ADR-0054, open question 2), **decided:**
 

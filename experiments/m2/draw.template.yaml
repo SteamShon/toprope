@@ -1,7 +1,8 @@
 # M2's draw (ADR-0054 §3, docs/experiments/M2-spec.md §5): TEMPLATE.
 # The types, shares and request count are the researcher's decision of 2026-11-12 ("추천대로").
 # The researcher copies this to draw.yaml, puts the output of `m2_draw.py salt-hash` in
-# salt_sha256, and freezes it with the preregistration. The salt itself never enters the repository.
+# salt_sha256, sets status: frozen, and merges it into develop before the bases are frozen.
+# The salt itself never enters the repository. `m2_draw.py draw` refuses a draw.yaml not frozen.
 instrument: draw
 experiment: M2
 status: draft

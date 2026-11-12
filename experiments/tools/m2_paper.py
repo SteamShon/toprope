@@ -3,57 +3,50 @@
   python experiments/tools/m2_paper.py check BINDING
   python experiments/tools/m2_paper.py serve -- <toprope-proxy arguments, with --binding BINDING>
 
-`serve` runs the check, then `toprope-proxy` with the same arguments; M2's proxy is started this way
-and no other. The check refuses unless all of these hold:
-- the upstream is a command that runs Alpaca's MCP server (`alpaca-mcp-server`), not a URL;
-- the binding's `env` sets `ALPACA_PAPER_TRADE: "true"`, and nothing passes it in from outside;
-- the keys come through `pass_env` (never written in the binding), and the key ID in the
-  environment is a paper key (Alpaca's paper key IDs start with `PK`; live ones with `AK`);
-- no variable the server gets points at Alpaca's live API (`api.alpaca.markets`).
+`serve` reads the forwarded arguments with `toprope-proxy`'s own parser. It checks the binding the
+proxy will load, and only then runs the proxy. M2's proxy is started this way and no other way.
+The check refuses unless all of these hold:
+- the upstream command is exactly `[uvx, alpaca-mcp-server==X.Y.Z]`: Alpaca's official server,
+  pinned, with nothing that runs other code;
+- the binding's `env` holds exactly `ALPACA_PAPER_TRADE: "true"`;
+- `pass_env` holds exactly the two keys, so no key is written in the binding and nothing can turn
+  paper trading off;
+- the key ID in the environment is a paper one (it starts with `PK`). This is a second guard; the
+  flag above is the first.
 """
 from __future__ import annotations
 
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
 
-SERVER = "alpaca-mcp-server"
+PINNED = re.compile(r"alpaca-mcp-server==\d+\.\d+\.\d+")
 FLAG = "ALPACA_PAPER_TRADE"
 KEYS = ("ALPACA_API_KEY", "ALPACA_SECRET_KEY")
 PAPER_PREFIX = "PK"
-LIVE_HOST = "api.alpaca.markets"
-PAPER_HOST = "paper-api.alpaca.markets"
+SHAPE = ('`upstream: {command: [uvx, alpaca-mcp-server==X.Y.Z], env: {ALPACA_PAPER_TRADE: "true"}, '
+         'pass_env: [ALPACA_API_KEY, ALPACA_SECRET_KEY]}`')
 
 
 def problems(upstream: dict[str, Any], environ: Any) -> list[str]:
-    out = []
     if "command" not in upstream:
-        return ["the upstream is not a command. Fix: run `alpaca-mcp-server` as the binding's `upstream.command`"]
-    if not any(str(x).split("==")[0].split("@")[0] == SERVER for x in upstream["command"]):
-        out.append(f"the upstream command does not run `{SERVER}`. Fix: run Alpaca's official MCP server, "
-                   f"e.g. `command: [uvx, {SERVER}]`")
+        return [f"the upstream is not a command. Fix: use {SHAPE}"]
+    out = []
+    cmd = [str(x) for x in upstream["command"]]
+    if len(cmd) != 2 or cmd[0] != "uvx" or not PINNED.fullmatch(cmd[1]):
+        out.append(f"the upstream command is {cmd}, not Alpaca's server pinned to a version. Fix: use {SHAPE}")
     env = {str(k): str(v) for k, v in (upstream.get("env") or {}).items()}
+    if env != {FLAG: "true"}:
+        out.append(f"the binding's `env` is {sorted(env)} with `{FLAG}` = {env.get(FLAG)!r}, not exactly "
+                   f"`{FLAG}: \"true\"`. Fix: use {SHAPE}")
     passed = [str(n) for n in upstream.get("pass_env") or []]
-    if env.get(FLAG, "").lower() != "true":
-        out.append(f"the binding does not set `{FLAG}: \"true\"`. Fix: add it under `upstream.env`")
-    if FLAG in passed:
-        out.append(f"`{FLAG}` is passed in from the environment, which could turn paper off. "
-                   f"Fix: remove it from `pass_env`; the binding sets it")
-    for k in KEYS:
-        if k in env:
-            out.append(f"the binding writes `{k}` itself. Fix: move it to `pass_env`, and set it in the "
-                       "proxy's environment")
-        elif k not in passed:
-            out.append(f"the server gets no `{k}`. Fix: add it to `upstream.pass_env`")
-    key = environ.get(KEYS[0], "")
-    if KEYS[0] in passed and not key.startswith(PAPER_PREFIX):
+    if sorted(passed) != sorted(KEYS):
+        out.append(f"`pass_env` is {passed}, not exactly the two keys. Fix: use {SHAPE}")
+    if not str(environ.get(KEYS[0], "")).startswith(PAPER_PREFIX):
         out.append(f"`{KEYS[0]}` in the environment is not a paper key (it does not start with `{PAPER_PREFIX}`). "
                    "Fix: use the key ID of the Alpaca paper account")
-    values = list(env.items()) + [(n, environ.get(n, "")) for n in passed]
-    for name, value in values:
-        if LIVE_HOST in value and PAPER_HOST not in value:
-            out.append(f"`{name}` points at Alpaca's live API. Fix: remove it, or point it at `{PAPER_HOST}`")
     return out
 
 
@@ -65,11 +58,13 @@ def check(binding: str | Path, environ: Any = None) -> list[str]:
 def main(argv: list[str] | None = None) -> None:
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv[:1] == ["check"] and len(argv) == 2:
-        found = check(argv[1])
-    elif argv[:2] == ["serve", "--"] and "--binding" in argv:
-        found = check(argv[argv.index("--binding") + 1])
+        binding = argv[1]
+    elif argv[:2] == ["serve", "--"]:
+        from toprope.proxy.cli import build_parser
+        binding = build_parser().parse_args(argv[2:]).binding      # the binding the proxy will load
     else:
         raise SystemExit(__doc__)
+    found = check(binding)
     for p in found:
         print(f"error: {p}", file=sys.stderr)
     if found:
