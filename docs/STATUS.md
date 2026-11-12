@@ -441,14 +441,12 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    The preregistration (`experiments/m2/`: `preregistration.yaml`, `verdict-rules.yaml`, `draw.yaml`
    with the salt's hash; the grader's expert sample: 60 flags, agreement 0.80 and kappa 0.60 per
    item; its model after the pilot) is frozen by the researcher's human request
-   (`m2-preregistration`, #264). Then the held-out items for ② (the template and `m2_heldout.py`, #266, with `ask`, #267: written
-   outside the repository in `~/m2-private/`, which agents are denied; only the hash is committed;
-   candidate rules may come from an agent's list of published principles, tagged `from-list` and
-   reported apart, ADR-0056; `ask --from` labels a line marked `[from-list]` itself;
-   or `csv` makes the memo a CSV to fill in a spreadsheet, and `ask --from rules.csv` makes each row
-   with a situation an outcome item with no questions; situations may be drafted by an agent session
-   that never saw the rules and judged by the researcher, 모름 left out, tagged `blind-situation`, ADR-0057),
-   then the interview (Phase A) and the probes, on the researcher's Mac (the Alpaca keys and the
+   (`m2-preregistration`, #264). The held-out items for ② are sealed (`experiments/m2/heldout.sealed.json`,
+   committed by the researcher): 60 outcome items, 59 from situations an agent session drafted without
+   seeing the rules and the researcher judged (`blind-situation`, ADR-0057), 1 earlier item; the file
+   itself stays in `~/m2-private/` (#266, #267, #270, ADR-0056). Before the interview, the session
+   that saw the rules is moved out of agents' reach. Next: the interview (Phase A)
+   and the probes, on the researcher's Mac (the Alpaca keys and the
    salt stay there).
 4. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
 5. When a domain is shared by several people or agents (M2, or a hosted server): its event
