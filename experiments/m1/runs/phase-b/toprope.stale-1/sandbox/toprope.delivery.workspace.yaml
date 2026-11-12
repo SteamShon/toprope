@@ -1,7 +1,0 @@
-domain: domains/delivery/delivery.domain.yaml
-interview_log: domains/delivery/interview.jsonl
-usage_log: domains/delivery/sources-used.jsonl
-sources:
-- id: interview
-  kind: interview-log
-  path: domains/delivery/interview.jsonl

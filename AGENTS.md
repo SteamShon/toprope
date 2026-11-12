@@ -188,6 +188,7 @@ check starts enforcing a rule, and drop a rule from the text once its mistake ca
 | Every error, refusal and reply message written in `src/toprope/` and `tools/human_request.py` names its fix, once (ADR-0053 §5, amending ADR-0049 §5); the scan is static, its blind spots are in `src/toprope/errors.py` | `checks` workflow (`tests/test_error_fixes.py`) |
 | M2 trades on a paper account only (ADR-0054) | `experiments/tools/m2_paper.py serve` (reads the proxy's own arguments, then starts it only when the binding runs the pinned official server with paper trading set and the keys passed in); tested in `checks` |
 | M2's seeds come from the preregistered draw, not the researcher's choice (ADR-0054 §3) | `experiments/tools/m2_draw.py`: a public beacon round published after the bases reach `develop` decides with the salt; it refuses bases or a draw file not on `origin/develop`, changed there, or not frozen; `verify` recomputes every draw, the fallback and each request's frozen intent |
+| Raw run records stay outside the working tree; summaries stay in git (ADR-0055) | `checks` workflow (`tools/run_archive.py check`); Phase B refuses a split run without its records and names `restore` |
 | Gold sets and sealed files are human-only | text only: review |
 | Real tests only; no skipped or weakened tests | text only: review |
 | No model identifiers in commits, PRs or code (run records excepted) | text only: review |

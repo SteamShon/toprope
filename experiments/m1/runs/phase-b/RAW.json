@@ -1,0 +1,14 @@
+{
+  "source_commit": "02aa14dbbe0685eae970bc4ff7aafbf352990b7b",
+  "raw": {
+    "nl": "91b18e0744021e38bbd0c86f3efbad49d1d43cf6",
+    "nl.stale-1": "8e4663c87b28bdfbc9ab51a5c87a764bd731055e",
+    "scoring/transcripts": "a2aef71cc92dcb30731ff482d53163da9072bffc",
+    "scoring.first-1/transcripts": "14079fc44f25c9d1a94560b588982b64af2eecf6",
+    "structured": "7fdb8771b4b3fa02710b1e39bfaf8ab4df056cef",
+    "structured.stale-1": "24b3cd3e1ffbb7ca97a82c0643bf411a4183723d",
+    "toprope": "28d1b9a4977b9093561cffe0f87aa7e4d309a9d8",
+    "toprope.stale-1": "5076e47a140f3d668e94ecae394e384149f0ae95",
+    "worlds": "3aa05cc630d44eae882c15197e3615139fc58f63"
+  }
+}

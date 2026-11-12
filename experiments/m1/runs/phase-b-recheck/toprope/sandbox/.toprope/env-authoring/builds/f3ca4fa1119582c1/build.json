@@ -1,9 +1,0 @@
-{
-  "id": "f3ca4fa1119582c1",
-  "domain": "authoring",
-  "version": 20,
-  "declaration_sha256": "f3ca4fa1119582c13d1e0878d2c3248ed07659159004f5409544fa304ef2a17a",
-  "toolchain": "45dcf59bceae89ec388152ff75a63cf206f20fa3691e317920b7ef01a913ed51",
-  "harness_ok": true,
-  "created_at": "2026-11-09T16:50:54+00:00"
-}

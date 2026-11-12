@@ -1,3 +1,0 @@
-{"at": "2026-11-06T13:36:38+00:00", "author": "owner <owner@library.invalid>", "branch": "work", "content": "d9ed7a127857fcad", "domain": "library", "id": "1-d9ed7a127857fcad", "interface": "1.0.0", "message": "", "parents": [], "seq": 1}
-{"at": "2026-11-06T13:36:44+00:00", "author": "owner <owner@library.invalid>", "branch": "work", "content": "55694aded68b5ebc", "domain": "library", "id": "2-55694aded68b5ebc", "interface": "1.1.0", "message": "", "parents": ["1-d9ed7a127857fcad"], "seq": 2}
-{"at": "2026-11-06T13:36:48+00:00", "author": "owner <owner@library.invalid>", "branch": "work", "content": "246bb8edfc8343cd", "domain": "library", "id": "3-246bb8edfc8343cd", "interface": "1.2.0", "message": "", "parents": ["2-55694aded68b5ebc"], "seq": 3}

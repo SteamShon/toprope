@@ -25,6 +25,8 @@ jobs:
         run: uv run pytest -q
       - name: Frozen instruments unchanged (amend records every change)
         run: uv run python experiments/tools/instruments.py verify experiments/m1/instruments --run
+      - name: Raw run records stay outside the tree (ADR-0055)
+        run: uv run python tools/run_archive.py check
       - name: Self-domain logs only extend the base's (AGENTS.md, Self domains)
         if: github.event_name == 'pull_request'
         run: uv run python tools/logs_check.py --base "origin/${{ github.base_ref }}"

@@ -1,9 +1,0 @@
-{
-  "id": "fba2ee64acd7466a",
-  "domain": "delivery",
-  "version": 10,
-  "declaration_sha256": "fba2ee64acd7466a4f914fe8ebccd1339ab3f540e0e3da7bfaaebc848c0c4242",
-  "toolchain": "45dcf59bceae89ec388152ff75a63cf206f20fa3691e317920b7ef01a913ed51",
-  "harness_ok": true,
-  "created_at": "2026-11-09T17:01:13+00:00"
-}

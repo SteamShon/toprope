@@ -1,9 +1,0 @@
-{
-  "id": "b166c276af8e110f",
-  "domain": "authoring",
-  "version": 22,
-  "declaration_sha256": "b166c276af8e110fc066bb940482df4f084ab3741e8b10cf0c50ba0f98a563ad",
-  "toolchain": "98c4deb6811c8648fe28340c6b4a2162f9ae5fa6e61383d132c257f1333e109e",
-  "harness_ok": true,
-  "created_at": "2026-11-08T06:00:03+00:00"
-}

@@ -1,9 +1,0 @@
-{
-  "id": "ecc88316dbbe725f",
-  "domain": "delivery",
-  "version": 2,
-  "declaration_sha256": "ecc88316dbbe725f2b1eea3893a9da1b9ae19c5e25029855463f6a46182e9d1d",
-  "toolchain": "98c4deb6811c8648fe28340c6b4a2162f9ae5fa6e61383d132c257f1333e109e",
-  "harness_ok": true,
-  "created_at": "2026-11-08T05:28:12+00:00"
-}

@@ -1,0 +1,11 @@
+# Raw records, kept in git history only (ADR-0055); restore with
+# python tools/run_archive.py restore experiments/m1/runs/phase-b
+/nl/
+/nl.stale-1/
+/scoring/transcripts/
+/scoring.first-1/transcripts/
+/structured/
+/structured.stale-1/
+/toprope/
+/toprope.stale-1/
+/worlds/

@@ -17,4 +17,6 @@ The dry run (changes 1–2, #109) and the full run (changes 3–20, #112), run b
    (`experiments/m1/phase_b/baseline.py`; the researcher's decision, 2026-11-07). The NL skill
    was rendered from `authoring@4`, so it is rendered again.
 
-Their manifests name the instruments, materials, prompts and harness commit they used.
+Their manifests name the instruments, materials, prompts and harness commit they used. The run
+directory is kept in git history only (ADR-0055); bring it back with
+`python tools/run_archive.py restore experiments/m1/runs/superseded`.
