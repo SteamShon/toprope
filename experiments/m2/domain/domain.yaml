@@ -10,13 +10,6 @@ objects:
       kind: system
       ref: uvx alpaca-mcp-server==2.4.1#/tools/0
     status: proposed
-  Locate:
-    description: A Locate, as the server keeps it.
-    properties: {}
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/16
-    status: proposed
   Order:
     description: An Order, as the server keeps it.
     properties: {}
@@ -37,13 +30,6 @@ objects:
     source:
       kind: system
       ref: uvx alpaca-mcp-server==2.4.1#/tools/29
-    status: proposed
-  BeforeOrder:
-    description: A BeforeOrder, as the server keeps it.
-    properties: {}
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/32
     status: proposed
 actions:
   place_stock_order:
@@ -120,22 +106,6 @@ actions:
     source:
       kind: system
       ref: uvx alpaca-mcp-server==2.4.1#/tools/0
-    status: proposed
-  get_locate:
-    description: Returns a single locate request by its ID. Not available in paper
-      trading.
-    actor:
-    - unassigned
-    params: {}
-    target: Locate
-    effects:
-    - call: mcp:get_locate
-      with:
-        locate_id: target.id
-      reply: record_get_locate
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/16
     status: proposed
   get_account_activities:
     description: Returns a list of account activities such as fills, dividends, and
@@ -297,7 +267,7 @@ actions:
       after_order_id:
         type: string
         optional: true
-    target: BeforeOrder
+    target: Order
     effects:
     - call: mcp:get_orders
       with:
@@ -473,22 +443,6 @@ actions:
       kind: system
       ref: uvx alpaca-mcp-server==2.4.1#/tools/0
     status: proposed
-  record_get_locate:
-    description: Record the server's answer to get_locate.
-    actor:
-    - external:kernel
-    target: Locate
-    params:
-      ok:
-        type: boolean
-    preconditions:
-    - id: get-locate-done
-      check: params.ok == true
-      reason: The server did not do it (get_locate).
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/16
-    status: proposed
   record_get_account_activities:
     description: Record the server's answer to get_account_activities.
     actor:
@@ -557,7 +511,7 @@ actions:
     description: Record the server's answer to get_orders.
     actor:
     - external:kernel
-    target: BeforeOrder
+    target: Order
     params:
       ok:
         type: boolean
