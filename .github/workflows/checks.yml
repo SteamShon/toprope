@@ -21,8 +21,8 @@ jobs:
         with:
           python-version: "3.12"
       - run: uv sync
-      - name: Tests (memory and SQLite stores)
-        run: uv run pytest -q
+      - name: Tests (memory and SQLite stores), in parallel
+        run: uv run pytest -q -n auto
       - name: Frozen instruments unchanged (amend records every change)
         run: uv run python experiments/tools/instruments.py verify experiments/m1/instruments --run
       - name: Raw run records stay outside the tree (ADR-0055)
