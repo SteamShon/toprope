@@ -1,0 +1,16 @@
+{
+  "files": {
+    "preregistration.yaml": {
+      "sha256": "fc2475ff153fe6c2b164e8071115fe3e44a440a13bf41580b5736defc5e11433",
+      "frozen_at": "2026-11-12T03:04:23+00:00"
+    },
+    "verdict-rules.yaml": {
+      "sha256": "80815e239386867acc98a4573e89cc6f2ba3740c5683c204f62473fd24da18dd",
+      "frozen_at": "2026-11-12T03:04:23+00:00"
+    },
+    "draw.yaml": {
+      "sha256": "3210d7607425ac7bde42a349211b7940b4c722ab96c77cd07c686c9c25d02eda",
+      "frozen_at": "2026-11-12T03:04:23+00:00"
+    }
+  }
+}

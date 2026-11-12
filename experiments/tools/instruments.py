@@ -7,6 +7,7 @@ Usage (from the repo root):
   uv run --with pyyaml python experiments/tools/instruments.py freeze-protocol experiments/m1/instruments
   uv run --with pyyaml python experiments/tools/instruments.py verify   experiments/m1/instruments [--run]
   uv run --with pyyaml python experiments/tools/instruments.py amend    experiments/m1/instruments FILE --reason TEXT
+  uv run --with pyyaml python experiments/tools/instruments.py freeze-prereg experiments/m2
 
 validate        checks the filled files (not *.template.yaml) for format and cross-file consistency.
 freeze          researcher only: freezes into FROZEN.json the probe suite and verdict rules
@@ -25,6 +26,12 @@ amend FILE --reason TEXT
                 new version of a frozen file. The file must still validate and be `frozen`; the
                 previous hash moves to the file's history with the reason, so every run can
                 report which version it used. Nothing is ever erased from the manifest.
+freeze-prereg   researcher only (ADR-0054; through a human request): freezes M2's preregistration,
+                preregistration.yaml, verdict-rules.yaml and draw.yaml, in one step. Each must
+                say `status: draft` or `frozen`; the step sets `frozen` and records the hashes.
+                draw.yaml must hold the salt's hash, never the placeholder. M2's instruments
+                written later (probes, change requests, key, binding, run protocol) are frozen
+                in steps of their own.
 verify          fails if a frozen file changed. It also fails unless the probe suite and verdict
                 rules are frozen (the gate for building the checks), and with --run (used by
                 the harness before every arm run) unless the change requests, the key,
@@ -323,6 +330,60 @@ def freeze_protocol(d: Path) -> list[str]:
     return _freeze(d, ["run-protocol"])
 
 
+PREREG = ["preregistration.yaml", "verdict-rules.yaml", "draw.yaml"]   # M2 (ADR-0054)
+
+
+def _check_draw(path: Path) -> list[str]:
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("m2_draw", Path(__file__).with_name("m2_draw.py"))
+    m2_draw = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m2_draw)
+    try:
+        m2_draw.parse_draw(path.read_text())
+    except SystemExit as e:
+        return [str(e).removeprefix("error: ")]
+    return []
+
+
+def freeze_prereg(d: Path) -> list[str]:
+    """M2's preregistration, frozen at once: status set to frozen, hashes recorded."""
+    errs = []
+    for f in PREREG:
+        p = d / f
+        if not p.exists():
+            errs.append(f"missing {f}")
+            continue
+        doc = yaml.safe_load(p.read_text()) or {}
+        if not isinstance(doc, dict) or doc.get("status") not in ("draft", "frozen"):
+            errs.append(f"{f}: `status` is draft or frozen")
+        elif doc.get("experiment") != "M2":
+            errs.append(f"{f}: `experiment: M2` is missing")
+    if not errs:
+        errs += _check_draw(d / "draw.yaml")
+    if errs:
+        return errs
+    manifest, merrs = read_manifest(d)
+    if merrs:
+        return merrs
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    for f in PREREG:
+        p = d / f
+        text = p.read_text()
+        if re.search(r"^status: draft\b", text, flags=re.M):
+            text = re.sub(r"^status: draft\b", "status: frozen", text, count=1, flags=re.M)
+            p.write_text(text)
+        if f in manifest["files"]:
+            if manifest["files"][f]["sha256"] != sha(p):
+                errs.append(f"{f} already frozen with a different hash; refreezing is not allowed (use amend)")
+            continue
+        manifest["files"][f] = {"sha256": sha(p), "frozen_at": now}
+    if errs:
+        return errs
+    (d / "FROZEN.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    print(f"frozen: {sorted(manifest['files'])} → {d / 'FROZEN.json'}")
+    return []
+
+
 def verify(d: Path, run: bool = False) -> list[str]:
     if not (d / "FROZEN.json").exists():
         return ["no FROZEN.json: instruments are not frozen"]
@@ -330,6 +391,14 @@ def verify(d: Path, run: bool = False) -> list[str]:
     if merrs:
         return merrs
     files = manifest["files"]
+    if (d / "preregistration.yaml").exists():                      # M2: its preregistration so far
+        errs = [f"{f} is not frozen" for f in PREREG if f not in files]
+        for f, meta in files.items():
+            if not (d / f).exists():
+                errs.append(f"{f} missing")
+            elif sha(d / f) != meta["sha256"]:
+                errs.append(f"{f} changed after freezing")
+        return errs
     required = [FILES[k] for k in BEFORE_CHECKS] + (
         [FILES[k] for k in BEFORE_RUN] + [FILES["binding"], FILES["run-protocol"]] if run else [])
     required += [FILES[k] for k in OPTIONAL_STAGE1 if (d / FILES[k]).exists()]   # a gold file, once it exists
@@ -352,7 +421,7 @@ if __name__ == "__main__":
         errs = amend(d, rest[0] if rest and rest[0] != "--reason" else "", reason)
     else:
         errs = {"validate": validate, "freeze": freeze, "freeze-binding": freeze_binding,
-                "freeze-protocol": freeze_protocol}[cmd](d)
+                "freeze-protocol": freeze_protocol, "freeze-prereg": freeze_prereg}[cmd](d)
     for e in errs:
         print("error:", e)
     print("ok" if not errs else f"{len(errs)} error(s)")

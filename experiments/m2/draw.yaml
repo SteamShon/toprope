@@ -1,0 +1,15 @@
+# M2's draw (ADR-0054 §3, docs/experiments/M2-spec.md §5).
+# The types, shares and request count are the researcher's decision of 2026-11-12 ("추천대로").
+# salt_sha256 is the hash of the salt the researcher made on their own machine (2026-11-12); the
+# salt never enters the repository. Frozen by the researcher's human request (freeze-prereg).
+instrument: draw
+experiment: M2
+status: frozen
+requests: 20            # Phase B runs with what the diary holds, at least 12
+salt_sha256: "05b268d47f71c76c27c7cc8505f1131e72f1d29bc57d3d0f76fabe62a649807b"
+types:                  # in this order: the draw's buckets, and the fallback order
+  - {type: none, share: 0.30}                 # clean control
+  - {type: conflicts-with-rule, share: 0.20}
+  - {type: breaks-reference, share: 0.15}
+  - {type: widens-who-can-act, share: 0.15}
+  - {type: breaks-outcome-rule, share: 0.20}
