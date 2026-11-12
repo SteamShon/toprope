@@ -1,7 +1,0 @@
-domain: domains/authoring/authoring.domain.yaml
-interview_log: domains/authoring/interview.jsonl
-usage_log: domains/authoring/sources-used.jsonl
-sources:
-- id: interview
-  kind: interview-log
-  path: domains/authoring/interview.jsonl

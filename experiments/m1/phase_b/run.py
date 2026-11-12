@@ -578,6 +578,12 @@ def main(argv: list[str] | None = None, backend: Backend | None = None) -> None:
     for k, v in vars(args).items():               # every path absolute: subprocesses run elsewhere
         if isinstance(v, Path):
             setattr(args, k, v.resolve())
+    out = getattr(args, "out", None)
+    if isinstance(out, Path) and (out / "RAW.json").exists():   # raw records in git history (ADR-0055)
+        missing = [p for p in json.loads((out / "RAW.json").read_text())["raw"] if not (out / p).exists()]
+        if missing:
+            raise SystemExit(f"error: {out} keeps its raw records in git history (ADR-0055), and "
+                             f"{', '.join(missing)} are not here. Fix: python tools/run_archive.py restore {out}")
 
     if args.cmd == "freeze-prompts":
         print(json.dumps(freeze_prompts(args.instruments, args.reason), indent=2))

@@ -25,6 +25,8 @@ jobs:
         run: uv run pytest -q
       - name: Frozen instruments unchanged (amend records every change)
         run: uv run python experiments/tools/instruments.py verify experiments/m1/instruments --run
+      - name: Raw run records stay outside the tree (ADR-0055)
+        run: uv run python tools/run_archive.py check
       - name: M2's preregistration unchanged once frozen (ADR-0054)
         run: |
           if [ -f experiments/m2/FROZEN.json ]; then

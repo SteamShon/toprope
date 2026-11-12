@@ -1,7 +1,0 @@
-{
-  "draft": "library",
-  "deployed": false,
-  "request": "library:2-55694aded68b5ebc:local",
-  "refusal": "superseded: commit 2-55694aded68b5ebc is superseded by approved 3-246bb8edfc8343cd",
-  "newest_approved": "3-246bb8edfc8343cd"
-}
