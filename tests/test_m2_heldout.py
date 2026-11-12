@@ -72,3 +72,68 @@ def test_seal_refuses_a_file_inside_the_repository(tmp_path):
 def test_agents_are_denied_the_private_folder():
     deny = json.loads((ROOT / ".claude/settings.json").read_text())["permissions"]["deny"]
     assert {"Read(~/m2-private/**)", "Edit(~/m2-private/**)"} <= set(deny)
+
+
+# --- `ask`: fixed questions at a terminal (requested 2026-11-12); answers are format filler ---
+
+def _script(answers):
+    it = iter(answers)
+    return lambda prompt: next(it)
+
+
+def _ask(tmp_path, answers, notes=None, terminal=True):
+    out = []
+    a = argparse.Namespace(file=str(tmp_path / "h.yaml"), from_notes=str(notes) if notes else None)
+    ho.cmd_ask(a, ask=_script(answers), say=out.append, terminal=terminal)
+    return yaml.safe_load((tmp_path / "h.yaml").read_text()), "\n".join(out)
+
+
+def test_ask_turns_answers_into_items_that_validate(tmp_path, capsys):
+    doc, shown = _ask(tmp_path, [
+        "filler-domain",
+        "rule one", "1", "a situation", "d", "a reason", "n", "", "y",       # outcome, tacit
+        "rule two", "3", "an action", "role-a, role-b", "y", "x, y", "y",   # actors, written down
+        "rule three", "2", "a question?", "y", "n", "", "n",                # yes_no, then stop
+    ])
+    assert "무엇에 대해 쓰나" in shown and "답은 어떤 형태로" in shown          # the guide comes first
+    items = doc["items"]
+    assert [i["id"] for i in items] == ["H01", "H02", "H03"]
+    assert items[0]["answer"] == {"kind": "outcome", "expected": {"result": "denied", "reason": "a reason"}}
+    assert items[0]["tacit"] is True and items[1]["tacit"] is False
+    assert items[1]["answer"] == {"kind": "actors", "expected": ["role-a", "role-b"]}
+    assert items[2]["answer"] == {"kind": "yes_no", "expected": "yes"}
+    assert ho.problems(doc) == []
+    ho.cmd_validate(argparse.Namespace(file=str(tmp_path / "h.yaml")))
+    assert "3 items, 2 tacit" in capsys.readouterr().out
+
+
+def test_ask_saves_each_item_so_a_stop_keeps_the_work(tmp_path):
+    def answers():
+        yield from ["d", "rule one", "4", "an event", "a state", "n", "", "y", "rule two"]
+        raise KeyboardInterrupt
+    gen = answers()
+    out = []
+    ho.cmd_ask(argparse.Namespace(file=str(tmp_path / "h.yaml"), from_notes=None),
+               ask=lambda p: next(gen), say=out.append, terminal=True)
+    doc = yaml.safe_load((tmp_path / "h.yaml").read_text())
+    assert len(doc["items"]) == 1 and doc["items"][0]["answer"] == {"kind": "state", "expected": "a state"}
+    assert any("이어서" in o for o in out)
+
+
+def test_ask_from_notes_walks_the_memo_and_skips_rules_already_made(tmp_path):
+    notes = tmp_path / "rules.txt"
+    ho.cmd_notes(argparse.Namespace(file=str(notes)))
+    assert "한 줄에 규칙 하나" in notes.read_text()
+    notes.write_text(notes.read_text() + "rule one\n\nrule two\n")
+    doc, _ = _ask(tmp_path, ["d", "2", "q1?", "n", "n", "", "s"], notes=notes)     # second rule skipped
+    assert [i["rule"] for i in doc["items"]] == ["rule one"]
+    doc, shown = _ask(tmp_path, ["2", "q2?", "y", "n", ""], notes=notes)           # resume: only rule two
+    assert [i["rule"] for i in doc["items"]] == ["rule one", "rule two"] and "1개는 이미 항목" in shown
+
+
+def test_ask_runs_only_at_a_terminal_and_outside_the_repository(tmp_path):
+    with pytest.raises(SystemExit, match="only at a terminal"):
+        _ask(tmp_path, [], terminal=False)
+    with pytest.raises(SystemExit, match="inside the repository"):
+        ho.cmd_ask(argparse.Namespace(file=str(ROOT / "experiments/m2/h.yaml"), from_notes=None),
+                   ask=_script([]), say=lambda s: None, terminal=True)

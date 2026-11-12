@@ -1,5 +1,9 @@
 """M2's held-out items for ②: checked, sealed and later unsealed without an agent seeing them.
 
+  python experiments/tools/m2_heldout.py guide          # what to write about, and in what form
+  python experiments/tools/m2_heldout.py ask FILE       # answer fixed questions at a terminal; writes FILE
+  python experiments/tools/m2_heldout.py notes NOTES    # a rules memo with its guide, to fill first
+  python experiments/tools/m2_heldout.py ask FILE --from NOTES   # turn each memo line into an item
   python experiments/tools/m2_heldout.py validate FILE   # the format; prints counts and errors only
   python experiments/tools/m2_heldout.py seal FILE       # writes experiments/m2/heldout.sealed.json
   python experiments/tools/m2_heldout.py unseal FILE     # after Phase A: checks the hash, copies it in
@@ -18,9 +22,13 @@ import argparse
 import hashlib
 import json
 from datetime import UTC, datetime
+import sys
 from pathlib import Path
 
 import yaml
+
+if str(Path(__file__).resolve().parent) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 ROOT = Path(__file__).resolve().parents[2]
 M2 = ROOT / "experiments" / "m2"
@@ -145,14 +153,51 @@ def cmd_unseal(a: argparse.Namespace, sealed: Path = SEALED, into: Path = M2 / "
     print(f"unsealed {rec['items']} items into {into}; commit it with the scoring")
 
 
+def _outside(path: Path) -> Path:
+    path = path.expanduser()
+    if inside_repo(path):
+        die(f"{path} is inside the repository, where an agent or a commit could read it",
+            "keep it outside the repository, e.g. in ~/m2-private/")
+    return path
+
+
+def cmd_guide(a: argparse.Namespace) -> None:
+    from m2_heldout_ask import GUIDE
+    print(GUIDE)
+
+
+def cmd_notes(a: argparse.Namespace) -> None:
+    from m2_heldout_ask import write_notes
+    path = _outside(Path(a.file))
+    write_notes(path)
+    print(f"{path}: write one rule per line, then `ask FILE --from {path}`")
+
+
+def cmd_ask(a: argparse.Namespace, ask=input, say=print, terminal=None) -> None:
+    from m2_heldout_ask import GUIDE, Asker, at_terminal, read_notes
+    if not (at_terminal() if terminal is None else terminal):
+        die("`ask` runs only at a terminal, so that only a person answers",
+            "run it yourself in a terminal; an agent may run `validate` instead")
+    path = _outside(Path(a.file))
+    if getattr(a, "from_notes", None):
+        _outside(Path(a.from_notes))
+    say(GUIDE)
+    rules = read_notes(Path(a.from_notes)) if getattr(a, "from_notes", None) else None
+    Asker(path, ask=ask, say=say).run(rules)
+
+
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(prog="m2_heldout", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for name, f in (("validate", cmd_validate), ("seal", cmd_seal), ("unseal", cmd_unseal)):
+    for name, f in (("validate", cmd_validate), ("seal", cmd_seal), ("unseal", cmd_unseal),
+                    ("notes", cmd_notes), ("ask", cmd_ask)):
         s = sub.add_parser(name)
         s.add_argument("file")
+        if name == "ask":
+            s.add_argument("--from", dest="from_notes", help="a rules memo made with `notes`")
         s.set_defaults(f=f)
+    sub.add_parser("guide").set_defaults(f=cmd_guide)
     a = ap.parse_args(argv)
     a.f(a)
 

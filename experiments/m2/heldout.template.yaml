@@ -10,6 +10,12 @@
 # its hash enters the repository, through `m2_heldout.py seal`. Write it BEFORE the interview
 # starts, in a sitting no agent sees. Keep a backup: a lost file cannot be unsealed.
 #
+# The easier way: let a fixed-question tool write this file for you (no model involved):
+#   python experiments/tools/m2_heldout.py guide                               # what to write, in what form
+#   python experiments/tools/m2_heldout.py ask ~/m2-private/heldout.yaml       # one rule at a time
+#   python experiments/tools/m2_heldout.py notes ~/m2-private/rules.txt        # or: write rules first,
+#   python experiments/tools/m2_heldout.py ask ~/m2-private/heldout.yaml --from ~/m2-private/rules.txt
+# Or by hand:
 #   cp experiments/m2/heldout.template.yaml ~/m2-private/heldout.yaml   # then fill it
 #   python experiments/tools/m2_heldout.py validate ~/m2-private/heldout.yaml   # prints counts only
 #   python experiments/tools/m2_heldout.py seal ~/m2-private/heldout.yaml       # writes heldout.sealed.json
