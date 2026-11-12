@@ -38,33 +38,12 @@ objects:
       kind: system
       ref: uvx alpaca-mcp-server==2.4.1#/tools/29
     status: proposed
-  SymbolOr:
-    description: A SymbolOr, as the server keeps it.
-    properties: {}
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/31
-    status: proposed
   BeforeOrder:
     description: A BeforeOrder, as the server keeps it.
     properties: {}
     source:
       kind: system
       ref: uvx alpaca-mcp-server==2.4.1#/tools/32
-    status: proposed
-  SymbolOrContract:
-    description: A SymbolOrContract, as the server keeps it.
-    properties: {}
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/42
-    status: proposed
-  Watchlist:
-    description: A Watchlist, as the server keeps it.
-    properties: {}
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/46
     status: proposed
 actions:
   place_stock_order:
@@ -141,113 +120,6 @@ actions:
     source:
       kind: system
       ref: uvx alpaca-mcp-server==2.4.1#/tools/0
-    status: proposed
-  place_crypto_order:
-    description: Place a cryptocurrency order.
-    actor:
-    - unassigned
-    params:
-      symbol:
-        type: string
-        optional: false
-      side:
-        type: string
-        optional: false
-      qty:
-        type: string
-        optional: true
-      notional:
-        type: string
-        optional: true
-      type:
-        type: string
-        optional: true
-      time_in_force:
-        type: string
-        optional: true
-      limit_price:
-        type: string
-        optional: true
-      stop_price:
-        type: string
-        optional: true
-    target: ClientOrder
-    effects:
-    - call: mcp:place_crypto_order
-      with:
-        client_order_id: target.id
-        symbol: params.symbol
-        side: params.side
-        qty: params.qty
-        notional: params.notional
-        type: params.type
-        time_in_force: params.time_in_force
-        limit_price: params.limit_price
-        stop_price: params.stop_price
-      reply: record_place_crypto_order
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/1
-    status: proposed
-  place_option_order:
-    description: 'Place an options order (single-leg or multi-leg).
-
-
-      For single-leg orders, provide symbol, side, and qty.
-
-      For multi-leg orders, provide qty, legs, and optionally
-
-      order_class="mleg" (auto-inferred). Symbol and side on the
-
-      parent are not needed for multi-leg.'
-    actor:
-    - unassigned
-    params:
-      qty:
-        type: string
-        optional: false
-      type:
-        type: string
-        optional: true
-      time_in_force:
-        type: string
-        optional: true
-      symbol:
-        type: string
-        optional: true
-      side:
-        type: string
-        optional: true
-      position_intent:
-        type: string
-        optional: true
-      limit_price:
-        type: string
-        optional: true
-      stop_price:
-        type: string
-        optional: true
-      order_class:
-        type: string
-        optional: true
-    target: ClientOrder
-    effects:
-    - call: mcp:place_option_order
-      with:
-        client_order_id: target.id
-        qty: params.qty
-        type: params.type
-        time_in_force: params.time_in_force
-        symbol: params.symbol
-        side: params.side
-        position_intent: params.position_intent
-        limit_price: params.limit_price
-        stop_price: params.stop_price
-        order_class: params.order_class
-      reply: record_place_option_order
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/2
     status: proposed
   get_locate:
     description: Returns a single locate request by its ID. Not available in paper
@@ -387,21 +259,6 @@ actions:
     source:
       kind: system
       ref: uvx alpaca-mcp-server==2.4.1#/tools/29
-    status: proposed
-  get_option_contract:
-    description: Retrieves a single option contract by symbol or contract ID.
-    actor:
-    - unassigned
-    params: {}
-    target: SymbolOr
-    effects:
-    - call: mcp:get_option_contract
-      with:
-        symbol_or_id: target.id
-      reply: record_get_option_contract
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/31
     status: proposed
   get_orders:
     description: Retrieves and formats orders with the specified filters.
@@ -600,126 +457,6 @@ actions:
       kind: system
       ref: uvx alpaca-mcp-server==2.4.1#/tools/41
     status: proposed
-  do_not_exercise_options_position:
-    description: Submits a do-not-exercise instruction for a held option contract.
-    actor:
-    - unassigned
-    params: {}
-    target: SymbolOrContract
-    effects:
-    - call: mcp:do_not_exercise_options_position
-      with:
-        symbol_or_contract_id: target.id
-      reply: record_do_not_exercise_options_position
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/42
-    status: proposed
-  exercise_options_position:
-    description: Exercises a held option contract, converting it into the underlying
-      asset.
-    actor:
-    - unassigned
-    params: {}
-    target: SymbolOrContract
-    effects:
-    - call: mcp:exercise_options_position
-      with:
-        symbol_or_contract_id: target.id
-      reply: record_exercise_options_position
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/43
-    status: proposed
-  get_watchlist_by_id:
-    description: Get a specific watchlist by its ID.
-    actor:
-    - unassigned
-    params: {}
-    target: Watchlist
-    effects:
-    - call: mcp:get_watchlist_by_id
-      with:
-        watchlist_id: target.id
-      reply: record_get_watchlist_by_id
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/46
-    status: proposed
-  update_watchlist_by_id:
-    description: 'Update an existing watchlist. IMPORTANT: this replaces the entire
-      watchlist. You must include the symbols parameter with the full list of desired
-      symbols, otherwise all assets will be removed.'
-    actor:
-    - unassigned
-    params:
-      name:
-        type: string
-        optional: true
-    target: Watchlist
-    effects:
-    - call: mcp:update_watchlist_by_id
-      with:
-        watchlist_id: target.id
-        name: params.name
-      reply: record_update_watchlist_by_id
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/47
-    status: proposed
-  add_asset_to_watchlist_by_id:
-    description: Add an asset by symbol to a specific watchlist.
-    actor:
-    - unassigned
-    params:
-      symbol:
-        type: string
-        optional: true
-    creates: Watchlist
-    effects:
-    - call: mcp:add_asset_to_watchlist_by_id
-      with:
-        watchlist_id: target.id
-        symbol: params.symbol
-      reply: record_add_asset_to_watchlist_by_id
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/48
-    status: proposed
-  delete_watchlist_by_id:
-    description: Delete a specific watchlist by its ID.
-    actor:
-    - unassigned
-    params: {}
-    target: Watchlist
-    effects:
-    - call: mcp:delete_watchlist_by_id
-      with:
-        watchlist_id: target.id
-      reply: record_delete_watchlist_by_id
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/49
-    status: proposed
-  remove_asset_from_watchlist_by_id:
-    description: Remove an asset by symbol from a specific watchlist.
-    actor:
-    - unassigned
-    params:
-      symbol:
-        type: string
-        optional: false
-    target: Watchlist
-    effects:
-    - call: mcp:remove_asset_from_watchlist_by_id
-      with:
-        watchlist_id: target.id
-        symbol: params.symbol
-      reply: record_remove_asset_from_watchlist_by_id
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/50
-    status: proposed
   record_place_stock_order:
     description: Record the server's answer to place_stock_order.
     actor:
@@ -735,38 +472,6 @@ actions:
     source:
       kind: system
       ref: uvx alpaca-mcp-server==2.4.1#/tools/0
-    status: proposed
-  record_place_crypto_order:
-    description: Record the server's answer to place_crypto_order.
-    actor:
-    - external:kernel
-    target: ClientOrder
-    params:
-      ok:
-        type: boolean
-    preconditions:
-    - id: place-crypto-order-done
-      check: params.ok == true
-      reason: The server did not do it (place_crypto_order).
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/1
-    status: proposed
-  record_place_option_order:
-    description: Record the server's answer to place_option_order.
-    actor:
-    - external:kernel
-    target: ClientOrder
-    params:
-      ok:
-        type: boolean
-    preconditions:
-    - id: place-option-order-done
-      check: params.ok == true
-      reason: The server did not do it (place_option_order).
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/2
     status: proposed
   record_get_locate:
     description: Record the server's answer to get_locate.
@@ -847,22 +552,6 @@ actions:
     source:
       kind: system
       ref: uvx alpaca-mcp-server==2.4.1#/tools/29
-    status: proposed
-  record_get_option_contract:
-    description: Record the server's answer to get_option_contract.
-    actor:
-    - external:kernel
-    target: SymbolOr
-    params:
-      ok:
-        type: boolean
-    preconditions:
-    - id: get-option-contract-done
-      check: params.ok == true
-      reason: The server did not do it (get_option_contract).
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/31
     status: proposed
   record_get_orders:
     description: Record the server's answer to get_orders.
@@ -975,118 +664,6 @@ actions:
     source:
       kind: system
       ref: uvx alpaca-mcp-server==2.4.1#/tools/41
-    status: proposed
-  record_do_not_exercise_options_position:
-    description: Record the server's answer to do_not_exercise_options_position.
-    actor:
-    - external:kernel
-    target: SymbolOrContract
-    params:
-      ok:
-        type: boolean
-    preconditions:
-    - id: do-not-exercise-options-position-done
-      check: params.ok == true
-      reason: The server did not do it (do_not_exercise_options_position).
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/42
-    status: proposed
-  record_exercise_options_position:
-    description: Record the server's answer to exercise_options_position.
-    actor:
-    - external:kernel
-    target: SymbolOrContract
-    params:
-      ok:
-        type: boolean
-    preconditions:
-    - id: exercise-options-position-done
-      check: params.ok == true
-      reason: The server did not do it (exercise_options_position).
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/43
-    status: proposed
-  record_get_watchlist_by_id:
-    description: Record the server's answer to get_watchlist_by_id.
-    actor:
-    - external:kernel
-    target: Watchlist
-    params:
-      ok:
-        type: boolean
-    preconditions:
-    - id: get-watchlist-by-id-done
-      check: params.ok == true
-      reason: The server did not do it (get_watchlist_by_id).
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/46
-    status: proposed
-  record_update_watchlist_by_id:
-    description: Record the server's answer to update_watchlist_by_id.
-    actor:
-    - external:kernel
-    target: Watchlist
-    params:
-      ok:
-        type: boolean
-    preconditions:
-    - id: update-watchlist-by-id-done
-      check: params.ok == true
-      reason: The server did not do it (update_watchlist_by_id).
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/47
-    status: proposed
-  record_add_asset_to_watchlist_by_id:
-    description: Record the server's answer to add_asset_to_watchlist_by_id.
-    actor:
-    - external:kernel
-    target: Watchlist
-    params:
-      ok:
-        type: boolean
-    preconditions:
-    - id: add-asset-to-watchlist-by-id-done
-      check: params.ok == true
-      reason: The server did not do it (add_asset_to_watchlist_by_id).
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/48
-    status: proposed
-  record_delete_watchlist_by_id:
-    description: Record the server's answer to delete_watchlist_by_id.
-    actor:
-    - external:kernel
-    target: Watchlist
-    params:
-      ok:
-        type: boolean
-    preconditions:
-    - id: delete-watchlist-by-id-done
-      check: params.ok == true
-      reason: The server did not do it (delete_watchlist_by_id).
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/49
-    status: proposed
-  record_remove_asset_from_watchlist_by_id:
-    description: Record the server's answer to remove_asset_from_watchlist_by_id.
-    actor:
-    - external:kernel
-    target: Watchlist
-    params:
-      ok:
-        type: boolean
-    preconditions:
-    - id: remove-asset-from-watchlist-by-id-done
-      check: params.ok == true
-      reason: The server did not do it (remove_asset_from_watchlist_by_id).
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/50
     status: proposed
 purpose:
   problem: 이 도메인은 계좌 주인을 위해서 에이전트랑 사람이 포트폴리오를 운영하는 문제를 해결하는 거야.
