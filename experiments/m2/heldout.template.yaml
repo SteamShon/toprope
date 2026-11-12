@@ -1,0 +1,41 @@
+# M2 held-out items for ②: TEMPLATE (format only). Written by the researcher alone; agents never
+# fill it, read a filled copy, or see its answers (AGENTS.md, human-only). The format was added at
+# the researcher's request (2026-11-12).
+#
+# ② is observed in M2, not judged (ADR-0054 §4): these items measure whether the model built
+# through the interview gets the researcher's tacit rules right, labelled "expert = builder".
+#
+# Where the filled copy lives: OUTSIDE the repository, e.g. ~/m2-private/heldout.yaml, next to the
+# salt. The project's .claude/settings.json denies agents' Read and Edit of ~/m2-private/**. Only
+# its hash enters the repository, through `m2_heldout.py seal`. Write it BEFORE the interview
+# starts, in a sitting no agent sees. Keep a backup: a lost file cannot be unsealed.
+#
+#   cp experiments/m2/heldout.template.yaml ~/m2-private/heldout.yaml   # then fill it
+#   python experiments/tools/m2_heldout.py validate ~/m2-private/heldout.yaml   # prints counts only
+#   python experiments/tools/m2_heldout.py seal ~/m2-private/heldout.yaml       # writes heldout.sealed.json
+#   (commit experiments/m2/heldout.sealed.json yourself; after Phase A, `unseal` it for scoring)
+#
+# What to ask: what the trading declaration can express. Who may do what, what is allowed or
+# denied and why, the resulting state, what must always hold (e.g. position limits, cash floor,
+# approval of orders). Prefer rules you hold but have written nowhere: those are what ② is about.
+# Not gold: what the Toprope kernel guarantees for every domain (it cannot be wrong), market facts,
+# or the agent's judgement about which stock to buy. Agent behavior a declaration cannot express
+# goes to the probes, not here.
+# Size: about 20 items is a suggestion; at least 12 make a number worth reporting.
+instrument: heldout
+experiment: M2
+status: draft            # draft → sealed (set by `m2_heldout.py seal`)
+domain: "<the domain's name, as the interview will name it; may be filled after Phase A starts>"
+items:
+  - id: H01              # stable id, never reused
+    question: "<a question about your investing rules, in your own words>"
+    answer:
+      kind: yes_no       # yes_no | outcome | state | actors | free_text
+      expected: "<yes|no>"
+      # outcome:    {result: allowed|denied, reason: "<why, in your terms, optional>"}
+      # state:      "<the resulting state>"
+      # actors:     ["<role or actor>", ...]   (order-insensitive)
+      # free_text:  rubric: ["<point that must be present>", ...]   (graded by a person)
+    tacit: true          # true: a rule you have not written down anywhere the agent can read
+    covers: []           # optional free labels for analysis, e.g. [position-limit, approval]
+    notes: ""
