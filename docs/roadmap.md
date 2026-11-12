@@ -149,10 +149,10 @@ migration, and its harness passes on every surface.
 
 Use the self-compiled authoring tool from M1, not the hand-built kernel, to model a
 second, everyday domain: the researcher's own investing in US stocks, on an Alpaca
-paper-trading account (ADR-0054). The researcher takes every role (expert, owner, seeder, user); a preregistered
-draw, not the researcher, decides which problems are seeded, and the key is sealed. **② is
-observed here, not judged**: it needs a domain
-expert who is not Toprope's builder (ADR-0030), so it stays untested until such a domain runs.
+paper-trading account (ADR-0054). The researcher takes every role (expert, owner, seeder,
+user); a preregistered draw, not the researcher, decides which problems are seeded, and the key
+is sealed. **② is observed here, not judged**: it needs a domain expert who is not Toprope's
+builder (ADR-0030), so it stays untested until such a domain runs.
 The held-out protocol built for M1 (`experiments/m1/interview-guide.md`, sealed validation,
 fact keys, kernel-fact exclusion) is the starting point. M2's estimate is redone in its spec
 PR, and M3 may use M2's gold only after M2's verdict is frozen.
