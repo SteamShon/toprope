@@ -1,9 +1,9 @@
-# M2: the first ① verdict, on a domain whose expert is not the builder (design draft)
+# M2: a provisional ① result, on the researcher's paper trading (design draft)
 
-Link: ① iterate safely and ② the model is right, judged here; ③ works as built. **Status: draft.**
+Link: ③ works as built, judged here; ① iterate safely, provisional; ② the model is right, observed only (ADR-0054). **Status: draft.**
 The assistant drafted this at the researcher's request, carrying M1's findings into M2's
 Phase B. The researcher decides each point and freezes it in M2's spec PR. The roadmap
-(`roadmap.md`, M2) gives the domain and the entry criterion. This draft adds only what M1 changes.
+(`roadmap.md`, M2) and ADR-0054 give the domain and the roles. This draft adds only what M1 changes.
 
 **What stays human-only.** M2 gives link verdicts, so its instruments are written by people
 (AGENTS.md):
@@ -21,7 +21,7 @@ each, in one sitting), and both ahead of the natural-language skill (0.64). The 
 share was a kind of problem no LLM review caught (M1-report). So M2 asks:
 
 > **Does the full Toprope check beat a structured spec reviewed by an LLM, in both recall and
-> precision, on changes an expert who is not the builder writes and seeds?**
+> precision, on changes whose problems a preregistered draw decides?**
 
 If it does not, Toprope's value narrows to its declaration format, and to the kinds of problem only
 the compiler catches. That is reported as such.
@@ -84,8 +84,12 @@ What changed from M1, and why:
   mark such a gap but still apply the frozen thresholds (Decision 1).
 
 ## Before the run
-1. **The expert.** The domain expert, not the builder, writes the change requests, seeds the
-   problems and keeps the key (roadmap; ADR-0034).
+1. **The roles and the isolation (ADR-0054).** The researcher takes every role. The checks are
+   frozen first. The change requests come from the diary of real use. A preregistered draw
+   decides the seeds. The key is sealed. ① is provisional and ② is observed. The broker is
+   Alpaca's paper account (US stocks), reached through its MCP server behind `toprope-proxy`.
+   ADR-0054's open questions are decided in M2's spec PR: who places an approved order, and
+   the draw's shares.
 2. **Freezing order.** The researcher freezes the probes, the verdict rules and the run protocol
    before the checks are built.
 3. **Outcome rules in the domain.** The domain declares its outcome rules, through its interview

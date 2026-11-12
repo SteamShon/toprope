@@ -9,6 +9,9 @@
 > domains; the ① verdict moves to M2, and the self domains' M1 instruments are exempt from
 > the human-only rule.
 
+> Amended by ADR-0054: M2 runs on the researcher's own paper trading, with every role the
+> researcher's. ② gets no verdict in M2, only an observation; it waits for a domain with an outside expert.
+
 ## Context
 M1 was to give verdicts on ① (iterate safely) and ② (the model is right) on Toprope's own
 self domains, with held-out gold accuracy as the primary measure of ②. Writing that gold set

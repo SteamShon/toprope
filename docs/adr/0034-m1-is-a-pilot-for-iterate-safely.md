@@ -6,6 +6,10 @@
   human-only rule), `docs/experiments/M1-self-compile.md`, the roadmap and README milestone
   table, `docs/milestones/M0a.md` (sub-PR 8's gate)
 
+> Amended by ADR-0054: in M2 the researcher writes the change requests and seeds them, with a
+> preregistered draw choosing the seeds and the key sealed. ① is a provisional result; the table
+> stays `untested` until problems seeded by someone who is not the builder confirm it.
+
 ## Context
 ADR-0030 moved ② out of M1. Its reason was that the builder's answers are not independent
 evidence about a domain the builder designed. The same reason applies to ①, M1's remaining
