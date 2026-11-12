@@ -437,13 +437,12 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    are approved, three of them low risk ([`U-f1-remeasure.md`](experiments/U-f1-remeasure.md):
    `tools/usability_baseline.py --since-commit 3c041cbd --record …`); then the researcher decides ADR-0051 §4–5 (a source's
    lifecycle as a Sources domain, its readers and extractors as that domain's kernel services).
-3. M2's spec ([`M2-spec.md`](experiments/M2-spec.md); ADR-0054), decided as recommended
-   (2026-11-12) except the grader's expert sample and model. Setup is built (#263): the
-   paper-only check (`m2_paper.py serve`, with the proxy's `pass_env`) and the draw tool
-   (`m2_draw.py`). Next the researcher makes the salt (`m2_draw.py make-salt`, outside the
-   repository), opens an Alpaca paper account, decides the grader's items and freezes the
-   preregistration (`draw.yaml` from its template, the verdict rules, the run protocol, the checks'
-   revision).
+3. M2's spec ([`M2-spec.md`](experiments/M2-spec.md); ADR-0054) and setup (#263) are in `develop`.
+   The preregistration (`experiments/m2/`: `preregistration.yaml`, `verdict-rules.yaml`, `draw.yaml`
+   with the salt's hash; the grader's expert sample: 60 flags, agreement 0.80 and kappa 0.60 per
+   item; its model after the pilot) is frozen by the researcher's human request
+   (`m2-preregistration`, #264). Then: the held-out items for ②, the interview (Phase A) and the
+   probes, on the researcher's Mac (the Alpaca keys and the salt stay there).
 4. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
 5. When a domain is shared by several people or agents (M2, or a hosted server): its event
    log moves from git to a database (`--store postgres:DSN` for a composition, one schema per

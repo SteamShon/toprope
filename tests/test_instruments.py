@@ -1,6 +1,7 @@
 """The M1 instrument validator (experiments/tools/instruments.py), on placeholder copies of
 the templates only. No gold content is written here: questions are format filler."""
 import importlib.util
+import json
 import re
 from pathlib import Path
 
@@ -171,3 +172,41 @@ def test_the_run_protocol_is_frozen_by_hash_before_any_arm_runs(tmp_path, capsys
     assert "run-protocol.md changed after freezing" in instruments.verify(d)
     assert instruments.amend(d, "run-protocol", "fewer runs, for cost") == []
     assert instruments.verify(d) == []
+
+
+# --- M2's preregistration (ADR-0054): frozen at once, through a human request ---
+
+M2 = ROOT / "experiments/m2"
+
+
+def _prereg(tmp_path):
+    for f in instruments.PREREG:
+        (tmp_path / f).write_text((M2 / f).read_text())
+    return tmp_path
+
+
+def test_freeze_prereg_sets_frozen_and_records_every_file(tmp_path):
+    d = _prereg(tmp_path)
+    assert instruments.freeze_prereg(d) == []
+    manifest = json.loads((d / "FROZEN.json").read_text())["files"]
+    assert sorted(manifest) == sorted(instruments.PREREG)
+    for f in instruments.PREREG:
+        assert yaml.safe_load((d / f).read_text())["status"] == "frozen"
+    assert instruments.verify(d) == []
+    (d / "verdict-rules.yaml").write_text((d / "verdict-rules.yaml").read_text().replace("0.80", "0.70"))
+    assert instruments.verify(d) == ["verdict-rules.yaml changed after freezing"]
+
+
+def test_freeze_prereg_refuses_the_salt_placeholder_or_a_missing_file(tmp_path):
+    d = _prereg(tmp_path)
+    (d / "draw.yaml").write_text((M2 / "draw.template.yaml").read_text())
+    assert any("salt_sha256" in e for e in instruments.freeze_prereg(d))
+    (d / "preregistration.yaml").unlink()
+    assert "missing preregistration.yaml" in instruments.freeze_prereg(d)
+
+
+def test_a_frozen_prereg_is_not_refrozen_with_other_content(tmp_path):
+    d = _prereg(tmp_path)
+    assert instruments.freeze_prereg(d) == []
+    (d / "preregistration.yaml").write_text((d / "preregistration.yaml").read_text().replace("size: 60", "size: 30"))
+    assert any("refreezing is not allowed" in e for e in instruments.freeze_prereg(d))

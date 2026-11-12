@@ -272,7 +272,10 @@ Still open, with no recommendation yet (M2-grader leaves them to the preregistra
 2. **The grader's model.** It is decided once M2's pilot shows what a second model would cost.
 
 **Freezing.** The researcher freezes the preregistration in their own commit, or through a human
-request (ADR-0039). The preregistration holds:
+request (ADR-0039). The files are `experiments/m2/preregistration.yaml`, `verdict-rules.yaml` and
+`draw.yaml`, frozen in one `freeze-prereg` step (`experiments/tools/instruments.py`). The grader's
+expert sample is in `preregistration.yaml`, as recommended: 60 of the pilot's flags, 20 per arm,
+with at least 0.80 raw agreement and a kappa of 0.60 on each checklist item. The preregistration holds:
 - the checks' revision;
 - the verdict rules;
 - the draw (the shares, the number of requests, and the salt's hash);

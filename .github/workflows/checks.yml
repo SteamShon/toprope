@@ -27,6 +27,13 @@ jobs:
         run: uv run python experiments/tools/instruments.py verify experiments/m1/instruments --run
       - name: Raw run records stay outside the tree (ADR-0055)
         run: uv run python tools/run_archive.py check
+      - name: M2's preregistration unchanged once frozen (ADR-0054)
+        run: |
+          if [ -f experiments/m2/FROZEN.json ]; then
+            uv run python experiments/tools/instruments.py verify experiments/m2
+          else
+            echo "M2's preregistration is not frozen yet"
+          fi
       - name: Self-domain logs only extend the base's (AGENTS.md, Self domains)
         if: github.event_name == 'pull_request'
         run: uv run python tools/logs_check.py --base "origin/${{ github.base_ref }}"
