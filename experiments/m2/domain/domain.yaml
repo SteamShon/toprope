@@ -3,13 +3,6 @@ version: 1
 roles:
 - unassigned
 objects:
-  ClientOrder:
-    description: A ClientOrder, as the server keeps it.
-    properties: {}
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/0
-    status: proposed
   Order:
     description: An Order, as the server keeps it.
     properties: {}
@@ -17,19 +10,24 @@ objects:
       kind: system
       ref: uvx alpaca-mcp-server==2.4.1#/tools/19
     status: proposed
-  SymbolOrAsset:
-    description: A SymbolOrAsset, as the server keeps it.
-    properties: {}
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/25
-    status: proposed
   CorporateActionAnnouncement:
     description: A CorporateActionAnnouncement, as the server keeps it.
     properties: {}
     source:
       kind: system
       ref: uvx alpaca-mcp-server==2.4.1#/tools/29
+    status: proposed
+  Asset:
+    description: An Asset, as the server keeps it.
+    properties: &id001 {}
+    source: &id002
+      kind: system
+      ref: uvx alpaca-mcp-server==2.4.1#/tools/25
+    status: proposed
+  Position:
+    description: A Position, as the server keeps it.
+    properties: *id001
+    source: *id002
     status: proposed
 actions:
   place_stock_order:
@@ -82,7 +80,7 @@ actions:
       stop_loss_limit_price:
         type: string
         optional: true
-    target: ClientOrder
+    target: Order
     effects:
     - call: mcp:place_stock_order
       with:
@@ -205,7 +203,7 @@ actions:
     actor:
     - unassigned
     params: {}
-    target: SymbolOrAsset
+    target: Asset
     effects:
     - call: mcp:get_asset
       with:
@@ -377,7 +375,7 @@ actions:
     actor:
     - unassigned
     params: {}
-    target: ClientOrder
+    target: Order
     effects:
     - call: mcp:get_order_by_client_id
       with:
@@ -392,7 +390,7 @@ actions:
     actor:
     - unassigned
     params: {}
-    target: SymbolOrAsset
+    target: Position
     effects:
     - call: mcp:get_open_position
       with:
@@ -415,7 +413,7 @@ actions:
       percentage:
         type: number
         optional: true
-    target: SymbolOrAsset
+    target: Position
     effects:
     - call: mcp:close_position
       with:
@@ -431,7 +429,7 @@ actions:
     description: Record the server's answer to place_stock_order.
     actor:
     - external:kernel
-    target: ClientOrder
+    target: Order
     params:
       ok:
         type: boolean
@@ -479,7 +477,7 @@ actions:
     description: Record the server's answer to get_asset.
     actor:
     - external:kernel
-    target: SymbolOrAsset
+    target: Asset
     params:
       ok:
         type: boolean
@@ -575,7 +573,7 @@ actions:
     description: Record the server's answer to get_order_by_client_id.
     actor:
     - external:kernel
-    target: ClientOrder
+    target: Order
     params:
       ok:
         type: boolean
@@ -591,7 +589,7 @@ actions:
     description: Record the server's answer to get_open_position.
     actor:
     - external:kernel
-    target: SymbolOrAsset
+    target: Position
     params:
       ok:
         type: boolean
@@ -607,7 +605,7 @@ actions:
     description: Record the server's answer to close_position.
     actor:
     - external:kernel
-    target: SymbolOrAsset
+    target: Position
     params:
       ok:
         type: boolean
