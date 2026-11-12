@@ -13,6 +13,7 @@ its binding names, with their own names and input schemas, and nothing else:
 The binding (YAML):
 
     upstream: {command: [python, server.py]}        # or {url: https://…/mcp}
+    # a command may add `env: {NAME: value}` and `pass_env: [SECRET]` (taken from the proxy's environment)
     tools:
       refund_order:
         action: refund                               # the declared action this tool is
@@ -32,6 +33,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import os
 import threading
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -95,6 +97,11 @@ class Binding:
         if ("command" in up) == ("url" in up):
             raise SystemExit(fixed(f"the binding {path}: `upstream` has exactly one of `command` or `url`",
                                    "give `command: [program, args…]` for stdio, or `url:` for streamable HTTP"))
+        pe = up.get("pass_env", [])
+        if not (isinstance(pe, list) and all(isinstance(x, str) and x for x in pe)) or (pe and "url" in up):
+            raise SystemExit(fixed(f"the binding {path}: `upstream.pass_env` is a list of variable names, for a `command`",
+                                   "list the names whose values the server reads from the proxy's environment, "
+                                   "e.g. `pass_env: [API_KEY]`; never write the values in the binding"))
         extra = sorted(set(map(str, data)) - {"upstream", "tools", "confirmed"})
         if extra:
             raise SystemExit(fixed(f"the binding {path} has unknown key(s) {', '.join(extra)}",
@@ -121,6 +128,22 @@ class Binding:
                                        "name the argument that identifies the object"))
             tools[str(name)] = tb
         return cls(up, tools, digest(up, data["tools"]), conf)
+
+
+def stdio_params(spec: dict[str, Any], environ: Any = None) -> Any:
+    """How to start a `command` upstream. The server gets the binding's `env`, and the value of
+    each name in `pass_env` from the proxy's own environment, so a secret is never written in the
+    binding (whose content a person confirms and git keeps)."""
+    from mcp import StdioServerParameters
+    environ = os.environ if environ is None else environ
+    cmd = [str(x) for x in spec["command"]]
+    env = {str(k): str(v) for k, v in (spec.get("env") or {}).items()}
+    missing = [n for n in spec.get("pass_env") or [] if n not in environ]
+    if missing:
+        raise SystemExit(fixed(f"the binding passes {', '.join(missing)} to the server, and the proxy's environment "
+                               "does not set it", f"set {', '.join(missing)} before starting the proxy"))
+    env.update({n: environ[n] for n in spec.get("pass_env") or []})
+    return StdioServerParameters(command=cmd[0], args=cmd[1:], env=env or None)
 
 
 class Upstream:
@@ -158,9 +181,7 @@ class Upstream:
     def open(cls, spec: dict[str, Any]) -> Upstream:
         if "url" in spec:
             return cls(str(spec["url"]))
-        from mcp import StdioServerParameters
-        cmd = [str(x) for x in spec["command"]]
-        return cls(StdioServerParameters(command=cmd[0], args=cmd[1:], env=spec.get("env")))
+        return cls(stdio_params(spec))
 
     def _run(self, coro: Any, timeout: float = 120) -> Any:
         return asyncio.run_coroutine_threadsafe(coro, self._loop).result(timeout=timeout)

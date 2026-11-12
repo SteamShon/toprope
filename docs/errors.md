@@ -463,9 +463,11 @@ to do about it. `{…}` is filled in when the error is raised.
 | Unknown or missing credentials | connect with a token the proxy's identity knows |
 | cannot read the binding {…}: {…} | give the binding's YAML file |
 | no kernel services in this proxy for {…} | call only `mcp:` tools from a declaration served by toprope-proxy |
+| the binding passes {…} to the server, and the proxy's environment does not set it | set {…} before starting the proxy |
 | the binding {…} has unknown key(s) {…} | keep only `upstream`, `tools` and the `confirmed` record `toprope-proxy --confirm-binding` writes |
 | the binding {…} needs `upstream:` and `tools:` mappings | see `toprope-proxy --help` for the binding's shape |
 | the binding {…}: `confirmed` is not a confirmation record | remove it, and let a person confirm with `toprope-proxy --confirm-binding` |
+| the binding {…}: `upstream.pass_env` is a list of variable names, for a `command` | list the names whose values the server reads from the proxy's environment, e.g. `pass_env: [API_KEY]`; never write the values in the binding |
 | the binding {…}: `upstream` has exactly one of `command` or `url` | give `command: [program, args…]` for stdio, or `url:` for streamable HTTP |
 | the binding {…}: tool {…} has unknown key(s) {…} | use only the keys {…} |
 | the binding {…}: tool {…} is either `read: true` or an `action` | bind it to a declared action, or mark it read-only |
