@@ -444,7 +444,9 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    (`m2-preregistration`, #264). Then the held-out items for ② (the template and `m2_heldout.py`, #266, with `ask`, #267: written
    outside the repository in `~/m2-private/`, which agents are denied; only the hash is committed;
    candidate rules may come from an agent's list of published principles, tagged `from-list` and
-   reported apart, ADR-0056),
+   reported apart, ADR-0056; `ask --from` labels a line marked `[from-list]` itself;
+   or `csv` makes the memo a CSV to fill in a spreadsheet, and `ask --from rules.csv` makes each row
+   with a situation an outcome item with no questions),
    then the interview (Phase A) and the probes, on the researcher's Mac (the Alpaca keys and the
    salt stay there).
 4. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.

@@ -1,6 +1,7 @@
 """experiments/tools/m2_heldout.py: M2's held-out items are checked and sealed without showing
 their content. The items here are format filler, not gold."""
 import argparse
+import csv
 import hashlib
 import importlib.util
 import json
@@ -129,6 +130,72 @@ def test_ask_from_notes_walks_the_memo_and_skips_rules_already_made(tmp_path):
     assert [i["rule"] for i in doc["items"]] == ["rule one"]
     doc, shown = _ask(tmp_path, ["2", "q2?", "y", "n", ""], notes=notes)           # resume: only rule two
     assert [i["rule"] for i in doc["items"]] == ["rule one", "rule two"] and "1개는 이미 항목" in shown
+
+
+def test_ask_labels_a_rule_from_the_list_without_asking(tmp_path):
+    # ADR-0056: a rule marked `[from-list ...]` in the memo came from an agent's list, so it is
+    # written down somewhere (tacit: false) and tagged `from-list`; ask does not ask either.
+    notes = tmp_path / "rules.txt"
+    notes.write_text("[from-list L01] rule one\nrule two\n")
+    doc, shown = _ask(tmp_path, ["d", "2", "q1?", "n",                   # listed: no tacit, no tag
+                                 "2", "q2?", "y", "n", "own"], notes=notes)
+    listed, own = doc["items"]
+    assert listed["tacit"] is False and listed["covers"] == ["from-list"]
+    assert own["tacit"] is True and own["covers"] == ["own"]
+    assert "from-list" in shown and ho.problems(doc) == []
+
+
+def test_ask_turns_a_csv_memo_into_items_without_questions(tmp_path):
+    # Requested 2026-11-12: a memo as CSV (규칙, 상황, 결과, 이유, 출처), as a spreadsheet saves it.
+    # A row with a situation is an item and nothing is asked; a row without one stays memo.
+    notes = tmp_path / "rules.csv"
+    notes.write_text("\ufeff규칙,상황,결과,이유,출처\n"
+                     'rule one,"situation one, with a comma",거부,reason one,\n'
+                     "rule two,situation two,허용,,from-list\n"
+                     "rule three left as memo,,,,\n", encoding="utf-8")
+    doc, shown = _ask(tmp_path, ["d"], notes=notes)                     # only the domain is asked
+    own, listed = doc["items"]
+    assert own["rule"] == "rule one" and own["tacit"] is True and own["covers"] == []
+    assert own["answer"] == {"kind": "outcome", "expected": {"result": "denied", "reason": "reason one"}}
+    assert "situation one, with a comma" in own["question"]
+    assert listed["tacit"] is False and listed["covers"] == ["from-list"]
+    assert listed["answer"] == {"kind": "outcome", "expected": {"result": "allowed"}}
+    assert ho.problems(doc) == [] and "1줄은 상황이 없어" in shown
+    doc, _ = _ask(tmp_path, [], notes=notes)                            # again: nothing new, nothing asked
+    assert len(doc["items"]) == 2
+
+
+def test_ask_refuses_a_csv_row_it_cannot_read_and_names_the_row(tmp_path):
+    notes = tmp_path / "rules.csv"
+    notes.write_text("규칙,상황,결과,이유,출처\nrule one,situation one,maybe,,\n", encoding="utf-8")
+    with pytest.raises(SystemExit, match="row 2"):
+        _ask(tmp_path, ["d"], notes=notes)
+    notes.write_text("rule,situation\nrule one,situation one\n", encoding="utf-8")
+    with pytest.raises(SystemExit, match="규칙,상황,결과,이유,출처"):
+        _ask(tmp_path, ["d"], notes=notes)
+
+
+def test_ask_csv_refuses_a_file_not_in_utf8_and_adds_a_repeated_rule_once(tmp_path):
+    notes = tmp_path / "rules.csv"
+    notes.write_bytes("규칙,상황,결과,이유,출처\nrule one,s,거부,,\n".encode("cp949"))
+    with pytest.raises(SystemExit, match="UTF-8"):
+        _ask(tmp_path, ["d"], notes=notes)
+    notes.write_text("규칙,상황,결과,이유,출처\nrule one,s,거부,,\nrule one,s,거부,,\n", encoding="utf-8")
+    doc, _ = _ask(tmp_path, ["d"], notes=notes)
+    assert len(doc["items"]) == 1
+
+
+def test_csv_turns_a_text_memo_into_the_csv_to_fill(tmp_path, capsys):
+    notes = tmp_path / "rules.txt"
+    notes.write_text("# a comment\nrule one\n[from-list L01] rule, two\n\n")
+    ho.cmd_csv(argparse.Namespace(file=str(notes)))
+    out = tmp_path / "rules.csv"
+    rows = list(csv.reader(out.open(encoding="utf-8-sig")))
+    assert rows == [["규칙", "상황", "결과", "이유", "출처"],
+                    ["rule one", "", "", "", ""], ["rule, two", "", "", "", "from-list"]]
+    assert "2" in capsys.readouterr().out and "rule one" not in out.name
+    with pytest.raises(SystemExit, match="exists"):
+        ho.cmd_csv(argparse.Namespace(file=str(notes)))
 
 
 def test_ask_runs_only_at_a_terminal_and_outside_the_repository(tmp_path):

@@ -4,6 +4,8 @@
   python experiments/tools/m2_heldout.py ask FILE       # answer fixed questions at a terminal; writes FILE
   python experiments/tools/m2_heldout.py notes NOTES    # a rules memo with its guide, to fill first
   python experiments/tools/m2_heldout.py ask FILE --from NOTES   # turn each memo line into an item
+  python experiments/tools/m2_heldout.py csv NOTES     # the memo as a CSV (규칙,상황,결과,이유,출처) to fill
+  python experiments/tools/m2_heldout.py ask FILE --from NOTES.csv   # each row with 상황 is an item; no questions
   python experiments/tools/m2_heldout.py validate FILE   # the format; prints counts and errors only
   python experiments/tools/m2_heldout.py seal FILE       # writes experiments/m2/heldout.sealed.json
   python experiments/tools/m2_heldout.py unseal FILE     # after Phase A: checks the hash, copies it in
@@ -173,14 +175,27 @@ def cmd_notes(a: argparse.Namespace) -> None:
     print(f"{path}: write one rule per line, then `ask FILE --from {path}`")
 
 
+def cmd_csv(a: argparse.Namespace) -> None:
+    from m2_heldout_ask import write_csv
+    notes = _outside(Path(a.file))
+    out = notes.with_suffix(".csv")
+    n = write_csv(notes, out)
+    print(f"{out}: {n} rules. Fill 상황 and 결과 (거부 or 허용) for the ones to make items, "
+          f"then `ask FILE --from {out}`")
+
+
 def cmd_ask(a: argparse.Namespace, ask=input, say=print, terminal=None) -> None:
-    from m2_heldout_ask import GUIDE, Asker, at_terminal, read_notes
+    from m2_heldout_ask import GUIDE, Asker, at_terminal, read_csv, read_notes
     if not (at_terminal() if terminal is None else terminal):
         die("`ask` runs only at a terminal, so that only a person answers",
             "run it yourself in a terminal; an agent may run `validate` instead")
     path = _outside(Path(a.file))
     if getattr(a, "from_notes", None):
         _outside(Path(a.from_notes))
+    if getattr(a, "from_notes", None) and Path(a.from_notes).suffix.lower() == ".csv":
+        rows, memo = read_csv(Path(a.from_notes))
+        Asker(path, ask=ask, say=say).run_rows(rows, memo)
+        return
     say(GUIDE)
     rules = read_notes(Path(a.from_notes)) if getattr(a, "from_notes", None) else None
     Asker(path, ask=ask, say=say).run(rules)
@@ -191,11 +206,12 @@ def main(argv: list[str] | None = None) -> None:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     for name, f in (("validate", cmd_validate), ("seal", cmd_seal), ("unseal", cmd_unseal),
-                    ("notes", cmd_notes), ("ask", cmd_ask)):
+                    ("notes", cmd_notes), ("csv", cmd_csv), ("ask", cmd_ask)):
         s = sub.add_parser(name)
         s.add_argument("file")
         if name == "ask":
-            s.add_argument("--from", dest="from_notes", help="a rules memo made with `notes`")
+            s.add_argument("--from", dest="from_notes",
+                           help="a rules memo made with `notes`, or a CSV (규칙,상황,결과,이유,출처): no questions")
         s.set_defaults(f=f)
     sub.add_parser("guide").set_defaults(f=cmd_guide)
     a = ap.parse_args(argv)
