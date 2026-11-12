@@ -18,7 +18,7 @@ Legend: ✅ done · 🟡 in part · ⬜ not started
 | M1 self-compile | ① ⑥ pilot, no verdict | ✅ | closed after the recheck ([`M1-report.md`](experiments/M1-report.md)): Toprope with its LLM review leads on recall (first run 0.84 against 0.64 NL; recheck 0.94–1.0 against 0.44–0.62, biased and a reference only); the grader's noise (0.18) moves to M2's grader redesign; six probes carried to M2's probe design; ⑥ inconclusive |
 | U usability before M2 (ADR-0049) | none (enabler) | 🟡 | the four themes' code is in `develop` (#201, #213, #218, #224); F1 baseline recorded; the targets are not measured yet. Left: F2 on ADR-0053's path, run by a newcomer the researcher finds; F1 measured again from theme 1's merge; ADR-0051 §4–5 (a Sources domain), proposed, for the researcher |
 | M0b surfaces and effects | none (enabler) | ⬜ | |
-| M2 dogfood | ③, ① provisional, ② observed | ⬜ | the researcher's own paper trading of US stocks (Alpaca), every role the researcher's (ADR-0054): the first ③ verdict; ① a provisional result (the table stays `untested`); ② only observed |
+| M2 dogfood | ③, ① provisional, ② observed | 🟡 | the researcher's own paper trading of US stocks (Alpaca), every role the researcher's (ADR-0054): the first ③ verdict; ① a provisional result (the table stays `untested`); ② only observed. Spec drafted ([`M2-spec.md`](experiments/M2-spec.md), #PRNUM), not frozen |
 | M3 shared language | ④ | ⬜ | |
 | M4 evolution | ⑤ | ⬜ | |
 | M5 handoff and release | ⑥ (partial) | ⬜ | |
@@ -437,12 +437,11 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    are approved, three of them low risk ([`U-f1-remeasure.md`](experiments/U-f1-remeasure.md):
    `tools/usability_baseline.py --since-commit 3c041cbd --record …`); then the researcher decides ADR-0051 §4–5 (a source's
    lifecycle as a Sources domain, its readers and extractors as that domain's kernel services).
-3. M2's spec, from the draft (`docs/experiments/M2-design.md`), on the researcher's paper trading
-   (ADR-0054; US stocks on an Alpaca paper account, through Alpaca's MCP server behind
-   `toprope-proxy`): the researcher decides each point and ADR-0054's open questions (who places
-   an approved order, the draw's shares), freezes the checks' revision, the verdict rules and the
-   draw (types, shares, the salt's hash); the change list comes from the diary of daily use, the
-   draw picks the seeds, and the key is sealed.
+3. M2's spec ([`M2-spec.md`](experiments/M2-spec.md), a draft; ADR-0054: US stocks on an Alpaca
+   paper account, the agent placing approved orders through `toprope-proxy`): the researcher
+   decides its drafts (the draw's shares and request count, ③'s window and use threshold, not
+   waiting for M0b, ③'s verdict rules, the grader's open items) and freezes the preregistration.
+   Then setup builds the paper-only check and the draw tool.
 4. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
 5. When a domain is shared by several people or agents (M2, or a hosted server): its event
    log moves from git to a database (`--store postgres:DSN` for a composition, one schema per

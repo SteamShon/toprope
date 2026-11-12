@@ -112,13 +112,14 @@ pipeline, project tracking, and the researcher's own stock investing. Stock inve
 ## Open questions (decided in M2's spec PR)
 Which paper-trading API to use, and how the tool reaches it, are decided in decision 1.
 
-1. **Who places an approved order.** Either the agent places it through the gated call, or the
-   researcher places it by hand. ③'s brownfield effect needs the gated call.
+1. **Who places an approved order.** Decided 2026-11-12 ("추천대로"): the agent places it,
+   through the gated call ([`M2-spec.md`](../experiments/M2-spec.md) §1).
 2. **The draw.** This covers the problem types' shares, the share of clean controls, and how
-   many change requests there are. M1 had about 20.
+   many change requests there are. M1 had about 20. Drafted in `M2-spec.md` §5.
 3. **Enough change requests.** Two weeks of a diary may hold fewer requests than Phase B needs.
-4. **Whether M2 waits for M0b.** The roadmap puts M0b first. M2's brownfield effect no longer
+   Drafted in `M2-spec.md` §4–5.
+4. **Whether M2 waits for M0b.** Drafted in `M2-spec.md` §6. The roadmap puts M0b first. M2's brownfield effect no longer
    needs M0b's GitHub adapter, but ③'s live changes call for migration plans (ADR-0018), which
    are an M0b item.
 5. **Paper only, enforced.** The rule that M2 never trades live needs a check, not only this
-   text.
+   text. Drafted in `M2-spec.md` §1.

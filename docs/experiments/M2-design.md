@@ -88,8 +88,7 @@ What changed from M1, and why:
    frozen first. The change requests come from the diary of real use. A preregistered draw
    decides the seeds. The key is sealed. ① is provisional and ② is observed. The broker is
    Alpaca's paper account (US stocks), reached through its MCP server behind `toprope-proxy`.
-   ADR-0054's open questions are decided in M2's spec PR: who places an approved order, and
-   the draw's shares.
+   The spec, with ADR-0054's open questions, is [`M2-spec.md`](M2-spec.md).
 2. **Freezing order.** The researcher freezes the probes, the verdict rules and the run protocol
    before the checks are built.
 3. **Outcome rules in the domain.** The domain declares its outcome rules, through its interview
