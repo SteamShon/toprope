@@ -29,6 +29,42 @@ objects:
     properties: *id001
     source: *id002
     status: proposed
+  Account:
+    description: An Account, as the server keeps it.
+    properties: {}
+    source: &id003
+      kind: interview
+      ref: interview/log.jsonl
+    status: proposed
+links:
+  position_account:
+    from: Position
+    to: Account
+    cardinality: many-to-one
+    required: true
+    source: *id003
+    status: proposed
+  position_asset:
+    from: Position
+    to: Asset
+    cardinality: many-to-one
+    required: true
+    source: *id003
+    status: proposed
+  order_account:
+    from: Order
+    to: Account
+    cardinality: many-to-one
+    required: true
+    source: *id003
+    status: proposed
+  order_asset:
+    from: Order
+    to: Asset
+    cardinality: many-to-one
+    required: true
+    source: *id003
+    status: proposed
 actions:
   place_stock_order:
     description: Place a stock or ETF order.
