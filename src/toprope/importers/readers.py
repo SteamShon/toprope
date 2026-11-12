@@ -81,11 +81,11 @@ class McpReader:
     annotations}]}`; a draft cites `<location>#/tools/<i>`."""
     kind = "mcp"
 
-    def read(self, location: str, profile: Profile) -> Raw:
+    def read(self, location: str, profile: Profile, server: dict | None = None) -> Raw:
         import json
 
         from ..proxy import Upstream
-        spec = upstream_spec(location)
+        spec = {**upstream_spec(location), **(server or {})}   # env, pass_env: as the binding will name them
         up = Upstream.open(spec)
         try:
             tools = [t.model_dump(mode="json", by_alias=True, exclude_none=True) for t in up.tools().values()]
