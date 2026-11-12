@@ -445,8 +445,8 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    committed by the researcher): 60 outcome items, 59 from situations an agent session drafted without
    seeing the rules and the researcher judged (`blind-situation`, ADR-0057), 1 earlier item; the file
    itself stays in `~/m2-private/` (#266, #267, #270, ADR-0056). Before the interview, the session
-   that saw the rules is moved out of agents' reach. Next:
-   then the interview (Phase A) and the probes, on the researcher's Mac (the Alpaca keys and the
+   that saw the rules is moved out of agents' reach. Next: the interview (Phase A)
+   and the probes, on the researcher's Mac (the Alpaca keys and the
    salt stay there).
 4. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
 5. When a domain is shared by several people or agents (M2, or a hosted server): its event
