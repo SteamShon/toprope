@@ -1,3 +1,0 @@
-summary: "Freeze M2's preregistration: preregistration.yaml, verdict-rules.yaml and draw.yaml in experiments/m2 (ADR-0054, M2-spec)"
-steps:
-  - freeze-prereg: experiments/m2

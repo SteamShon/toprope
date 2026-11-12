@@ -3,7 +3,7 @@
 # ("추천대로"). Frozen by the researcher's human request (freeze-prereg), before any check runs.
 instrument: verdict-rules
 experiment: M2
-status: draft
+status: frozen
 
 # ③ works as built: a verdict. Over ③'s window (preregistration.yaml), on harness-passing builds.
 factory:

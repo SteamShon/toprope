@@ -4,7 +4,7 @@
 # salt never enters the repository. Frozen by the researcher's human request (freeze-prereg).
 instrument: draw
 experiment: M2
-status: draft
+status: frozen
 requests: 20            # Phase B runs with what the diary holds, at least 12
 salt_sha256: "05b268d47f71c76c27c7cc8505f1131e72f1d29bc57d3d0f76fabe62a649807b"
 types:                  # in this order: the draw's buckets, and the fallback order
