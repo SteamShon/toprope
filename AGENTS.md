@@ -174,7 +174,7 @@ check starts enforcing a rule, and drop a rule from the text once its mistake ca
 |---|---|
 | `docs/STATUS.md` is current in every PR into `develop` or `umbrella/*` | `status` workflow (`tools/status_check.py`) |
 | A release PR follows a cleanup PR | `status` workflow (`Cleaned for release`) |
-| Tests pass on the memory and SQLite stores | `checks` workflow (`uv run pytest`) |
+| Tests pass on the memory and SQLite stores | `checks` workflow (`uv run pytest -n auto`, in parallel) |
 | A frozen instrument changes only through `amend` | `checks` workflow (`instruments.py verify --run` for M1; `instruments.py verify experiments/m2` once M2's preregistration is frozen) |
 | A workspace source points at files that exist (#91) | `Workspace.stale_sources`, tested in `checks` |
 | One line of history for the self domains (below) | `checks` workflow (`tools/logs_check.py`) |
@@ -205,7 +205,8 @@ them (#124). CI fails a PR whose head does not extend each such file of its base
 
 ## Development
 
-- `uv sync`, then `uv run pytest`.
+- `uv sync`, then `uv run pytest -n auto` (in parallel, about 5 minutes on four cores; plain
+  `uv run pytest` runs the same tests one at a time, about 17 minutes).
 - PostgreSQL tests run when `TOPROPE_PG_DSN` is set (e.g. `host=127.0.0.1 port=5432
   user=postgres dbname=postgres`); each test uses its own throwaway schema. Without it, the
   same contract tests run on the memory and SQLite stores only.

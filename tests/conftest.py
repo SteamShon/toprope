@@ -44,3 +44,21 @@ def open_store(store_kind, tmp_path):
         import psycopg
         with psycopg.connect(PG_DSN, autocommit=True) as c:
             c.execute(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
+
+
+# Under pytest-xdist (`pytest -n auto`, as CI runs it): a module whose module fixture is costly
+# goes to one worker as a whole, so the fixture is built once; every other test is scheduled on
+# its own, so the workers stay evenly loaded. `--dist loadgroup` would do the first part, but its
+# group marks do not take with the pytest this project pins.
+SHARED_FIXTURE_MODULES = ("tests/test_phase_b_probes.py",)   # the eight probe worlds, ~4 minutes
+
+
+def pytest_xdist_make_scheduler(config, log):
+    from xdist.scheduler import LoadScopeScheduling
+
+    class OneWorkerForCostlyModules(LoadScopeScheduling):
+        def _split_scope(self, nodeid: str) -> str:
+            module = nodeid.split("::", 1)[0]
+            return module if module.endswith(SHARED_FIXTURE_MODULES) else nodeid
+
+    return OneWorkerForCostlyModules(config, log)
