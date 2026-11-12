@@ -89,7 +89,10 @@ off, wrapper commands, unpinned or git-sourced servers, and a second `--binding`
    `unseal` copies the file in for scoring, but only if its hash is the sealed one.
 4. **Phase A** (the researcher). The interview, with the agent drafting and the researcher
    confirming. The declaration is approved and deployed, and the proxy's binding is confirmed.
-   The probes are written and frozen before ③'s window starts.
+   The probes are written and frozen before ③'s window starts. Where (2026-11-12, the researcher):
+   the interview and the declaration's draft run in a cloud session, which asks and drafts while
+   the researcher answers and confirms; approval, deployment and `toprope-proxy --confirm-binding`
+   run on the researcher's machine, which holds the Alpaca keys and the salt.
 5. **③'s window** (the researcher). Daily use, with the diary and the defect log (§4). Live
    changes to the declaration go through the change loop (`toprope-change`, `toprope-apply` or a
    human request).

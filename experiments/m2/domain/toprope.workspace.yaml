@@ -1,0 +1,7 @@
+# The interview's workspace (toprope-interview): the declaration, the log, the sources.
+domain: domain.yaml
+interview_log: interview/log.jsonl
+sources:
+- id: interview
+  kind: interview-log
+  path: interview/log.jsonl
