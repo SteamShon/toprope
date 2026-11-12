@@ -533,3 +533,9 @@ def test_a_failed_step_s_record_of_its_attempt_survives_the_restore(tmp_path, mo
     assert "deliver" in (ev / "idempotency.jsonl").read_text() and "deliver" in (ev / "attempts.jsonl").read_text()
     assert (ev / "events.jsonl").read_text() == '{"before": true}\n'          # undone
     assert not (tmp_path / "half-written.json").exists()
+
+
+def test_a_request_may_freeze_m2s_preregistration():
+    req = {"summary": "Freeze M2's preregistration", "steps": [{"freeze-prereg": "experiments/m2"}]}
+    assert hr.check(req) == []
+    assert hr.command(req["steps"][0])[-2:] == ["freeze-prereg", "experiments/m2"]

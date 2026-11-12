@@ -10,7 +10,8 @@ A request is a file `.toprope/requests/<id>.yaml` on a work branch:
       - run: {member: authoring, action: confirm_all_proposed, target: authoring}
 
 Steps, from a fixed set:
-- `freeze: DIR`, `freeze-binding: DIR`, `freeze-protocol: DIR`: `experiments/tools/instruments.py`
+- `freeze: DIR`, `freeze-binding: DIR`, `freeze-protocol: DIR`, `freeze-prereg: DIR` (M2's
+  preregistration): `experiments/tools/instruments.py`
 - `amend: {dir: DIR, file: FILE, reason: TEXT}`: the same, on the record
 - `run: {member, action, target, params, workspace}`: a self-domain action through `toprope-run`, as
   the approver (`--identity github`). `workspace` defaults to `toprope.<member>.workspace.yaml`;
@@ -77,7 +78,8 @@ from toprope.errors import fixed
 ROOT = Path(__file__).resolve().parents[1]
 REQUESTS = ".toprope/requests"
 APPROVAL_RUNS = ".toprope/approval-runs.jsonl"
-INSTRUMENT_STEPS = ("freeze", "freeze-binding", "freeze-protocol", "amend")
+FREEZE_STEPS = ("freeze", "freeze-binding", "freeze-protocol", "freeze-prereg")
+INSTRUMENT_STEPS = (*FREEZE_STEPS, "amend")
 COMPOSITION = "domains/toprope-self.composition.yaml"
 MADE = "$commit"                     # the commit an earlier commit_draft step of the request made
 AGAIN = ("fix the cause, then push a change to the request (the workflow leaves the steps that did not run in it), "
@@ -117,7 +119,7 @@ def check(req: object) -> list[str]:
             errors.append(f"step {i}: one of {', '.join(INSTRUMENT_STEPS)} or run")
             continue
         (kind, arg), = st.items()
-        if kind in ("freeze", "freeze-binding", "freeze-protocol"):
+        if kind in FREEZE_STEPS:
             if not isinstance(arg, str) or not arg:
                 errors.append(f"step {i}: {kind} takes the instruments directory")
         elif kind == "amend":
@@ -245,7 +247,7 @@ def commands(req: dict) -> list[list[str]]:
 def command(st: dict, made: str | None = None, identity: str = "github") -> list[str]:
     tool = [sys.executable, str(ROOT / "experiments/tools/instruments.py")]
     (kind, arg), = st.items()
-    if kind in ("freeze", "freeze-binding", "freeze-protocol"):
+    if kind in FREEZE_STEPS:
         return tool + [kind, arg]
     if kind == "amend":
         return tool + ["amend", arg["dir"], arg["file"], "--reason", arg["reason"]]

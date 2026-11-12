@@ -1,0 +1,47 @@
+# M2's preregistration (ADR-0054; docs/experiments/M2-spec.md; docs/experiments/M2-grader.md).
+# Drafted by the assistant at the researcher's request; the researcher decided the spec on
+# 2026-11-12 ("추천대로"). Frozen with verdict-rules.yaml and draw.yaml by the researcher's human
+# request (freeze-prereg), before any problem is written and before any check runs.
+# Instruments written later (held-out items, probes, change requests, key, binding, run protocol)
+# are the researcher's and are frozen in steps of their own.
+instrument: preregistration
+experiment: M2
+status: draft
+
+domain:
+  what: the researcher's own investing in US stocks                     # ADR-0054 §1
+  account: Alpaca paper trading; no live account is connected
+  broker_access: alpaca-mcp-server, pinned, behind toprope-proxy, started only by m2_paper.py serve
+  places_approved_orders: the agent, through the gated call
+
+checks_revision:
+  # The Toprope revision M2's checks run on: develop when the spec and setup were merged (#263).
+  # A later change to the checks is an amendment, reported with the run (M2-spec §3).
+  commit: 02aa14dbbe0685eae970bc4ff7aafbf352990b7b
+
+window:                                   # ③'s window (M2-spec §4)
+  min_us_trading_days: 10
+  max_us_trading_days: 30                 # it ends earlier once the diary holds `draw.yaml` requests
+  min_share_of_days_used: 0.80
+  a_day_is_used_when: approves or refuses a proposed order, reads back a fill, or checks positions against the rules
+  defect_classes: [state-permission, ux, performance, external-api, hand-edit]
+
+draw: draw.yaml                           # types, shares, request count, the salt's hash (M2-spec §5)
+
+grader:                                   # M2-grader.md, decided 2026-11-10 and 2026-11-11
+  checklist: "(a), (b), (c); seeded = (a) and ((b) or (c)); rule B as M2-grader option 4"
+  majority_of: 3                          # over answer orders (revision 1)
+  noise_limit_recall_per_arm: 0.05
+  max_revisions_before_freeze: 2
+  expert_sample:                          # the researcher labels blind, with the checklist
+    from: the pilot's flags, never M1's
+    size: 60                              # 20 per arm, drawn at random; all of an arm's flags if it has fewer
+    min_agreement_per_item: 0.80          # raw agreement with the grader, per checklist item
+    min_kappa_per_item: 0.60              # Cohen's kappa, per checklist item
+    below_minimum: the grader is revised, within the same cap of two revisions
+  model: decided after the pilot, from its cost, and recorded by amend before the main run
+
+limits_reported_with_results:             # M2-spec §8
+  - "①: one person was expert, requester and seeder; the draw chose the seeds, the wording was the researcher's; one person's diary"
+  - "②: the expert is the builder; an observation (ADR-0030)"
+  - "③: a paper account, today's surfaces; fills from the paper engine"

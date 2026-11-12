@@ -1,0 +1,42 @@
+# M2's verdict rules (docs/experiments/M2-spec.md §7; ADR-0054).
+# Drafted by the assistant at the researcher's request; decided by the researcher on 2026-11-12
+# ("추천대로"). Frozen by the researcher's human request (freeze-prereg), before any check runs.
+instrument: verdict-rules
+experiment: M2
+status: draft
+
+# ③ works as built: a verdict. Over ③'s window (preregistration.yaml), on harness-passing builds.
+factory:
+  supports:
+    state_permission_defects_max: 0        # an action allowed or denied differently from the declaration
+    hand_edits_to_generated_code_max: 0
+  weakens:
+    state_permission_defects_min: 1
+    hand_edits_to_generated_code_min: 1
+  not_judged_if:
+    trading_days_used_below: 0.80          # reported as "not enough use"
+  reported_beside:                         # do not count against ③
+    - external_api_defects                 # Alpaca's server or API
+
+# ① iterate safely: a provisional result. The claim-status table stays `untested` (ADR-0054 §4).
+# From docs/experiments/M2-design.md, unchanged.
+iterate:
+  supports:
+    toprope_recall_min: 0.80
+    toprope_precision_grouped_min: 0.70        # grouped precision is primary
+    nl_recall_gap_min: 0.20
+    structured_recall_gap_min: 0.10
+    structured_precision_grouped_gap_min: 0.0
+    median_iteration_minutes_max: 1
+  weakens:
+    structured_within: 0.0                     # no recall gain over the structured spec
+    toprope_precision_grouped_below: 0.50
+  noise:
+    gap_within_noise_is: inconclusive          # within the larger of the reviews' and the grader's noise
+  not_run_if:
+    change_requests_below: 12
+
+# ② the model is right: an observation only, labelled "expert = builder" (ADR-0054 §4). Reported:
+# held-out accuracy, accuracy over iterations, unsupported rules, human time. No thresholds.
+fidelity:
+  observation_only: true

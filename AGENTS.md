@@ -175,7 +175,7 @@ check starts enforcing a rule, and drop a rule from the text once its mistake ca
 | `docs/STATUS.md` is current in every PR into `develop` or `umbrella/*` | `status` workflow (`tools/status_check.py`) |
 | A release PR follows a cleanup PR | `status` workflow (`Cleaned for release`) |
 | Tests pass on the memory and SQLite stores | `checks` workflow (`uv run pytest`) |
-| A frozen instrument changes only through `amend` | `checks` workflow (`instruments.py verify --run`) |
+| A frozen instrument changes only through `amend` | `checks` workflow (`instruments.py verify --run` for M1; `instruments.py verify experiments/m2` once M2's preregistration is frozen) |
 | A workspace source points at files that exist (#91) | `Workspace.stale_sources`, tested in `checks` |
 | One line of history for the self domains (below) | `checks` workflow (`tools/logs_check.py`) |
 | The harness misses no invariant break TLC can reach in the modeled part of a declaration (ADR-0043) | `tla` workflow (`tools/tla_check.py`), with a seeded break it must find |
