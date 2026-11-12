@@ -442,7 +442,9 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    with the salt's hash; the grader's expert sample: 60 flags, agreement 0.80 and kappa 0.60 per
    item; its model after the pilot) is frozen by the researcher's human request
    (`m2-preregistration`, #264). Then the held-out items for ② (the template and `m2_heldout.py`, #266, with `ask`, #267: written
-   outside the repository in `~/m2-private/`, which agents are denied; only the hash is committed),
+   outside the repository in `~/m2-private/`, which agents are denied; only the hash is committed;
+   candidate rules may come from an agent's list of published principles, tagged `from-list` and
+   reported apart, ADR-0056),
    then the interview (Phase A) and the probes, on the researcher's Mac (the Alpaca keys and the
    salt stay there).
 4. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
