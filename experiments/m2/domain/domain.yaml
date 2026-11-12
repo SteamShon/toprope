@@ -13,9 +13,9 @@ objects:
   CorporateActionAnnouncement:
     description: A CorporateActionAnnouncement, as the server keeps it.
     properties: {}
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/29
+    source: &id004
+      kind: interview
+      ref: interview/log.jsonl
     status: proposed
   Asset:
     description: An Asset, as the server keeps it.
@@ -64,6 +64,20 @@ links:
     cardinality: many-to-one
     required: true
     source: *id003
+    status: proposed
+  announcement_initiating_asset:
+    from: CorporateActionAnnouncement
+    to: Asset
+    cardinality: many-to-one
+    required: true
+    source: *id004
+    status: proposed
+  announcement_target_asset:
+    from: CorporateActionAnnouncement
+    to: Asset
+    cardinality: many-to-one
+    required: false
+    source: *id004
     status: proposed
 actions:
   place_stock_order:
@@ -248,21 +262,6 @@ actions:
     source:
       kind: system
       ref: uvx alpaca-mcp-server==2.4.1#/tools/25
-    status: proposed
-  get_corporate_action_announcement:
-    description: Retrieves a single corporate action announcement by ID.
-    actor:
-    - unassigned
-    params: {}
-    target: CorporateActionAnnouncement
-    effects:
-    - call: mcp:get_corporate_action_announcement
-      with:
-        id: target.id
-      reply: record_get_corporate_action_announcement
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/29
     status: proposed
   get_orders:
     description: Retrieves and formats orders with the specified filters.
@@ -524,22 +523,6 @@ actions:
     source:
       kind: system
       ref: uvx alpaca-mcp-server==2.4.1#/tools/25
-    status: proposed
-  record_get_corporate_action_announcement:
-    description: Record the server's answer to get_corporate_action_announcement.
-    actor:
-    - external:kernel
-    target: CorporateActionAnnouncement
-    params:
-      ok:
-        type: boolean
-    preconditions:
-    - id: get-corporate-action-announcement-done
-      check: params.ok == true
-      reason: The server did not do it (get_corporate_action_announcement).
-    source:
-      kind: system
-      ref: uvx alpaca-mcp-server==2.4.1#/tools/29
     status: proposed
   record_get_orders:
     description: Record the server's answer to get_orders.
