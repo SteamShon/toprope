@@ -1,7 +1,7 @@
 # ADR-0054: M2 runs on the researcher's own paper trading, with every role the researcher's
 
 - Link: ① iterate safely, ② model is right, ③ works as built (what M2 judges) · Status: **accepted**
-  (1–6), 2026-11-11, decided by SteamShon. The researcher chose the domain, a paper-trading
+  (1–6), 2026-11-11 and 2026-11-12 (market and broker), decided by SteamShon. The researcher chose the domain, a paper-trading
   account and daily use. They chose to take every role, with seeding by a preregistered draw ("이대로
   가자"), and a provisional ① result ("잠정 결과로 해도 될 것 같아"). Drafted by the assistant.
   Open questions are listed below.
@@ -47,6 +47,17 @@ pipeline, project tracking, and the researcher's own stock investing. Stock inve
    researcher is the expert, the owner, the seeder and the user. What the domain contains
    (states, actions, rules, outcome rules) comes from the researcher's interview, not from this
    ADR. No live brokerage account is connected in M2.
+   - **Market and broker (decided 2026-11-12, "미국으로 가자").** M2 covers US stocks only, on an
+     Alpaca paper-trading account. The researcher invests in both Korean and US stocks. One
+     market keeps the API surface to one, and the rules can be written so they do not depend on
+     the market.
+   - **How the tool reaches the broker.** Through Alpaca's official MCP server
+     (`alpaca-mcp-server`), behind `toprope-proxy` (ADR-0052). That server defaults to paper
+     trading, and M2 never sets it to live.
+   - **Why not a Korean broker.** No official MCP server was found for a Korean broker's paper
+     account, only community ones. Their defects would mix into ③'s defect log.
+   - **The time difference.** US trading hours fall in the Korean night. An order proposed and
+     approved in the day waits for the open, and its fill is read back the next morning.
 2. **The human-only rule is unchanged.** M2's change requests, seeds, key, probes, binding and any
    gold set are written by the researcher. An agent drafts none of their content.
 3. **The researcher does not choose which problems to seed.** The bias ADR-0034 named comes from a
@@ -97,12 +108,8 @@ pipeline, project tracking, and the researcher's own stock investing. Stock inve
   money. ③'s finding reads "works as built on a paper account".
 
 ## Open questions (decided in M2's spec PR)
-1. **Which paper-trading API.** For example, a Korean broker's open API with a paper (모의투자)
-   account for Korean stocks, or a US broker's paper account. It follows the market the
-   researcher trades in.
-2. **How the tool reaches the broker.** The recommendation is an MCP server for the broker
-   behind `toprope-proxy` (ADR-0052), which exists today. M0b's effect adapters are not built
-   yet.
+Questions 1 and 2 (which paper-trading API, and how the tool reaches it) are decided in decision 1.
+
 3. **Who places an approved order.** Either the agent places it through the gated call, or the
    researcher places it by hand. ③'s brownfield effect needs the gated call.
 4. **The draw.** This covers the problem types' shares, the share of clean controls, and how

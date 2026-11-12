@@ -148,8 +148,8 @@ migration, and its harness passes on every surface.
 ## M2: Dogfood domain (③ judged, ① provisional, ② observed, 3–4 weeks)
 
 Use the self-compiled authoring tool from M1, not the hand-built kernel, to model a
-second, everyday domain: the researcher's own stock investing, on a paper-trading account
-(ADR-0054). The researcher takes every role (expert, owner, seeder, user); a preregistered
+second, everyday domain: the researcher's own investing in US stocks, on an Alpaca
+paper-trading account (ADR-0054). The researcher takes every role (expert, owner, seeder, user); a preregistered
 draw, not the researcher, decides which problems are seeded, and the key is sealed. **② is
 observed here, not judged**: it needs a domain
 expert who is not Toprope's builder (ADR-0030), so it stays untested until such a domain runs.

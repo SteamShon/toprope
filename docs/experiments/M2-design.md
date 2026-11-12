@@ -86,9 +86,10 @@ What changed from M1, and why:
 ## Before the run
 1. **The roles and the isolation (ADR-0054).** The researcher takes every role. The checks are
    frozen first. The change requests come from the diary of real use. A preregistered draw
-   decides the seeds. The key is sealed. ① is provisional and ② is observed. ADR-0054's open
-   questions are decided in M2's spec PR: the paper-trading API, how the tool reaches it, who
-   places an approved order, and the draw's shares.
+   decides the seeds. The key is sealed. ① is provisional and ② is observed. The broker is
+   Alpaca's paper account (US stocks), reached through its MCP server behind `toprope-proxy`.
+   ADR-0054's open questions are decided in M2's spec PR: who places an approved order, and
+   the draw's shares.
 2. **Freezing order.** The researcher freezes the probes, the verdict rules and the run protocol
    before the checks are built.
 3. **Outcome rules in the domain.** The domain declares its outcome rules, through its interview
