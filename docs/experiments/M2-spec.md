@@ -80,7 +80,9 @@ off, wrapper commands, unpinned or git-sourced servers, and a second `--binding`
      minimum agreement, and its model (M2-grader).
 3. **Held-out items for ②** (the researcher, before the interview). The researcher writes them
    alone, from `experiments/m2/heldout.template.yaml`, into a file outside the repository
-   (`~/m2-private/heldout.yaml`). The project's `.claude/settings.json` denies agents' Read and
+   (`~/m2-private/heldout.yaml`), by hand or with `m2_heldout.py ask`. `ask` puts fixed questions at a
+   terminal and involves no model; `notes` and `ask --from` turn a memo of rules into items, and
+   `guide` says what to write about and in what form. The project's `.claude/settings.json` denies agents' Read and
    Edit of `~/m2-private/**`. `experiments/tools/m2_heldout.py validate` checks the format and
    prints counts only. `seal` writes `experiments/m2/heldout.sealed.json`: the file's sha256 and
    the item ids. The researcher commits that record before the interview starts. After Phase A,

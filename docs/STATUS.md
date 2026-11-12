@@ -441,7 +441,7 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    The preregistration (`experiments/m2/`: `preregistration.yaml`, `verdict-rules.yaml`, `draw.yaml`
    with the salt's hash; the grader's expert sample: 60 flags, agreement 0.80 and kappa 0.60 per
    item; its model after the pilot) is frozen by the researcher's human request
-   (`m2-preregistration`, #264). Then the held-out items for ② (the template and `m2_heldout.py`, #266: written
+   (`m2-preregistration`, #264). Then the held-out items for ② (the template and `m2_heldout.py`, #266, with `ask`, #PRNUM: written
    outside the repository in `~/m2-private/`, which agents are denied; only the hash is committed),
    then the interview (Phase A) and the probes, on the researcher's Mac (the Alpaca keys and the
    salt stay there).
