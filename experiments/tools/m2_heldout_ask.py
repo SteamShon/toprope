@@ -152,7 +152,7 @@ class Asker:
         self.save()
         return iid
 
-    def run_rows(self, rows: list[dict], memo: int) -> int:
+    def run_rows(self, rows: list[dict], memo: int, unjudged: int = 0) -> int:
         """A CSV memo: each row with a situation is an item as written; nothing is asked."""
         if not self.doc.get("domain"):
             self.doc["domain"] = self.line("도메인 이름 (인터뷰에서 붙일 이름, 모르면 아무거나): ")
@@ -166,7 +166,7 @@ class Asker:
         for r in todo:
             self.add(r)
         self.say(f"CSV의 항목 {len(rows)}개 중 {len(rows) - len(todo)}개는 이미 있고, {len(todo)}개를 넣었습니다. "
-                 f"{memo}줄은 상황이 없어 메모로 두었습니다.")
+                 f"{memo}줄은 상황이 없어 메모로 두었습니다. {unjudged}줄은 판정이 없어(빈칸 또는 모름) 뺐습니다.")
         self.say(f"모두 {len(self.doc['items'])}개. 다 되면 validate, 그 다음 seal.")
         return len(todo)
 
@@ -204,14 +204,17 @@ class Asker:
 
 CSV_COLUMNS = ["규칙", "상황", "결과", "이유", "출처"]
 RESULTS = {"거부": "denied", "허용": "allowed"}
+UNJUDGED = {"", "모름"}
+BLIND = "blind-situation"
 
 
-def read_csv(path: Path) -> tuple[list[dict], int]:
-    """A memo saved as CSV: (the rows that are items, the number of rows left as memo).
+def read_csv(path: Path) -> tuple[list[dict], int, int]:
+    """A memo saved as CSV: (the rows that are items, rows left as memo, rows not judged).
 
     Columns 규칙, 상황, 결과 (거부 or 허용), 이유 (optional), 출처 (`from-list` for a rule picked from
-    an agent's list, ADR-0056). A row without a situation stays memo. Errors name the row, never
-    its content.
+    an agent's list, ADR-0056; `blind-situation` for a situation drafted by an agent that never saw
+    the rules, ADR-0057). A row without a situation stays memo; a row whose 결과 is empty or 모름
+    is left out. Errors name the row, never its content.
     """
     try:
         text = path.expanduser().read_text(encoding="utf-8-sig")
@@ -223,7 +226,7 @@ def read_csv(path: Path) -> tuple[list[dict], int]:
         if [c.strip() for c in (reader.fieldnames or [])][: len(CSV_COLUMNS)] != CSV_COLUMNS:
             raise SystemExit(f"error: {path}: the first row is not the header. "
                              f"Fix: make the first row {','.join(CSV_COLUMNS)}")
-        items, memo = [], 0
+        items, memo, unjudged = [], 0, 0
         for n, row in enumerate(reader, start=2):
             row = {k.strip(): (v or "").strip() for k, v in row.items() if k}
             rule, sit = row["규칙"], row["상황"]
@@ -232,15 +235,19 @@ def read_csv(path: Path) -> tuple[list[dict], int]:
             if not sit:
                 memo += 1
                 continue
+            if row["결과"] in UNJUDGED:
+                unjudged += 1
+                continue
             if row["결과"] not in RESULTS:
-                raise SystemExit(f"error: {path}: row {n}: 결과 is not 거부 or 허용. Fix: write 거부 or 허용 in 결과")
+                raise SystemExit(f"error: {path}: row {n}: 결과 is not 거부, 허용 or 모름. Fix: write 거부, 허용 or 모름 in 결과")
             listed = row["출처"] == FROM_LIST or from_list(rule)
+            covers = [FROM_LIST] if listed else [BLIND] if row["출처"] == BLIND else []
             exp = {"result": RESULTS[row["결과"]], **({"reason": row["이유"]} if row["이유"] else {})}
             items.append({"question": f"상황: {sit} → 허용되나, 거부되나?",
                           "answer": {"kind": "outcome", "expected": exp},
-                          "tacit": not listed, "covers": [FROM_LIST] if listed else [],
+                          "tacit": not listed, "covers": covers,
                           "rule": rule, "rule_key": rule_key(rule)})
-        return items, memo
+        return items, memo, unjudged
 
 
 def write_csv(notes: Path, out: Path) -> int:

@@ -446,7 +446,8 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    candidate rules may come from an agent's list of published principles, tagged `from-list` and
    reported apart, ADR-0056; `ask --from` labels a line marked `[from-list]` itself;
    or `csv` makes the memo a CSV to fill in a spreadsheet, and `ask --from rules.csv` makes each row
-   with a situation an outcome item with no questions),
+   with a situation an outcome item with no questions; situations may be drafted by an agent session
+   that never saw the rules and judged by the researcher, 모름 left out, tagged `blind-situation`, ADR-0057),
    then the interview (Phase A) and the probes, on the researcher's Mac (the Alpaca keys and the
    salt stay there).
 4. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.

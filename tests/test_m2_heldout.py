@@ -185,6 +185,21 @@ def test_ask_csv_refuses_a_file_not_in_utf8_and_adds_a_repeated_rule_once(tmp_pa
     assert len(doc["items"]) == 1
 
 
+def test_ask_csv_takes_blind_situations_judged_by_the_researcher(tmp_path):
+    # ADR-0057: an agent that never saw the rules drafts situations (출처 blind-situation); the
+    # researcher only judges each one. 모름 or an empty 결과 leaves the row out of the items.
+    notes = tmp_path / "situations.csv"
+    notes.write_text("규칙,상황,결과,이유,출처\n"
+                     "S01,situation one,거부,,blind-situation\n"
+                     "S02,situation two,모름,,blind-situation\n"
+                     "S03,situation three,,,blind-situation\n", encoding="utf-8")
+    doc, shown = _ask(tmp_path, ["d"], notes=notes)
+    (item,) = doc["items"]
+    assert item["rule"] == "S01" and item["covers"] == ["blind-situation"] and item["tacit"] is True
+    assert item["answer"] == {"kind": "outcome", "expected": {"result": "denied"}}
+    assert ho.problems(doc) == [] and "2줄은 판정이 없어" in shown
+
+
 def test_csv_turns_a_text_memo_into_the_csv_to_fill(tmp_path, capsys):
     notes = tmp_path / "rules.txt"
     notes.write_text("# a comment\nrule one\n[from-list L01] rule, two\n\n")

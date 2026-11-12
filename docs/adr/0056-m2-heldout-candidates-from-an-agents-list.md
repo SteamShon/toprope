@@ -49,6 +49,9 @@ Two risks were weighed:
    - The probes, change requests, seeds, key, binding and any gold set for M2 and later.
    - The held-out items' questions and answers. Only the list of candidate rules is affected.
 
+> Amended by ADR-0057: the situations of held-out items may be drafted by an agent session that
+> never saw the rules; the researcher judges each one, so the answers stay human-only.
+
 ## Consequences
 - The researcher saves research time. ② still has a number that rests on rules no agent
   suggested.

@@ -129,7 +129,9 @@ state; they link here. The README claim-status table stays in the README, becaus
   runs. Everything that feeds a link verdict (M2 and later instruments, any gold set) stays
   human-only, with one exception: for M2's held-out items, an agent may draft a list of
   candidate rules from published sources when the researcher asks. The researcher picks and
-  rewrites the rules, and each item from the list is labelled `from-list` (ADR-0056).
+  rewrites the rules, and each item from the list is labelled `from-list` (ADR-0056). An agent
+  session that never saw the rules may draft the items' situations; the researcher judges each
+  one, so every answer stays the researcher's (ADR-0057).
 - **Freezing and amending.** The researcher freezes an instrument, or tells an agent to, and
   the commit records that instruction. From a cloud session, the agent writes the steps as a
   human request (`.toprope/requests/<id>.yaml`) and the researcher approves its run in GitHub;

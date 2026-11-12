@@ -193,8 +193,8 @@ def cmd_ask(a: argparse.Namespace, ask=input, say=print, terminal=None) -> None:
     if getattr(a, "from_notes", None):
         _outside(Path(a.from_notes))
     if getattr(a, "from_notes", None) and Path(a.from_notes).suffix.lower() == ".csv":
-        rows, memo = read_csv(Path(a.from_notes))
-        Asker(path, ask=ask, say=say).run_rows(rows, memo)
+        rows, memo, unjudged = read_csv(Path(a.from_notes))
+        Asker(path, ask=ask, say=say).run_rows(rows, memo, unjudged)
         return
     say(GUIDE)
     rules = read_notes(Path(a.from_notes)) if getattr(a, "from_notes", None) else None
