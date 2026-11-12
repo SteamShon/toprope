@@ -1,25 +1,26 @@
-# M2: the spec, on the researcher's paper trading (draft)
+# M2: the spec, on the researcher's paper trading
 
 Link: ③ works as built, judged; ① iterate safely, a provisional result; ② the model is right,
-observed only (ADR-0054). **Status: draft.** The assistant drafted this at the researcher's request
-("M2 스펙 PR 초안 작성해줘", 2026-11-12). Each point marked **decided** was decided by the researcher.
-Each point marked **draft** is the researcher's to change, and is frozen in the preregistration
-(*Freezing order*). Progress is in [`STATUS.md`](../STATUS.md).
+observed only (ADR-0054). **Status: decided, not frozen.** The assistant drafted this at the
+researcher's request ("M2 스펙 PR 초안 작성해줘", 2026-11-12), and the researcher decided every
+draft as recommended ("추천대로", 2026-11-12), except the grader's open items (§10). The values
+below are frozen in the preregistration (§3, step 2) before any check runs. Until then the
+researcher may still change them. Progress is in [`STATUS.md`](../STATUS.md).
 
 Builds on:
 - [`M2-design.md`](M2-design.md): the arms, the measures and the draft verdict rules;
 - [`M2-grader.md`](M2-grader.md): the grader, as decided and validated;
 - ADR-0054: the domain, the roles and the isolation.
 
-**What this draft does not hold.** M2's instruments are human-only (AGENTS.md), and this draft
+**What this spec does not hold.** M2's instruments are human-only (AGENTS.md), and this spec
 holds none of their content. They are written by the researcher:
 - the change requests, the seeds and the key;
 - the probes;
 - the experiment's binding;
 - the held-out items for ②.
 
-Where this draft proposes verdict rules, thresholds or the draw's shares, they are drafts. The
-researcher reviews and freezes them before the checks run.
+The verdict rules, thresholds and the draw's shares were drafted by the assistant and decided by
+the researcher. The researcher freezes them before the checks run.
 
 ## 1. The domain and its system
 
@@ -35,7 +36,7 @@ What the domain contains (its states, actions, rules and outcome rules) is not s
 from the interview.
 
 ### Paper only, enforced (ADR-0054, open question 5)
-A rule in a document is skipped by the first agent that does not read it (AGENTS.md). **Draft:** a
+A rule in a document is skipped by the first agent that does not read it (AGENTS.md). **Decided:** a
 check refuses to start M2's proxy unless all of these hold:
 - the upstream's environment sets `ALPACA_PAPER_TRADE` to true, and does not set it to false;
 - the binding names the paper server only;
@@ -88,7 +89,7 @@ instrument).
 
 ## 4. ③'s window and the diary
 
-- **Length** (ADR-0054, open question 3), **draft:**
+- **Length** (ADR-0054, open question 3), **decided:**
   - at least 10 US trading days (two weeks);
   - it ends once the diary holds the number of change requests the draw needs (§5), or after 30
     trading days, whichever comes first.
@@ -97,7 +98,7 @@ instrument).
   - reads back a fill;
   - checks the positions against the rules.
 
-  A missed day is recorded, not made up later. **Draft:** ③ needs at least 80% of the window's
+  A missed day is recorded, not made up later. **Decided:** ③ needs at least 80% of the window's
   trading days used.
 - **The time difference.** An order proposed and approved in the Korean daytime waits for the US
   open. Its fill, part fill or cancellation is read back the next morning. That reading-back is
@@ -131,7 +132,7 @@ instrument).
   and are sealed with it.
 - After scoring, the salt is published, and `m2_draw.py verify` recomputes every draw.
 
-**Types and shares** (ADR-0054, open question 2), **draft:**
+**Types and shares** (ADR-0054, open question 2), **decided:**
 
 | Type | Share | What the researcher writes into the request |
 |---|---|---|
@@ -142,7 +143,7 @@ instrument).
 | breaks an outcome rule | 0.20 | a change after which some path reaches a guarded outcome without its check |
 
 - The clean controls give precision a base. M1 had none by design.
-- **The number of requests**, draft: 20, the same as M1. Phase B runs with what the diary holds
+- **The number of requests**, decided: 20, the same as M1. Phase B runs with what the diary holds
   at the window's end, with at least 12. Below 12, Phase B is not run, and ① is reported as "not
   enough changes".
 - **A drawn type that cannot be written into a request.** For example, there may be no outcome
@@ -152,7 +153,7 @@ instrument).
 
 ## 6. Does M2 wait for M0b? (ADR-0054, open question 4)
 
-**Draft recommendation: no.**
+**Decided: no.**
 - M2 runs on the surfaces that exist today:
   - `toprope-run`;
   - the generated MCP server;
@@ -163,7 +164,7 @@ instrument).
   If that is not enough, it is logged as a defect of class "needs migration", not fixed by hand.
 - ③'s finding then reads "works as built on today's surfaces, without a generated UI".
 
-## 7. Verdict rules (draft)
+## 7. Verdict rules (decided, frozen in the preregistration)
 
 ```yaml
 # ③ (verdict). Over ③'s window, with at least 80% of trading days used.
@@ -224,11 +225,21 @@ it.
 
 ## 10. Decisions left for the researcher
 
-1. The draw's shares and the number of requests (§5).
-2. ③'s window length and the 80% use threshold (§4).
-3. Not waiting for M0b (§6).
-4. ③'s verdict rules (§7), and whether ①'s rules stay as M2-design drafted them.
-5. The grader items left to the preregistration: the expert sample's size and minimum agreement,
-   and the grader's model (M2-grader).
+Decided on 2026-11-12 ("추천대로"): the draw's shares and the number of requests (§5), ③'s window
+and its 80% use threshold (§4), not waiting for M0b (§6), and the verdict rules (§7). ①'s rules
+stay as M2-design drafted them.
 
-Then the researcher freezes them, in their own commit or through a human request.
+Still open, with no recommendation yet (M2-grader leaves them to the preregistration):
+1. **The expert sample.** Its size, and the grader's minimum agreement with the researcher's blind
+   labels on it.
+2. **The grader's model.** It is decided once M2's pilot shows what a second model would cost.
+
+**Freezing.** The researcher freezes the preregistration in their own commit, or through a human
+request (ADR-0039). The preregistration holds:
+- the checks' revision;
+- the verdict rules;
+- the draw (the shares, the number of requests, and the salt's hash);
+- the run protocol;
+- the grader's items.
+
+The salt is made on the researcher's machine, and only its hash is committed.
