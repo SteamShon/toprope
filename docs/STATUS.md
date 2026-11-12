@@ -441,7 +441,7 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    The preregistration (`experiments/m2/`: `preregistration.yaml`, `verdict-rules.yaml`, `draw.yaml`
    with the salt's hash; the grader's expert sample: 60 flags, agreement 0.80 and kappa 0.60 per
    item; its model after the pilot) is frozen by the researcher's human request
-   (`m2-preregistration`, #PRNUM). Then: the held-out items for ②, the interview (Phase A) and the
+   (`m2-preregistration`, #264). Then: the held-out items for ②, the interview (Phase A) and the
    probes, on the researcher's Mac (the Alpaca keys and the salt stay there).
 4. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
 5. When a domain is shared by several people or agents (M2, or a hosted server): its event
