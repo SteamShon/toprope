@@ -440,9 +440,9 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
 3. M2's spec, from the draft (`docs/experiments/M2-design.md`), on the researcher's paper trading
    (ADR-0054; US stocks on an Alpaca paper account, through Alpaca's MCP server behind
    `toprope-proxy`): the researcher decides each point and ADR-0054's open questions (who places
-   an approved order, the draw's shares), freezes the
-   checks' revision, the verdict rules and the draw (types, shares, the salt's hash); the change
-   list comes from the diary of daily use, the draw picks the seeds, and the key is sealed.
+   an approved order, the draw's shares), freezes the checks' revision, the verdict rules and the
+   draw (types, shares, the salt's hash); the change list comes from the diary of daily use, the
+   draw picks the seeds, and the key is sealed.
 4. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
 5. When a domain is shared by several people or agents (M2, or a hosted server): its event
    log moves from git to a database (`--store postgres:DSN` for a composition, one schema per
