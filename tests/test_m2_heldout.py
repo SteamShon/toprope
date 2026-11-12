@@ -131,6 +131,19 @@ def test_ask_from_notes_walks_the_memo_and_skips_rules_already_made(tmp_path):
     assert [i["rule"] for i in doc["items"]] == ["rule one", "rule two"] and "1개는 이미 항목" in shown
 
 
+def test_ask_labels_a_rule_from_the_list_without_asking(tmp_path):
+    # ADR-0056: a rule marked `[from-list ...]` in the memo came from an agent's list, so it is
+    # written down somewhere (tacit: false) and tagged `from-list`; ask does not ask either.
+    notes = tmp_path / "rules.txt"
+    notes.write_text("[from-list L01] rule one\nrule two\n")
+    doc, shown = _ask(tmp_path, ["d", "2", "q1?", "n",                   # listed: no tacit, no tag
+                                 "2", "q2?", "y", "n", "own"], notes=notes)
+    listed, own = doc["items"]
+    assert listed["tacit"] is False and listed["covers"] == ["from-list"]
+    assert own["tacit"] is True and own["covers"] == ["own"]
+    assert "from-list" in shown and ho.problems(doc) == []
+
+
 def test_ask_runs_only_at_a_terminal_and_outside_the_repository(tmp_path):
     with pytest.raises(SystemExit, match="only at a terminal"):
         _ask(tmp_path, [], terminal=False)

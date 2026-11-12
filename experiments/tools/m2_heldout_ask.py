@@ -54,12 +54,21 @@ NOTES_GUIDE = """\
 # 내 규칙 메모 (M2 held-out 항목의 재료). 저장소 밖에 두세요. 에이전트에게 보여 주지 마세요.
 # 한 줄에 규칙 하나, 평소 말투로. 숫자는 숫자 그대로. 예외는 따로 한 줄.
 # '#'로 시작하는 줄은 메모로 보고 건너뜁니다. 빈 줄도 건너뜁니다.
+# 에이전트의 후보 목록에서 고른 규칙은 줄 앞에 [from-list]를 붙이세요 (ADR-0056): 묻지 않고 tacit false, 꼬리표 from-list.
 # 떠올리기: 승인 없이 하면 안 되는 일 / 숫자 한도 / 순서·시점 / 예외 / 취소·정정 / 끝난 뒤 상태 / 절대 깨지면 안 되는 것
 # 예시(빵집, 형식만): 웨딩 케이크는 점장이 확인해야 받는다
 #                    주문 취소는 픽업 48시간 전까지만 된다
 """
 
 KINDS = {"1": "outcome", "2": "yes_no", "3": "actors", "4": "state", "5": "free_text"}
+
+
+FROM_LIST = "from-list"
+
+
+def from_list(rule: str) -> bool:
+    """A memo line marked `[from-list ...]` came from an agent's list of candidates (ADR-0056)."""
+    return rule.lstrip().startswith(f"[{FROM_LIST}")
 
 
 def rule_key(rule: str) -> str:
@@ -122,8 +131,13 @@ class Asker:
             q = self.line("질문: ")
             pts = [p.strip() for p in self.line("꼭 들어가야 할 요점 (쉼표로): ").split(",") if p.strip()]
             ans = {"kind": kind, "rubric": pts}
-        tacit = self.choice("이 규칙, 에이전트가 읽을 수 있는 곳에 적어 둔 적 있나요?  y) 있음  n) 없음: ", "yn") == "n"
-        covers = [c.strip() for c in self.line("꼬리표 (선택, 쉼표로, 비워도 됨): ", allow_empty=True).split(",") if c.strip()]
+        if from_list(rule):
+            # ADR-0056: it came from an agent's list, so it is written down and tagged; not asked.
+            tacit, covers = False, [FROM_LIST]
+            self.say(f"목록에서 온 규칙: tacit false, 꼬리표 {FROM_LIST} (ADR-0056).")
+        else:
+            tacit = self.choice("이 규칙, 에이전트가 읽을 수 있는 곳에 적어 둔 적 있나요?  y) 있음  n) 없음: ", "yn") == "n"
+            covers = [c.strip() for c in self.line("꼬리표 (선택, 쉼표로, 비워도 됨): ", allow_empty=True).split(",") if c.strip()]
         return {"question": q, "answer": ans, "tacit": tacit, "covers": covers, "rule": rule, "rule_key": rule_key(rule)}
 
     def add(self, it: dict) -> str:
