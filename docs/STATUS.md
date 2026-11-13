@@ -447,7 +447,7 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    itself stays in `~/m2-private/` (#266, #267, #270, ADR-0056). Before the interview, the session
    that saw the rules is moved out of agents' reach. `toprope-proxy` binds a tool with no object argument to
    one object (`target_value`), and reads numbers sent as text where a tool says so (`text_numbers`), for
-   Alpaca's account and positions (#PR); an amendment to M2's frozen checks. Next: the interview (Phase A)
+   Alpaca's account and positions (#275); an amendment to M2's frozen checks. Next: the interview (Phase A)
    and the probes, on the researcher's Mac (the Alpaca keys and the
    salt stay there).
 4. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
