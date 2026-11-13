@@ -9,6 +9,7 @@ objects:
     properties:
       status:
         enum:
+        - draft
         - proposed
         - approved
         - declined
@@ -40,10 +41,10 @@ objects:
         type: string
         optional: true
       qty:
-        type: string
+        type: number
         optional: true
       notional:
-        type: string
+        type: number
         optional: true
       type:
         type: string
@@ -52,7 +53,7 @@ objects:
         type: string
         optional: true
       limit_price:
-        type: string
+        type: number
         optional: true
       stop_price:
         type: string
@@ -148,7 +149,7 @@ objects:
         type: string
         optional: true
       qty:
-        type: string
+        type: number
         optional: true
       avg_entry_price:
         type: string
@@ -159,6 +160,9 @@ objects:
       unrealized_pl:
         type: string
         optional: true
+      refreshed_at:
+        type: datetime
+        optional: true
     source:
       kind: interview
       ref: interview:interview/log.jsonl#L8
@@ -166,7 +170,16 @@ objects:
     status: proposed
   Account:
     description: An Account, as the server keeps it.
-    properties: {}
+    properties:
+      status:
+        enum:
+        - ACTIVE
+      equity:
+        type: number
+        optional: true
+      refreshed_at:
+        type: datetime
+        optional: true
     source:
       kind: interview
       ref: interview/log.jsonl
@@ -225,6 +238,16 @@ links:
     source:
       kind: interview
       ref: interview/log.jsonl
+    status: proposed
+  order_position:
+    from: Order
+    to: Position
+    cardinality: many-to-one
+    required: false
+    source:
+      kind: interview
+      ref: interview/log.jsonl
+      quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
     status: proposed
 actions:
   place_stock_order:
@@ -378,8 +401,8 @@ actions:
   propose_order:
     actor:
     - unassigned
-    description: Propose a stock or ETF order; nothing is sent to Alpaca until a person
-      approves it.
+    description: Draft a stock or ETF order; it is checked when it is submitted as
+      a proposal, and nothing is sent to Alpaca until a person approves it.
     creates: Order
     params:
       symbol:
@@ -389,10 +412,10 @@ actions:
         type: string
         optional: false
       qty:
-        type: string
+        type: number
         optional: true
       notional:
-        type: string
+        type: number
         optional: true
       type:
         type: string
@@ -401,7 +424,7 @@ actions:
         type: string
         optional: true
       limit_price:
-        type: string
+        type: number
         optional: true
       stop_price:
         type: string
@@ -427,6 +450,13 @@ actions:
       stop_loss_limit_price:
         type: string
         optional: true
+      account:
+        ref: Account
+      asset:
+        ref: Asset
+      position:
+        ref: Position
+        optional: true
     effects:
     - set:
         target.symbol: params.symbol
@@ -444,6 +474,9 @@ actions:
         target.take_profit_limit_price: params.take_profit_limit_price
         target.stop_loss_stop_price: params.stop_loss_stop_price
         target.stop_loss_limit_price: params.stop_loss_limit_price
+        target.order_account: params.account
+        target.order_asset: params.asset
+        target.order_position: params.position
     source:
       kind: interview
       ref: interview/log.jsonl
@@ -621,6 +654,133 @@ actions:
       ref: interview/log.jsonl
       quote: '1'
     status: proposed
+  submit_proposal:
+    actor:
+    - unassigned
+    description: Submit a drafted order as a proposal, within the limits.
+    target: Order
+    preconditions:
+    - id: sell-within-80-percent-of-the-position
+      check: target.side != 'sell' or target.qty * 100 <= target.order_position.qty
+        * 80 or 'account_owner' in actor.roles
+      reason: A sell over 80% of the position's shares is proposed by the account
+        owner only.
+      source:
+        kind: interview
+        ref: interview/log.jsonl
+        quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+      status: proposed
+    - id: buy-within-half-the-account
+      check: target.side != 'buy' or (exists(target.notional) and target.notional
+        * 2 <= target.order_account.equity) or (exists(target.limit_price) and exists(target.qty)
+        and target.qty * target.limit_price * 2 <= target.order_account.equity)
+      reason: A buy over 50% of the account's value is refused; a buy without notional
+        or limit_price cannot be checked and is refused too.
+      source:
+        kind: interview
+        ref: interview/log.jsonl
+        quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+      status: proposed
+    - id: position-refreshed-today
+      check: target.side != 'sell' or days_since(target.order_position.refreshed_at)
+        == 0
+      reason: Refresh the position today before proposing a sell.
+      source:
+        kind: interview
+        ref: interview/log.jsonl
+        quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+      status: proposed
+    - id: account-refreshed-today
+      check: target.side != 'buy' or days_since(target.order_account.refreshed_at)
+        == 0
+      reason: Refresh the account today before proposing a buy.
+      source:
+        kind: interview
+        ref: interview/log.jsonl
+        quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+      status: proposed
+    source:
+      kind: interview
+      ref: interview/log.jsonl
+      quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+    status: proposed
+  refresh_position:
+    actor:
+    - unassigned
+    description: Read a position from Alpaca and record its shares.
+    target: Position
+    effects:
+    - call: mcp:get_open_position
+      with:
+        symbol_or_asset_id: target.id
+      reply: record_refresh_position
+    source:
+      kind: interview
+      ref: interview/log.jsonl
+      quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+    status: proposed
+  record_refresh_position:
+    actor:
+    - external:kernel
+    description: Record the position Alpaca returned.
+    target: Position
+    params:
+      ok:
+        type: boolean
+      qty:
+        type: number
+        optional: true
+    preconditions:
+    - id: refresh-position-done
+      check: params.ok == true
+      reason: Alpaca did not return the position.
+    effects:
+    - set:
+        target.qty: params.qty
+        target.refreshed_at: now()
+    source:
+      kind: interview
+      ref: interview/log.jsonl
+      quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+    status: proposed
+  refresh_account:
+    actor:
+    - unassigned
+    description: Read the account from Alpaca and record its value.
+    target: Account
+    effects:
+    - call: mcp:get_account_info
+      with: {}
+      reply: record_refresh_account
+    source:
+      kind: interview
+      ref: interview/log.jsonl
+      quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+    status: proposed
+  record_refresh_account:
+    actor:
+    - external:kernel
+    description: Record the account Alpaca returned.
+    target: Account
+    params:
+      ok:
+        type: boolean
+      equity:
+        type: number
+        optional: true
+    preconditions:
+    - id: refresh-account-done
+      check: params.ok == true
+      reason: Alpaca did not return the account.
+    effects:
+    - set:
+        target.equity: params.equity
+        target.refreshed_at: now()
+    source:
+      kind: interview
+      ref: interview/log.jsonl
+      quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+    status: proposed
 purpose:
   problem: 이 도메인은 계좌 주인을 위해서 에이전트랑 사람이 포트폴리오를 운영하는 문제를 해결하는 거야.
   success_metric:
@@ -630,8 +790,96 @@ purpose:
 transitions:
   Order:
     field: status
-    initial: proposed
+    initial: draft
     matrix:
+      draft:
+        submit_proposal:
+          to: proposed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
+        approve_order:
+          deny: 초안은 먼저 제안으로 제출해야 합니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
+        decline_order:
+          deny: 초안은 먼저 제안으로 제출해야 합니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
+        place_stock_order:
+          deny: 초안은 먼저 제안으로 제출해야 합니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
+        propose_cancel:
+          deny: 초안은 먼저 제안으로 제출해야 합니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
+        approve_cancel:
+          deny: 초안은 먼저 제안으로 제출해야 합니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
+        decline_cancel:
+          deny: 초안은 먼저 제안으로 제출해야 합니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
+        cancel_order_by_id:
+          deny: 초안은 먼저 제안으로 제출해야 합니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
+        propose_replace:
+          deny: 초안은 먼저 제안으로 제출해야 합니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
+        approve_replace:
+          deny: 초안은 먼저 제안으로 제출해야 합니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
+        decline_replace:
+          deny: 초안은 먼저 제안으로 제출해야 합니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
+        replace_order_by_id:
+          deny: 초안은 먼저 제안으로 제출해야 합니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
+        record_place_stock_order: n/a
+        record_cancel_order_by_id: n/a
+        record_replace_order_by_id: n/a
       proposed:
         approve_order:
           to: approved
@@ -713,6 +961,13 @@ transitions:
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
+        submit_proposal:
+          deny: 제출할 주문 초안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
       approved:
         approve_order:
           deny: 승인할 주문 제안이 아닙니다.
@@ -794,6 +1049,13 @@ transitions:
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
+        submit_proposal:
+          deny: 제출할 주문 초안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
       declined:
         approve_order:
           deny: 승인할 주문 제안이 아닙니다.
@@ -875,6 +1137,13 @@ transitions:
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
+        submit_proposal:
+          deny: 제출할 주문 초안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
       cancel_proposed:
         approve_order:
           deny: 승인할 주문 제안이 아닙니다.
@@ -956,6 +1225,13 @@ transitions:
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
+        submit_proposal:
+          deny: 제출할 주문 초안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
       cancel_approved:
         approve_order:
           deny: 승인할 주문 제안이 아닙니다.
@@ -1037,6 +1313,13 @@ transitions:
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
+        submit_proposal:
+          deny: 제출할 주문 초안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
       replace_proposed:
         approve_order:
           deny: 승인할 주문 제안이 아닙니다.
@@ -1118,6 +1401,13 @@ transitions:
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
+        submit_proposal:
+          deny: 제출할 주문 초안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
       replace_approved:
         approve_order:
           deny: 승인할 주문 제안이 아닙니다.
@@ -1199,6 +1489,13 @@ transitions:
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
+        submit_proposal:
+          deny: 제출할 주문 초안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
       pending_new:
         approve_order:
           deny: 승인할 주문 제안이 아닙니다.
@@ -1280,6 +1577,13 @@ transitions:
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
+        submit_proposal:
+          deny: 제출할 주문 초안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
       accepted:
         approve_order:
           deny: 승인할 주문 제안이 아닙니다.
@@ -1361,6 +1665,13 @@ transitions:
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
+        submit_proposal:
+          deny: 제출할 주문 초안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
       new:
         approve_order:
           deny: 승인할 주문 제안이 아닙니다.
@@ -1448,6 +1759,13 @@ transitions:
           status: proposed
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
+        submit_proposal:
+          deny: 제출할 주문 초안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
       partially_filled:
         approve_order:
           deny: 승인할 주문 제안이 아닙니다.
@@ -1529,6 +1847,13 @@ transitions:
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
+        submit_proposal:
+          deny: 제출할 주문 초안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
       done_for_day:
         approve_order:
           deny: 승인할 주문 제안이 아닙니다.
@@ -1610,6 +1935,13 @@ transitions:
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
+        submit_proposal:
+          deny: 제출할 주문 초안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
       pending_cancel:
         approve_order:
           deny: 승인할 주문 제안이 아닙니다.
@@ -1697,6 +2029,13 @@ transitions:
             quote: '1'
           status: proposed
         record_replace_order_by_id: n/a
+        submit_proposal:
+          deny: 제출할 주문 초안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
       pending_replace:
         approve_order:
           deny: 승인할 주문 제안이 아닙니다.
@@ -1784,6 +2123,13 @@ transitions:
             ref: interview/log.jsonl
             quote: '1'
           status: proposed
+        submit_proposal:
+          deny: 제출할 주문 초안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
       accepted_for_bidding:
         approve_order:
           deny: 승인할 주문 제안이 아닙니다.
@@ -1865,6 +2211,13 @@ transitions:
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
+        submit_proposal:
+          deny: 제출할 주문 초안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
       stopped:
         approve_order:
           deny: 승인할 주문 제안이 아닙니다.
@@ -1946,6 +2299,13 @@ transitions:
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
+        submit_proposal:
+          deny: 제출할 주문 초안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
       suspended:
         approve_order:
           deny: 승인할 주문 제안이 아닙니다.
@@ -2027,6 +2387,13 @@ transitions:
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
+        submit_proposal:
+          deny: 제출할 주문 초안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
       calculated:
         approve_order:
           deny: 승인할 주문 제안이 아닙니다.
@@ -2108,6 +2475,13 @@ transitions:
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
+        submit_proposal:
+          deny: 제출할 주문 초안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
       held:
         approve_order:
           deny: 승인할 주문 제안이 아닙니다.
@@ -2189,6 +2563,13 @@ transitions:
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
+        submit_proposal:
+          deny: 제출할 주문 초안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
       filled:
         approve_order:
           deny: 승인할 주문 제안이 아닙니다.
@@ -2270,6 +2651,13 @@ transitions:
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
+        submit_proposal:
+          deny: 제출할 주문 초안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
       canceled:
         approve_order:
           deny: 승인할 주문 제안이 아닙니다.
@@ -2351,6 +2739,13 @@ transitions:
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
+        submit_proposal:
+          deny: 제출할 주문 초안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
       expired:
         approve_order:
           deny: 승인할 주문 제안이 아닙니다.
@@ -2432,6 +2827,13 @@ transitions:
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
+        submit_proposal:
+          deny: 제출할 주문 초안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
       replaced:
         approve_order:
           deny: 승인할 주문 제안이 아닙니다.
@@ -2513,6 +2915,13 @@ transitions:
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
+        submit_proposal:
+          deny: 제출할 주문 초안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
       rejected:
         approve_order:
           deny: 승인할 주문 제안이 아닙니다.
@@ -2594,6 +3003,13 @@ transitions:
         record_place_stock_order: n/a
         record_cancel_order_by_id: n/a
         record_replace_order_by_id: n/a
+        submit_proposal:
+          deny: 제출할 주문 초안이 아닙니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
   Position:
     field: state
     initial: held
@@ -2628,6 +3044,20 @@ transitions:
             quote: '1'
           status: proposed
         record_close_position: n/a
+        refresh_position:
+          to: held
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
+        record_refresh_position:
+          to: held
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
       close_proposed:
         propose_close:
           deny: 청산을 제안할 수 있는 포지션이 아닙니다.
@@ -2658,6 +3088,20 @@ transitions:
             quote: '1'
           status: proposed
         record_close_position: n/a
+        refresh_position:
+          to: close_proposed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
+        record_refresh_position:
+          to: close_proposed
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
       close_approved:
         propose_close:
           deny: 청산을 제안할 수 있는 포지션이 아닙니다.
@@ -2688,6 +3132,20 @@ transitions:
             quote: '1'
           status: proposed
         record_close_position: n/a
+        refresh_position:
+          to: close_approved
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
+        record_refresh_position:
+          to: close_approved
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
       closed:
         propose_close:
           deny: 청산을 제안할 수 있는 포지션이 아닙니다.
@@ -2723,6 +3181,33 @@ transitions:
             kind: interview
             ref: interview/log.jsonl
             quote: '1'
+          status: proposed
+        refresh_position:
+          deny: 청산된 포지션입니다.
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
+        record_refresh_position: n/a
+  Account:
+    field: status
+    initial: ACTIVE
+    matrix:
+      ACTIVE:
+        refresh_account:
+          to: ACTIVE
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+          status: proposed
+        record_refresh_account:
+          to: ACTIVE
+          source:
+            kind: interview
+            ref: interview/log.jsonl
+            quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
           status: proposed
 rules:
   Order-approved-needs-a-person:
