@@ -162,3 +162,14 @@ def test_a_param_only_copied_into_a_field_nothing_reads_takes_one_value():
                               "reason": "r"})
     read = Domain.model_validate(raw)
     assert _unread_params(read, read.actions["approve_experiment"]) == set()       # read: every value
+
+
+def test_multiplication_is_modeled_as_tlc_multiplies_integers():
+    """`*` (ADR-0058) becomes `OpMul`, an integer product in the model, so TLC checks a share rule."""
+    raw = schema_doc_domain()
+    raw["actions"]["approve_experiment"]["preconditions"].append(
+        {"id": "share", "check": "count(target.notes) * 100 <= 80 * 2", "reason": "A share."})
+    e = export(Domain.model_validate(raw))
+    assert e.left_out == {}
+    assert "OpMul(a, b) == IF IsInt(a) /\\ IsInt(b) THEN I(a[2] * b[2]) ELSE E" in e.module
+    assert "OpMul(OpCount(" in e.module

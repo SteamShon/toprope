@@ -14,7 +14,7 @@ _TOKEN = re.compile(
     (?P<ws>\s+)
   | (?P<number>\d+(?:\.\d+)?)
   | (?P<string>'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")
-  | (?P<op>==|!=|<=|>=|<|>|\+|-|\(|\)|\[|\]|,|\.)
+  | (?P<op>==|!=|<=|>=|<|>|\+|-|\*|\(|\)|\[|\]|,|\.)
   | (?P<name>[A-Za-z_][A-Za-z0-9_]*)
     """,
     re.VERBOSE,
@@ -127,11 +127,18 @@ class _Parser:
         return left
 
     def sum(self) -> Node:
-        node = self.unary()
+        node = self.product()
         while self.tok.kind == "op" and self.tok.text in ("+", "-"):
             op = self.tok.text
             self.i += 1
-            node = Arith(op, node, self.unary())
+            node = Arith(op, node, self.product())
+        return node
+
+    def product(self) -> Node:
+        """`*` binds tighter than `+` and `-` (ADR-0058)."""
+        node = self.unary()
+        while self.accept("op", "*"):
+            node = Arith("*", node, self.unary())
         return node
 
     def unary(self) -> Node:
