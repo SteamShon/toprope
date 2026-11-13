@@ -3280,3 +3280,22 @@ world:
       status: ACTIVE
       equity: 100000
       refreshed_at: '2026-11-13T09:00:00+09:00'
+invariants:
+- id: position-qty-not-negative
+  'on': Position
+  check: not exists(target.qty) or target.qty >= 0
+  reason: 포지션 수량은 음수가 될 수 없다.
+  source:
+    kind: interview
+    ref: interview/log.jsonl
+    quote: 포지션 수량은 음수가 될 수 없다. 주문 수량은 0보다 커야 한다.
+  status: proposed
+- id: order-qty-positive
+  'on': Order
+  check: not exists(target.qty) or target.qty > 0
+  reason: 주문 수량은 0보다 커야 한다.
+  source:
+    kind: interview
+    ref: interview/log.jsonl
+    quote: 포지션 수량은 음수가 될 수 없다. 주문 수량은 0보다 커야 한다.
+  status: proposed
