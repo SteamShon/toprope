@@ -554,3 +554,110 @@ def test_pass_env_must_be_a_list_of_names_on_a_command(tmp_path, upstream):
     f.write_text(f"upstream: {upstream}\ntools: {{}}\n")
     with pytest.raises(SystemExit, match="pass_env.*never write the values"):
         Binding.load(f)
+
+
+# -- a tool with no object argument, and numbers sent as text (M2: Alpaca's account) ---------------
+
+ACCOUNT_DOMAIN = {
+    "domain": "acct", "version": 1, "roles": ["owner"],
+    "objects": {"Account": {"description": "a", "properties": {
+        "status": {"enum": ["ACTIVE"]}, "equity": {"type": "number", "optional": True}}}},
+    "transitions": {"Account": {"field": "status", "initial": "ACTIVE", "matrix": {"ACTIVE": {
+        "refresh_account": "ACTIVE", "record_refresh_account": "ACTIVE"}}}},
+    "actions": {
+        "refresh_account": {"description": "r", "actor": ["owner"], "target": "Account",
+                            "effects": [{"call": "mcp:get_account", "with": {}, "reply": "record_refresh_account"}]},
+        "record_refresh_account": {"description": "rr", "actor": ["external:kernel"], "target": "Account",
+                                   "params": {"ok": {"type": "boolean"}, "equity": {"type": "number", "optional": True}},
+                                   "effects": [{"set": {"target.equity": "params.equity"}}]}},
+}
+
+
+def account_server():
+    from mcp.server.mcpserver import MCPServer
+    server = MCPServer(name="broker")
+
+    @server.tool(description="The account, numbers as text.")
+    def get_account() -> dict:
+        return {"id": "A-1", "status": "ACTIVE", "equity": "1500.5"}
+
+    @server.tool(description="Read the account.", annotations={"readOnlyHint": True})
+    def read_account() -> dict:
+        return {"id": "A-1", "status": "ACTIVE", "equity": "1200"}
+    return server
+
+
+def test_a_tool_with_no_object_argument_acts_on_its_target_value_and_text_numbers_are_typed(tmp_path):
+    """`target_value` names the one object a tool without an object argument acts on; `load`
+    reads it with no argument; a number the server sends as text is recorded as a number."""
+    from mcp import Client
+    b = tmp_path / "b.yaml"
+    b.write_text(yaml.safe_dump({"upstream": {"command": ["x"]}, "tools": {
+        "get_account": {"action": "refresh_account", "target_value": "A-1", "result": {"equity": "number"},
+                        "load": "read_account", "text_numbers": True},
+        "read_account": {"read": True}}}))
+    binding, up = Binding.load(b), Upstream(account_server())
+    from toprope.decl import Domain
+    d = Domain.model_validate(ACCOUNT_DOMAIN)
+    assert register(binding, up.tools(), d) == []
+    assert check(d, binding, confirmation=False) == []
+    ids = tmp_path / "ids.yaml"
+    ids.write_text("t-o: {id: o, roles: [owner]}\n")
+    ex = Execution(d, open_store("memory"), open_identity(f"static:{ids}"), services=UpstreamServices(up))
+    server = build_proxy(ex, binding, up, lambda: "t-o")
+
+    async def go():
+        async with Client(server) as c:
+            return await c.call_tool("get_account", {})
+    try:
+        r = asyncio.run(go())
+    finally:
+        up.close()
+    assert not r.is_error, r.content
+    first = ex.history("A-1")[0]
+    assert first.payload["changes"]["equity"] == 1200.0                            # loaded by `load`, typed
+    assert ex.state("A-1")["equity"] == 1500.5                                     # the reply, typed
+
+
+def test_typed_turns_text_into_the_declared_type_and_leaves_anything_else():
+    from toprope.proxy import typed
+    assert typed("10", "integer") == 10 and typed("10.5", "number") == 10.5 and typed("true", "boolean") is True
+    assert typed("ten", "number") == "ten" and typed("nan", "number") == "nan" and typed("1.5", "integer") == "1.5"
+    assert typed("10", "string") == "10" and typed(3, "number") == 3
+
+
+def test_without_text_numbers_a_number_sent_as_text_is_still_refused(tmp_path):
+    """`text_numbers` is the binding's choice: left out, the load refuses text where a number is
+    declared, as before."""
+    from mcp import Client
+    from toprope.decl import Domain
+    b = tmp_path / "b.yaml"
+    b.write_text(yaml.safe_dump({"upstream": {"command": ["x"]}, "tools": {
+        "get_account": {"action": "refresh_account", "target_value": "A-1", "result": {"equity": "number"},
+                        "load": "read_account"},
+        "read_account": {"read": True}}}))
+    binding, up = Binding.load(b), Upstream(account_server())
+    d = Domain.model_validate(ACCOUNT_DOMAIN)
+    assert register(binding, up.tools(), d) == []
+    ids = tmp_path / "ids.yaml"
+    ids.write_text("t-o: {id: o, roles: [owner]}\n")
+    ex = Execution(d, open_store("memory"), open_identity(f"static:{ids}"), services=UpstreamServices(up))
+    server = build_proxy(ex, binding, up, lambda: "t-o")
+
+    async def go():
+        async with Client(server) as c:
+            return await c.call_tool("get_account", {})
+    try:
+        r = asyncio.run(go())
+    finally:
+        up.close()
+    assert r.is_error and "equity='1200' is not a valid number" in r.content[0].text
+    assert ex.lookup("A-1") is None
+
+
+def test_a_binding_names_one_way_to_the_object(tmp_path):
+    b = tmp_path / "b.yaml"
+    b.write_text(yaml.safe_dump({"upstream": {"command": ["x"]}, "tools": {
+        "get_account": {"action": "refresh_account", "target": "id", "target_value": "A-1"}}}))
+    with pytest.raises(SystemExit, match="or `target_value` for a tool with no object argument"):
+        Binding.load(b)
