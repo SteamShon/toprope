@@ -359,7 +359,10 @@ to do about it. `{…}` is filled in when the error is raised.
 
 | Error | Fix |
 |---|---|
+| --env and --pass-env set what an MCP server is started with | use them with `toprope-import mcp <command>`, or leave them out |
+| --env {…} is not NAME=VALUE | write it as --env NAME=VALUE |
 | --into and --out both name where the draft goes | give one |
+| --pass-env names {…}, which your environment does not set | set {…} before importing |
 | --patch joins the workspace's draft, so it takes no --into or --out | give --patch alone (the loop proposes into the workspace's draft), or --into/--out to write a file |
 | --workspace and --source-id go with --patch | add --patch FILE, or leave them out |
 | cannot read the draft {…}: {…} | give --into an existing draft, or --out for a new one |

@@ -7,6 +7,7 @@
     toprope-import rules AGENTS.md --questions q.yaml   # candidate rules and contradictions
     toprope-import rules .claude/skills --via tree      # every Markdown file under a folder
     toprope-import mcp "python server.py" --domain payments --binding-out payments.binding.yaml
+    toprope-import mcp "uvx some-server" --env MODE=paper --pass-env API_KEY   # a server that needs its keys
     toprope-import --list                    # the readers and extractors installed
 
 Into the change loop (ADR-0049 C1): `--patch FILE` registers the source as a source of the
@@ -29,6 +30,7 @@ ask_question` puts in the interview. A person confirms what is right (ADR-0041).
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 
 import yaml
@@ -53,9 +55,34 @@ def build_parser() -> argparse.ArgumentParser:
                                         "a new one is made for --domain")
     ap.add_argument("--source-id", help="with --patch: the source's id in the workspace (default: <domain>-<kind>)")
     ap.add_argument("--binding-out", help="write the draft binding a server's tools give (mcp), for toprope-proxy")
+    ap.add_argument("--env", action="append", default=[], metavar="NAME=VALUE",
+                    help="mcp: set this variable for the server it starts (not a secret: the binding writes it)")
+    ap.add_argument("--pass-env", action="append", default=[], metavar="NAME",
+                    help="mcp: give the server this variable from your environment (a key); the binding names it, "
+                         "never its value, as toprope-proxy's `pass_env`")
     ap.add_argument("--questions", help="also write the conflicts and questions as YAML records, for an agent to work from")
     ap.add_argument("--list", action="store_true", help="the readers and extractors installed")
     return ap
+
+
+def _server_env(a: argparse.Namespace) -> dict | None:
+    """`--env` and `--pass-env`: what the server `mcp` starts is given, in the binding's own terms."""
+    if not (a.env or a.pass_env):
+        return None
+    if (a.via or ("mcp" if a.kind == "mcp" else "file")) != "mcp":
+        raise SystemExit(fixed("--env and --pass-env set what an MCP server is started with",
+                               "use them with `toprope-import mcp <command>`, or leave them out"))
+    env = {}
+    for item in a.env:
+        name, eq, value = item.partition("=")
+        if not (eq and name):
+            raise SystemExit(fixed(f"--env {item!r} is not NAME=VALUE", "write it as --env NAME=VALUE"))
+        env[name] = value
+    missing = [n for n in a.pass_env if n not in os.environ]
+    if missing:
+        raise SystemExit(fixed(f"--pass-env names {', '.join(missing)}, which your environment does not set",
+                               f"set {', '.join(missing)} before importing"))
+    return {**({"env": env} if env else {}), **({"pass_env": list(a.pass_env)} if a.pass_env else {})}
 
 
 def _new(path: str | None, flag: str) -> Path | None:
@@ -80,6 +107,7 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit(fixed("--into and --out both name where the draft goes", "give one"))
     if (a.workspace or a.source_id) and not a.patch:
         raise SystemExit(fixed("--workspace and --source-id go with --patch", "add --patch FILE, or leave them out"))
+    server = _server_env(a)
     qdest, bdest, pdest = _new(a.questions, "--questions"), _new(a.binding_out, "--binding-out"), _new(a.patch, "--patch")
     named = [p.resolve() for p in (qdest, bdest, pdest, Path(a.out) if a.out else None, Path(a.into) if a.into else None)
              if p is not None]
@@ -104,7 +132,7 @@ def main(argv: list[str] | None = None) -> None:
             base = {"domain": a.domain, "version": 1}
     try:
         out = import_source(a.kind, a.source, domain=str(base["domain"]) if base else a.domain,
-                            profile=Profile.load(a.profile), via=a.via, into=base)
+                            profile=Profile.load(a.profile), via=a.via, into=base, server=server)
     except (yaml.YAMLError, ValueError, UnicodeDecodeError) as e:
         raise SystemExit(fixed(f"{a.source} does not read as {a.kind}: {e}",
                                "give the export as it was written, or another extractor")) from None

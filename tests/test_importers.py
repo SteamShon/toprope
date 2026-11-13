@@ -631,3 +631,50 @@ def test_joining_a_source_that_names_who_acts_fills_an_unassigned_actor(tmp_path
     d = valid(yaml.safe_load(dest.read_text()))
     assert d.actions["refund_order"].actor == ["clerk"] and d.actions["refund_order"].status == "proposed"
     assert d.actions["create_order"].actor == ["unassigned"] and "clerk" in d.roles
+
+
+# -- an MCP server that needs its keys to start (M2: Alpaca's server) ------------------------------
+
+KEYED_SERVER = '''
+import os, sys
+if not os.environ.get("SERVER_KEY") or os.environ.get("MODE") != "paper":
+    sys.exit("SERVER_KEY must be set, and MODE must be paper")
+from mcp.server.mcpserver import MCPServer
+server = MCPServer(name="keyed")
+
+@server.tool(description="Cancel an order.")
+def cancel_order(order_id: str) -> dict:
+    return {"order_id": order_id}
+
+server.run()
+'''
+
+
+def test_an_mcp_server_that_needs_keys_is_imported_with_env_and_pass_env(tmp_path, monkeypatch):
+    """The server gets `--env` values and the named variables from the importer's environment; the
+    draft binding names them as the proxy reads them, and holds no secret value."""
+    import sys
+
+    from toprope.importers.cli import main
+    script = tmp_path / "keyed_server.py"
+    script.write_text(KEYED_SERVER)
+    monkeypatch.setenv("SERVER_KEY", "s3cret-value")
+    out, binding = tmp_path / "d.yaml", tmp_path / "b.yaml"
+    main(["mcp", f"{sys.executable} {script}", "--domain", "keyed", "--out", str(out), "--binding-out", str(binding),
+          "--env", "MODE=paper", "--pass-env", "SERVER_KEY"])
+    assert "cancel_order" in yaml.safe_load(out.read_text())["actions"]
+    text = binding.read_text()
+    up = yaml.safe_load(text)["upstream"]
+    assert up == {"command": [sys.executable, str(script)], "env": {"MODE": "paper"}, "pass_env": ["SERVER_KEY"]}
+    assert "s3cret-value" not in text and "s3cret-value" not in out.read_text()
+
+
+def test_env_and_pass_env_are_refused_where_they_cannot_apply(tmp_path, monkeypatch):
+    from toprope.importers.cli import main
+    monkeypatch.delenv("NOT_SET_ANYWHERE", raising=False)
+    with pytest.raises(SystemExit, match="--env"):
+        main(["openapi", str(tmp_path / "x.yaml"), "--env", "A=1"])
+    with pytest.raises(SystemExit, match="NAME=VALUE"):
+        main(["mcp", "srv", "--env", "A"])
+    with pytest.raises(SystemExit, match="NOT_SET_ANYWHERE"):
+        main(["mcp", "srv", "--pass-env", "NOT_SET_ANYWHERE"])
