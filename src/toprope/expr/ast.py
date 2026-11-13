@@ -61,6 +61,6 @@ class Compare(Node):
 
 @dataclass(frozen=True)
 class Arith(Node):
-    op: str  # + -
+    op: str  # + - *
     left: Node
     right: Node

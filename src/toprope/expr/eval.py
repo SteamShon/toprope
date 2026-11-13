@@ -120,7 +120,7 @@ def evaluate(node: Node, env: Env) -> Any:
                 raise EvalError(f"cannot join {type(a).__name__} and {type(b).__name__}")
             if any(isinstance(x, bool) or not isinstance(x, (int, float)) for x in (a, b)):
                 raise EvalError(f"cannot apply {op} to {type(a).__name__} and {type(b).__name__}")
-            return a + b if op == "+" else a - b
+            return a + b if op == "+" else a - b if op == "-" else a * b
         case Compare(op, left, right):
             a, b = _times(evaluate(left, env), evaluate(right, env))
             if op == "==":
