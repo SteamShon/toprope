@@ -124,3 +124,26 @@ def test_days_since_accepts_aware_naive_and_dates(value):
 def test_days_since_bad_string_is_eval_error():
     with pytest.raises(EvalError):
         ev("days_since(target.t) > 1", {"t": "yesterday"})
+
+
+# -- `*` (ADR-0058) ---------------------------------------------------------------------------------
+
+@given(st.integers(-10**4, 10**4), st.integers(-10**4, 10**4), st.integers(-10**4, 10**4))
+def test_multiplication_matches_python_and_binds_tighter_than_plus_and_minus(a, b, c):
+    assert ev(f"{a} + {b} * {c} == {a + b * c}") is True
+    assert ev(f"{a} - {b} * {c} == {a - b * c}") is True
+    assert ev(f"{a} * {b} - {c} == {a * b - c}") is True
+
+
+def test_a_share_is_written_as_a_product():
+    """`qty` at most 80 % of a position's: qty * 100 <= held * 80 (no division, ADR-0058)."""
+    assert ev("params.qty * 100 <= params.held * 80", params={"qty": 8, "held": 10}) is True
+    assert ev("params.qty * 100 <= params.held * 80", params={"qty": 9, "held": 10}) is False
+    assert ev("params.qty * params.price * 2 <= params.equity", params={"qty": 2, "price": 2.5, "equity": 10}) is True
+
+
+@pytest.mark.parametrize("src", ["'a' * 2", "true * 2", "null * 2", "[1] * 2"])
+def test_multiplication_takes_numbers_only(src):
+    with pytest.raises(EvalError):
+        ev(src)
+

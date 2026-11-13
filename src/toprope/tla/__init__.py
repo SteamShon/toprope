@@ -93,6 +93,7 @@ OpAdd(a, b) == IF Tag(a) = "s" /\ Tag(b) \in {"s", "i"} THEN S(a[2] \o (IF Tag(b
                ELSE IF Tag(b) = "s" /\ Tag(a) = "i" THEN S(ToString(a[2]) \o b[2])
                ELSE IF IsInt(a) /\ IsInt(b) THEN I(a[2] + b[2]) ELSE E
 OpSub(a, b) == IF IsInt(a) /\ IsInt(b) THEN I(a[2] - b[2]) ELSE E
+OpMul(a, b) == IF IsInt(a) /\ IsInt(b) THEN I(a[2] * b[2]) ELSE E
 OpNeg(a) == IF IsInt(a) THEN I(-a[2]) ELSE E
 OpNot(a) == IF Tag(a) = "b" THEN B(~a[2]) ELSE E
 OpAnd(a, b) == IF Tag(a) # "b" THEN E ELSE IF ~a[2] THEN B(FALSE) ELSE IF Tag(b) # "b" THEN E ELSE b
@@ -193,7 +194,7 @@ class Expr:
             case Logical(op, a, b):
                 return f"Op{'And' if op == 'and' else 'Or'}({self.node(a)}, {self.node(b)})"
             case Arith(op, a, b):
-                return f"Op{'Add' if op == '+' else 'Sub'}({self.node(a)}, {self.node(b)})"
+                return f"Op{ {'+': 'Add', '-': 'Sub', '*': 'Mul'}[op] }({self.node(a)}, {self.node(b)})"
             case Compare(op, a, b):
                 name = {"==": "Eq", "!=": "Ne", "<": "Lt", "<=": "Le", ">": "Gt", ">=": "Ge",
                         "in": "In", "not_in": "NotIn"}[op]
