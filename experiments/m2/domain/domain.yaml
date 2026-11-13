@@ -456,9 +456,10 @@ actions:
     target: Order
     source:
       kind: interview
-      ref: interview/log.jsonl
-      quote: '1'
+      ref: interview:interview/log.jsonl#L13
+      quote: '2: only a person, never an agent on its own'
     status: proposed
+    requires: human
   decline_order:
     actor:
     - unassigned
@@ -486,9 +487,10 @@ actions:
     target: Order
     source:
       kind: interview
-      ref: interview/log.jsonl
-      quote: '1'
+      ref: interview:interview/log.jsonl#L20
+      quote: '2: only a person, never an agent on its own'
     status: proposed
+    requires: human
   decline_cancel:
     actor:
     - unassigned
@@ -553,9 +555,10 @@ actions:
     target: Order
     source:
       kind: interview
-      ref: interview/log.jsonl
-      quote: '1'
+      ref: interview:interview/log.jsonl#L16
+      quote: '2: only a person, never an agent on its own'
     status: proposed
+    requires: human
   decline_replace:
     actor:
     - unassigned
@@ -590,13 +593,25 @@ actions:
   approve_close:
     actor:
     - unassigned
+    - account_owner
     description: Approve a proposed close.
     target: Position
     source:
       kind: interview
-      ref: interview/log.jsonl
-      quote: '1'
+      ref: interview:interview/log.jsonl#L19
+      quote: '1: only a person, never an agent on its own'
     status: proposed
+    preconditions:
+    - check: target.close_percentage <= 80 or 'account_owner' in actor.roles
+      reason: Over 80 close_percentage, only the account_owner may approve a proposed
+        close.
+      source:
+        kind: interview
+        ref: interview:interview/log.jsonl#L17
+        quote: close_percentage over 80, only account_owner
+      status: proposed
+      id: limit-close_percentage
+    requires: human
   decline_close:
     actor:
     - unassigned
@@ -2749,3 +2764,19 @@ rules:
     status: proposed
 glossary:
   account_owner: 계좌주인
+world:
+  fixtures:
+  - Order:
+      id: 0-1
+      status: filled
+      symbol: AMZN
+      side: buy
+      qty: '10'
+      limit_price: '260'
+      filled_avg_price: '260'
+  - Position:
+      id: P-1
+      state: held
+      symbol: AMZN
+      qty: '10'
+      avg_entry_price: '240'
