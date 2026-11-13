@@ -29,14 +29,16 @@ from .port import (
 
 
 def import_source(kind: str, location: str, *, domain: str = "imported", profile: Profile | None = None,
-                  via: str | None = None, into: dict[str, Any] | None = None) -> dict[str, Any]:
+                  via: str | None = None, into: dict[str, Any] | None = None,
+                  server: dict[str, Any] | None = None) -> dict[str, Any]:
     """The draft a source gives, and what it cannot say. `via` defaults to the reader of the same
     name as the extractor if there is one (`mcp`), else `file`. With `into` (an existing draft),
     `items` is what joining the source to it adds (`draft.plan`): the draft's own elements are never
-    overwritten, and each disagreement is a conflict naming both places."""
+    overwritten, and each disagreement is a conflict naming both places. `server`: the `env` and
+    `pass_env` an MCP server is started with (the mcp reader only)."""
     profile = profile or Profile()
     via = via or ("mcp" if kind == "mcp" else "file")
-    raw = reader(via).read(location, profile)
+    raw = reader(via).read(location, profile, **({"server": server} if server else {}))
     ext = extractor(kind).extract(raw, profile)
     places: dict[str, str] = {}
     draft = build(domain, ext, places)

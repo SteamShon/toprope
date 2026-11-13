@@ -289,6 +289,8 @@ The interview's route for a newcomer: docs/interview.md.
 | `--workspace` `WORKSPACE` | with --patch: the workspace file (default: `workspace:` in toprope.yaml); a new one is made for --domain |
 | `--source-id` `SOURCE_ID` | with --patch: the source's id in the workspace (default: <domain>-<kind>) |
 | `--binding-out` `BINDING_OUT` | write the draft binding a server's tools give (mcp), for toprope-proxy |
+| `--env` `NAME=VALUE` | mcp: set this variable for the server it starts (not a secret: the binding writes it) (default `[]`) |
+| `--pass-env` `NAME` | mcp: give the server this variable from your environment (a key); the binding names it, never its value, as toprope-proxy's `pass_env` (default `[]`) |
 | `--questions` `QUESTIONS` | also write the conflicts and questions as YAML records, for an agent to work from |
 | `--list` | the readers and extractors installed |
 
