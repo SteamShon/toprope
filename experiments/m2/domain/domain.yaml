@@ -2,6 +2,7 @@ domain: domain
 version: 1
 roles:
 - unassigned
+- account_owner
 objects:
   Order:
     description: An Order, as the server keeps it.
@@ -2746,3 +2747,5 @@ rules:
       ref: interview/log.jsonl
       quote: '1'
     status: proposed
+glossary:
+  account_owner: 계좌주인
