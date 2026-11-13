@@ -143,6 +143,21 @@ objects:
       close_percentage:
         type: number
         optional: true
+      symbol:
+        type: string
+        optional: true
+      qty:
+        type: string
+        optional: true
+      avg_entry_price:
+        type: string
+        optional: true
+      market_value:
+        type: string
+        optional: true
+      unrealized_pl:
+        type: string
+        optional: true
     source:
       kind: interview
       ref: interview:interview/log.jsonl#L8
