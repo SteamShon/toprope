@@ -451,7 +451,7 @@ actions:
     status: proposed
   approve_order:
     actor:
-    - unassigned
+    - account_owner
     description: Approve a proposed order.
     target: Order
     source:
@@ -482,7 +482,7 @@ actions:
     status: proposed
   approve_cancel:
     actor:
-    - unassigned
+    - account_owner
     description: Approve a proposed cancellation.
     target: Order
     source:
@@ -550,7 +550,7 @@ actions:
     status: proposed
   approve_replace:
     actor:
-    - unassigned
+    - account_owner
     description: Approve a proposed replacement.
     target: Order
     source:
@@ -592,7 +592,6 @@ actions:
     status: proposed
   approve_close:
     actor:
-    - unassigned
     - account_owner
     description: Approve a proposed close.
     target: Position
