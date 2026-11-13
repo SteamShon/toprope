@@ -3275,3 +3275,8 @@ world:
       symbol: AMZN
       qty: '10'
       avg_entry_price: '240'
+  - Account:
+      id: A-1
+      status: ACTIVE
+      equity: 100000
+      refreshed_at: '2026-11-13T09:00:00+09:00'
