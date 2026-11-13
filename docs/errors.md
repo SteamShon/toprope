@@ -471,7 +471,7 @@ to do about it. `{…}` is filled in when the error is raised.
 | the binding {…}: `upstream` has exactly one of `command` or `url` | give `command: [program, args…]` for stdio, or `url:` for streamable HTTP |
 | the binding {…}: tool {…} has unknown key(s) {…} | use only the keys {…} |
 | the binding {…}: tool {…} is either `read: true` or an `action` | bind it to a declared action, or mark it read-only |
-| the binding {…}: tool {…} names exactly one of `target` or `new_id` | name the argument that identifies the object |
+| the binding {…}: tool {…} names exactly one of `target` or `new_id`, or `target_value` for a tool with no object argument | name the argument that identifies the object, or with `target_value:` the one object a tool without such an argument acts on |
 | the upstream MCP server did not start: {…} | check the binding's `upstream` command or URL, and that the server runs on its own |
 | toprope-proxy needs POSIX file locks, which this system lacks | run the proxy on Linux or macOS |
 | {…} failed upstream: {…} | to try again, call with a new `idempotency_key` |

@@ -13,11 +13,13 @@ its binding names, with their own names and input schemas, and nothing else:
 The binding (YAML):
 
     upstream: {command: [python, server.py]}        # or {url: https://…/mcp}
-    # a command may add `env: {NAME: value}` and `pass_env: [SECRET]` (taken from the proxy's environment)
+    # a command may add `env: {NAME: value}` and `pass_env: [SECRET]` (taken from the proxy's environment);
+    # a tool may add `text_numbers: true` when its server sends numbers as text (`"qty": "10"`)
     tools:
       refund_order:
         action: refund                               # the declared action this tool is
-        target: order_id                             # the argument naming the object (or `new_id:`)
+        target: order_id                             # the argument naming the object (or `new_id:`, or
+                                                     # `target_value: <id>` for a tool with no such argument)
         params: {amount: amount}                     # action param: tool argument (default: same names)
         result: {refund_id: string}                  # fields of the answer the reply may take
         load: get_order                              # an order the gate has not seen: read it here
@@ -54,6 +56,8 @@ class ToolBinding:
     action: str | None = None
     target: str | None = None          # the argument that names the object the action targets
     new_id: str | None = None          # for a creating action: the argument that names the new object
+    target_value: str | None = None    # for a tool whose arguments name no object: the one object it acts on
+    text_numbers: bool = False         # the server sends numbers and booleans as text: read them as the declared type
     params: dict[str, str] = field(default_factory=dict)   # action param -> tool argument
     result: dict[str, str] = field(default_factory=dict)   # answer field -> service type
     hidden: set[str] = field(default_factory=set)          # optional arguments the gate never sees: not offered
@@ -112,7 +116,8 @@ class Binding:
             raise SystemExit(fixed(f"the binding {path}: `confirmed` is not a confirmation record",
                                    "remove it, and let a person confirm with `toprope-proxy --confirm-binding`"))
         tools = {}
-        known = {"read", "action", "target", "new_id", "params", "result", "load"}   # `hidden` is computed
+        known = {"read", "action", "target", "new_id", "target_value", "text_numbers", "params", "result",
+                 "load"}   # `hidden` is computed
         for name, spec in data["tools"].items():
             spec = spec or {}
             bad = sorted(set(spec) - known) if isinstance(spec, dict) else ["(not a mapping)"]
@@ -123,9 +128,11 @@ class Binding:
             if tb.read == bool(tb.action):
                 raise SystemExit(fixed(f"the binding {path}: tool {name} is either `read: true` or an `action`",
                                        "bind it to a declared action, or mark it read-only"))
-            if tb.action and bool(tb.target) == bool(tb.new_id):
-                raise SystemExit(fixed(f"the binding {path}: tool {name} names exactly one of `target` or `new_id`",
-                                       "name the argument that identifies the object"))
+            if tb.action and sum(bool(x) for x in (tb.target, tb.new_id, tb.target_value)) != 1:
+                raise SystemExit(fixed(f"the binding {path}: tool {name} names exactly one of `target` or `new_id`, "
+                                       "or `target_value` for a tool with no object argument",
+                                       "name the argument that identifies the object, or with `target_value:` the one "
+                                       "object a tool without such an argument acts on"))
             tools[str(name)] = tb
         return cls(up, tools, digest(up, data["tools"]), conf)
 
@@ -214,6 +221,26 @@ def answer(res: Any) -> dict[str, Any]:
         return {"result": text}
 
 
+def typed(value: Any, kind: str | None) -> Any:
+    """A server's value as the declared type, where it is the same value written as text: many
+    APIs send numbers as strings (`"qty": "10"`). Anything else is returned as it is, so a check
+    of its type still refuses it."""
+    if not isinstance(value, str):
+        return value
+    v = value.strip()
+    if kind == "integer" and v.lstrip("+-").isdigit():
+        return int(v)
+    if kind == "number":
+        try:
+            n = float(v)
+        except ValueError:
+            return value
+        return n if n == n and n not in (float("inf"), float("-inf")) else value
+    if kind == "boolean" and v.lower() in ("true", "false"):
+        return v.lower() == "true"
+    return value
+
+
 class UpstreamServices(KernelServices):
     """Runs a declaration's `call: mcp:<tool>` effects against the upstream server. The full
     answer to each call is kept, by tool and inputs, for the proxy to hand back to the agent (the
@@ -222,6 +249,7 @@ class UpstreamServices(KernelServices):
     def __init__(self, upstream: Upstream, fallback: KernelServices | None = None):
         self.upstream, self.fallback = upstream, fallback
         self.last: dict[str, Any] = {}
+        self.text_numbers: set[str] = set()    # tools whose answers carry numbers as text (`text_numbers: true`)
 
     def run(self, service: str, inputs: dict[str, Any]) -> dict[str, Any]:
         if not service.startswith(UPSTREAM):
@@ -239,7 +267,11 @@ class UpstreamServices(KernelServices):
         data = answer(res)
         if getattr(res, "is_error", False):
             return {"ok": False, "error": str(data.get("result") or data)}
-        return {"ok": True, **data}
+        if tool not in self.text_numbers:
+            return {"ok": True, **data}
+        from ..kernel import UPSTREAM_SERVICES
+        types = UPSTREAM_SERVICES[service].result if service in UPSTREAM_SERVICES else {}
+        return {"ok": True, **{k: typed(v, types.get(k)) for k, v in data.items()}}
 
 
 class StoreLock:
@@ -311,7 +343,7 @@ def register(binding: Binding, tools: dict[str, Any], d: Any) -> list[str]:
                 problems.append(fixed(f"the binding marks {name} read-only, but the server does not (readOnlyHint)",
                                       f"bind {name} to a declared action, or leave it out"))
             continue
-        if tb.load and tb.load in tools and tb.target not in ((tools[tb.load].input_schema or {}).get("properties") or {}):
+        if tb.load and tb.load in tools and tb.target and tb.target not in ((tools[tb.load].input_schema or {}).get("properties") or {}):
             problems.append(fixed(f"tool {name} loads with {tb.load}, which takes no `{tb.target}` argument",
                                   f"name a read tool that takes `{tb.target}`, or drop `load:`"))
         a = d.actions.get(tb.action)
@@ -403,6 +435,7 @@ def build_proxy(ex: Any, binding: Binding, upstream: Upstream, credentials: Any,
 
     offered = upstream.tools()
     services: UpstreamServices = ex.services
+    services.text_numbers = {n for n, tb in binding.tools.items() if tb.text_numbers}
     gate = lock or threading.Lock()  # one gated call at a time: the next sees what the last one did
 
     def log(entry: dict[str, Any]) -> None:
@@ -429,14 +462,15 @@ def build_proxy(ex: Any, binding: Binding, upstream: Upstream, credentials: Any,
         obj = ex.d.objects[a.object_type]
         field = ex.d.transitions[a.object_type].field if a.object_type in ex.d.transitions else None
         try:
-            res = upstream.call(tb.load, {tb.target: target})
+            res = upstream.call(tb.load, {} if tb.target_value else {tb.target: target})
         except Exception as e:                                    # noqa: BLE001 - no answer: refuse, fail closed
             raise ToolError(fixed(f"{name}: could not read {target} with {tb.load} ({type(e).__name__}: {e})",
                                   "ask again when the server answers; nothing was sent")) from None
         if getattr(res, "is_error", False):
             raise ToolError(fixed(f"{name}: {tb.load} could not read {target}: {answer(res).get('result')}",
                                   f"check that {target} exists on the server; nothing was sent"))
-        data = {k: v for k, v in answer(res).items() if k in obj.properties}
+        data = {k: typed(v, obj.properties[k].type) if tb.text_numbers else v
+                for k, v in answer(res).items() if k in obj.properties}
         found = ex.lookup(target)
         have = found[1] if found else {}
         new = {k: v for k, v in data.items() if not (k == field and found)}   # the stage is the gate's
@@ -488,7 +522,7 @@ def build_proxy(ex: Any, binding: Binding, upstream: Upstream, credentials: Any,
                 return answer(res)
             ikey = args.pop("idempotency_key", None) or hashlib.sha256(
                 json.dumps([caller.actor.id, name, args], sort_keys=True, default=str).encode()).hexdigest()[:32]
-            target = args.get(tb.new_id or tb.target or "")
+            target = tb.target_value or args.get(tb.new_id or tb.target or "")
             if target is None:
                 raise ToolError(fixed(f"{name} needs `{tb.new_id or tb.target}`, the object it acts on",
                                       f"call it again with `{tb.new_id or tb.target}`"))
