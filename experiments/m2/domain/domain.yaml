@@ -104,6 +104,9 @@ objects:
       replace_trail:
         type: string
         optional: true
+      filled_avg_price:
+        type: string
+        optional: true
     source:
       kind: interview
       ref: interview:interview/log.jsonl#L7
