@@ -448,7 +448,9 @@ Not started. Plans: [`roadmap.md`](roadmap.md).
    that saw the rules is moved out of agents' reach. `toprope-import mcp` starts a server that needs
    its keys (`--env NAME=VALUE`, `--pass-env NAME`), and its draft binding names them as
    `m2_paper.py` expects, with no key written (#273). The check language has `*` (ADR-0058, #274), for
-   the share limits the interview states; an amendment to M2's frozen checks. Next: the interview (Phase A)
+   the share limits the interview states. `toprope-proxy` binds a tool with no object argument to one
+   object (`target_value`), and reads numbers sent as text where a tool says so (`text_numbers`), for
+   Alpaca's account and positions (#275). #274 and #275 amend M2's frozen checks. Next: the interview (Phase A)
    and the probes, on the researcher's Mac (the Alpaca keys and the
    salt stay there).
 4. Push the `v0.1.0` tag on `main` (maintainer); release M1 to `main`.
