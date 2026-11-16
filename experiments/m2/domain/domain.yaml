@@ -180,6 +180,9 @@ objects:
       refreshed_at:
         type: datetime
         optional: true
+      cash:
+        type: number
+        optional: true
     source:
       kind: interview
       ref: interview/log.jsonl
@@ -288,6 +291,16 @@ actions:
         kind: interview
         ref: interview/log.jsonl
         quote: '매도 주문의 수량은 ... 어카운트 포지션에 있는 전체 수보다 ... 같거나 작아야 한다. / 22-a: 1'
+      status: proposed
+    - id: buy-within-the-cash
+      check: target.side != 'buy' or (exists(target.notional) and target.notional
+        <= target.order_account.cash) or (exists(target.limit_price) and exists(target.qty)
+        and target.qty * target.limit_price <= target.order_account.cash)
+      reason: 매수 주문의 금액은 계좌의 현금 잔액(cash)보다 같거나 작아야 한다.
+      source:
+        kind: interview
+        ref: interview/log.jsonl
+        quote: '매수 주문의 수량은 현재 남아있는 계좌의 잔액보다 같거나 작아야 한다. / 22-b: cash'
       status: proposed
   cancel_order_by_id:
     description: Cancel a specific order by its ID.
@@ -516,6 +529,16 @@ actions:
         ref: interview/log.jsonl
         quote: '매도 주문의 수량은 ... 어카운트 포지션에 있는 전체 수보다 ... 같거나 작아야 한다. / 22-a: 1'
       status: proposed
+    - id: buy-within-the-cash
+      check: target.side != 'buy' or (exists(target.notional) and target.notional
+        <= target.order_account.cash) or (exists(target.limit_price) and exists(target.qty)
+        and target.qty * target.limit_price <= target.order_account.cash)
+      reason: 매수 주문의 금액은 계좌의 현금 잔액(cash)보다 같거나 작아야 한다.
+      source:
+        kind: interview
+        ref: interview/log.jsonl
+        quote: '매수 주문의 수량은 현재 남아있는 계좌의 잔액보다 같거나 작아야 한다. / 22-b: cash'
+      status: proposed
   decline_order:
     actor:
     - account_owner
@@ -734,6 +757,16 @@ actions:
         ref: interview/log.jsonl
         quote: '매도 주문의 수량은 ... 어카운트 포지션에 있는 전체 수보다 ... 같거나 작아야 한다. / 22-a: 1'
       status: proposed
+    - id: buy-within-the-cash
+      check: target.side != 'buy' or (exists(target.notional) and target.notional
+        <= target.order_account.cash) or (exists(target.limit_price) and exists(target.qty)
+        and target.qty * target.limit_price <= target.order_account.cash)
+      reason: 매수 주문의 금액은 계좌의 현금 잔액(cash)보다 같거나 작아야 한다.
+      source:
+        kind: interview
+        ref: interview/log.jsonl
+        quote: '매수 주문의 수량은 현재 남아있는 계좌의 잔액보다 같거나 작아야 한다. / 22-b: cash'
+      status: proposed
     source:
       kind: interview
       ref: interview/log.jsonl
@@ -805,6 +838,9 @@ actions:
       equity:
         type: number
         optional: true
+      cash:
+        type: number
+        optional: true
     preconditions:
     - id: refresh-account-done
       check: params.ok == true
@@ -813,6 +849,7 @@ actions:
     - set:
         target.equity: params.equity
         target.refreshed_at: now()
+        target.cash: params.cash
     source:
       kind: interview
       ref: interview/log.jsonl
