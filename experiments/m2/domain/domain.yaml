@@ -280,6 +280,15 @@ actions:
       ref: uvx alpaca-mcp-server==2.4.1#/tools/0
     status: proposed
     target: Order
+    preconditions:
+    - id: sell-at-most-the-position
+      check: target.side != 'sell' or not exists(target.qty) or target.qty <= target.order_position.qty
+      reason: 매도 주문의 수량은 포지션의 전체 수량보다 같거나 작아야 한다.
+      source:
+        kind: interview
+        ref: interview/log.jsonl
+        quote: '매도 주문의 수량은 ... 어카운트 포지션에 있는 전체 수보다 ... 같거나 작아야 한다. / 22-a: 1'
+      status: proposed
   cancel_order_by_id:
     description: Cancel a specific order by its ID.
     actor:
@@ -498,6 +507,15 @@ actions:
       quote: '2: only a person, never an agent on its own'
     status: proposed
     requires: human
+    preconditions:
+    - id: sell-at-most-the-position
+      check: target.side != 'sell' or not exists(target.qty) or target.qty <= target.order_position.qty
+      reason: 매도 주문의 수량은 포지션의 전체 수량보다 같거나 작아야 한다.
+      source:
+        kind: interview
+        ref: interview/log.jsonl
+        quote: '매도 주문의 수량은 ... 어카운트 포지션에 있는 전체 수보다 ... 같거나 작아야 한다. / 22-a: 1'
+      status: proposed
   decline_order:
     actor:
     - account_owner
@@ -707,6 +725,14 @@ actions:
         kind: interview
         ref: interview/log.jsonl
         quote: 1번은 제한 2단계로 나눠줘. 2번은 오늘. 3번은 예. (4번은) 이대로 해줘.
+      status: proposed
+    - id: sell-at-most-the-position
+      check: target.side != 'sell' or not exists(target.qty) or target.qty <= target.order_position.qty
+      reason: 매도 주문의 수량은 포지션의 전체 수량보다 같거나 작아야 한다.
+      source:
+        kind: interview
+        ref: interview/log.jsonl
+        quote: '매도 주문의 수량은 ... 어카운트 포지션에 있는 전체 수보다 ... 같거나 작아야 한다. / 22-a: 1'
       status: proposed
     source:
       kind: interview
